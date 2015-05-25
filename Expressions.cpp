@@ -63,7 +63,7 @@ CValue IndexExpression::Compile(CompilerContext* context)
 	context->Line(token.line);
 
 	//ok, once again we need a pointer to the LHS...
-		//so hack time
+	//so hack time
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto lhs = context->named_values[p->GetName()];
 	//auto lhs = left->Compile(context);
@@ -73,12 +73,12 @@ CValue IndexExpression::Compile(CompilerContext* context)
 	{
 		//treat it as a pointer to a struct atm
 		int index = 0;
-		for (; index < lhs.type.data->members.size(); index++)
+		for (; index < lhs.type->data->members.size(); index++)
 		{
-			if (lhs.type.data->members[index].first == string->GetValue())
+			if (lhs.type->data->members[index].first == string->GetValue())
 				break;
 		}
-		if (index >= lhs.type.data->members.size())
+		if (index >= lhs.type->data->members.size())
 			throw 7;//not found;
 
 		//replace second zero with the index for the part we want
@@ -86,9 +86,9 @@ CValue IndexExpression::Compile(CompilerContext* context)
 		std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 		//todo, embed type info
 		auto ptr = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-		
+
 		//need to dereference
-		return CValue(lhs.type.data->members[index].second, context->parent->builder.CreateLoad(ptr));
+		return CValue(lhs.type->data->members[index].second, context->parent->builder.CreateLoad(ptr));
 	}
 	else
 	{
@@ -111,12 +111,12 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	if (auto string = dynamic_cast<StringExpression*>(index))
 	{
 		int index = 0;
-		for (; index < lhs.type.data->members.size(); index++)
+		for (; index < lhs.type->data->members.size(); index++)
 		{
-			if (lhs.type.data->members[index].first == string->GetValue())
+			if (lhs.type->data->members[index].first == string->GetValue())
 				break;
 		}
-		if (index >= lhs.type.data->members.size())
+		if (index >= lhs.type->data->members.size())
 			throw 7;//not found;
 
 		std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
@@ -142,7 +142,7 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	index->Compile(context);
 	context->StoreIndex();
 	}*/
-	
+
 }
 
 /*void ObjectExpression::Compile(CompilerContext* context)
@@ -378,7 +378,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 		fname = "_lambda_id_";
 
 	//build list of types of vars
-	std::vector<std::pair<Type,std::string>> argsv;
+	std::vector<std::pair<Type*, std::string>> argsv;
 	for (auto ii : *this->args)
 	{
 		argsv.push_back({ context->parent->LookupType(ii.first), ii.second });
@@ -596,25 +596,26 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	//alloc args
 	/*auto AI = f->arg_begin();
 	for (unsigned Idx = 0, e = args->size(); Idx != e; ++Idx, ++AI) {
-		// Create an alloca for this variable.
-		//llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(F, Args[Idx]);
-		auto aname = (*this->args)[Idx].second;
+	// Create an alloca for this variable.
+	//llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(F, Args[Idx]);
+	auto aname = (*this->args)[Idx].second;
 
-		//llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
-		//auto Alloca = TmpB.CreateAlloca(llvm::Type::getDoubleTy(function->parent->context), 0, aname);
-		// Store the initial value into the alloca.
-		//function->parent->builder.CreateStore(AI, Alloca);
+	//llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
+	//auto Alloca = TmpB.CreateAlloca(llvm::Type::getDoubleTy(function->parent->context), 0, aname);
+	// Store the initial value into the alloca.
+	//function->parent->builder.CreateStore(AI, Alloca);
 
-		AI->setName(aname);
+	AI->setName(aname);
 
-		// Add arguments to variable symbol table.
-		//function->named_values[aname] = Alloca;
+	// Add arguments to variable symbol table.
+	//function->named_values[aname] = Alloca;
 	}*/
 }
 
 CValue LocalExpression::Compile(CompilerContext* context)
 {
-	//add types to me!!!
+	context->Line((*_names)[0].second.line);
+
 	int i = 0;
 
 	for (auto ii : *this->_names) {
@@ -623,8 +624,8 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		auto aname = ii.second.getText();// static_cast<NameExpression*>((*this->args)[Idx])->GetName();
 
 		llvm::IRBuilder<> TmpB(&context->f->getEntryBlock(), context->f->getEntryBlock().begin());
-		
-		Type type = context->parent->LookupType(ii.first);
+
+		Type* type = context->parent->LookupType(ii.first);
 		auto Alloca = TmpB.CreateAlloca(GetType(type), 0, aname);
 		// Store the initial value into the alloca.
 		if (this->_right)
@@ -641,20 +642,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 	}
 
 	return CValue();
-	/*context->Line((*_names)[0].line);
-
-	//add load variable instruction
-	for (auto ii: *this->_right)
-	ii->Compile(context);
-
-	//make sure to create identifier
-	for (auto _name: *this->_names)
-	if (context->RegisterLocal(_name.getText()) == false)
-	throw CompilerException(context->filename, _name.line, "Duplicate Local Variable '"+_name.text+"'");
-
-	//actually store if we have something to store
-	for (int i = _right->size()-1; i >= 0; i--)
-	context->StoreLocal((*_names)[i].text);*/
 }
 
 CValue StructExpression::Compile(CompilerContext* context)
@@ -665,32 +652,48 @@ CValue StructExpression::Compile(CompilerContext* context)
 	std::vector<llvm::Type*> elementss;
 	for (auto ii : *this->elements)
 	{
-		auto type = context->parent->LookupType(ii.first);
-		//s->members.push_back({ ii.second, type });
-		elementss.push_back(GetType(type));
+	auto type = context->parent->LookupType(ii.first);
+	//s->members.push_back({ ii.second, type });
+	elementss.push_back(GetType(type));
 	}
 	auto type = llvm::StructType::create(elementss, this->name);
 	//context->parent->module->getOrInsertGlobal("testing", type);
 	//add me to the list!
 	s->type = type;
-	
+
 	context->parent->types[this->name] = Type(Types::Class, s);*/
 	return CValue();
 }
 
 void StructExpression::CompileDeclarations(CompilerContext* context)
 {
-	//build data about the struct 
-	Type str;
-	str.type = Types::Class;
-	str.data = new Struct;
-	str.data->name = this->name;
+	//build data about the struct
+	//get or add the struct type from the type table
+	Type* str = 0;
+	auto ii = context->parent->types.find(this->name);
+	if (ii == context->parent->types.end())//its new
+	{
+		str = new Type;
+		context->parent->types[this->name] = str;
+	}
+	else
+	{
+		str = ii->second;
+		if (str->type != Types::Invalid)
+		{
+			printf("Struct %s Already Defined!\n", this->name.c_str());
+			throw 7;
+		}
+	}
+
+	str->type = Types::Class;
+	str->data = new Struct;
+	str->data->name = this->name;
 	for (auto ii : *this->elements)
 	{
 		auto type = context->parent->AdvanceTypeLookup(ii.first);
 
-		str.data->members.push_back({ ii.second, type });
+		str->data->members.push_back({ ii.second, type });
 	}
-	context->parent->types[this->name] = str;
 };
 

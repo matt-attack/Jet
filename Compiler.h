@@ -51,6 +51,8 @@ namespace Jet
 		Function,
 
 		Pointer,
+
+		Invalid,//for unloaded types
 	};
 
 
@@ -63,12 +65,12 @@ namespace Jet
 		union
 		{
 			Struct* data;//for classes
-			Types base;//for pointers
+			Type* base;//for pointers
 		};
 
 		Type() { data = 0; type = Types::Void; loaded = false; }
 		Type(Types type, Struct* data = 0) : type(type), data(data), loaded(false) {}
-		Type(Types type, Types base) : type(type), base(base), loaded(false) {}
+		Type(Types type, Type* base) : type(type), base(base), loaded(false) {}
 
 		void Load(Compiler* compiler);
 	};
@@ -76,7 +78,7 @@ namespace Jet
 	struct Struct
 	{
 		std::string name;
-		std::vector<std::pair<std::string,Type>> members;
+		std::vector<std::pair<std::string, Type*>> members;
 		llvm::Type* type;
 
 		bool loaded;
@@ -90,22 +92,26 @@ namespace Jet
 		void Load(Compiler* compiler);
 	};
 
+	extern Type VoidType;
+	extern Type BoolType;
+	extern Type DoubleType;
+	extern Type IntType;
+
 	struct CValue
 	{
 		//my type info
-		Type type;
+		Type* type;
 		llvm::Value* val;
 
 		CValue()
 		{
-			type.type = Types::Void;
-			type.data = 0;
+			type = &VoidType;
 			val = 0;
 		}
 
-		CValue(Type type, llvm::Value* val) : type(type), val(val) {}
-		CValue(Types type, llvm::Value* val, Struct* data = 0) : type(type, data), val(val) {}
-		CValue(Types type, Types base, llvm::Value* val) : type(type, base), val(val) {}
+		CValue(Type* type, llvm::Value* val) : type(type), val(val) {}
+		//CValue(Types type, llvm::Value* val, Struct* data = 0) : type(type, data), val(val) {}
+		//CValue(Types type, Types base, llvm::Value* val) : type(type, base), val(val) {}
 	};
 
 	struct Function
@@ -113,11 +119,11 @@ namespace Jet
 		std::string name;
 
 		std::vector<llvm::Type*> args;
-		std::vector<std::pair<Type, std::string>> argst;
+		std::vector<std::pair<Type*, std::string>> argst;
 
 		llvm::Function* f;//not always used
 
-		Type return_type;
+		Type* return_type;
 
 		bool loaded;
 
@@ -143,13 +149,13 @@ namespace Jet
 		Compiler() : builder(llvm::getGlobalContext()), context(llvm::getGlobalContext())
 		{
 			//insert basic types
-			types["double"] = Type(Types::Double);
-			types["float"] = Type(Types::Float);
-			types["int"] = Type(Types::Int);
-			types["short"] = Type(Types::Short);
-			types["char"] = Type(Types::Char);
-			types["bool"] = Type(Types::Bool);
-			types["void"] = Type(Types::Void);
+			types["double"] = new Type(Types::Double);
+			types["float"] = &DoubleType;// new Type(Types::Float);
+			types["int"] = &IntType;// new Type(Types::Int);
+			types["short"] = new Type(Types::Short);
+			types["char"] = new Type(Types::Char);
+			types["bool"] = &BoolType;// new Type(Types::Bool);
+			types["void"] = &VoidType;// new Type(Types::Void);
 		}
 
 		void Compile(const char* code, const char* filename);
@@ -188,7 +194,7 @@ namespace Jet
 			module->dump();
 		}
 
-		Type AdvanceTypeLookup(const std::string& name)
+		Type* AdvanceTypeLookup(const std::string& name)
 		{
 			auto type = types.find(name);
 			if (type == types.end())
@@ -199,38 +205,58 @@ namespace Jet
 					//its a pointer
 					//printf("we got a pointer type\n");
 					auto t = types[name.substr(0, name.length() - 1)];
-					t.base = t.type;
-					t.type = Types::Pointer;
-					return t;
+
+					Type* type = new Type;
+					type->base = t;
+					type->type = Types::Pointer;
+
+					types[name] = type;
+					return type;
 				}
 
-				throw 7;
+				//who knows what type it is, create a dummy one
+				Type* type = new Type;
+				type->type = Types::Invalid;
+				type->data = 0;
+				types[name] = type;
+
+				return type;
 			}
 			return type->second;
 		}
 
-		std::map<std::string, Type> types;
-		Type LookupType(const std::string& name)
+		std::map<std::string, Type*> types;
+		Type* LookupType(const std::string& name)
 		{
-			//time to handle pointers yo
-			if (name[name.length() - 1] == '*')
+			auto type = types[name];
+			if (type == 0)
 			{
-				//its a pointer
-				//printf("we got a pointer type\n");
-				auto t = types[name.substr(0, name.length() - 1)];
-				t.base = t.type;
-				t.type = Types::Pointer;
-				return t;
+				//time to handle pointers yo
+				if (name[name.length() - 1] == '*')
+				{
+					//its a pointer
+					//printf("we got a pointer type\n");
+					auto t = types[name.substr(0, name.length() - 1)];
+
+					type = new Type;
+					type->base = t;
+					type->type = Types::Pointer;
+
+					types[name] = type;
+				}
+				else
+				{
+					printf("Error: Couldn't Find Type: %s\n", name.c_str());
+					throw 7;
+				}
 			}
 
-			auto type = types[name];
-
 			//load it if it hasnt been loaded
-			if (type.loaded == false)
+			if (type->loaded == false)
 			{
-				type.Load(this);
-				type.loaded = true;
-				types[name] = type;
+				type->Load(this);
+				type->loaded = true;
+				//types[name] = type;
 			}
 
 			return type;
@@ -243,7 +269,7 @@ namespace Jet
 	//using namespace llvm;
 	//compiles functions
 
-	llvm::Type* GetType(Type t);
+	llvm::Type* GetType(Type* t);
 
 	class CompilerContext
 	{
@@ -252,7 +278,7 @@ namespace Jet
 		Compiler* parent;
 
 		llvm::Function* f;
-		llvm::FunctionType* ft;
+		//llvm::FunctionType* ft;
 
 		std::map<std::string, CValue> named_values;
 
@@ -269,7 +295,7 @@ namespace Jet
 
 		CValue Number(double value)
 		{
-			return CValue(Types::Double, llvm::ConstantFP::get(parent->context, llvm::APFloat(value)));
+			return CValue(&DoubleType, llvm::ConstantFP::get(parent->context, llvm::APFloat(value)));
 		}
 
 		CValue String(const std::string& str)
@@ -291,7 +317,7 @@ namespace Jet
 			//well this stuff is dumb... fix me later
 			//auto res = this->parent->builder.CreateGEP(cont, llvm::ConstantPointerNull::get(llvm::Type::getInt8PtrTy(parent->context)));
 			//auto res = llvm::GetElementPtrInst::Create(cont, { 0 });
-			return CValue(Types::Pointer, Types::Char, res);
+			return CValue(this->parent->LookupType("char*"), res);
 		}
 
 		llvm::StoreInst* Store(const std::string& name, CValue val)
@@ -312,13 +338,13 @@ namespace Jet
 			llvm::Value* res = 0;
 
 			//should this be a floating point calc?
-			if (left.type.type != right.type.type)
+			if (left.type->type != right.type->type)
 			{
 				//conversion time!!
 				throw 7;
 			}
 
-			if (left.type.type == Types::Float || left.type.type == Types::Double)
+			if (left.type->type == Types::Float || left.type->type == Types::Double)
 			{
 				switch (op)
 				{
@@ -341,28 +367,28 @@ namespace Jet
 				case TokenType::LessThan:
 					//use U or O?
 					res = parent->builder.CreateFCmpULT(left.val, right.val);
-					return CValue(Types::Bool, res);
+					return CValue(&BoolType, res);
 					break;
 				case TokenType::LessThanEqual:
 					res = parent->builder.CreateFCmpULE(left.val, right.val);
-					return CValue(Types::Bool, res);
+					return CValue(&BoolType, res);
 					break;
 				case TokenType::GreaterThan:
 					res = parent->builder.CreateFCmpUGT(left.val, right.val);
-					return CValue(Types::Bool, res);
+					return CValue(&BoolType, res);
 					break;
 				case TokenType::GreaterThanEqual:
 					res = parent->builder.CreateFCmpUGE(left.val, right.val);
-					return CValue(Types::Bool, res);
+					return CValue(&BoolType, res);
 					break;
 				default:
 					throw 7;
 					break;
 				}
 
-				return CValue(left.type.type, res);
+				return CValue(left.type, res);
 			}
-			else if (left.type.type == Types::Int || left.type.type == Types::Short || left.type.type == Types::Char)
+			else if (left.type->type == Types::Int || left.type->type == Types::Short || left.type->type == Types::Char)
 			{
 				//integer probably
 				switch (op)
@@ -396,26 +422,26 @@ namespace Jet
 				case TokenType::LessThan:
 					//use U or S?
 					res = parent->builder.CreateICmpSLT(left.val, right.val);
-					return CValue(Types::Bool, res);
+					return CValue(&BoolType, res);
 					break;
 				case TokenType::LessThanEqual:
 					res = parent->builder.CreateICmpSLE(left.val, right.val);
-					return CValue(Types::Bool, res);
+					return CValue(&BoolType, res);
 					break;
 				case TokenType::GreaterThan:
 					res = parent->builder.CreateICmpSGT(left.val, right.val);
-					return CValue(Types::Bool, res);
+					return CValue(&BoolType, res);
 					break;
 				case TokenType::GreaterThanEqual:
 					res = parent->builder.CreateICmpSGE(left.val, right.val);
-					return CValue(Types::Bool, res);
+					return CValue(&BoolType, res);
 					break;
 				default:
 					throw 7;
 					break;
 				}
 
-				return CValue(left.type.type, res);
+				return CValue(left.type, res);
 			}
 			throw 7;
 			//return res;
@@ -436,51 +462,51 @@ namespace Jet
 
 		}
 
-		CValue DoCast(Type t, CValue value)
+		CValue DoCast(Type* t, CValue value)
 		{
-			if (value.type.type == t.type && value.type.data == t.data)
+			if (value.type->type == t->type && value.type->data == t->data)
 				return value;
 
 			llvm::Type* tt = GetType(t);
-			if (value.type.type == Types::Float && t.type == Types::Double)
+			if (value.type->type == Types::Float && t->type == Types::Double)
 			{
 				//lets do this
 				return CValue(t, parent->builder.CreateFPExt(value.val, tt));
 			}
-			if (value.type.type == Types::Double && t.type == Types::Float)
+			if (value.type->type == Types::Double && t->type == Types::Float)
 			{
 				//lets do this
 				return CValue(t, parent->builder.CreateFPTrunc(value.val, tt));
 			}
-			if (value.type.type == Types::Double || value.type.type == Types::Float)
+			if (value.type->type == Types::Double || value.type->type == Types::Float)
 			{
 				//float to int
-				if (t.type == Types::Int || t.type == Types::Short || t.type == Types::Char)
+				if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
 					return CValue(t, parent->builder.CreateFPToSI(value.val, tt));
 
 				//remove me later float to bool
-				if (t.type == Types::Bool)
+				if (t->type == Types::Bool)
 					return CValue(t, parent->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
 			}
-			if (value.type.type == Types::Int || value.type.type == Types::Short || value.type.type == Types::Char)
+			if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
 			{
 				//int to float
-				if (t.type == Types::Double || t.type == Types::Float)
+				if (t->type == Types::Double || t->type == Types::Float)
 					return CValue(t, parent->builder.CreateSIToFP(value.val, tt));
-				if (t.type == Types::Bool)
+				if (t->type == Types::Bool)
 					return CValue(t, parent->builder.CreateIsNotNull(value.val));
 			}
-			if (value.type.type == Types::Pointer)
+			if (value.type->type == Types::Pointer)
 			{
 				//pointer to bool
-				if (t.type == Types::Bool)
+				if (t->type == Types::Bool)
 					return CValue(t, parent->builder.CreateIsNotNull(value.val));
 			}
 
 			throw 7; //unhandled cast
 		}
 
-		CompilerContext* AddFunction(const std::string& fname, Type ret, const std::vector<std::pair<Type, std::string>>& args);
+		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args);
 	};
 
 	//per function context, or w/e

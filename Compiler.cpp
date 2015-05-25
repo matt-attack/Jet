@@ -6,6 +6,11 @@
 
 using namespace Jet;
 
+Type Jet::VoidType(Types::Void);
+Type Jet::BoolType(Types::Bool);
+Type Jet::DoubleType(Types::Double);
+Type Jet::IntType(Types::Int);
+
 void Type::Load(Compiler* compiler)
 {
 	//recursively load
@@ -15,6 +20,16 @@ void Type::Load(Compiler* compiler)
 	if (type == Types::Class)
 	{
 		data->Load(compiler);
+	}
+	else if (type == Types::Invalid)
+	{
+		printf("Tried to use undefined type");
+		throw 7;
+	}
+	else if (type == Types::Pointer)
+	{
+		//load recursively
+		this->base->Load(compiler);
 	}
 	this->loaded = true;
 }
@@ -29,7 +44,7 @@ void Struct::Load(Compiler* compiler)
 	for (auto ii : this->members)
 	{
 		auto type = ii.second;
-		ii.second.Load(compiler);// compiler->LookupType(ii.first);
+		ii.second->Load(compiler);// compiler->LookupType(ii.first);
 		//s->members.push_back({ ii.second, type });
 		elementss.push_back(GetType(type));
 	}
@@ -48,7 +63,7 @@ void Function::Load(Compiler* compiler)
 	if (this->loaded)
 		return;
 
-	this->return_type.Load(compiler);
+	this->return_type->Load(compiler);
 
 	//std::vector<llvm::Type*> argsv;
 	for (auto type : this->argst)
@@ -56,7 +71,7 @@ void Function::Load(Compiler* compiler)
 		//auto type = context->parent->AdvanceTypeLookup(ii.first);
 
 		//fun->argst.push_back(type);
-		type.first.Load(compiler);
+		type.first->Load(compiler);
 		this->args.push_back(GetType(type.first));
 	}
 
@@ -100,9 +115,9 @@ void Function::Load(Compiler* compiler)
 	this->loaded = true;
 }
 
-llvm::Type* Jet::GetType(Type t)
+llvm::Type* Jet::GetType(Type* t)
 {
-	switch (t.type)
+	switch (t->type)
 	{
 	case Types::Double:
 		return llvm::Type::getDoubleTy(llvm::getGlobalContext());
@@ -119,9 +134,9 @@ llvm::Type* Jet::GetType(Type t)
 	case Types::Bool:
 		return llvm::Type::getInt1Ty(llvm::getGlobalContext());
 	case Types::Class:
-		return t.data->type;
+		return t->data->type;
 	case Types::Pointer:
-		return llvm::PointerType::get(GetType(t.base), 0);//address space, wat?
+		return llvm::PointerType::get(GetType(t->base), 0);//address space, wat?
 	}
 	throw 7;
 }
@@ -158,7 +173,7 @@ void Compiler::Compile(const char* code, const char* filename)
 		ii->Compile(global);
 	}
 
-	auto init = global->AddFunction("global", Type(Types::Int), {});
+	auto init = global->AddFunction("global", &IntType, {});
 	init->Return(global->Number(6));
 
 	//module->dump();
@@ -168,7 +183,7 @@ void Compiler::Compile(const char* code, const char* filename)
 	//go through global scope
 }
 
-CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type ret, const std::vector<std::pair<Type, std::string>>& args)
+CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args)
 {
 	Function* func = parent->functions[fname];// new Function;
 	if (func == 0)
@@ -184,9 +199,9 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type ret
 		}
 
 		auto n = new CompilerContext(this->parent);
-		n->ft = 0;
-		n->ft = llvm::FunctionType::get(GetType(ret), func->args, false);
-		n->f = llvm::Function::Create(n->ft, llvm::Function::ExternalLinkage, fname, parent->module);
+		//n->ft = 0;
+		auto ft = llvm::FunctionType::get(GetType(ret), func->args, false);
+		n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
 		n->function = func;
 		func->f = n->f;
 		this->parent->functions[fname] = func;
@@ -206,7 +221,6 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type ret
 	//	}
 
 	auto n = new CompilerContext(this->parent);
-	n->ft = 0;
 	//n->ft = llvm::FunctionType::get(GetType(ret), func->args, false);
 	//n->f = llvm::Function::Create(n->ft, llvm::Function::ExternalLinkage, fname, parent->module);
 	n->f = func->f;// this->parent->module->getOrInsertFunction(fname, n->ft);

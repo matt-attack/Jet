@@ -608,7 +608,7 @@ namespace Jet
 			context->parent->builder.SetInsertPoint(start);
 
 			auto cond = this->condition->Compile(context);
-			cond = context->DoCast(Type(Types::Bool), cond);
+			cond = context->DoCast(&BoolType, cond);
 
 			context->parent->builder.CreateCondBr(cond.val, body, end);
 
@@ -787,7 +787,7 @@ namespace Jet
 			{
 				auto cond = ii->condition->Compile(context);
 
-				cond = context->DoCast(Type(Types::Bool), cond);//try and cast to bool
+				cond = context->DoCast(&BoolType, cond);//try and cast to bool
 				//	need to convert to a type usable for this
 				//cond = CValue(Types::Bool, context->parent->builder.CreateIsNotNull(cond.val));//fixme later,
 

@@ -77,12 +77,13 @@ int main()
 		//"extern fun void* malloc(int size);"
 		//"extern fun void free(void* mem);"
 		"extern fun void printf(int arg1);"
-		"fun void test2() { local Point x; x.y = 5; local int p; p = x.x; return;}"
+		"fun void test2() { local Point x; x.y = 5; local int p; p = x.x; local Ref r; local Ref* rr; return;}"
 		"fun double calltest() { return test(test(8,6),7); }"
 		"fun double test(int x, int y) { return x+y; }"
 		"fun int t() { for (local double i = 5; i < 10; i += 1) { puts(\"hi\");} return 7;}"
 		"extern fun int puts(char* str);"
 		"fun int main() { if (\"testing\") puts(\"Hello from Jet!\"); else puts(\"Other Hi from Jet!\"); t(); local int x = 5; x = 2*5; x *= 5; return 7 + 14;}"
+		"struct Ref { Point p; }"
 		"struct Point { int x; double y; }"
 		, "testing");
 
