@@ -103,6 +103,7 @@ CValue IndexExpression::Compile(CompilerContext* context)
 
 void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 {
+	context->Line(token.line);
 	//um, HACK
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto lhs = context->named_values[p->GetName()];
@@ -120,8 +121,7 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 			throw 7;//not found;
 
 		std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
-		//std::vector<llvm::Constant*> iindex = { const_inst32, const_inst32 };
-
+		
 		auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
 		context->parent->builder.CreateStore(right.val, loc);
 	}
@@ -129,20 +129,6 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	{
 		throw 7;
 	}
-	/*context->Line(token.line);
-
-	left->Compile(context);
-	//if the index is constant compile to a special instruction carying that constant
-	if (auto string = dynamic_cast<StringExpression*>(index))
-	{
-	context->StoreIndex(string->GetValue().c_str());
-	}
-	else
-	{
-	index->Compile(context);
-	context->StoreIndex();
-	}*/
-
 }
 
 /*void ObjectExpression::Compile(CompilerContext* context)
@@ -181,10 +167,6 @@ context->Pop();
 CValue StringExpression::Compile(CompilerContext* context)
 {
 	return context->String(this->value);
-
-	//pop off if we dont need the result
-	//if (dynamic_cast<BlockExpression*>(this->Parent))
-	//context->Pop();
 }
 
 /*void NullExpression::Compile(CompilerContext* context)
@@ -218,16 +200,9 @@ lstorable->CompileStore(context);
 
 CValue AssignExpression::Compile(CompilerContext* context)
 {
-	//context->Store(this->right->Compile(context));
-	//this->right->Compile(context);
-
-	//context->Store()
-
-	//if (dynamic_cast<BlockExpression*>(this->Parent) == 0)
-	//	context->Duplicate();//if my parent is not block expression, we need the result, so push it
-
 	if (auto storable = dynamic_cast<IStorableExpression*>(this->left))
 		storable->CompileStore(context, right->Compile(context));
+
 	return CValue();
 }
 
@@ -254,56 +229,6 @@ CValue CallExpression::Compile(CompilerContext* context)
 
 	//get actual method signature, and then lets do conversions
 	return CValue(fun->return_type, context->parent->builder.CreateCall(f, argsv, "calltmp"));
-
-	/*context->Line(token.line);
-
-	//need to check if left is a local, or a captured value before looking at globals
-	if (dynamic_cast<NameExpression*>(left) && context->IsLocal(dynamic_cast<NameExpression*>(left)->GetName()) == false)
-	{
-	//push args onto stack
-	for (auto i: *args)
-	i->Compile(context);
-
-	context->Call(dynamic_cast<NameExpression*>(left)->GetName(), args->size());
-	}
-	else// if (dynamic_cast<IStorableExpression*>(left) != 0)
-	{
-	auto index = dynamic_cast<IndexExpression*>(left);
-	if (index && index->token.type == TokenType::Colon)//its a "self" call
-	{
-	index->left->Compile(context);//push object as the first argument
-
-	//push args onto stack
-	for (auto i: *args)
-	i->Compile(context);//pushes args
-
-	//compile left I guess?
-	left->Compile(context);//pushes function
-
-	//increase number of args
-	context->ECall(args->size()+1);
-	}
-	else
-	{
-	//push args onto stack
-	for (auto i: *args)
-	i->Compile(context);
-
-	//compile left I guess?
-	left->Compile(context);
-
-	context->ECall(args->size());
-	}
-	}
-	//else
-	//{
-	//throw ParserException(token.filename, token.line, "Error: Cannot call an expression that is not a name");
-	//}
-	//help, how should I handle this for multiple returns
-	//pop off return value if we dont need it
-	if (dynamic_cast<BlockExpression*>(this->Parent))
-	context->Pop();*///if my parent is block expression, we dont the result, so pop it
-	return CValue();
 }
 
 CValue NameExpression::Compile(CompilerContext* context)
@@ -311,9 +236,6 @@ CValue NameExpression::Compile(CompilerContext* context)
 	//add load variable instruction
 	//todo make me detect if this is a local or not
 	return context->Load(name);
-
-	//if (dynamic_cast<BlockExpression*>(this->Parent))
-	//context->Pop();
 }
 
 CValue OperatorAssignExpression::Compile(CompilerContext* context)
@@ -563,53 +485,16 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	Function* fun = new Function;
 	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type);
 
-	//std::vector<llvm::Type*> argsv;
 	for (auto ii : *this->args)
 	{
 		auto type = context->parent->AdvanceTypeLookup(ii.first);
 
 		fun->argst.push_back({ type, ii.second });
-		//fun->args.push_back(GetType(type));
 	}
 
 	fun->name = fname;
-
-	//CompilerContext* function = context->AddFunction(fname, this->args->size());// , this->varargs);
-	//std::vector<llvm::Type*> Doubles(args->size(), llvm::Type::getDoubleTy(context->parent->context));
-	//llvm::FunctionType *ft = llvm::FunctionType::get(GetType(fun->return_type), fun->args, false);
-	//llvm::Function *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, context->parent->module);
-
-	fun->f = 0;// f;
+	fun->f = 0;
 	context->parent->functions[fname] = fun;
-	//ok, kinda hacky
-	//int start = context->out.size();
-
-	//ok push locals, in opposite order
-	/*for (unsigned int i = 0; i < this->args->size(); i++)
-	{
-	auto aname = static_cast<NameExpression*>((*this->args)[i]);
-	function->RegisterLocal(aname->GetName());
-	}
-	if (this->varargs)
-	function->RegisterLocal(this->varargs->GetName());*/
-
-	//alloc args
-	/*auto AI = f->arg_begin();
-	for (unsigned Idx = 0, e = args->size(); Idx != e; ++Idx, ++AI) {
-	// Create an alloca for this variable.
-	//llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(F, Args[Idx]);
-	auto aname = (*this->args)[Idx].second;
-
-	//llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
-	//auto Alloca = TmpB.CreateAlloca(llvm::Type::getDoubleTy(function->parent->context), 0, aname);
-	// Store the initial value into the alloca.
-	//function->parent->builder.CreateStore(AI, Alloca);
-
-	AI->setName(aname);
-
-	// Add arguments to variable symbol table.
-	//function->named_values[aname] = Alloca;
-	}*/
 }
 
 CValue LocalExpression::Compile(CompilerContext* context)
@@ -617,11 +502,8 @@ CValue LocalExpression::Compile(CompilerContext* context)
 	context->Line((*_names)[0].second.line);
 
 	int i = 0;
-
 	for (auto ii : *this->_names) {
-		// Create an alloca for this variable.
-		//llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(F, Args[Idx]);
-		auto aname = ii.second.getText();// static_cast<NameExpression*>((*this->args)[Idx])->GetName();
+		auto aname = ii.second.getText();
 
 		llvm::IRBuilder<> TmpB(&context->f->getEntryBlock(), context->f->getEntryBlock().begin());
 
@@ -637,7 +519,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		}
 
 		// Add arguments to variable symbol table.
-		//use the type info
 		context->named_values[aname] = CValue(type, Alloca);
 	}
 
@@ -648,20 +529,6 @@ CValue StructExpression::Compile(CompilerContext* context)
 {
 	context->Line(token.line);
 
-	/*Struct* s = new Struct;
-	std::vector<llvm::Type*> elementss;
-	for (auto ii : *this->elements)
-	{
-	auto type = context->parent->LookupType(ii.first);
-	//s->members.push_back({ ii.second, type });
-	elementss.push_back(GetType(type));
-	}
-	auto type = llvm::StructType::create(elementss, this->name);
-	//context->parent->module->getOrInsertGlobal("testing", type);
-	//add me to the list!
-	s->type = type;
-
-	context->parent->types[this->name] = Type(Types::Class, s);*/
 	return CValue();
 }
 

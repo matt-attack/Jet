@@ -44,16 +44,11 @@ void Struct::Load(Compiler* compiler)
 	for (auto ii : this->members)
 	{
 		auto type = ii.second;
-		ii.second->Load(compiler);// compiler->LookupType(ii.first);
-		//s->members.push_back({ ii.second, type });
+		ii.second->Load(compiler);
+
 		elementss.push_back(GetType(type));
 	}
 	this->type = llvm::StructType::create(elementss, this->name);
-	//context->parent->module->getOrInsertGlobal("testing", type);
-	//add me to the list!
-	//s->type = type;
-
-	//context->parent->types[this->name] = Type(Types::Class, s);
 
 	this->loaded = true;
 }
@@ -65,34 +60,16 @@ void Function::Load(Compiler* compiler)
 
 	this->return_type->Load(compiler);
 
-	//std::vector<llvm::Type*> argsv;
 	for (auto type : this->argst)
 	{
-		//auto type = context->parent->AdvanceTypeLookup(ii.first);
-
-		//fun->argst.push_back(type);
 		type.first->Load(compiler);
 		this->args.push_back(GetType(type.first));
 	}
 
-	//CompilerContext* function = context->AddFunction(fname, this->args->size());// , this->varargs);
-	//std::vector<llvm::Type*> Doubles(args->size(), llvm::Type::getDoubleTy(context->parent->context));
 	llvm::FunctionType *ft = llvm::FunctionType::get(GetType(this->return_type), this->args, false);
 	llvm::Function *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
 
 	this->f = f;
-	//context->parent->functions[fname] = fun;
-	//ok, kinda hacky
-	//int start = context->out.size();
-
-	//ok push locals, in opposite order
-	/*for (unsigned int i = 0; i < this->args->size(); i++)
-	{
-	auto aname = static_cast<NameExpression*>((*this->args)[i]);
-	function->RegisterLocal(aname->GetName());
-	}
-	if (this->varargs)
-	function->RegisterLocal(this->varargs->GetName());*/
 
 	//alloc args
 	auto AI = f->arg_begin();
@@ -212,21 +189,11 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 	}
 
 	func->Load(this->parent);
-	//func->return_type = ret;
-	//func->argst = args;
-	//func->name = fname;
-	//for (int i = 0; i < args.size(); i++)
-	//{
-	//	func->args.push_back(GetType(args[i].first));
-	//	}
+
 
 	auto n = new CompilerContext(this->parent);
-	//n->ft = llvm::FunctionType::get(GetType(ret), func->args, false);
-	//n->f = llvm::Function::Create(n->ft, llvm::Function::ExternalLinkage, fname, parent->module);
-	n->f = func->f;// this->parent->module->getOrInsertFunction(fname, n->ft);
+	n->f = func->f;
 	n->function = func;
-	//func->f = n->f;
-	//this->parent->functions[fname] = func;
 
 	llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "entry", n->f);
 	parent->builder.SetInsertPoint(bb);
