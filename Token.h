@@ -104,27 +104,19 @@ namespace Jet
 		TokenType type;
 		std::string text;
 		unsigned int line;
+		unsigned int column;
 
 		Token()
 		{
 
 		}
 
-		Token(unsigned int line, TokenType type, std::string txt)
+		Token(unsigned int line, unsigned int column, TokenType type, std::string txt)
 		{
 			this->type = type;
 			this->text = txt;
 			this->line = line;
-		}
-
-		TokenType getType()
-		{
-			return type;
-		}
-
-		std::string getText()
-		{
-			return text;
+			this->column = column;
 		}
 	};
 }

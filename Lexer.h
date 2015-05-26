@@ -19,7 +19,7 @@ namespace Jet
 		std::string text;
 
 		unsigned int linenumber;
-
+		unsigned int column;
 	public:
 		Lexer(std::istream* input, std::string filename);
 		Lexer(std::string text, std::string filename);

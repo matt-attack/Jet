@@ -11,6 +11,13 @@ Type Jet::BoolType(Types::Bool);
 Type Jet::DoubleType(Types::Double);
 Type Jet::IntType(Types::Int);
 
+void Jet::Error(const std::string& msg, Token token)
+{
+	int startrow = token.column;
+	printf("[error] %d:%d to %d:%d: %s\n[error] >>>%s\n\n", token.line, startrow, token.line, startrow+token.text.length(), msg.c_str(), "some code here yo");
+	throw 7;
+}
+
 void Type::Load(Compiler* compiler)
 {
 	//recursively load
@@ -23,8 +30,10 @@ void Type::Load(Compiler* compiler)
 	}
 	else if (type == Types::Invalid)
 	{
-		printf("Tried to use undefined type");
-		throw 7;
+		//get a good error here!!!
+		Error("Tried to use undefined type", *compiler->current_function->current_token);
+		//printf("Tried to use undefined type\n");
+		//throw 7;
 	}
 	else if (type == Types::Pointer)
 	{
@@ -34,9 +43,34 @@ void Type::Load(Compiler* compiler)
 	this->loaded = true;
 }
 
+std::string Type::ToString()
+{
+	switch (type)
+	{
+	case Types::Class:
+		return this->data->name;
+	case Types::Pointer:
+		return this->base->ToString() + "*";
+	case Types::Bool:
+		return "Bool";
+	case Types::Char:
+		return "Char";
+	case Types::Int:
+		return "Int";
+	case Types::Float:
+		return "Float";
+	case Types::Double:
+		return "Double";
+	case Types::Short:
+		return "Short";
+	case Types::Void:
+		return "Void";
+	}
+}
+
 void Struct::Load(Compiler* compiler)
 {
-	if (loaded)
+	if (this->loaded)
 		return;
 
 	//recursively load
@@ -67,26 +101,15 @@ void Function::Load(Compiler* compiler)
 	}
 
 	llvm::FunctionType *ft = llvm::FunctionType::get(GetType(this->return_type), this->args, false);
-	llvm::Function *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
-
-	this->f = f;
+	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
 
 	//alloc args
 	auto AI = f->arg_begin();
-	for (unsigned Idx = 0, e = argst.size(); Idx != e; ++Idx, ++AI) {
-		// Create an alloca for this variable.
-		//llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(F, Args[Idx]);
+	for (unsigned Idx = 0, e = argst.size(); Idx != e; ++Idx, ++AI) 
+	{
 		auto aname = this->argst[Idx].second;
 
-		//llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
-		//auto Alloca = TmpB.CreateAlloca(llvm::Type::getDoubleTy(function->parent->context), 0, aname);
-		// Store the initial value into the alloca.
-		//function->parent->builder.CreateStore(AI, Alloca);
-
 		AI->setName(aname);
-
-		// Add arguments to variable symbol table.
-		//function->named_values[aname] = Alloca;
 	}
 
 	this->loaded = true;
@@ -142,27 +165,40 @@ void Compiler::Compile(const char* code, const char* filename)
 		ii->CompileDeclarations(global);
 	}
 
-
+	int errors = 0;
 	//then do this for each file
 	for (auto ii : result->statements)
 	{
-		//branch off a new compiler
-		ii->Compile(global);
+		//catch any exceptions
+		try
+		{
+			ii->Compile(global);
+		}
+		catch (...)
+		{
+			printf("Exception Compiling Line\n");
+			errors++;
+		}
 	}
 
 	auto init = global->AddFunction("global", &IntType, {});
 	init->Return(global->Number(6));
-
-	//module->dump();
-
+	//todo: put intializers here and have this call main()
 	delete result;
+
+	if (errors > 0)
+	{
+		printf("Compiling Failed: %d Errors Found\n", errors);
+		delete module;
+		module = 0;
+	}
 
 	//go through global scope
 }
 
 CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args)
 {
-	Function* func = parent->functions[fname];// new Function;
+	Function* func = parent->functions[fname];
 	if (func == 0)
 	{
 		//no function exists
@@ -176,7 +212,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		}
 
 		auto n = new CompilerContext(this->parent);
-		//n->ft = 0;
+		
 		auto ft = llvm::FunctionType::get(GetType(ret), func->args, false);
 		n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
 		n->function = func;
@@ -198,5 +234,6 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 	llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "entry", n->f);
 	parent->builder.SetInsertPoint(bb);
 
+	this->parent->current_function = n;
 	return n;
 }

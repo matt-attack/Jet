@@ -45,16 +45,16 @@ namespace Jet
 
 	class NameExpression : public Expression, public IStorableExpression
 	{
-		std::string name;
+		Token token;
 	public:
-		NameExpression(std::string name)
+		NameExpression(Token name)
 		{
-			this->name = name;
+			this->token = name;
 		}
 
 		std::string GetName()
 		{
-			return this->name;
+			return token.text;
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -62,9 +62,13 @@ namespace Jet
 		void CompileStore(CompilerContext* context, CValue right)
 		{
 			//need to do cast if necessary
-			right = context->DoCast(context->named_values[name].type, right);
-			context->Store(name, right);
-			//context->Store(name);
+			context->CurrentToken(&token);
+			auto iter = context->named_values.find(token.text);
+			if (iter == context->named_values.end())
+				Error("undeclared identifier '" + token.text + "'", token);
+
+			right = context->DoCast(iter->second.type, right);
+			context->Store(token.text, right);
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
@@ -242,6 +246,8 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context);
 
+		CValue GetGEP(CompilerContext* context);
+
 		void CompileStore(CompilerContext* context, CValue right);
 
 		void CompileDeclarations(CompilerContext* context) {};
@@ -335,57 +341,61 @@ namespace Jet
 	void Compile(CompilerContext* context);
 	};*/
 
-	/*class PrefixExpression: public Expression
+	class PrefixExpression : public Expression
 	{
-	Token _operator;
+		Token _operator;
 
-	Expression* right;
+		Expression* right;
 	public:
-	PrefixExpression(Token type, Expression* r)
-	{
-	this->_operator = type;
-	this->right = r;
-	}
+		PrefixExpression(Token type, Expression* r)
+		{
+			this->_operator = type;
+			this->right = r;
+		}
 
-	~PrefixExpression()
-	{
-	delete this->right;
-	}
+		~PrefixExpression()
+		{
+			delete this->right;
+		}
 
-	void SetParent(Expression* parent)
-	{
-	this->Parent = parent;
-	right->SetParent(this);
-	}
+		void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+			right->SetParent(this);
+		}
 
-	llvm::Value* Compile(CompilerContext* context);
+		CValue Compile(CompilerContext* context);
+
+		void CompileDeclarations(CompilerContext* context) {};
 	};
 
-	class PostfixExpression: public Expression
+	class PostfixExpression : public Expression
 	{
-	Token _operator;
+		Token _operator;
 
-	Expression* left;
+		Expression* left;
 	public:
-	PostfixExpression(Expression* l, Token type)
-	{
-	this->_operator = type;
-	this->left = l;
-	}
+		PostfixExpression(Expression* l, Token type)
+		{
+			this->_operator = type;
+			this->left = l;
+		}
 
-	~PostfixExpression()
-	{
-	delete this->left;
-	}
+		~PostfixExpression()
+		{
+			delete this->left;
+		}
 
-	void SetParent(Expression* parent)
-	{
-	this->Parent = parent;
-	left->SetParent(this);
-	}
+		void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+			left->SetParent(this);
+		}
 
-	llvm::Value* Compile(CompilerContext* context);
-	};*/
+		CValue Compile(CompilerContext* context);
+
+		void CompileDeclarations(CompilerContext* context) {};
+	};
 
 	class OperatorExpression : public Expression
 	{
@@ -462,7 +472,7 @@ namespace Jet
 			return CValue();
 		}
 
-		void CompileDeclarations(CompilerContext* context) 
+		void CompileDeclarations(CompilerContext* context)
 		{
 			for (auto ii : statements)
 				ii->CompileDeclarations(context);
@@ -485,12 +495,12 @@ namespace Jet
 		CValue Compile(CompilerContext* context)
 		{
 			//push scope
-			//context->PushScope();
+			context->PushScope();
 
 			return BlockExpression::Compile(context);
 
 			//pop scope
-			//context->PopScope();
+			context->PopScope();
 		}
 	};
 
@@ -523,20 +533,34 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
-			/*context->Line(token.line);
+			context->CurrentToken(&token);
 
-			std::string uuid = context->GetUUID();
-			context->Label("loopstart_"+uuid);
-			this->condition->Compile(context);
-			context->JumpFalse(("loopend_"+uuid).c_str());
+			llvm::BasicBlock *start = llvm::BasicBlock::Create(llvm::getGlobalContext(), "whilestart");
+			llvm::BasicBlock *body = llvm::BasicBlock::Create(llvm::getGlobalContext(), "whilebody");
+			llvm::BasicBlock *end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "whileend");
 
-			context->PushLoop("loopend_"+uuid, "loopstart_"+uuid);
+
+			context->parent->builder.CreateBr(start);
+			context->f->getBasicBlockList().push_back(start);
+			context->parent->builder.SetInsertPoint(start);
+
+			auto cond = this->condition->Compile(context);
+			cond = context->DoCast(&BoolType, cond);
+			context->parent->builder.CreateCondBr(cond.val, body, end);
+
+
+			context->f->getBasicBlockList().push_back(body);
+			context->parent->builder.SetInsertPoint(body);
+
+			context->PushLoop(end, start);
 			this->block->Compile(context);
 			context->PopLoop();
 
-			context->Jump(("loopstart_"+uuid).c_str());
-			context->Label("loopend_"+uuid);*/
-			throw 7;
+			context->parent->builder.CreateBr(start);
+
+			context->f->getBasicBlockList().push_back(end);
+			context->parent->builder.SetInsertPoint(end);
+
 			return CValue();
 		}
 
@@ -575,32 +599,16 @@ namespace Jet
 			initial->SetParent(block);
 		}
 
-		/*	int pos = 0;
-			bool hasElse = this->Else ? this->Else->block->statements.size() > 0 : false;
-			llvm::BasicBlock *EndBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "endif");
-			llvm::BasicBlock *ElseBB = 0;
-			if (hasElse)
-			ElseBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "else");
-
-			llvm::BasicBlock *NextBB = 0;
-			for (auto& ii : this->branches)
-			{
-			auto cond = ii->condition->Compile(context);
-
-			cond = context->DoCast(Type(Types::Bool), cond);//try and cast to bool
-			//	*/
 		CValue Compile(CompilerContext* context)
 		{
-			context->Line(token.line);
+			context->CurrentToken(&token);
 
-
-			//std::string uuid = context->GetUUID();
 			this->initial->Compile(context);
-			//context->Label("forloopstart_"+uuid);
 
 			llvm::BasicBlock *start = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forstart");
 			llvm::BasicBlock *body = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forbody");
 			llvm::BasicBlock *end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forend");
+			llvm::BasicBlock *cont = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forcontinue");
 
 			//insert stupid branch
 			context->parent->builder.CreateBr(start);
@@ -612,23 +620,23 @@ namespace Jet
 
 			context->parent->builder.CreateCondBr(cond.val, body, end);
 
-			//context->JumpFalse(("forloopend_"+uuid).c_str());
-
 			context->f->getBasicBlockList().push_back(body);
 			context->parent->builder.SetInsertPoint(body);
 
-			//context->PushLoop("forloopend_"+uuid, "forloopcontinue_"+uuid);
+			context->PushLoop(end, cont);
 			this->block->Compile(context);
-			//context->PopLoop();
+			context->PopLoop();
 
-			//this wont work if we do some kind of continue keyword unless it jumps to here
-			//context->Label("forloopcontinue_"+uuid);
+			context->parent->builder.CreateBr(cont);
+
+			//insert continue branch here
+			context->f->getBasicBlockList().push_back(cont);
+			context->parent->builder.SetInsertPoint(cont);
+
 			this->incr->Compile(context);
 
 			context->parent->builder.CreateBr(start);
 
-			//context->Jump(("forloopstart_"+uuid).c_str());
-			//context->Label("forloopend_"+uuid);
 			context->f->getBasicBlockList().push_back(end);
 			context->parent->builder.SetInsertPoint(end);
 
@@ -754,7 +762,6 @@ namespace Jet
 			delete Else;
 			for (auto ii : this->branches)
 				delete ii;
-			//delete this->branches;
 		}
 
 		virtual void SetParent(Expression* parent)
@@ -771,10 +778,8 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
-			context->Line(token.line);
+			context->CurrentToken(&token);
 
-			//std::string uuid = context->GetUUID();
-			//std::string bname = "ifstatement_" + uuid + "_I";
 			int pos = 0;
 			bool hasElse = this->Else ? this->Else->block->statements.size() > 0 : false;
 			llvm::BasicBlock *EndBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "endif");
@@ -785,40 +790,36 @@ namespace Jet
 			llvm::BasicBlock *NextBB = 0;
 			for (auto& ii : this->branches)
 			{
-				auto cond = ii->condition->Compile(context);
+				if (NextBB)
+					context->parent->builder.SetInsertPoint(NextBB);
 
+				auto cond = ii->condition->Compile(context);
 				cond = context->DoCast(&BoolType, cond);//try and cast to bool
-				//	need to convert to a type usable for this
-				//cond = CValue(Types::Bool, context->parent->builder.CreateIsNotNull(cond.val));//fixme later,
 
 				llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "then", context->f);
-				NextBB = hasElse ? ElseBB : EndBB;
-				//if (hasElse)
-				//NextBB = ElseBB;// llvm::BasicBlock::Create(llvm::getGlobalContext(), "else");
+				NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(llvm::getGlobalContext(), "elseif", context->f);
 
 				context->parent->builder.CreateCondBr(cond.val, ThenBB, NextBB);
 
+				//statement body
 				context->parent->builder.SetInsertPoint(ThenBB);
-
 				ii->block->Compile(context);
-
 				context->parent->builder.CreateBr(EndBB);//branch to end
 
 				pos++;
-				break;
 			}
 
-			if (hasElse)//this->Else && this->Else->block->statements->size() > 0)
+			if (hasElse)
 			{
 				context->f->getBasicBlockList().push_back(ElseBB);
 				context->parent->builder.SetInsertPoint(ElseBB);
-				//context->Label(bname);
+
 				this->Else->block->Compile(context);
 				context->parent->builder.CreateBr(EndBB);
 			}
 			context->f->getBasicBlockList().push_back(EndBB);
 			context->parent->builder.SetInsertPoint(EndBB);
-			//context->Label("ifstatementend_"+uuid);
+
 			return CValue();
 		}
 
@@ -1023,7 +1024,7 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
-			context->Line(token.line);
+			context->CurrentToken(&token);
 
 			if (right)
 				context->Return(right->Compile(context));
@@ -1036,36 +1037,44 @@ namespace Jet
 		void CompileDeclarations(CompilerContext* context) {};
 	};
 
-	/*class BreakExpression: public Expression
+	class BreakExpression : public Expression
 	{
 	public:
 
-	void SetParent(Expression* parent)
-	{
-	this->Parent = parent;
-	}
+		void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+		}
 
-	void Compile(CompilerContext* context)
-	{
-	context->Break();
-	}
-	};*/
+		CValue Compile(CompilerContext* context)
+		{
+			context->Break();
 
-	/*class ContinueExpression: public Expression
-	{
-	public:
-	void SetParent(Expression* parent)
-	{
-	this->Parent = parent;
-	}
+			return CValue();
+		}
 
-	void Compile(CompilerContext* context)
-	{
-	context->Continue();
-	}
+		void CompileDeclarations(CompilerContext* context) {};
 	};
 
-	class YieldExpression: public Expression
+	class ContinueExpression : public Expression
+	{
+	public:
+		void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+		}
+
+		CValue Compile(CompilerContext* context)
+		{
+			context->Continue();
+
+			return CValue();
+		}
+
+		void CompileDeclarations(CompilerContext* context) {};
+	};
+
+	/*class YieldExpression: public Expression
 	{
 	Token token;
 	Expression* right;

@@ -54,7 +54,7 @@ namespace Jet
 	public:
 		Expression* parse(Parser* parser, Token token)
 		{
-			return new NumberExpression(::atof(token.getText().c_str()));
+			return new NumberExpression(::atof(token.text.c_str()));
 		}
 	};
 
@@ -90,7 +90,7 @@ namespace Jet
 	public:
 		Expression* parse(Parser* parser, Token token)
 		{
-			return new StringExpression(token.getText());
+			return new StringExpression(token.text);
 		}
 	};
 
@@ -160,7 +160,7 @@ namespace Jet
 		}
 	};
 
-	/*class PostfixOperatorParselet: public InfixParselet
+	class PostfixOperatorParselet: public InfixParselet
 	{
 		int precedence;
 	public:
@@ -178,7 +178,7 @@ namespace Jet
 		{
 			return precedence;
 		}
-	};*/
+	};
 
 	class BinaryOperatorParselet: public InfixParselet
 	{
@@ -207,7 +207,7 @@ namespace Jet
 		int getPrecedence()
 		{
 			//replace precedence here
-			return 9;
+			return 9;// 9;
 		}
 	};
 
@@ -219,7 +219,7 @@ namespace Jet
 		int getPrecedence()
 		{
 			//replace precedence here
-			return 3;//maybe?
+			return 9;// 3;//maybe?
 		}
 	};
 
@@ -255,7 +255,7 @@ namespace Jet
 		Expression* parse(Parser* parser, Token token);
 	};
 
-	/*class ContinueParselet: public StatementParselet
+	class ContinueParselet: public StatementParselet
 	{
 	public:
 		ContinueParselet()
@@ -281,7 +281,7 @@ namespace Jet
 		{
 			return new BreakExpression();
 		}
-	};*/
+	};
 
 	class WhileParselet: public StatementParselet
 	{

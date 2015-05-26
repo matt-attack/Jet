@@ -35,6 +35,8 @@
 
 namespace Jet
 {
+	void Error(const std::string& msg, Token token);
+
 	class BlockExpression;
 
 	enum class Types
@@ -73,6 +75,8 @@ namespace Jet
 		Type(Types type, Type* base) : type(type), base(base), loaded(false) {}
 
 		void Load(Compiler* compiler);
+
+		std::string ToString();
 	};
 
 	struct Struct
@@ -110,8 +114,6 @@ namespace Jet
 		}
 
 		CValue(Type* type, llvm::Value* val) : type(type), val(val) {}
-		//CValue(Types type, llvm::Value* val, Struct* data = 0) : type(type, data), val(val) {}
-		//CValue(Types type, Types base, llvm::Value* val) : type(type, base), val(val) {}
 	};
 
 	struct Function
@@ -145,6 +147,7 @@ namespace Jet
 		llvm::LLVMContext& context;
 		llvm::Module* module;
 		std::map<std::string, Function*> functions;
+		CompilerContext* current_function;
 
 		Compiler() : builder(llvm::getGlobalContext()), context(llvm::getGlobalContext())
 		{
@@ -180,9 +183,6 @@ namespace Jet
 
 			OurFPM.doInitialization();
 
-			// Set the global so the code gen can use this.
-			//TheFPM = &OurFPM;
-
 			for (auto ii : this->functions)
 			{
 				OurFPM.run(*ii.second->f);
@@ -191,7 +191,8 @@ namespace Jet
 
 		void Dump()
 		{
-			module->dump();
+			if (module)
+				module->dump();
 		}
 
 		Type* AdvanceTypeLookup(const std::string& name)
@@ -203,7 +204,6 @@ namespace Jet
 				if (name[name.length() - 1] == '*')
 				{
 					//its a pointer
-					//printf("we got a pointer type\n");
 					auto t = types[name.substr(0, name.length() - 1)];
 
 					Type* type = new Type;
@@ -235,7 +235,6 @@ namespace Jet
 				if (name[name.length() - 1] == '*')
 				{
 					//its a pointer
-					//printf("we got a pointer type\n");
 					auto t = types[name.substr(0, name.length() - 1)];
 
 					type = new Type;
@@ -256,21 +255,15 @@ namespace Jet
 			{
 				type->Load(this);
 				type->loaded = true;
-				//types[name] = type;
 			}
 
 			return type;
 		}
 	};
 
-	//#include <vector>
-	//#include <map>
-	//using namespace std;
-	//using namespace llvm;
-	//compiles functions
-
 	llvm::Type* GetType(Type* t);
 
+	//compiles functions
 	class CompilerContext
 	{
 
@@ -278,15 +271,10 @@ namespace Jet
 		Compiler* parent;
 
 		llvm::Function* f;
-		//llvm::FunctionType* ft;
 
 		std::map<std::string, CValue> named_values;
 
 		Function* function;
-		//std::vector<llvm::Type*> args;
-		//std::vector<Type> argst;
-
-		//Type return_type;
 
 		CompilerContext(Compiler* parent)
 		{
@@ -300,13 +288,8 @@ namespace Jet
 
 		CValue String(const std::string& str)
 		{
-			std::vector<char> s;
-			for (auto ii : str)
-				s.push_back(ii);
 			auto fname = llvm::ConstantDataArray::getString(parent->context, str, true);
-			//cont->getAggregateElement
 
-			//parent->module->getOrInsertGlobal
 			auto FBloc = new llvm::GlobalVariable(*parent->module, fname->getType(), true,
 				llvm::GlobalValue::InternalLinkage, fname,
 				"const_string");
@@ -314,23 +297,77 @@ namespace Jet
 			std::vector<llvm::Constant*> const_ptr_7_indices = { const_inst32, const_inst32 };
 			auto res = llvm::ConstantExpr::getGetElementPtr(FBloc, const_ptr_7_indices);
 
-			//well this stuff is dumb... fix me later
-			//auto res = this->parent->builder.CreateGEP(cont, llvm::ConstantPointerNull::get(llvm::Type::getInt8PtrTy(parent->context)));
-			//auto res = llvm::GetElementPtrInst::Create(cont, { 0 });
 			return CValue(this->parent->LookupType("char*"), res);
 		}
 
 		llvm::StoreInst* Store(const std::string& name, CValue val)
 		{
-			return parent->builder.CreateStore(val.val, named_values[name].val);
+			auto iter = named_values.find(name);
+			if (iter == named_values.end())
+				Error("undeclared identifier '" + name + "'", *current_token);
+
+			return parent->builder.CreateStore(val.val, iter->second.val);
 		}
 
 		CValue Load(const std::string& name)
 		{
 			auto iter = named_values.find(name);
 			if (iter == named_values.end())
-				throw 7;
+				Error("undeclared identifier '"+name+"'", *current_token);
 			return CValue(iter->second.type, parent->builder.CreateLoad(iter->second.val, name.c_str()));
+		}
+
+
+		CValue UnaryOperation(TokenType operation, CValue value)
+		{
+			llvm::Value* res = 0;
+
+			if (value.type->type == Types::Float || value.type->type == Types::Double)
+			{
+				switch (operation)
+				{
+				case TokenType::Increment:
+					//res = parent->builder.CreateFAdd(left.val, right.val);
+					break;
+				case TokenType::Decrement:
+					//res = parent->builder.CreateFSub(left.val, right.val);
+					break;
+				case TokenType::Minus:
+					res = parent->builder.CreateFNeg(value.val);// parent->builder.CreateFMul(left.val, right.val);
+					break;
+				default:
+					throw 7;
+					break;
+				}
+
+				return CValue(value.type, res);
+			}
+			else if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
+			{
+				//integer probably
+				switch (operation)
+				{
+				case TokenType::Increment:
+					//res = parent->builder.CreateFAdd(left.val, right.val);
+					break;
+				case TokenType::Decrement:
+					//res = parent->builder.CreateFSub(left.val, right.val);
+					break;
+				case TokenType::Minus:
+					res = parent->builder.CreateNeg(value.val);// parent->builder.CreateFMul(left.val, right.val);
+					break;
+				case TokenType::BNot:
+					res = parent->builder.CreateNot(value.val);
+					break;
+				default:
+					throw 7;
+					break;
+				}
+
+				return CValue(value.type, res);
+			}
+			//throw 7;
+			Error("Invalid Unary Operation!", *current_token);
 		}
 
 		CValue BinaryOperation(Jet::TokenType op, CValue left, CValue right)
@@ -341,6 +378,7 @@ namespace Jet
 			if (left.type->type != right.type->type)
 			{
 				//conversion time!!
+
 				throw 7;
 			}
 
@@ -381,8 +419,17 @@ namespace Jet
 					res = parent->builder.CreateFCmpUGE(left.val, right.val);
 					return CValue(&BoolType, res);
 					break;
+				case TokenType::Equals:
+					res = parent->builder.CreateFCmpUEQ(left.val, right.val);
+					return CValue(&BoolType, res);
+					break;
+				case TokenType::NotEqual:
+					res = parent->builder.CreateFCmpUNE(left.val, right.val);
+					return CValue(&BoolType, res);
+					break;
 				default:
-					throw 7;
+					Error("Invalid Binary Operation!", *current_token);
+					//throw 7;
 					break;
 				}
 
@@ -436,30 +483,102 @@ namespace Jet
 					res = parent->builder.CreateICmpSGE(left.val, right.val);
 					return CValue(&BoolType, res);
 					break;
+				case TokenType::Equals:
+					res = parent->builder.CreateICmpEQ(left.val, right.val);
+					return CValue(&BoolType, res);
+					break;
+				case TokenType::NotEqual:
+					res = parent->builder.CreateICmpNE(left.val, right.val);
+					return CValue(&BoolType, res);
+					break;
+				case TokenType::BAnd:
+				case TokenType::AndAssign:
+					res = parent->builder.CreateAnd(left.val, right.val);
+					break;
+				case TokenType::BOr:
+				case TokenType::OrAssign:
+					res = parent->builder.CreateOr(left.val, right.val);
+					break;
+				case TokenType::Xor:
+				case TokenType::XorAssign:
+					res = parent->builder.CreateXor(left.val, right.val);
+					break;
+				case TokenType::LeftShift:
+					//todo
+				case TokenType::RightShift:
+					//todo
 				default:
-					throw 7;
+					Error("Invalid Binary Operation!", *current_token);
+					//throw 7;
 					break;
 				}
 
 				return CValue(left.type, res);
 			}
-			throw 7;
+			//printf("Invalid Binary Operation!\n");
+
+			Error("Invalid Binary Operation!", *current_token);
+			//throw 7;
 			//return res;
+		}
+
+		std::stack<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> loops;
+		void PushLoop(llvm::BasicBlock* Break, llvm::BasicBlock* Continue)
+		{
+			loops.push({ Break, Continue });
+		}
+
+		void PopLoop()
+		{
+			loops.pop();
+		}
+
+		void Continue()
+		{
+			//todo
+			//insert new label after this
+			if (loops.empty())
+				Error("Cannot continue from outside loop!", *current_token);
+
+			this->parent->builder.CreateBr(loops.top().second);
+		}
+
+		void Break()
+		{
+			//todo
+			//insert new label after this
+			if (loops.empty())
+				Error("Cannot break from outside loop!", *current_token);
+
+			this->parent->builder.CreateBr(loops.top().first);
 		}
 
 		llvm::ReturnInst* Return(CValue ret)
 		{
 			//try and cast if we can
 			if (this->function == 0)
-				throw 7;
+			{
+				Error("Cannot return from outside function!", *current_token);
+			}
 
 			ret = this->DoCast(this->function->return_type, ret);
 			return parent->builder.CreateRet(ret.val);
 		}
 
-		void Line(int id)
+		Token* current_token;
+		inline void CurrentToken(Token* token)
 		{
+			current_token = token;
+		}
 
+		void PushScope()
+		{
+			//todo
+		}
+
+		void PopScope()
+		{
+			//todo
 		}
 
 		CValue DoCast(Type* t, CValue value)
@@ -503,7 +622,10 @@ namespace Jet
 					return CValue(t, parent->builder.CreateIsNotNull(value.val));
 			}
 
-			throw 7; //unhandled cast
+			Error("Invalid Cast!", *current_token);
+
+			//printf("Invalid Cast!\n");
+			//throw 7; //unhandled cast
 		}
 
 		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args);

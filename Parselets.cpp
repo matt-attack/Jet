@@ -17,7 +17,7 @@ Expression* NameParselet::parse(Parser* parser, Token token)
 		//return new IndexExpression(new NameExpression(token.text), index.Release(), token);
 	}
 	else
-		return new NameExpression(token.text);
+		return new NameExpression(token);
 }
 
 Expression* AssignParselet::parse(Parser* parser, Expression* left, Token token)
@@ -53,7 +53,7 @@ Expression* OperatorAssignParselet::parse(Parser* parser, Expression* left, Toke
 		throw CompilerException(parser->filename, token.line, "SwapParselet: Right hand side must be a storable location!");
 
 	return new SwapExpression(left, right.Release());
-}
+}*/
 
 Expression* PrefixOperatorParselet::parse(Parser* parser, Token token)
 {
@@ -62,7 +62,7 @@ Expression* PrefixOperatorParselet::parse(Parser* parser, Token token)
 		throw CompilerException(parser->filename, token.line, "PrefixOperatorParselet: Right hand side missing!");
 
 	return new PrefixExpression(token, right);
-}*/
+}
 
 Expression* BinaryOperatorParselet::parse(Parser* parser, Expression* left, Token token)
 {
@@ -208,7 +208,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	//read in type
 	std::string ret_type = ParseType(parser);
 
-	auto name = new NameExpression(parser->Consume(TokenType::Name).getText());
+	auto name = new NameExpression(parser->Consume(TokenType::Name));
 	auto arguments = new std::vector<std::pair<std::string, std::string>>;
 
 	NameExpression* varargs = 0;
@@ -252,7 +252,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 
 	std::string ret_type = ParseType(parser);
 
-	auto name = new NameExpression(parser->Consume(TokenType::Name).getText());
+	auto name = new NameExpression(parser->Consume(TokenType::Name));
 	auto arguments = new std::vector<std::pair<std::string, std::string>>;
 
 	NameExpression* varargs = 0;
@@ -359,6 +359,15 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 		std::string type = ParseType(parser);
 		
 		Token name = parser->Consume(TokenType::Name);
+
+		if (parser->MatchAndConsume(TokenType::LeftBracket))
+		{
+			//its an array type
+			//read the number
+			auto size = parser->parseExpression(Precedence::ASSIGNMENT);
+
+			parser->Consume(TokenType::RightBracket);
+		}
 		names->push_back({ type, name });
 	}
 	while (parser->MatchAndConsume(TokenType::Comma));
@@ -428,7 +437,7 @@ Expression* ConstParselet::parse(Parser* parser, Token token)
 	}
 	parser->Consume(TokenType::RightBracket);
 	return new ArrayExpression(std::move(inits));
-}
+}*/
 
 Expression* IndexParselet::parse(Parser* parser, Expression* left, Token token)
 {
@@ -436,7 +445,7 @@ Expression* IndexParselet::parse(Parser* parser, Expression* left, Token token)
 	parser->Consume(TokenType::RightBracket);
 
 	return new IndexExpression(left, index.Release(), token);
-}*/
+}
 
 Expression* MemberParselet::parse(Parser* parser, Expression* left, Token token)
 {

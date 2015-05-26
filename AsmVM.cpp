@@ -72,27 +72,30 @@ int main()
 	Jet::Compiler c;
 
 	//finish structs
-	//todo: fix the need for forward declarations
 	c.Compile(
 		//"extern fun void* malloc(int size);"
 		//"extern fun void free(void* mem);"
-		"extern fun void printf(int arg1);"
-		"fun void test2() { local Point x; x.y = 5; local int p; p = x.x; local Ref r; local Ref* rr; return;}"
-		"fun double calltest() { return test(test(8,6),7); }"
-		"fun double test(int x, int y) { return x+y; }"
-		"fun int t() { for (local double i = 5; i < 10; i += 1) { puts(\"hi\");} return 7;}"
-		"extern fun int puts(char* str);"
-		"fun int main() { if (\"testing\") puts(\"Hello from Jet!\"); else puts(\"Other Hi from Jet!\"); t(); local int x = 5; x = 2*5; x *= 5; return 7 + 14;}"
-		"struct Ref { Point p; }"
-		"struct Point { int x; double y; }"
+		"extern fun void printf(int arg1);\n"
+		"fun void test2() { local Point x[10]; x.p = 7; x.y = 5; local int p; p = x.x; local Ref r; r.p.x = 5;  r.p.y = -r.p.x; local Ref* rr; return;}\n"
+		"fun double calltest() { while (0) puts(\"hi\"); return test(test(8,6),7); }\n"
+		"fun double test(int x, int y) { /*zasd = 5;*/ return x+y; }\n"
+		"fun int t(int m) { for (local double i = 0; i < m; i += 1) { puts(\"hi\"); } return 7;}\n"
+		"extern fun int puts(char* str);\n"
+		"fun int main() { local PP q; if (\"testing\") puts(\"Hello from Jet!\"); elseif (1) puts(\"hi\"); else puts(\"Other Hi from Jet!\"); t(6); local int x = 5; x = 2*5; x *= 5; return 7 + 14;}\n"
+		"struct Ref { Point p; }\n"
+		"struct Point { int x; double y; }\n"
+		"struct PP { abple q;}"
 		, "testing");
 
 	//c.Optimize();
 	//std::stringstream str;
-	std::string code = "";
-	llvm::raw_string_ostream str(code);
-	llvm::AssemblyAnnotationWriter writer;
-	c.module->print(str, &writer);
+	if (c.module)
+	{
+		std::string code = "";
+		llvm::raw_string_ostream str(code);
+		llvm::AssemblyAnnotationWriter writer;
+		c.module->print(str, &writer);
+	}
 
 	//add member funcs!!!!
 	c.Dump();

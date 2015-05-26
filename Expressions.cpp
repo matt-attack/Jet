@@ -8,109 +8,82 @@ using namespace Jet;
 #include <llvm\IR\Module.h>
 #include <llvm\IR\LLVMContext.h>
 
-/*void PrefixExpression::Compile(CompilerContext* context)
+CValue PrefixExpression::Compile(CompilerContext* context)
 {
-context->Line(this->_operator.line);
+	context->CurrentToken(&this->_operator);
 
-right->Compile(context);
+	auto rhs = right->Compile(context);
 
-context->UnaryOperation(this->_operator.type);
+	return context->UnaryOperation(this->_operator.type, rhs);
 
-switch (this->_operator.type)
-{
-case TokenType::BNot:
-case TokenType::Minus:
-{
-if (dynamic_cast<BlockExpression*>(this->Parent))
-context->Pop();
-break;
+	/*switch (this->_operator.type)
+	{
+	case TokenType::BNot:
+	case TokenType::Minus:
+	{
+		if (dynamic_cast<BlockExpression*>(this->Parent))
+			context->Pop();
+		break;
+	}
+	default://operators that also do a store, like ++ and --
+	{
+		auto location = dynamic_cast<IStorableExpression*>(this->right);
+		if (location)
+		{
+			if (dynamic_cast<BlockExpression*>(this->Parent) == 0)
+				context->Duplicate();
+
+			location->CompileStore(context);
+		}
+		else if (dynamic_cast<BlockExpression*>(this->Parent) != 0)
+			context->Pop();
+	}
+	}*/
 }
-default://operators that also do a store, like ++ and --
+
+CValue PostfixExpression::Compile(CompilerContext* context)
 {
-auto location = dynamic_cast<IStorableExpression*>(this->right);
-if (location)
-{
-if (dynamic_cast<BlockExpression*>(this->Parent) == 0)
-context->Duplicate();
+	context->CurrentToken(&this->_operator);
 
-location->CompileStore(context);
+	auto lhs = left->Compile(context);
+
+	context->UnaryOperation(this->_operator.type, lhs);
+
+	return lhs;
 }
-else if (dynamic_cast<BlockExpression*>(this->Parent) != 0)
-context->Pop();
-}
-}
-}*/
-
-/*void PostfixExpression::Compile(CompilerContext* context)
-{
-context->Line(this->_operator.line);
-
-left->Compile(context);
-
-if (dynamic_cast<BlockExpression*>(this->Parent) == 0 && dynamic_cast<IStorableExpression*>(this->left))
-context->Duplicate();
-
-context->UnaryOperation(this->_operator.type);
-
-if (dynamic_cast<IStorableExpression*>(this->left))
-dynamic_cast<IStorableExpression*>(this->left)->CompileStore(context);
-else if (dynamic_cast<BlockExpression*>(this->Parent) != 0)
-context->Pop();
-}*/
 
 CValue IndexExpression::Compile(CompilerContext* context)
 {
-	context->Line(token.line);
+	context->CurrentToken(&token);
 
-	//ok, once again we need a pointer to the LHS...
-	//so hack time
-	auto p = dynamic_cast<NameExpression*>(left);
-	auto lhs = context->named_values[p->GetName()];
-	//auto lhs = left->Compile(context);
-
-	//if the index is constant compile to a special instruction carying that constant
-	if (auto string = dynamic_cast<StringExpression*>(index))
+	auto string = dynamic_cast<StringExpression*>(index);
+	if (string)
 	{
-		//treat it as a pointer to a struct atm
-		int index = 0;
-		for (; index < lhs.type->data->members.size(); index++)
-		{
-			if (lhs.type->data->members[index].first == string->GetValue())
-				break;
-		}
-		if (index >= lhs.type->data->members.size())
-			throw 7;//not found;
-
-		//replace second zero with the index for the part we want
-		//context->LoadIndex(string->GetValue().c_str());
-		std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
-		//todo, embed type info
-		auto ptr = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-
-		//need to dereference
-		return CValue(lhs.type->data->members[index].second, context->parent->builder.CreateLoad(ptr));
+		auto loc = this->GetGEP(context);
+		return CValue(loc.type, context->parent->builder.CreateLoad(loc.val));
 	}
 	else
 	{
 		throw 7;
-		//todo:
-		auto idx = index->Compile(context);
-		//context->LoadIndex();
 	}
 
 	return CValue();
 }
 
-void IndexExpression::CompileStore(CompilerContext* context, CValue right)
+CValue IndexExpression::GetGEP(CompilerContext* context)
 {
-	context->Line(token.line);
-	//um, HACK
 	auto p = dynamic_cast<NameExpression*>(left);
-	auto lhs = context->named_values[p->GetName()];
-	//auto lhs = left->Compile(context);
+	auto i = dynamic_cast<IndexExpression*>(left);
 
-	if (auto string = dynamic_cast<StringExpression*>(index))
+	auto string = dynamic_cast<StringExpression*>(index);
+	if (string && (p || i))
 	{
+		CValue lhs;
+		if (p)
+			lhs = context->named_values[p->GetName()];
+		else if (i)
+			lhs = i->GetGEP(context);
+
 		int index = 0;
 		for (; index < lhs.type->data->members.size(); index++)
 		{
@@ -118,12 +91,30 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 				break;
 		}
 		if (index >= lhs.type->data->members.size())
+		{
+			Error("Struct Member '" + string->GetValue() + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
 			throw 7;//not found;
+		}
 
 		std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
-		
+
 		auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-		context->parent->builder.CreateStore(right.val, loc);
+		return CValue(lhs.type->data->members[index].second, loc);
+	}
+	throw 7;
+}
+
+
+void IndexExpression::CompileStore(CompilerContext* context, CValue right)
+{
+	context->CurrentToken(&token);
+
+	auto string = dynamic_cast<StringExpression*>(index);
+	if (string)
+	{
+		auto loc = this->GetGEP(context);
+		right = context->DoCast(loc.type, right);
+		context->parent->builder.CreateStore(right.val, loc.val);
 	}
 	else
 	{
@@ -208,15 +199,19 @@ CValue AssignExpression::Compile(CompilerContext* context)
 
 CValue CallExpression::Compile(CompilerContext* context)
 {
+	context->CurrentToken(&this->token);
+
 	auto fun = context->parent->functions[dynamic_cast<NameExpression*>(left)->GetName()];
 
 	fun->Load(context->parent);
 
 	auto f = context->parent->module->getFunction(dynamic_cast<NameExpression*>(left)->GetName());
 
-
 	if (args->size() != f->arg_size())
-		throw 7;
+	{
+		//todo: add better checks later
+		Error("Mismatched function parameters in call", token);
+	}
 
 	//build arg list
 	std::vector<llvm::Value*> argsv;
@@ -233,14 +228,15 @@ CValue CallExpression::Compile(CompilerContext* context)
 
 CValue NameExpression::Compile(CompilerContext* context)
 {
+	context->CurrentToken(&token);
 	//add load variable instruction
 	//todo make me detect if this is a local or not
-	return context->Load(name);
+	return context->Load(token.text);
 }
 
 CValue OperatorAssignExpression::Compile(CompilerContext* context)
 {
-	context->Line(token.line);
+	context->CurrentToken(&token);
 
 	//try and cast right side to left
 	auto lhs = this->left->Compile(context);
@@ -258,7 +254,7 @@ CValue OperatorAssignExpression::Compile(CompilerContext* context)
 
 CValue OperatorExpression::Compile(CompilerContext* context)
 {
-	context->Line(this->_operator.line);
+	context->CurrentToken(&this->_operator);
 
 	/*if (this->_operator.type == TokenType::And)
 	{
@@ -291,7 +287,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 
 CValue FunctionExpression::Compile(CompilerContext* context)
 {
-	context->Line(token.line);
+	context->CurrentToken(&token);
 
 	std::string fname;
 	if (name)
@@ -323,7 +319,6 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	auto AI = function->f->arg_begin();
 	for (unsigned Idx = 0, e = args->size(); Idx != e; ++Idx, ++AI) {
 		// Create an alloca for this variable.
-		//llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(F, Args[Idx]);
 		auto aname = (*this->args)[Idx].second;
 
 		llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
@@ -399,7 +394,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 
 CValue ExternExpression::Compile(CompilerContext* context)
 { //finish assign expression
-	context->Line(token.line);
+	//context->Line(token.line);
 
 	//std::string fname = static_cast<NameExpression*>(name)->GetName();
 
@@ -499,11 +494,11 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 
 CValue LocalExpression::Compile(CompilerContext* context)
 {
-	context->Line((*_names)[0].second.line);
+	context->CurrentToken(&(*_names)[0].second);
 
 	int i = 0;
 	for (auto ii : *this->_names) {
-		auto aname = ii.second.getText();
+		auto aname = ii.second.text;
 
 		llvm::IRBuilder<> TmpB(&context->f->getEntryBlock(), context->f->getEntryBlock().begin());
 
@@ -527,7 +522,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 CValue StructExpression::Compile(CompilerContext* context)
 {
-	context->Line(token.line);
+	//context->Line(token.line);
 
 	return CValue();
 }

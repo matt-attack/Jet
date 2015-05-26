@@ -78,7 +78,7 @@
     <ProjectGuid>{F085F551-7313-45C8-9072-B940B08AE997}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>AsmVM</RootNamespace>
-    <ProjectName>JetVM</ProjectName>
+    <ProjectName>Jet</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

@@ -53,7 +53,7 @@ Parser::Parser(Lexer* l)
 
 	//array/index stuffs
 	//this->Register(TokenType::LeftBracket, new ArrayParselet());
-	//this->Register(TokenType::LeftBracket, new IndexParselet());//postfix
+	this->Register(TokenType::LeftBracket, new IndexParselet());//postfix
 
 	//operator assign
 	this->Register(TokenType::AddAssign, new OperatorAssignParselet());
@@ -66,14 +66,14 @@ Parser::Parser(Lexer* l)
 
 
 	//prefix stuff
-	//this->Register(TokenType::Increment, new PrefixOperatorParselet(Precedence::PREFIX));
-	//this->Register(TokenType::Decrement, new PrefixOperatorParselet(Precedence::PREFIX));
-	//this->Register(TokenType::Minus, new PrefixOperatorParselet(Precedence::PREFIX));
-	//this->Register(TokenType::BNot, new PrefixOperatorParselet(Precedence::PREFIX));
+	this->Register(TokenType::Increment, new PrefixOperatorParselet(Precedence::PREFIX));
+	this->Register(TokenType::Decrement, new PrefixOperatorParselet(Precedence::PREFIX));
+	this->Register(TokenType::Minus, new PrefixOperatorParselet(Precedence::PREFIX));
+	this->Register(TokenType::BNot, new PrefixOperatorParselet(Precedence::PREFIX));
 
 	//postfix stuff
-	//this->Register(TokenType::Increment, new PostfixOperatorParselet(Precedence::POSTFIX));
-	//this->Register(TokenType::Decrement, new PostfixOperatorParselet(Precedence::POSTFIX));
+	this->Register(TokenType::Increment, new PostfixOperatorParselet(Precedence::POSTFIX));
+	this->Register(TokenType::Decrement, new PostfixOperatorParselet(Precedence::POSTFIX));
 
 	//boolean stuff
 	this->Register(TokenType::Equals, new BinaryOperatorParselet(Precedence::CONDITIONAL, false));
@@ -108,7 +108,7 @@ Parser::Parser(Lexer* l)
 	//this->Register(TokenType::LeftParen, new LambdaParselet());
 
 	//statements
-	//this->Register(TokenType::While, new WhileParselet()); 
+	this->Register(TokenType::While, new WhileParselet()); 
 	this->Register(TokenType::If, new IfParselet());
 	this->Register(TokenType::Function, new FunctionParselet());
 	this->Register(TokenType::Ret, new ReturnParselet());
@@ -117,8 +117,9 @@ Parser::Parser(Lexer* l)
 
 	this->Register(TokenType::Extern, new ExternParselet());
 	this->Register(TokenType::Struct, new StructParselet());
-	//this->Register(TokenType::Break, new BreakParselet());
-	//this->Register(TokenType::Continue, new ContinueParselet());
+
+	this->Register(TokenType::Break, new BreakParselet());
+	this->Register(TokenType::Continue, new ContinueParselet());
 
 	//this->Register(TokenType::Const, new ConstParselet());
 	//this->Register(TokenType::Null, new NullParselet());
@@ -144,11 +145,11 @@ Parser::~Parser()
 Expression* Parser::parseExpression(int precedence)
 {
 	Token token = Consume();
-	PrefixParselet* prefix = mPrefixParselets[token.getType()];
+	PrefixParselet* prefix = mPrefixParselets[token.type];
 
 	if (prefix == 0)
 	{
-		std::string str = "ParseExpression: No Parser Found for: " + token.getText();
+		std::string str = "ParseExpression: No Parser Found for: " + token.text;
 		throw CompilerException(this->filename, token.line, str);//printf("Consume: TokenType not as expected!\n");
 	}
 
@@ -157,7 +158,7 @@ Expression* Parser::parseExpression(int precedence)
 	{
 		token = Consume();
 
-		InfixParselet* infix = mInfixParselets[token.getType()];
+		InfixParselet* infix = mInfixParselets[token.type];
 		left = infix->parse(this, left, token);
 	}
 	return left;
@@ -166,7 +167,7 @@ Expression* Parser::parseExpression(int precedence)
 Expression* Parser::ParseStatement(bool takeTrailingSemicolon)//call this until out of tokens (hit EOF)
 {
 	Token token = LookAhead();
-	StatementParselet* statement = mStatementParselets[token.getType()];
+	StatementParselet* statement = mStatementParselets[token.type];
 
 	if (statement == 0)
 	{
@@ -230,7 +231,7 @@ Token Parser::Consume()
 Token Parser::Consume(TokenType expected)
 {
 	auto temp = LookAhead();
-	if (temp.getType() != expected)
+	if (temp.type != expected)
 	{
 		std::string str = "Consume: TokenType not as expected! Expected: " + TokenToString[expected] + " Got: " + temp.text;
 		throw CompilerException(this->filename, temp.line, str);
@@ -251,13 +252,13 @@ Token Parser::LookAhead(unsigned int num)
 			return ii;
 	}
 
-	return Token(0, TokenType::EoF, "EOF");
+	return Token(0, 0, TokenType::EoF, "EOF");
 }
 
 bool Parser::Match(TokenType expected)
 {
 	Token token = LookAhead();
-	if (token.getType() != expected)
+	if (token.type != expected)
 	{
 		return false;
 	}
@@ -268,7 +269,7 @@ bool Parser::Match(TokenType expected)
 bool Parser::MatchAndConsume(TokenType expected)
 {
 	Token token = LookAhead();
-	if (token.getType() != expected)
+	if (token.type != expected)
 	{
 		return false;
 	}
@@ -293,7 +294,7 @@ void Parser::Register(TokenType token, StatementParselet* parselet)
 }
 
 int Parser::getPrecedence() {
-	InfixParselet* parser = mInfixParselets[LookAhead(0).getType()];
+	InfixParselet* parser = mInfixParselets[LookAhead(0).type];
 	if (parser != 0) 
 		return parser->getPrecedence();
 
