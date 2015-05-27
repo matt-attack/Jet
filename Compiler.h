@@ -329,6 +329,9 @@ namespace Jet
 			if (iter == named_values.end())
 				Error("undeclared identifier '" + name + "'", *current_token);
 
+			//iter->second.val->dump();
+			//val.val->dump();
+			//val.val->getType()->dump();
 			return parent->builder.CreateStore(val.val, iter->second.val);
 		}
 

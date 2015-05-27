@@ -95,7 +95,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 	auto i = dynamic_cast<IndexExpression*>(left);
 
 	auto string = dynamic_cast<StringExpression*>(index);
-	if (string && (p || i))
+	if (p || i)
 	{
 		CValue lhs;
 		if (p)
@@ -103,7 +103,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		else if (i)
 			lhs = i->GetGEP(context);
 
-		if (lhs.type->type == Types::Class)
+		if (string && lhs.type->type == Types::Class)
 		{
 			int index = 0;
 			for (; index < lhs.type->data->members.size(); index++)
@@ -122,9 +122,14 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
 			return CValue(lhs.type->data->members[index].second, loc);
 		}
-		else if (lhs.type->type == Types::Array)
+		else if (lhs.type->type == Types::Array && string == 0)//or pointer!!(later)
 		{
-			Error("Not Implemented", this->token);
+			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->DoCast(&IntType, index->Compile(context)).val };
+			//iindex[0]->dump();
+			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
+			//loc->dump();
+			//loc->getType()->dump();
+			return CValue(lhs.type->base, loc);
 		}
 	}
 	Error("Not Implemented", this->token);
@@ -135,17 +140,9 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 {
 	context->CurrentToken(&token);
 
-	auto string = dynamic_cast<StringExpression*>(index);
-	if (string)
-	{
-		auto loc = this->GetGEP(context);
-		right = context->DoCast(loc.type, right);
-		context->parent->builder.CreateStore(right.val, loc.val);
-	}
-	else
-	{
-		Error("Not Implemented", this->token);
-	}
+	auto loc = this->GetGEP(context);
+	right = context->DoCast(loc.type, right);
+	context->parent->builder.CreateStore(right.val, loc.val);
 }
 
 /*void ObjectExpression::Compile(CompilerContext* context)
@@ -395,83 +392,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 }
 
 CValue ExternExpression::Compile(CompilerContext* context)
-{ //finish assign expression
-	//context->Line(token.line);
-
-	//std::string fname = static_cast<NameExpression*>(name)->GetName();
-
-	//Function* fun = new Function;
-	//fun->return_type = context->parent->LookupType(this->ret_type);
-
-	////std::vector<llvm::Type*> argsv;
-	//for (auto ii : *this->args)
-	//{
-	//	auto t = context->parent->LookupType(ii.first);
-	//	fun->argst.push_back(t);
-	//	fun->args.push_back(GetType(t));
-	//}
-
-	////CompilerContext* function = context->AddFunction(fname, this->args->size());// , this->varargs);
-	////std::vector<llvm::Type*> Doubles(args->size(), llvm::Type::getDoubleTy(context->parent->context));
-	//llvm::FunctionType *ft = llvm::FunctionType::get(GetType(fun->return_type), fun->args, false);
-	//llvm::Function *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, context->parent->module);
-
-	//fun->f = f;
-	//context->parent->functions[fname] = fun;
-	////ok, kinda hacky
-	////int start = context->out.size();
-
-	////ok push locals, in opposite order
-	///*for (unsigned int i = 0; i < this->args->size(); i++)
-	//{
-	//auto aname = static_cast<NameExpression*>((*this->args)[i]);
-	//function->RegisterLocal(aname->GetName());
-	//}
-	//if (this->varargs)
-	//function->RegisterLocal(this->varargs->GetName());*/
-
-	////alloc args
-	//auto AI = f->arg_begin();
-	//for (unsigned Idx = 0, e = args->size(); Idx != e; ++Idx, ++AI) {
-	//	// Create an alloca for this variable.
-	//	//llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(F, Args[Idx]);
-	//	auto aname = (*this->args)[Idx].second;
-
-	//	//llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
-	//	//auto Alloca = TmpB.CreateAlloca(llvm::Type::getDoubleTy(function->parent->context), 0, aname);
-	//	// Store the initial value into the alloca.
-	//	//function->parent->builder.CreateStore(AI, Alloca);
-
-	//	AI->setName(aname);
-
-	//	// Add arguments to variable symbol table.
-	//	//function->named_values[aname] = Alloca;
-	//}
-
-	//block->Compile(function);
-
-	//if last instruction was a return, dont insert another one
-	/*if (block->statements.size() > 0)
-	{
-	if (dynamic_cast<ReturnExpression*>(block->statements.at(block->statements.size()-1)) == 0)
-	{
-	function->Null();//return nil
-	function->Return();
-	}
-	}
-	else
-	{
-	function->Null();//return nil
-	function->Return();
-	}
-
-	context->FinalizeFunction(function);
-
-	//only named functions need to be stored here
-	if (name)
-	context->Store(static_cast<NameExpression*>(name)->GetName());
-	*/
-	//vm will pop off locals when it removes the call stack
+{
 	return CValue();
 }
 
@@ -548,7 +469,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		str = ii->second;
 		if (str->type != Types::Invalid)
 		{
-			Error("Struct '"+this->name+"' Already Defined", this->token);
+			Error("Struct '" + this->name + "' Already Defined", this->token);
 		}
 	}
 

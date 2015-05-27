@@ -14,7 +14,7 @@ Expression* NameParselet::parse(Parser* parser, Token token)
 		UniquePtr<Expression*> index = parser->parseExpression();
 		parser->Consume(TokenType::RightBracket);
 
-		//return new IndexExpression(new NameExpression(token.text), index.Release(), token);
+		return new IndexExpression(new NameExpression(token), index.Release(), token);
 	}
 	else
 		return new NameExpression(token);
