@@ -88,6 +88,9 @@ namespace Jet
 		Increment,
 		Decrement,
 
+		//Dereference,
+		//AddressOf,
+
 		Operator,
 
 		LineComment,

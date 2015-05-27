@@ -3,7 +3,7 @@
 
 using namespace Jet;
 
-//std::map<TokenType,std::string> Jet::TokenToString; 
+std::map<TokenType,std::string> Jet::TokenToString; 
 
 class LexerStatic
 {
@@ -21,6 +21,9 @@ public:
 		operators["*"] = TokenType::Asterisk;
 		operators["/"] = TokenType::Slash;
 		operators["%"] = TokenType::Modulo;
+
+		//operators["&"] = TokenType::AddressOf;
+		//operators["*"] = TokenType::Dereference;
 
 		operators["&&"] = TokenType::And;
 		operators["||"] = TokenType::Or;

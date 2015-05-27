@@ -12,31 +12,55 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->_operator);
 
+	if (this->_operator.type == TokenType::BAnd)
+	{
+		auto i = dynamic_cast<NameExpression*>(right);
+		auto p = dynamic_cast<IndexExpression*>(right);
+		if (i)
+		{
+			auto var = context->named_values[i->GetName()];
+			return CValue(context->parent->LookupType(var.type->ToString() + "*"), var.val);
+		}
+		else if (p)
+		{
+			auto var = p->GetGEP(context);
+			return CValue(context->parent->LookupType(var.type->ToString() + "*"), var.val);
+		}
+		Error("Not Implemented", this->_operator);
+	}
+
 	auto rhs = right->Compile(context);
 
-	return context->UnaryOperation(this->_operator.type, rhs);
+	auto res = context->UnaryOperation(this->_operator.type, rhs);
+	//store here
+	//only do this for ++and--
+	if (this->_operator.type == TokenType::Increment || this->_operator.type == TokenType::Decrement)
+		if (auto storable = dynamic_cast<IStorableExpression*>(this->right))
+			storable->CompileStore(context, res);
+
+	return res;
 
 	/*switch (this->_operator.type)
 	{
 	case TokenType::BNot:
 	case TokenType::Minus:
 	{
-		if (dynamic_cast<BlockExpression*>(this->Parent))
-			context->Pop();
-		break;
+	if (dynamic_cast<BlockExpression*>(this->Parent))
+	context->Pop();
+	break;
 	}
 	default://operators that also do a store, like ++ and --
 	{
-		auto location = dynamic_cast<IStorableExpression*>(this->right);
-		if (location)
-		{
-			if (dynamic_cast<BlockExpression*>(this->Parent) == 0)
-				context->Duplicate();
+	auto location = dynamic_cast<IStorableExpression*>(this->right);
+	if (location)
+	{
+	if (dynamic_cast<BlockExpression*>(this->Parent) == 0)
+	context->Duplicate();
 
-			location->CompileStore(context);
-		}
-		else if (dynamic_cast<BlockExpression*>(this->Parent) != 0)
-			context->Pop();
+	location->CompileStore(context);
+	}
+	else if (dynamic_cast<BlockExpression*>(this->Parent) != 0)
+	context->Pop();
 	}
 	}*/
 }
@@ -47,7 +71,12 @@ CValue PostfixExpression::Compile(CompilerContext* context)
 
 	auto lhs = left->Compile(context);
 
-	context->UnaryOperation(this->_operator.type, lhs);
+	auto res = context->UnaryOperation(this->_operator.type, lhs);
+
+	//only do this for ++ and --
+	if (this->_operator.type == TokenType::Increment || this->_operator.type == TokenType::Decrement)
+		if (auto storable = dynamic_cast<IStorableExpression*>(this->left))	//store here
+			storable->CompileStore(context, res);
 
 	return lhs;
 }
@@ -56,18 +85,8 @@ CValue IndexExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&token);
 
-	auto string = dynamic_cast<StringExpression*>(index);
-	if (string)
-	{
-		auto loc = this->GetGEP(context);
-		return CValue(loc.type, context->parent->builder.CreateLoad(loc.val));
-	}
-	else
-	{
-		throw 7;
-	}
-
-	return CValue();
+	auto loc = this->GetGEP(context);
+	return CValue(loc.type, context->parent->builder.CreateLoad(loc.val));
 }
 
 CValue IndexExpression::GetGEP(CompilerContext* context)
@@ -84,24 +103,31 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		else if (i)
 			lhs = i->GetGEP(context);
 
-		int index = 0;
-		for (; index < lhs.type->data->members.size(); index++)
+		if (lhs.type->type == Types::Class)
 		{
-			if (lhs.type->data->members[index].first == string->GetValue())
-				break;
+			int index = 0;
+			for (; index < lhs.type->data->members.size(); index++)
+			{
+				if (lhs.type->data->members[index].first == string->GetValue())
+					break;
+			}
+			if (index >= lhs.type->data->members.size())
+			{
+				Error("Struct Member '" + string->GetValue() + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
+				//not found;
+			}
+
+			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
+
+			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
+			return CValue(lhs.type->data->members[index].second, loc);
 		}
-		if (index >= lhs.type->data->members.size())
+		else if (lhs.type->type == Types::Array)
 		{
-			Error("Struct Member '" + string->GetValue() + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
-			throw 7;//not found;
+			Error("Not Implemented", this->token);
 		}
-
-		std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
-
-		auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-		return CValue(lhs.type->data->members[index].second, loc);
 	}
-	throw 7;
+	Error("Not Implemented", this->token);
 }
 
 
@@ -118,7 +144,7 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	}
 	else
 	{
-		throw 7;
+		Error("Not Implemented", this->token);
 	}
 }
 
@@ -303,17 +329,6 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	}
 
 	CompilerContext* function = context->AddFunction(fname, context->parent->LookupType(this->ret_type), argsv);// , this->varargs);
-	//ok, kinda hacky
-	//int start = context->out.size();
-
-	//ok push locals, in opposite order
-	/*for (unsigned int i = 0; i < this->args->size(); i++)
-	{
-	auto aname = static_cast<NameExpression*>((*this->args)[i]);
-	function->RegisterLocal(aname->GetName());
-	}
-	if (this->varargs)
-	function->RegisterLocal(this->varargs->GetName());*/
 
 	//alloc args
 	auto AI = function->f->arg_begin();
@@ -349,12 +364,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	function->Return();
 	}
 
-	context->FinalizeFunction(function);
-
-	//only named functions need to be stored here
-	if (name)
-	context->Store(static_cast<NameExpression*>(name)->GetName());
-	*/
+	context->FinalizeFunction(function);*/
 
 	//todo add dummy return
 	//vm will pop off locals when it removes the call stack
@@ -372,23 +382,15 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	Function* fun = new Function;
 	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type);
 
-	//std::vector<llvm::Type*> argsv;
 	for (auto ii : *this->args)
 	{
 		auto type = context->parent->AdvanceTypeLookup(ii.first);
 
 		fun->argst.push_back({ type, ii.second });
-		//fun->args.push_back(GetType(type));
 	}
 
 	fun->name = fname;
-
-	//CompilerContext* function = context->AddFunction(fname, this->args->size());// , this->varargs);
-	//std::vector<llvm::Type*> Doubles(args->size(), llvm::Type::getDoubleTy(context->parent->context));
-	//llvm::FunctionType *ft = llvm::FunctionType::get(GetType(fun->return_type), fun->args, false);
-	//llvm::Function *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, context->parent->module);
-
-	fun->f = 0;// f;
+	fun->f = 0;
 	context->parent->functions[fname] = fun;
 }
 
@@ -503,7 +505,12 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		llvm::IRBuilder<> TmpB(&context->f->getEntryBlock(), context->f->getEntryBlock().begin());
 
 		Type* type = context->parent->LookupType(ii.first);
-		auto Alloca = TmpB.CreateAlloca(GetType(type), 0, aname);
+		llvm::AllocaInst* Alloca = 0;
+		if (type->type == Types::Array)
+			Alloca = TmpB.CreateAlloca(GetType(type), context->parent->builder.getInt32(type->size), aname);
+		else
+			Alloca = TmpB.CreateAlloca(GetType(type), 0, aname);
+
 		// Store the initial value into the alloca.
 		if (this->_right)
 		{
@@ -522,8 +529,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 CValue StructExpression::Compile(CompilerContext* context)
 {
-	//context->Line(token.line);
-
 	return CValue();
 }
 
@@ -543,8 +548,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		str = ii->second;
 		if (str->type != Types::Invalid)
 		{
-			printf("Struct %s Already Defined!\n", this->name.c_str());
-			throw 7;
+			Error("Struct '"+this->name+"' Already Defined", this->token);
 		}
 	}
 

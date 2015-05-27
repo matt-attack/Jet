@@ -76,14 +76,15 @@ int main()
 		//"extern fun void* malloc(int size);"
 		//"extern fun void free(void* mem);"
 		"extern fun void printf(int arg1);\n"
-		"fun void test2() { local Point x[10]; x.p = 7; x.y = 5; local int p; p = x.x; local Ref r; r.p.x = 5;  r.p.y = -r.p.x; local Ref* rr; return;}\n"
+		"fun void test2() { local Point x[10]; /*x.p = 7;*/ x.y = 5; local int p; p = x.x++; local Ref r; r.p.x = 5;  r.p.y = -r.p.x; local Ref* rr; return;}\n"
 		"fun double calltest() { while (0) puts(\"hi\"); return test(test(8,6),7); }\n"
 		"fun double test(int x, int y) { /*zasd = 5;*/ return x+y; }\n"
 		"fun int t(int m) { for (local double i = 0; i < m; i += 1) { puts(\"hi\"); } return 7;}\n"
 		"extern fun int puts(char* str);\n"
-		"fun int main() { local PP q; if (\"testing\") puts(\"Hello from Jet!\"); elseif (1) puts(\"hi\"); else puts(\"Other Hi from Jet!\"); t(6); local int x = 5; x = 2*5; x *= 5; return 7 + 14;}\n"
+		"fun int main() { /*local PP q;*/ if (\"testing\") puts(\"Hello from Jet!\"); elseif (1) puts(\"hi\"); else puts(\"Other Hi from Jet!\"); t(6); local int x = 5; x = 2*5; x *= 5; return 7 + 14;}\n"
 		"struct Ref { Point p; }\n"
-		"struct Point { int x; double y; }\n"
+		"fun void t45() { local int x = 5; local int* y = &x; (*y) = 6; local Point p; p.q = y; *p.q = 7; y = &p.x; p.x = 7; x = *y; }"
+		"struct Point { int x; double y; int* q;}\n"
 		"struct PP { abple q;}"
 		, "testing");
 

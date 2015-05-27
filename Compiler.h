@@ -22,6 +22,7 @@
 //#include <map>
 
 #include "Token.h"
+
 //#include "JetInstructions.h"
 //#include "JetExceptions.h"
 
@@ -36,6 +37,7 @@
 namespace Jet
 {
 	void Error(const std::string& msg, Token token);
+	void ParserError(const std::string& msg, Token token);
 
 	class BlockExpression;
 
@@ -53,6 +55,7 @@ namespace Jet
 		Function,
 
 		Pointer,
+		Array,//acts just like a pointer
 
 		Invalid,//for unloaded types
 	};
@@ -69,10 +72,11 @@ namespace Jet
 			Struct* data;//for classes
 			Type* base;//for pointers
 		};
+		unsigned int size;//for arrays
 
-		Type() { data = 0; type = Types::Void; loaded = false; }
-		Type(Types type, Struct* data = 0) : type(type), data(data), loaded(false) {}
-		Type(Types type, Type* base) : type(type), base(base), loaded(false) {}
+		Type() { data = 0; type = Types::Void; loaded = false; size = 0; }
+		Type(Types type, Struct* data = 0) : type(type), data(data), loaded(false), size(0) {}
+		Type(Types type, Type* base, int size = 0) : type(type), base(base), loaded(false), size(size) {}
 
 		void Load(Compiler* compiler);
 
@@ -235,12 +239,31 @@ namespace Jet
 				if (name[name.length() - 1] == '*')
 				{
 					//its a pointer
-					auto t = types[name.substr(0, name.length() - 1)];
+					auto t = this->LookupType(name.substr(0, name.length() - 1));
 
 					type = new Type;
 					type->base = t;
 					type->type = Types::Pointer;
 
+					types[name] = type;
+				}
+				else if (name[name.length() - 1] == ']')
+				{
+					//its an array
+					int p = 0;
+					for (p = 0; p < name.length(); p++)
+						if (name[p] == '[')
+							break;
+
+					auto len = name.substr(p+1, name.length()-p-2);
+
+					auto tname = name.substr(0, p);
+					auto t = this->LookupType(tname);
+
+					type = new Type;
+					type->base = t;
+					type->type = Types::Array;
+					type->size = std::stoi(len);//cheat for now
 					types[name] = type;
 				}
 				else
@@ -318,209 +341,9 @@ namespace Jet
 		}
 
 
-		CValue UnaryOperation(TokenType operation, CValue value)
-		{
-			llvm::Value* res = 0;
+		CValue UnaryOperation(TokenType operation, CValue value);
 
-			if (value.type->type == Types::Float || value.type->type == Types::Double)
-			{
-				switch (operation)
-				{
-				case TokenType::Increment:
-					//res = parent->builder.CreateFAdd(left.val, right.val);
-					break;
-				case TokenType::Decrement:
-					//res = parent->builder.CreateFSub(left.val, right.val);
-					break;
-				case TokenType::Minus:
-					res = parent->builder.CreateFNeg(value.val);// parent->builder.CreateFMul(left.val, right.val);
-					break;
-				default:
-					throw 7;
-					break;
-				}
-
-				return CValue(value.type, res);
-			}
-			else if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
-			{
-				//integer probably
-				switch (operation)
-				{
-				case TokenType::Increment:
-					//res = parent->builder.CreateFAdd(left.val, right.val);
-					break;
-				case TokenType::Decrement:
-					//res = parent->builder.CreateFSub(left.val, right.val);
-					break;
-				case TokenType::Minus:
-					res = parent->builder.CreateNeg(value.val);// parent->builder.CreateFMul(left.val, right.val);
-					break;
-				case TokenType::BNot:
-					res = parent->builder.CreateNot(value.val);
-					break;
-				default:
-					throw 7;
-					break;
-				}
-
-				return CValue(value.type, res);
-			}
-			//throw 7;
-			Error("Invalid Unary Operation!", *current_token);
-		}
-
-		CValue BinaryOperation(Jet::TokenType op, CValue left, CValue right)
-		{
-			llvm::Value* res = 0;
-
-			//should this be a floating point calc?
-			if (left.type->type != right.type->type)
-			{
-				//conversion time!!
-
-				throw 7;
-			}
-
-			if (left.type->type == Types::Float || left.type->type == Types::Double)
-			{
-				switch (op)
-				{
-				case TokenType::AddAssign:
-				case TokenType::Plus:
-					res = parent->builder.CreateFAdd(left.val, right.val);
-					break;
-				case TokenType::SubtractAssign:
-				case TokenType::Minus:
-					res = parent->builder.CreateFSub(left.val, right.val);
-					break;
-				case TokenType::MultiplyAssign:
-				case TokenType::Asterisk:
-					res = parent->builder.CreateFMul(left.val, right.val);
-					break;
-				case TokenType::DivideAssign:
-				case TokenType::Slash:
-					res = parent->builder.CreateFDiv(left.val, right.val);
-					break;
-				case TokenType::LessThan:
-					//use U or O?
-					res = parent->builder.CreateFCmpULT(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::LessThanEqual:
-					res = parent->builder.CreateFCmpULE(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::GreaterThan:
-					res = parent->builder.CreateFCmpUGT(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::GreaterThanEqual:
-					res = parent->builder.CreateFCmpUGE(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::Equals:
-					res = parent->builder.CreateFCmpUEQ(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::NotEqual:
-					res = parent->builder.CreateFCmpUNE(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				default:
-					Error("Invalid Binary Operation!", *current_token);
-					//throw 7;
-					break;
-				}
-
-				return CValue(left.type, res);
-			}
-			else if (left.type->type == Types::Int || left.type->type == Types::Short || left.type->type == Types::Char)
-			{
-				//integer probably
-				switch (op)
-				{
-				case TokenType::AddAssign:
-				case TokenType::Plus:
-					res = parent->builder.CreateAdd(left.val, right.val);
-					break;
-				case TokenType::SubtractAssign:
-				case TokenType::Minus:
-					res = parent->builder.CreateSub(left.val, right.val);
-					break;
-				case TokenType::MultiplyAssign:
-				case TokenType::Asterisk:
-					res = parent->builder.CreateMul(left.val, right.val);
-					break;
-				case TokenType::DivideAssign:
-				case TokenType::Slash:
-					if (true)//signed
-						res = parent->builder.CreateSDiv(left.val, right.val);
-					else//unsigned
-						res = parent->builder.CreateUDiv(left.val, right.val);
-					break;
-				case TokenType::Modulo:
-					if (true)//signed
-						res = parent->builder.CreateSRem(left.val, right.val);
-					else//unsigned
-						res = parent->builder.CreateURem(left.val, right.val);
-					break;
-					//todo add unsigned
-				case TokenType::LessThan:
-					//use U or S?
-					res = parent->builder.CreateICmpSLT(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::LessThanEqual:
-					res = parent->builder.CreateICmpSLE(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::GreaterThan:
-					res = parent->builder.CreateICmpSGT(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::GreaterThanEqual:
-					res = parent->builder.CreateICmpSGE(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::Equals:
-					res = parent->builder.CreateICmpEQ(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::NotEqual:
-					res = parent->builder.CreateICmpNE(left.val, right.val);
-					return CValue(&BoolType, res);
-					break;
-				case TokenType::BAnd:
-				case TokenType::AndAssign:
-					res = parent->builder.CreateAnd(left.val, right.val);
-					break;
-				case TokenType::BOr:
-				case TokenType::OrAssign:
-					res = parent->builder.CreateOr(left.val, right.val);
-					break;
-				case TokenType::Xor:
-				case TokenType::XorAssign:
-					res = parent->builder.CreateXor(left.val, right.val);
-					break;
-				case TokenType::LeftShift:
-					//todo
-				case TokenType::RightShift:
-					//todo
-				default:
-					Error("Invalid Binary Operation!", *current_token);
-					//throw 7;
-					break;
-				}
-
-				return CValue(left.type, res);
-			}
-			//printf("Invalid Binary Operation!\n");
-
-			Error("Invalid Binary Operation!", *current_token);
-			//throw 7;
-			//return res;
-		}
+		CValue BinaryOperation(Jet::TokenType op, CValue left, CValue right);
 
 		std::stack<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> loops;
 		void PushLoop(llvm::BasicBlock* Break, llvm::BasicBlock* Continue)

@@ -263,7 +263,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 		do
 		{
 			std::string type = ParseType(parser);
-			Token name = parser->Consume();
+			Token name = parser->Consume(TokenType::Name);
 			if (name.type == TokenType::Name)
 			{
 				arguments->push_back({ type, name.text });
@@ -276,6 +276,8 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 			}*/
 			else
 			{
+				//try and make it handle extra chars better, maybe just parse down to the next ;
+				//make this use new error system
 				std::string str = "Consume: TokenType not as expected! Expected Name or Ellises Got: " + name.text;
 				throw CompilerException(parser->filename, name.line, str);
 			}
@@ -367,6 +369,21 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 			auto size = parser->parseExpression(Precedence::ASSIGNMENT);
 
 			parser->Consume(TokenType::RightBracket);
+
+			if (auto s = dynamic_cast<NumberExpression*>(size))
+			{
+				if (s->GetValue() <= 0)
+				{
+					ParserError("Cannot size array with a zero or negative size", token);
+					throw 7;
+				}
+				type += "[" + std::to_string((int)s->GetValue()) + "]";
+			}
+			else
+			{
+				ParserError("Cannot size array with a non constant size", token);
+				throw 7;
+			}
 		}
 		names->push_back({ type, name });
 	}

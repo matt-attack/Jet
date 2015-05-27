@@ -10,7 +10,7 @@ namespace Jet
 	bool IsLetter(char c);
 	bool IsNumber(char c);
 
-	static std::map<TokenType,std::string> TokenToString; 
+	extern std::map<TokenType,std::string> TokenToString; 
 	class Lexer
 	{
 		unsigned int index;

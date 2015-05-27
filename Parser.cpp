@@ -70,6 +70,8 @@ Parser::Parser(Lexer* l)
 	this->Register(TokenType::Decrement, new PrefixOperatorParselet(Precedence::PREFIX));
 	this->Register(TokenType::Minus, new PrefixOperatorParselet(Precedence::PREFIX));
 	this->Register(TokenType::BNot, new PrefixOperatorParselet(Precedence::PREFIX));
+	this->Register(TokenType::BAnd, new PrefixOperatorParselet(Precedence::PREFIX));
+	this->Register(TokenType::Asterisk, new PrefixOperatorParselet(Precedence::PREFIX));
 
 	//postfix stuff
 	this->Register(TokenType::Increment, new PostfixOperatorParselet(Precedence::POSTFIX));
@@ -108,7 +110,7 @@ Parser::Parser(Lexer* l)
 	//this->Register(TokenType::LeftParen, new LambdaParselet());
 
 	//statements
-	this->Register(TokenType::While, new WhileParselet()); 
+	this->Register(TokenType::While, new WhileParselet());
 	this->Register(TokenType::If, new IfParselet());
 	this->Register(TokenType::Function, new FunctionParselet());
 	this->Register(TokenType::Ret, new ReturnParselet());
@@ -132,13 +134,13 @@ Parser::Parser(Lexer* l)
 
 Parser::~Parser()
 {
-	for (auto ii: this->mInfixParselets)
+	for (auto ii : this->mInfixParselets)
 		delete ii.second;
 
-	for (auto ii: this->mPrefixParselets)
+	for (auto ii : this->mPrefixParselets)
 		delete ii.second;
 
-	for (auto ii: this->mStatementParselets)
+	for (auto ii : this->mStatementParselets)
 		delete ii.second;
 };
 
@@ -150,7 +152,9 @@ Expression* Parser::parseExpression(int precedence)
 	if (prefix == 0)
 	{
 		std::string str = "ParseExpression: No Parser Found for: " + token.text;
-		throw CompilerException(this->filename, token.line, str);//printf("Consume: TokenType not as expected!\n");
+		//throw CompilerException(this->filename, token.line, str);//printf("Consume: TokenType not as expected!\n");
+		ParserError(str, token);
+		return 0;
 	}
 
 	Expression* left = prefix->parse(this, token);
@@ -194,7 +198,9 @@ BlockExpression* Parser::parseBlock(bool allowsingle)
 
 	if (allowsingle && !Match(TokenType::LeftBrace))
 	{
-		statements.push_back(this->ParseStatement());
+		auto res = this->ParseStatement();
+		if (res)
+		statements.push_back(res);
 		return new BlockExpression(std::move(statements));
 	}
 
@@ -202,7 +208,9 @@ BlockExpression* Parser::parseBlock(bool allowsingle)
 
 	while (!Match(TokenType::RightBrace))
 	{
-		statements.push_back(this->ParseStatement());
+		auto res = this->ParseStatement();
+		if (res)
+			statements.push_back(res);
 	}
 
 	Consume(TokenType::RightBrace);
@@ -214,7 +222,9 @@ BlockExpression* Parser::parseAll()
 	std::vector<Expression*> statements;
 	while (!Match(TokenType::EoF))
 	{
-		statements.push_back(this->ParseStatement());
+		auto res = this->ParseStatement();
+		if (res)
+			statements.push_back(res);
 	}
 	auto n = new BlockExpression(std::move(statements));
 	n->SetParent(0);//go through and setup parents
@@ -233,8 +243,16 @@ Token Parser::Consume(TokenType expected)
 	auto temp = LookAhead();
 	if (temp.type != expected)
 	{
-		std::string str = "Consume: TokenType not as expected! Expected: " + TokenToString[expected] + " Got: " + temp.text;
-		throw CompilerException(this->filename, temp.line, str);
+		std::string str = "Consume: TokenType Not As Expected! Expected: " + TokenToString[expected] + " Got: " + temp.text;
+		//throw CompilerException(this->filename, temp.line, str);
+
+		//fabricate a fake token
+		ParserError(str, temp);
+		//lets give up on this, it doesnt work well
+		throw 7;
+
+		mRead.pop_front();
+		return Token(temp.line, temp.column, expected, "uh");
 	}
 	mRead.pop_front();
 	return temp;
@@ -246,7 +264,7 @@ Token Parser::LookAhead(unsigned int num)
 		mRead.push_back(lexer->Next());
 
 	int c = 0;
-	for (auto ii: mRead)
+	for (auto ii : mRead)
 	{
 		if (c++ == num)
 			return ii;
@@ -295,7 +313,7 @@ void Parser::Register(TokenType token, StatementParselet* parselet)
 
 int Parser::getPrecedence() {
 	InfixParselet* parser = mInfixParselets[LookAhead(0).type];
-	if (parser != 0) 
+	if (parser != 0)
 		return parser->getPrecedence();
 
 	return 0;

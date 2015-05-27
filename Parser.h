@@ -6,7 +6,7 @@
 #include <map>
 
 #include "Token.h"
-#include "Compiler.h"
+//#include "Compiler.h"
 #include "Expressions.h"
 #include "Parselets.h"
 #include "Lexer.h"

@@ -341,7 +341,7 @@ namespace Jet
 	void Compile(CompilerContext* context);
 	};*/
 
-	class PrefixExpression : public Expression
+	class PrefixExpression : public Expression, public IStorableExpression
 	{
 		Token _operator;
 
@@ -362,6 +362,41 @@ namespace Jet
 		{
 			this->Parent = parent;
 			right->SetParent(this);
+		}
+
+		void CompileStore(CompilerContext* context, CValue right)
+		{
+			if (_operator.type != TokenType::Asterisk)
+				throw 7;//invalid atm
+
+			if (this->_operator.type == TokenType::Asterisk)
+			{
+				auto i = dynamic_cast<NameExpression*>(this->right);
+				auto p = dynamic_cast<IndexExpression*>(this->right);
+				if (i)
+				{
+					auto var = context->named_values[i->GetName()];
+					auto val = context->parent->builder.CreateLoad(var.val);
+
+					right = context->DoCast(var.type->base, right);
+
+					context->parent->builder.CreateStore(right.val, val);
+
+					return;
+				}
+				else if (p)
+				{
+					auto var = p->GetGEP(context);
+					auto val = context->parent->builder.CreateLoad(var.val);
+
+					right = context->DoCast(var.type->base, right);
+
+					context->parent->builder.CreateStore(right.val, val);
+					return;
+				}
+				throw 7;
+			}
+			throw 7;//implement me
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -891,13 +926,7 @@ namespace Jet
 			delete block;
 			delete name;
 			delete varargs;
-
-			if (args)
-			{
-				//for (auto ii: *args)
-				//delete ii;
-				delete args;
-			}
+			delete args;
 		}
 
 		void SetParent(Expression* parent)
@@ -906,8 +935,6 @@ namespace Jet
 			block->SetParent(this);
 			if (name)
 				name->SetParent(this);
-			//for (auto ii: *args)
-			//ii->SetParent(this);
 		}
 
 		CValue Compile(CompilerContext* context);
