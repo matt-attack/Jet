@@ -2,9 +2,9 @@
 //
 //add multiple returns perhaps?
 /*#ifdef _DEBUG
-#ifndef DBG_NEW      
-#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )     
-#define new DBG_NEW   
+#ifndef DBG_NEW
+#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
+#define new DBG_NEW
 #endif
 
 #define _CRTDBG_MAP_ALLOC
@@ -49,6 +49,25 @@ using namespace Jet;
 #pragma comment (lib, "LLVMAnalysis.lib")
 #pragma comment (lib, "LLVMMC.lib")
 
+#pragma comment (lib, "LLVMExecutionEngine.lib")
+#pragma comment (lib, "LLVMRuntimeDyld.lib")
+#pragma comment (lib, "LLVMObject.lib")
+#pragma comment (lib, "LLVMMCJIT.lib")
+#pragma comment (lib, "LLVMMCParser.lib")
+#pragma comment (lib, "LLVMMCDisassembler.lib")
+#pragma comment (lib, "LLVMipa.lib")
+#pragma comment (lib, "LLVMBitReader.lib")
+#pragma comment (lib, "LLVMX86CodeGen.lib")
+#pragma comment (lib, "LLVMX86Info.lib")
+#pragma comment (lib, "LLVMX86Desc.lib")
+#pragma comment (lib, "LLVMX86Utils.lib")
+#pragma comment (lib, "LLVMX86AsmParser.lib")
+#pragma comment (lib, "LLVMX86AsmPrinter.lib")
+#pragma comment (lib, "LLVMSelectionDAG.lib")
+#pragma comment (lib, "LLVMCodeGen.lib")
+#pragma comment (lib, "LLVMAsmPrinter.lib")
+#pragma comment (lib, "LLVMAsmParser.lib")
+
 std::string exec(char* cmd) {
 	FILE* pipe = _popen(cmd, "r");
 	if (!pipe) return "ERROR";
@@ -67,29 +86,19 @@ std::string exec(char* cmd) {
 #include <llvm\IR\AssemblyAnnotationWriter.h>
 #include <llvm\Support\raw_ostream.h>
 
-int main()
+int main(int argc, char* argv[])
 {
+	if (argc > 0)
+	{
+
+	}
 	Jet::Compiler c;
 
-	//finish structs
-	c.Compile(
-		//"extern fun void* malloc(int size);"
-		//"extern fun void free(void* mem);"
-		"extern fun void printf(int arg1);\n"
-		"fun void test2() { local Point x[10]; /*x.p = 7;*/ /*(x[5]).x = 5;*/ local int qp[10]; local int ppp; ppp = qp[4]; qp[5] = ppp; /*(qp[5]) = 4;*/ local int p; /*p = x.x++;*/ local Ref r; r.p.x = 5;  r.p.y = -r.p.x; local Ref* rr; return;}\n"
-		"fun double calltest() { while (0) puts(\"hi\"); return test(test(8,6),7); }\n"
-		"fun double test(int x, int y) { /*zasd = 5;*/ return x+y; }\n"
-		"fun int t(int m) { for (local double i = 0; i < m; i += 1) { puts(\"hi\"); } return 7;}\n"
-		"extern fun int puts(char* str);\n"
-		"fun int main() { /*local PP q;*/ if (\"testing\") puts(\"Hello from Jet!\"); elseif (1) puts(\"hi\"); else puts(\"Other Hi from Jet!\"); t(6); local int x = 5; x = 2*5; x *= 5; return 7 + 14;}\n"
-		"struct Ref { Point p; }\n"
-		//"fun void t45() { local int x = 5; local int* y = &x; (*y) = 6; local Point p; p.q = y; *p.q = 7; y = &p.x; p.x = 7; x = *y; }"
-		"struct Point { int x; double y; int* q;}\n"
-		"struct PP { abple q;}"
-		, "testing");
+	c.Compile("Test/test.jp");
 
 	//c.Optimize();
-	//std::stringstream str;
+
+
 	if (c.module)
 	{
 		std::string code = "";
@@ -102,6 +111,34 @@ int main()
 	c.Dump();
 
 	//ok, lets eventually pipe into clang
+
+	while (true)
+	{
+		printf("\n>");
+		char command[800];
+		char arg[150]; char command2[150];
+		memset(arg, 0, 150);
+		memset(command2, 0, 150);
+		std::cin.getline(command, 800);
+
+		Jet::Compiler c2;
+
+		c2.Compile("Test/test.jp");
+
+		//c.Optimize();
+
+
+		if (c2.module)
+		{
+			std::string code = "";
+			llvm::raw_string_ostream str(code);
+			llvm::AssemblyAnnotationWriter writer;
+			c2.module->print(str, &writer);
+		}
+
+		//add member funcs!!!!
+		c2.Dump();
+	}
 
 	return 0;
 }

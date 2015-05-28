@@ -102,10 +102,18 @@ namespace Jet
 
 	char* Operator(TokenType t);
 
+	struct Range
+	{
+		unsigned int index;
+		unsigned int length;
+	};
 	struct Token
 	{
 		TokenType type;
 		std::string text;
+		
+		//Range text;
+
 		unsigned int line;
 		unsigned int column;
 

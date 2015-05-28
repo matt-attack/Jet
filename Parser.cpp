@@ -36,7 +36,7 @@ char* Jet::Operator(TokenType t)
 Parser::Parser(Lexer* l)
 {
 	this->lexer = l;
-	this->filename = l->filename;
+	//this->filename = l->filename;
 
 	this->Register(TokenType::Name, new NameParselet());
 	this->Register(TokenType::Number, new NumberParselet());

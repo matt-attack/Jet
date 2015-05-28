@@ -10,28 +10,31 @@ namespace Jet
 	bool IsLetter(char c);
 	bool IsNumber(char c);
 
+	class Source;
+
 	extern std::map<TokenType,std::string> TokenToString; 
 	class Lexer
 	{
-		unsigned int index;
-		std::istream* stream;
+		//unsigned int index;
+		//std::istream* stream;
 
-		std::string text;
-
-		unsigned int linenumber;
-		unsigned int column;
+		//std::string text;
+		Source* src;
+		//std::vector<std::pair<const char*, unsigned int>> lines;
 	public:
-		Lexer(std::istream* input, std::string filename);
-		Lexer(std::string text, std::string filename);
+		Lexer(Source* source);// std::istream* input, std::string filename);
+		//Lexer(std::string text, std::string filename);
 
 		Token Next();
 
-		std::string filename;
+		//std::string GetLine(unsigned int line);
 
-	private:
-		char ConsumeChar();
-		char MatchAndConsumeChar(char c);
-		char PeekChar();
+		//std::string filename;
+
+	//private:
+		//char ConsumeChar();
+		//char MatchAndConsumeChar(char c);
+		//char PeekChar();
 	};
 }
 #endif

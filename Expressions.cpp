@@ -125,10 +125,9 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		else if (lhs.type->type == Types::Array && string == 0)//or pointer!!(later)
 		{
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->DoCast(&IntType, index->Compile(context)).val };
-			//iindex[0]->dump();
+
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-			//loc->dump();
-			//loc->getType()->dump();
+
 			return CValue(lhs.type->base, loc);
 		}
 	}

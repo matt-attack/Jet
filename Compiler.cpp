@@ -1,6 +1,6 @@
 #include "Compiler.h"
 
-
+#include "Source.h"
 #include "Parser.h"
 #include "Lexer.h"
 
@@ -11,21 +11,38 @@ Type Jet::BoolType(Types::Bool);
 Type Jet::DoubleType(Types::Double);
 Type Jet::IntType(Types::Int);
 
+//this is VERY TERRIBLE remove later
+Source* current_source = 0;
+
+//add underlines for the erroring symbol on a third line
 //start using this in parser, will need to remove the exception, but it is still needed later
 void Jet::Error(const std::string& msg, Token token)
 {
 	int startrow = token.column - token.text.length();
 	int endrow = token.column;
-	printf("[error] %d:%d to %d:%d: %s\n[error] >>>%s\n\n", token.line, startrow, token.line, endrow, msg.c_str(), "some code here yo");
+	std::string code = current_source->GetLine(token.line);
+	std::string underline = "";
+	for (int i = 0; i < code.length(); i++)
+	{
+		if (code[i] == '\t')
+			underline += '\t';
+		else if (i >= startrow && i < endrow)
+			underline += '~';
+		else
+			underline += ' ';
+	}
+	printf("[error] %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", token.line, startrow, token.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
 	throw 7;
 }
-
+//make it so this can get the source code to give a more useful error message
 void Jet::ParserError(const std::string& msg, Token token)
 {
 	int startrow = token.column - token.text.length();
 	int endrow = token.column;
-	printf("[error] %d:%d to %d:%d: %s\n[error] >>>%s\n\n", token.line, startrow, token.line, endrow, msg.c_str(), "some code here yo");
-	//throw 7;
+	std::string code = current_source->GetLine(token.line);
+
+	printf("[error] %d:%d to %d:%d: %s\n[error] >>>%s\n\n", token.line, startrow, token.line, endrow, msg.c_str(), code.c_str());
+	throw 7;
 }
 
 void Type::Load(Compiler* compiler)
@@ -153,61 +170,131 @@ llvm::Type* Jet::GetType(Type* t)
 	throw 7;
 }
 
-//#include "llvm/ExecutionEngine/MCJIT.h"
-void Compiler::Compile(const char* code, const char* filename)
+#include "JIT.h"
+MCJITHelper* JITHelper;
+
+#include <direct.h>
+
+#include <fstream>
+#include <filesystem>
+void Compiler::Compile(const char* projectfile)
 {
-	//spin off children and lets compile this bitch!
-	module = new llvm::Module(filename, context);
+	std::vector<std::string> files;
 
-	Lexer lexer = Lexer(code, filename);
-	Parser parser = Parser(&lexer);
+	//ok, lets parse the jp file
+	std::ifstream pf(projectfile, std::ios::in | std::ios::binary);
+	while (pf.peek() != EOF)
+	{
+		std::string file;//read in a filename
+		while (pf.peek() != ' ' && pf.peek() != EOF && pf.peek() != '\r' && pf.peek() != '\n' && pf.peek() != '\t')
+			file += pf.get();
 
-	//printf("In: %s\n\nResult:\n", code);
-	//result->print();
-	//printf("\n\n");
+		pf.get();
+		if (file.length() > 0)
+			files.push_back(file);
+	}
+
+	char olddir[500];
+	getcwd(olddir, 500);
+	std::string path = projectfile;
+	int i = path.length();
+	for (; i >= 0; i--)
+		if (path[i] == '\\' || path[i] == '/')
+			break;
+	path = path.substr(0, i);
+	chdir(path.c_str());
+
+	std::map<std::string, Source*> sources;
+	for (auto file : files)
+	{
+		std::ifstream t(file, std::ios::in | std::ios::binary);
+		if (t)
+		{
+			t.seekg(0, std::ios::end);    // go to the end
+			std::streamoff length = t.tellg();           // report location (this is the length)
+			t.seekg(0, std::ios::beg);    // go back to the beginning
+			char* buffer = new char[length + 1];    // allocate memory for a buffer of appropriate dimension
+			t.read(buffer, length);       // read the whole file into the buffer
+			buffer[length] = 0;
+			t.close();
+
+			sources[file] = new Source(buffer, file);
+		}
+		else
+		{
+			printf("Could not find file!");
+			throw 7;
+		}
+	}
+
+
+	JITHelper = new MCJITHelper(this->context);
+
+	//spin off children and lets compile this!
+	module = JITHelper->getModuleForNewFunction();// new llvm::Module(filename, context);
+
+
 	//compile it
 	//first lets create the global context!!
 	//ok this will be the main entry point it initializes everything, then calls the program's entry point
 	int errors = 0;
 	auto global = new CompilerContext(this);
 
-	BlockExpression* result = 0;
-	try
+	std::map<std::string, BlockExpression*> asts;
+	for (auto file : sources)
 	{
-		result = parser.parseAll();
-	}
-	catch (...)
-	{
-		printf("Compilation Stopped, Parser Error\n");
-		errors = 1;
-		goto error;
-	}
+		current_source = file.second;
+		Lexer lexer = Lexer(file.second);
+		Parser parser = Parser(&lexer);
 
-	//do this for each file
-	for (auto ii : result->statements)
-	{
-		ii->CompileDeclarations(global);
-	}
-
-	//then do this for each file
-	for (auto ii : result->statements)
-	{
-		//catch any exceptions
+		BlockExpression* result = 0;
 		try
 		{
-			ii->Compile(global);
+			result = parser.parseAll();
 		}
+		//catch (CompilerException c)
+		//{
+		//	printf("t");
+		//}
 		catch (...)
 		{
-			printf("Exception Compiling Line\n");
-			errors++;
+			printf("Compilation Stopped, Parser Error\n");
+			errors = 1;
+			goto error;
+		}
+		asts[file.first] = result;
+
+		//do this for each file
+		for (auto ii : result->statements)
+		{
+			ii->CompileDeclarations(global);
+		}
+	}
+
+	for (auto result : asts)
+	{
+		current_source = sources[result.first];
+
+		//then do this for each file
+		for (auto ii : result.second->statements)
+		{
+			//catch any exceptions
+			try
+			{
+				ii->Compile(global);
+			}
+			catch (...)
+			{
+				//printf("Exception Compiling Line\n");
+				errors++;
+			}
 		}
 	}
 
 	auto init = global->AddFunction("global", &IntType, {});
 	init->Return(global->Number(6));
 	//todo: put intializers here and have this call main()
-	delete result;
+	//delete result;
 
 error:
 	if (errors > 0)
@@ -217,7 +304,109 @@ error:
 		module = 0;
 	}
 
-	//go through global scope
+	for (auto ii : sources)
+		delete ii.second;
+
+	for (auto ii : asts)
+		delete ii.second;
+
+	if (errors == 0)
+	{
+		llvm::InitializeNativeTarget();
+		llvm::InitializeNativeTargetAsmParser();
+		llvm::InitializeNativeTargetAsmPrinter();
+		//llvm::InitializeNativeTargetAsmParser();
+		auto mod = JITHelper->getModuleForNewFunction();
+		void* res = JITHelper->getPointerToFunction(this->functions["main"]->f);
+		//try and jit
+		//llvm::EngineBuilder(this-)
+		//go through global scope
+		int(*FP)() = (int(*)())(intptr_t)res;
+		FP();
+	}
+
+	//restore working directory
+	chdir(olddir);
+	return;
+}
+
+void Compiler::Compile(const char* code, const char* filename)
+{
+//	JITHelper = new MCJITHelper(this->context);
+//
+//	//spin off children and lets compile this!
+//	module = JITHelper->getModuleForNewFunction();// new llvm::Module(filename, context);
+//
+//	Lexer lexer = Lexer(code, filename);
+//	Parser parser = Parser(&lexer);
+//
+//	//printf("In: %s\n\nResult:\n", code);
+//	//result->print();
+//	//printf("\n\n");
+//	//compile it
+//	//first lets create the global context!!
+//	//ok this will be the main entry point it initializes everything, then calls the program's entry point
+//	int errors = 0;
+//	auto global = new CompilerContext(this);
+//
+//	BlockExpression* result = 0;
+//	try
+//	{
+//		result = parser.parseAll();
+//	}
+//	catch (...)
+//	{
+//		printf("Compilation Stopped, Parser Error\n");
+//		errors = 1;
+//		goto error;
+//	}
+//
+//	//do this for each file
+//	for (auto ii : result->statements)
+//	{
+//		ii->CompileDeclarations(global);
+//	}
+//
+//	//then do this for each file
+//	for (auto ii : result->statements)
+//	{
+//		//catch any exceptions
+//		try
+//		{
+//			ii->Compile(global);
+//		}
+//		catch (...)
+//		{
+//			printf("Exception Compiling Line\n");
+//			errors++;
+//		}
+//	}
+//
+//	auto init = global->AddFunction("global", &IntType, {});
+//	init->Return(global->Number(6));
+//	//todo: put intializers here and have this call main()
+//	delete result;
+//
+//error:
+//	if (errors > 0)
+//	{
+//		printf("Compiling Failed: %d Errors Found\n", errors);
+//		delete module;
+//		module = 0;
+//	}
+//
+//	llvm::InitializeNativeTarget();
+//	llvm::InitializeNativeTargetAsmParser();
+//	llvm::InitializeNativeTargetAsmPrinter();
+//	//llvm::InitializeNativeTargetAsmParser();
+//	auto mod = JITHelper->getModuleForNewFunction();
+//	void* res = JITHelper->getPointerToFunction(this->functions["main"]->f);
+//	//try and jit
+//	//llvm::EngineBuilder(this-)
+//	//go through global scope
+//	int(*FP)() = (int(*)())(intptr_t)res;
+//	FP();
+//	return;
 }
 
 CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args)

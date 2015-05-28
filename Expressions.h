@@ -1031,6 +1031,7 @@ namespace Jet
 		Token token;
 		Expression* right;
 	public:
+
 		ReturnExpression(Token token, Expression* right)
 		{
 			this->token = token;
@@ -1066,15 +1067,18 @@ namespace Jet
 
 	class BreakExpression : public Expression
 	{
+		Token token;
 	public:
+		BreakExpression(Token token) : token(token) {}
 
 		void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
 		}
-
+		
 		CValue Compile(CompilerContext* context)
 		{
+			context->CurrentToken(&token);
 			context->Break();
 
 			return CValue();
@@ -1085,7 +1089,10 @@ namespace Jet
 
 	class ContinueExpression : public Expression
 	{
+		Token token;
 	public:
+		ContinueExpression(Token token) : token(token) {}
+
 		void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
@@ -1093,6 +1100,7 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
+			context->CurrentToken(&token);
 			context->Continue();
 
 			return CValue();

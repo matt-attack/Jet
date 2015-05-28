@@ -27,7 +27,8 @@ Expression* AssignParselet::parse(Parser* parser, Expression* left, Token token)
 	if (dynamic_cast<IStorableExpression*>(left) == 0)
 	{
 		delete right;
-		throw CompilerException(parser->filename, token.line, "AssignParselet: Left hand side must be a storable location!");
+		ParserError("AssignParselet: Left hand side must be a storable location!", token);
+		//throw CompilerException(parser->filename, token.line, "AssignParselet: Left hand side must be a storable location!");
 	}
 	return new AssignExpression(left, right);
 }
@@ -35,7 +36,8 @@ Expression* AssignParselet::parse(Parser* parser, Expression* left, Token token)
 Expression* OperatorAssignParselet::parse(Parser* parser, Expression* left, Token token)
 {
 	if (dynamic_cast<IStorableExpression*>(left) == 0)
-		throw CompilerException(parser->filename, token.line, "OperatorAssignParselet: Left hand side must be a storable location!");
+		ParserError("OperatorAssignParselet: Left hand side must be a storable location!", token);
+		//throw CompilerException(parser->filename, token.line, "OperatorAssignParselet: Left hand side must be a storable location!");
 
 	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT-1);
 
@@ -59,7 +61,8 @@ Expression* PrefixOperatorParselet::parse(Parser* parser, Token token)
 {
 	Expression* right = parser->parseExpression(precedence);
 	if (right == 0)
-		throw CompilerException(parser->filename, token.line, "PrefixOperatorParselet: Right hand side missing!");
+		ParserError("PrefixOperatorParselet: Right hand side missing!", token);
+		//throw CompilerException(parser->filename, token.line, "PrefixOperatorParselet: Right hand side missing!");
 
 	return new PrefixExpression(token, right);
 }
@@ -68,7 +71,8 @@ Expression* BinaryOperatorParselet::parse(Parser* parser, Expression* left, Toke
 {
 	Expression* right = parser->parseExpression(precedence - (isRight ? 1 : 0));
 	if (right == 0)
-		throw CompilerException(parser->filename, token.line, "BinaryOperatorParselet: Right hand side missing!");
+		ParserError("BinaryOperatorParselet: Right hand side missing!", token);
+		//throw CompilerException(parser->filename, token.line, "BinaryOperatorParselet: Right hand side missing!");
 
 	return new OperatorExpression(left, token, right);
 }
@@ -234,7 +238,8 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 			else
 			{
 				std::string str = "Consume: TokenType not as expected! Expected Name or Ellises Got: " + name.text;
-				throw CompilerException(parser->filename, name.line, str);
+				ParserError(str, name);
+				//throw CompilerException(parser->filename, name.line, str);
 			}
 		}
 		while(parser->MatchAndConsume(TokenType::Comma));
@@ -279,7 +284,8 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 				//try and make it handle extra chars better, maybe just parse down to the next ;
 				//make this use new error system
 				std::string str = "Consume: TokenType not as expected! Expected Name or Ellises Got: " + name.text;
-				throw CompilerException(parser->filename, name.line, str);
+				ParserError(str, name);
+				//throw CompilerException(parser->filename, name.line, str);
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
 
@@ -411,7 +417,8 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 
 Expression* ConstParselet::parse(Parser* parser, Token token)
 {
-	throw CompilerException("", 0, "Const keyword not implemented!");
+	ParserError("Not Implemented", token);
+	//throw CompilerException("", 0, "Const keyword not implemented!");
 
 	auto names = new std::vector<std::pair<std::string,Token>>;
 	do
@@ -472,7 +479,8 @@ Expression* MemberParselet::parse(Parser* parser, Expression* left, Token token)
 	if (name == 0)
 	{
 		delete member; delete left;
-		throw CompilerException(parser->filename, token.line, "Cannot access member name that is not a string");
+		ParserError("Cannot access member name that is not a string", token);
+		//throw CompilerException(parser->filename, token.line, "Cannot access member name that is not a string");
 	}
 
 	auto ret = new IndexExpression(left, new StringExpression(name->GetName()), token);

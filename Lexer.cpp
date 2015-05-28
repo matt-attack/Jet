@@ -1,5 +1,6 @@
 #include "Lexer.h"
 #include "Parser.h"
+#include "Source.h"
 
 using namespace Jet;
 
@@ -149,24 +150,27 @@ bool Jet::IsNumber(char c)
 	return (c >= '0' && c <= '9');
 }
 
-Lexer::Lexer(std::istream* input, std::string filename)
+Lexer::Lexer(Source* source)// std::istream* input, std::string filename)
 {
-	this->stream = input;
-	this->linenumber = 1;
-	this->column = 0;
-	this->index = 0;
-	this->filename = filename;
+	this->src = source;
+	//this->stream = input;
+	//this->linenumber = 1;
+	//this->column = 0;
+	//this->index = 0;
+	//this->filename = filename;
 }
 
-Lexer::Lexer(std::string text, std::string filename)
+/*Lexer::Lexer(std::string text, std::string filename)
 {
-	this->stream = 0;
-	this->column = 0;
-	this->linenumber = 1;
-	this->index = 0;
-	this->text = text;
+	//this->stream = 0;
+	//this->column = 0;
+	//this->linenumber = 1;
+	//this->index = 0;
+	//this->text = text;
 	this->filename = filename;
-}
+}*/
+
+
 
 //can move to functions at some point
 void ParseKeyword(const std::string& string)
@@ -177,10 +181,11 @@ void ParseKeyword(const std::string& string)
 Token Lexer::Next()
 {
 	static LexerStatic ls;
-	while (index < text.length())
+	while (src->IsAtEnd() == false)
 	{
-		char c = this->ConsumeChar();
-		std::string str = text.substr(index - 1, 1);
+		char c = src->ConsumeChar();
+		std::string str;
+		str += c;// = text.substr(index - 1, 1);
 		bool found = false; unsigned int len = 0;
 		TokenType toktype;
 		auto iter = ls.operatorsearch.find(str[0]);
@@ -188,7 +193,7 @@ Token Lexer::Next()
 		{
 			for (auto ii : iter->second)
 			{
-				if (ii.first.length() > (text.length() + 1 - index))
+				if (ii.first.length() > src->Remaining())///(text.length() + 1 - index))
 					continue;
 
 				//pick the longest matching operator/keyword
@@ -196,7 +201,7 @@ Token Lexer::Next()
 					continue;
 
 				//check if the characters match the operator/keyword
-				if (memcmp(ii.first.c_str(), &text.c_str()[index - 1], ii.first.length()) == 0)
+				if (src->IsOperator(ii.first))// memcmp(ii.first.c_str(), &text.c_str()[index - 1], ii.first.length()) == 0)
 				{
 					len = ii.first.length();
 					str = ii.first;
@@ -213,16 +218,16 @@ Token Lexer::Next()
 		if (found)
 		{
 			for (unsigned int i = 0; i < len - 1; i++)
-				this->ConsumeChar();
+				src->ConsumeChar();
 
 			//remove these use of operators
 			if (toktype == TokenType::LineComment)
 			{
 				//go to next line
-				char c = this->ConsumeChar();
+				char c = src->ConsumeChar();
 				while (c != '\n' && c != 0)
 				{
-					c = this->ConsumeChar();
+					c = src->ConsumeChar();
 				}
 
 				if (c == 0)
@@ -232,18 +237,20 @@ Token Lexer::Next()
 			}
 			else if (toktype == TokenType::CommentBegin)
 			{
-				int startline = this->linenumber;
+				int startline = src->linenumber;
 				//Token n = this->Next();
 				while (true)
 				{
-					char c = this->ConsumeChar();
-					if (c == '*' && this->PeekChar() == '/')
+					char c = src->ConsumeChar();
+					if (c == '*' && src->PeekChar() == '/')
 					{
-						this->ConsumeChar();
+						src->ConsumeChar();
 						break;
 					}
 					else if (c == 0)
-						throw CompilerException(this->filename, this->linenumber, "Missing end to comment block starting at line " + std::to_string(startline));
+						ParserError("Missing end to comment block starting at line " + std::to_string(startline), Token(src->linenumber, src->column, TokenType::String, ""));
+
+						//throw CompilerException(this->filename, this->linenumber, "Missing end to comment block starting at line " + std::to_string(startline));
 				}
 
 				continue;
@@ -252,13 +259,15 @@ Token Lexer::Next()
 			{
 				std::string txt;
 
-				int start = index;
-				while (index < text.length())
+				//int start = index;
+				while (src->IsAtEnd() == false)//index < text.length())
 				{
-					if (text[index] == '\\')
+					char p = src->PeekChar();
+					if (p == '\\')//text[index] == '\\')
 					{
+						src->ConsumeChar();
 						//handle escape sequences
-						char c = text[index + 1];
+						char c = src->ConsumeChar();// text[index + 1];
 						switch (c)
 						{
 						case 'n':
@@ -277,30 +286,35 @@ Token Lexer::Next()
 							txt.push_back('"');
 							break;
 						default:
-							throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'");
+							ParserError("Invalid Escape Sequence '\\" + std::to_string(c) + "'", Token(src->linenumber, src->column, TokenType::String, ""));
+
+							//throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'");
 						}
 
-						index += 2;
+						//index += 2;
 					}
-					else if (text[index] == '"')
+					else if (p == '"')
 					{
+						src->ConsumeChar();
 						break;
 					}
 					else
 					{
-						txt.push_back(text[index++]);
+						txt.push_back(src->ConsumeChar());// text[index++]);
 					}
 				}
 
-				index++;
-				return Token(linenumber, column, toktype, txt);
+				//index++;
+				return Token(src->linenumber, src->column, toktype, txt);
 			}
 			else if (toktype == TokenType::BlockString)
 			{
-				std::string txt;
+				ParserError("Block Strings Not Implemented", Token(src->linenumber, src->column, TokenType::String, ""));
+
+				/*std::string txt;
 
 				int start = index;
-				while (index < text.length())
+				while (src->IsAtEnd() == false)//index < text.length())
 				{
 					if (text[index] == '\\')
 					{
@@ -324,7 +338,9 @@ Token Lexer::Next()
 							txt.push_back('"');
 							break;
 						default:
-							throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'");
+							ParserError("Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'", Token(src->linenumber, src->column, TokenType::String, ""));
+
+							//throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'");
 						}
 
 						index += 2;
@@ -340,108 +356,114 @@ Token Lexer::Next()
 				}
 
 				index += 3;
-				return Token(linenumber, column, TokenType::String, txt);
+				return Token(src->linenumber, src->column, TokenType::String, txt);*/
 			}
 
-			return Token(linenumber, column, toktype, str);
+			return Token(src->linenumber, src->column, toktype, str);
 		}
 		else if (IsLetter(c) || c == '_')//word
 		{
-			int start = index - 1;
+			//int start = index - 1;
+			std::string name;
+			name += c;
 			while (true)
 			{
-				char c = this->PeekChar();
+				char c = src->PeekChar();
 				if (!(IsLetter(c) || c == '_'))
 					if (!IsNumber(c))
 						break;
 
-				this->ConsumeChar();
+				name += src->ConsumeChar();
 			}
 
-			std::string name = text.substr(start, index - start);
+			//std::string name = text.substr(start, index - start);
 			//check if it is a keyword
 			auto keyword = ls.keywords.find(name);
 			if (keyword != ls.keywords.end())//is keyword?
-				return Token(linenumber, column, keyword->second, name);
+				return Token(src->linenumber, src->column, keyword->second, name);
 			else//just a variable name
-				return Token(linenumber, column, TokenType::Name, name);
+				return Token(src->linenumber, src->column, TokenType::Name, name);
 		}
 		else if (IsNumber(c))//number
 		{
 			//finish adding different literal types
-			int start = index - 1;
+			//int start = index - 1;
 			if (c != '0')
 			{
+				std::string num;
+				num += c;
 				while (true)
 				{
-					char c = this->PeekChar();
+					char c = src->PeekChar();
 					if (!(c == '.' || IsNumber(c)))
 						break;
 
-					this->ConsumeChar();
+					num += src->ConsumeChar();
 				}
-				std::string num = text.substr(start, index - start);
-				return Token(linenumber, column, TokenType::Number, num);
+				//std::string num = text.substr(start, index - start);
+				return Token(src->linenumber, src->column, TokenType::Number, num);
 			}
 			else
 			{
 				//ok, its possibly some kind of non base ten literal
-				char c = this->PeekChar();
+				char c = src->PeekChar();
 				switch (c)
 				{
 				case 'b':
 				{
-					this->ConsumeChar();
+					src->ConsumeChar();
+					std::string num;
 					while (true)
 					{
-						char c = this->PeekChar();
+						char c = src->PeekChar();
 						if (!(c == '.' || IsNumber(c)))
 							break;
 
-						this->ConsumeChar();
+						num += src->ConsumeChar();
 					}
-					std::string num = text.substr(start, index - start);
-					return Token(linenumber, column, TokenType::Number, num);
+					//std::string num = text.substr(start, index - start);
+					return Token(src->linenumber, src->column, TokenType::Number, num);
 					break;
 				}
 				case 'x'://hex literal
 				{
-					this->ConsumeChar();
+					src->ConsumeChar();
+					std::string num;
 					while (true)
 					{
-						char c = this->PeekChar();
+						char c = src->PeekChar();
 						if (!(c == '.' || IsNumber(c)))
 							break;
 
-						this->ConsumeChar();
+						num += src->ConsumeChar();
 					}
-					std::string num = text.substr(start, index - start);
-					return Token(linenumber, column, TokenType::Number, num);
+					//std::string num = text.substr(start, index - start);
+					return Token(src->linenumber, src->column, TokenType::Number, num);
 					break;
 				}
 				default:
 				{
 					while (true)
 					{
-						char c = this->PeekChar();
+						char c = src->PeekChar();
 						if (!(c == '.' || IsNumber(c)))
 							break;
 
-						this->ConsumeChar();
+						str += src->ConsumeChar();
 					}
-					std::string num = text.substr(start, index - start);
-					return Token(linenumber, column, TokenType::Number, num);
+					//std::string num = text.substr(start, index - start);
+					return Token(src->linenumber, src->column, TokenType::Number, str);
 				}
 				}
 			}
 		}
 		else if (c == '\'')
 		{
-			char cc = this->ConsumeChar();
+			char cc = src->ConsumeChar();
 			if (cc == '\\')
 			{
 				//handle the escape sequence
-				cc = this->ConsumeChar();
+				cc = src->ConsumeChar();
 				switch (cc)
 				{
 				case 'n':
@@ -460,15 +482,19 @@ Token Lexer::Next()
 					cc = '\'';
 					break;
 				default:
-					throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index - 1, 1) + "'");
+					ParserError("Invalid Escape Sequence '\\" + std::to_string(cc)/*text.substr(index - 1, 1)*/ + "'", Token(src->linenumber, src->column, TokenType::String, ""));
+
+					//throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index - 1, 1) + "'");
 				}
 			}
 			std::string num = std::to_string((int)cc);
 
-			cc = this->ConsumeChar();
+			cc = src->ConsumeChar();
 			if (cc != '\'')
-				throw CompilerException(filename, linenumber, "Closing ' expected for character literal.");
-			return Token(linenumber, column, TokenType::Number, num);
+				ParserError("Closing ' expected for character literal.", Token(src->linenumber, src->column, TokenType::String, ""));
+
+			//	throw CompilerException(filename, linenumber, "Closing ' expected for character literal.");
+			return Token(src->linenumber, src->column, TokenType::Number, num);
 		}
 		else
 		{
@@ -476,50 +502,10 @@ Token Lexer::Next()
 			if (c == ' ' || c == '\t' || c == '\n' || c == '\r')
 				continue;
 			else
-				throw CompilerException(this->filename, this->linenumber, "Unexpected character: '" + str + "'");
+				ParserError("Unexpected character: '" + str + "'", Token(src->linenumber, src->column, TokenType::String, ""));
+				//throw CompilerException(this->filename, this->linenumber, "Unexpected character: '" + str + "'");
 		}
 	}
-	return Token(linenumber, column, TokenType::EoF, "EOF");
+	return Token(src->linenumber, src->column, TokenType::EoF, "EOF");
 }
 
-char Lexer::ConsumeChar()
-{
-	if (index >= text.size())
-		return 0;
-
-	column++;
-	if (text.at(index) == '\n')
-	{
-		this->linenumber++;
-		this->column = 0;
-	}
-
-	return text.at(index++);
-}
-
-char Lexer::MatchAndConsumeChar(char c)
-{
-	if (index >= text.size())
-		return 0;
-
-	char ch = text.at(index);
-	if (c == ch)
-	{
-		column++;
-		index++;
-		if (ch == '\n')
-		{
-			this->column = 0;
-			this->linenumber++;
-		}
-	}
-	return ch;
-}
-
-char Lexer::PeekChar()
-{
-	if (index >= text.size())
-		return 0;
-
-	return text.at(index);
-}

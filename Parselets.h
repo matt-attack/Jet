@@ -265,7 +265,7 @@ namespace Jet
 
 		Expression* parse(Parser* parser, Token token)
 		{
-			return new ContinueExpression();
+			return new ContinueExpression(token);
 		}
 	};
 
@@ -279,7 +279,7 @@ namespace Jet
 
 		Expression* parse(Parser* parser, Token token)
 		{
-			return new BreakExpression();
+			return new BreakExpression(token);
 		}
 	};
 
