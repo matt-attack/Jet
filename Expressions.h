@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "Compiler.h"
-//#include "Value.h"
 
 namespace Jet
 {
@@ -961,13 +960,7 @@ namespace Jet
 		~ExternExpression()
 		{
 			delete name;
-
-			if (args)
-			{
-				//for (auto ii : *args)
-				//delete ii;
-				delete args;
-			}
+			delete args;
 		}
 
 		void SetParent(Expression* parent)
@@ -975,8 +968,6 @@ namespace Jet
 			this->Parent = parent;
 			if (name)
 				name->SetParent(this);
-			//for (auto ii : *args)
-			//	ii->SetParent(this);
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -1002,23 +993,12 @@ namespace Jet
 
 		~StructExpression()
 		{
-			//delete name;
-
-			if (elements)
-			{
-				//for (auto ii : *args)
-				//delete ii;
-				delete elements;
-			}
+			delete elements;
 		}
 
 		void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
-			//if (elements)
-			//name->SetParent(this);
-			//for (auto ii : *args)
-			//	ii->SetParent(this);
 		}
 
 		CValue Compile(CompilerContext* context);

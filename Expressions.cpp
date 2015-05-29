@@ -278,32 +278,69 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->_operator);
 
-	/*if (this->_operator.type == TokenType::And)
+	if (this->_operator.type == TokenType::And)
 	{
-	std::string label = "_endand"+context->GetUUID();
-	this->left->Compile(context);
-	context->JumpFalsePeek(label.c_str());//jump to endand if false
-	context->Pop();
-	this->right->Compile(context);
-	context->Label(label);//put endand label here
-	return;
+		auto else_block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "land.shortcircuitelse");
+		auto end_block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "land.endshortcircuit");
+		auto cur_block = context->parent->builder.GetInsertBlock();
+
+		auto cond = this->left->Compile(context);
+		cond = context->DoCast(&BoolType, cond);
+		context->parent->builder.CreateCondBr(cond.val, else_block, end_block);
+		
+		context->f->getBasicBlockList().push_back(else_block);
+		context->parent->builder.SetInsertPoint(else_block);
+		auto cond2 = this->right->Compile(context);
+		//cond2.val->dump();
+		cond2 = context->DoCast(&BoolType, cond2);
+		context->parent->builder.CreateBr(end_block);
+		
+		context->f->getBasicBlockList().push_back(end_block);
+		context->parent->builder.SetInsertPoint(end_block);
+		auto phi = context->parent->builder.CreatePHI(GetType(cond.type), 2, "land");
+		phi->addIncoming(cond.val, cur_block);
+		//cond2.val->dump();
+		phi->addIncoming(cond2.val, else_block);
+		//phi->dump();
+		return CValue(&BoolType, phi);
 	}
 
 	if (this->_operator.type == TokenType::Or)
 	{
-	std::string label = "_endor"+context->GetUUID();
-	this->left->Compile(context);
-	context->JumpTruePeek(label.c_str());//jump to endor if true
-	context->Pop();
-	this->right->Compile(context);
-	context->Label(label);//put endor label here
-	return;
-	}*/
+		auto else_block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "lor.shortcircuitelse");
+		auto end_block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "lor.endshortcircuit");
+		auto cur_block = context->parent->builder.GetInsertBlock();
+
+		auto cond = this->left->Compile(context);
+		cond = context->DoCast(&BoolType, cond);
+		context->parent->builder.CreateCondBr(cond.val, end_block, else_block);
+
+		context->f->getBasicBlockList().push_back(else_block);
+		context->parent->builder.SetInsertPoint(else_block);
+		auto cond2 = this->right->Compile(context);
+		cond2 = context->DoCast(&BoolType, cond2);
+		context->parent->builder.CreateBr(end_block);
+
+		context->f->getBasicBlockList().push_back(end_block);
+		context->parent->builder.SetInsertPoint(end_block);
+		auto phi = context->parent->builder.CreatePHI(GetType(cond.type), 2, "lor");
+		phi->addIncoming(cond.val, cur_block);
+		phi->addIncoming(cond2.val, else_block);
+		return CValue(&BoolType, phi);
+		//std::string label = "_endor" + context->GetUUID();
+		//this->left->Compile(context);
+		//context->JumpTruePeek(label.c_str());//jump to endor if true
+		//context->Pop();
+		//this->right->Compile(context);
+		//context->Label(label);//put endor label here
+		//return;
+	}
 
 	auto lhs = this->left->Compile(context);
 	auto rhs = this->right->Compile(context);
 	rhs = context->DoCast(lhs.type, rhs);
-
+	//rhs.val->dump();
+	//lhs.val->dump();
 	return context->BinaryOperation(this->_operator.type, lhs, rhs);
 }
 

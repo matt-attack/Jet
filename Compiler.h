@@ -1,4 +1,5 @@
-#pragma once
+#ifndef JET_COMPILER_HEADER
+#define JET_COMPILER_HEADER
 
 /*#ifdef _DEBUG
 #ifndef DBG_NEW
@@ -21,10 +22,8 @@
 //#include <vector>
 //#include <map>
 
+#include "Types.h"
 #include "Token.h"
-
-//#include "JetInstructions.h"
-//#include "JetExceptions.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 //#include "llvm/ExecutionEngine/MCJIT.h"
@@ -34,81 +33,14 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/Scalar.h"
 
+
+
 namespace Jet
 {
 	void Error(const std::string& msg, Token token);
 	void ParserError(const std::string& msg, Token token);
 
 	class BlockExpression;
-
-	enum class Types
-	{
-		Void,
-		Double,
-		Float,
-		Int,
-		Char,
-		Short,
-		Bool,
-
-		Class,//value type
-		Function,
-
-		Pointer,
-		Array,//acts just like a pointer
-
-		Invalid,//for unloaded types
-	};
-
-
-	class Compiler;
-	struct Struct;
-	struct Type
-	{
-		Types type : 8;
-		bool loaded : 8;
-		union
-		{
-			Struct* data;//for classes
-			Type* base;//for pointers
-		};
-		unsigned int size;//for arrays
-
-		Type() { data = 0; type = Types::Void; loaded = false; size = 0; }
-		Type(Types type, Struct* data = 0) : type(type), data(data), loaded(false), size(0) {}
-		Type(Types type, Type* base, int size = 0) : type(type), base(base), loaded(false), size(size) {}
-
-		void Load(Compiler* compiler);
-
-		std::string ToString();
-
-		//Type* GetPointerType()
-		//{
-			//todo, idk how im gonna do this lel
-		//}
-	};
-
-	struct Struct
-	{
-		std::string name;
-		std::vector<std::pair<std::string, Type*>> members;
-		llvm::Type* type;
-
-		bool loaded;
-
-		Struct()
-		{
-			type = 0;
-			loaded = false;
-		}
-
-		void Load(Compiler* compiler);
-	};
-
-	extern Type VoidType;
-	extern Type BoolType;
-	extern Type DoubleType;
-	extern Type IntType;
 
 	struct CValue
 	{
@@ -123,27 +55,6 @@ namespace Jet
 		}
 
 		CValue(Type* type, llvm::Value* val) : type(type), val(val) {}
-	};
-
-	struct Function
-	{
-		std::string name;
-
-		std::vector<llvm::Type*> args;
-		std::vector<std::pair<Type*, std::string>> argst;
-
-		llvm::Function* f;//not always used
-
-		Type* return_type;
-
-		bool loaded;
-
-		Function()
-		{
-			loaded = false;
-		}
-
-		void Load(Compiler* compiler);
 	};
 
 	//add global variables
@@ -178,7 +89,6 @@ namespace Jet
 		void Optimize()
 		{
 			llvm::legacy::FunctionPassManager OurFPM(module);
-
 			// Set up the optimizer pipeline.  Start with registering info about how the
 			// target lays out data structures.
 			//TheModule->setDataLayout(*TheExecutionEngine->getDataLayout());
@@ -197,10 +107,14 @@ namespace Jet
 
 			for (auto ii : this->functions)
 			{
-				OurFPM.run(*ii.second->f);
+				if (ii.second->f)
+					OurFPM.run(*ii.second->f);
 			}
 		}
 
+		void OutputIR(const char* filename);
+		void OutputPackage();
+		
 		void Dump()
 		{
 			if (module)
@@ -223,6 +137,26 @@ namespace Jet
 					type->base = t;
 					type->type = Types::Pointer;
 
+					types[name] = type;
+					return type;
+				}
+				else if (name[name.length() - 1] == ']')
+				{
+					//its an array
+					int p = 0;
+					for (p = 0; p < name.length(); p++)
+						if (name[p] == '[')
+							break;
+
+					auto len = name.substr(p + 1, name.length() - p - 2);
+
+					auto tname = name.substr(0, p);
+					auto t = this->LookupType(tname);
+
+					Type* type = new Type;
+					type->base = t;
+					type->type = Types::Array;
+					type->size = std::stoi(len);//cheat for now
 					types[name] = type;
 					return type;
 				}
@@ -292,8 +226,6 @@ namespace Jet
 			return type;
 		}
 	};
-
-	llvm::Type* GetType(Type* t);
 
 	//compiles functions
 	class CompilerContext
@@ -456,6 +388,24 @@ namespace Jet
 				if (t->type == Types::Bool)
 					return CValue(t, parent->builder.CreateIsNotNull(value.val));
 			}
+			if (value.type->type == Types::Array)
+			{
+				//array to pointer
+				if (t->type == Types::Pointer)
+				{
+					if (t->base == value.type->base)
+					{
+						//lets just try it
+						//fixme later
+						/*std::vector<llvm::Value*> arr = { parent->builder.getInt32(0) };// , parent->builder.getInt32(0)
+		
+						value.val->dump();
+						value.val = parent->builder.CreateGEP(value.val, arr, "array2ptr");
+						value.val->dump();
+						return CValue(t, value.val);*/
+					}
+				}
+			}
 
 			Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 		}
@@ -463,3 +413,4 @@ namespace Jet
 		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args);
 	};
 };
+#endif

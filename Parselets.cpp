@@ -8,16 +8,7 @@ using namespace Jet;
 
 Expression* NameParselet::parse(Parser* parser, Token token)
 {
-	if (parser->MatchAndConsume(TokenType::LeftBracket))
-	{
-		//array index
-		UniquePtr<Expression*> index = parser->parseExpression();
-		parser->Consume(TokenType::RightBracket);
-
-		return new IndexExpression(new NameExpression(token), index.Release(), token);
-	}
-	else
-		return new NameExpression(token);
+	return new NameExpression(token);
 }
 
 Expression* AssignParselet::parse(Parser* parser, Expression* left, Token token)
@@ -175,7 +166,7 @@ std::string ParseType(Parser* parser)
 {
 	Token name = parser->Consume();
 	std::string out = name.text;
-	if (parser->MatchAndConsume(TokenType::Asterisk))
+	while (parser->MatchAndConsume(TokenType::Asterisk))
 	{
 		//its a pointer
 		out += '*';
@@ -196,6 +187,30 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		std::string type = ParseType(parser);
 
 		Token name = parser->Consume(TokenType::Name);//then read name
+
+		if (parser->MatchAndConsume(TokenType::LeftBracket))
+		{
+			//its an array type
+			//read the number
+			auto size = parser->parseExpression(Precedence::ASSIGNMENT);
+
+			parser->Consume(TokenType::RightBracket);
+
+			if (auto s = dynamic_cast<NumberExpression*>(size))
+			{
+				if (s->GetValue() <= 0)
+				{
+					ParserError("Cannot size array with a zero or negative size", token);
+					throw 7;
+				}
+				type += "[" + std::to_string((int)s->GetValue()) + "]";
+			}
+			else
+			{
+				ParserError("Cannot size array with a non constant size", token);
+				throw 7;
+			}
+		}
 
 		parser->Consume(TokenType::Semicolon);		
 

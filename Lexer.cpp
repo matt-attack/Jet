@@ -489,8 +489,8 @@ Token Lexer::Next()
 			}
 			std::string num = std::to_string((int)cc);
 
-			cc = src->ConsumeChar();
-			if (cc != '\'')
+			char endc = src->ConsumeChar();
+			if (endc != '\'')
 				ParserError("Closing ' expected for character literal.", Token(src->linenumber, src->column, TokenType::String, ""));
 
 			//	throw CompilerException(filename, linenumber, "Closing ' expected for character literal.");

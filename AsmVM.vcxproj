@@ -467,6 +467,7 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Token.h" />
+    <ClInclude Include="Types.h" />
     <ClInclude Include="UniquePtr.h" />
     <ClInclude Include="VMStack.h" />
   </ItemGroup>
@@ -479,6 +480,7 @@
     <ClCompile Include="Parser.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="Types.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
