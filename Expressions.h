@@ -906,29 +906,31 @@ namespace Jet
 
 	class FunctionExpression : public Expression
 	{
-		Expression* name;
+		Token name;
 		std::vector<std::pair<std::string, std::string>>* args;
 		ScopeExpression* block;
 		Token token;
+
+		Token Struct;
 
 		std::string ret_type;
 		NameExpression* varargs;
 	public:
 
-		FunctionExpression(Token token, Expression* name, std::string& ret_type, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, NameExpression* varargs = 0)
+		FunctionExpression(Token token, Token name, std::string& ret_type, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct)
 		{
 			this->ret_type = ret_type;
 			this->args = args;
 			this->block = block;
 			this->name = name;
 			this->token = token;
-			this->varargs = varargs;
+			this->varargs = 0;// varargs;
+			this->Struct = Struct;
 		}
 
 		~FunctionExpression()
 		{
 			delete block;
-			delete name;
 			delete varargs;
 			delete args;
 		}
@@ -944,8 +946,6 @@ namespace Jet
 		{
 			this->Parent = parent;
 			block->SetParent(this);
-			if (name)
-				name->SetParent(this);
 		}
 
 		CValue Compile(CompilerContext* context);

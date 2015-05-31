@@ -136,8 +136,9 @@ void Compiler::Compile(const char* code, const char* filename)
 
 CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member)
 {
-	Function* func = parent->functions[fname];
-	if (func == 0)
+	auto iter = parent->functions.find(fname);
+	Function* func;// = parent->functions[fname];
+	if (iter == parent->functions.end())
 	{
 		//no function exists
 		func = new Function;
@@ -161,6 +162,10 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "entry", n->f);
 		parent->builder.SetInsertPoint(bb);
 		return n;
+	}
+	else
+	{
+		func = iter->second;
 	}
 
 	func->Load(this->parent);
@@ -768,8 +773,6 @@ void Compiler::OutputPackage()
 	std::string function;
 	for (auto ii : this->functions)
 	{
-		if (ii.second == 0)
-			continue;//shouldnt happen, but w/e
 		function += "extern fun " + ii.second->return_type->ToString() + " ";
 		function += ii.first + "(";
 		bool first = false;

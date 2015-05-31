@@ -244,8 +244,18 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	//read in type
 	std::string ret_type = ParseType(parser);
 
-	auto name = new NameExpression(parser->Consume(TokenType::Name));
+	Token name = parser->Consume(TokenType::Name);
 	auto arguments = new std::vector<std::pair<std::string, std::string>>;
+
+	Token stru;
+	if (parser->MatchAndConsume(TokenType::Colon))
+	{
+		parser->Consume(TokenType::Colon);
+
+		//its a struct definition
+		stru = name;
+		name = parser->Consume(TokenType::Name);//parse the real function name
+	}
 
 	NameExpression* varargs = 0;
 	parser->Consume(TokenType::LeftParen);
@@ -280,7 +290,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	}
 
 	auto block = new ScopeExpression(parser->parseBlock());
-	return new FunctionExpression(token, name, ret_type, arguments, block, varargs);
+	return new FunctionExpression(token, name, ret_type, arguments, block, /*varargs,*/ stru);
 }
 
 Expression* ExternParselet::parse(Parser* parser, Token token)

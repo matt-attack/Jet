@@ -94,17 +94,12 @@ Type* IndexExpression::GetBaseType(CompilerContext* context)
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
 
-	auto string = dynamic_cast<StringExpression*>(index);
-	if (p || i)
-	{
-		CValue lhs;
-		if (p)
-			lhs = context->named_values[p->GetName()];
-		else if (i)
-			lhs = i->GetGEP(context);
+	if (p)
+		return context->named_values[p->GetName()].type;
+	else if (i)
+		return i->GetType(context);
 
-		return lhs.type;
-	}
+	Error("wat", token);
 }
 
 CValue IndexExpression::GetBaseGEP(CompilerContext* context)
@@ -112,17 +107,12 @@ CValue IndexExpression::GetBaseGEP(CompilerContext* context)
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
 
-	auto string = dynamic_cast<StringExpression*>(index);
-	if (p || i)
-	{
-		CValue lhs;
-		if (p)
-			lhs = context->named_values[p->GetName()];
-		else if (i)
-			lhs = i->GetGEP(context);
+	if (p)
+		return context->named_values[p->GetName()];
+	else if (i)
+		return i->GetGEP(context);
 
-		return lhs;
-	}
+	Error("wat", token);
 }
 
 Type* IndexExpression::GetType(CompilerContext* context)
@@ -154,17 +144,10 @@ Type* IndexExpression::GetType(CompilerContext* context)
 				//not found;
 			}
 
-			//std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
-
-			//auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
 			return lhs.type->data->members[index].second;
 		}
 		else if (lhs.type->type == Types::Array && string == 0)//or pointer!!(later)
 		{
-			//std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->DoCast(&IntType, index->Compile(context)).val };
-
-			//auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-
 			return lhs.type->base;
 		}
 	}
@@ -274,6 +257,7 @@ context->Pop();
 
 CValue NumberExpression::Compile(CompilerContext* context)
 {
+	//get type from the constant
 	return context->Number(this->value);
 }
 
@@ -316,7 +300,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 		auto iter = context->parent->functions.find(name->GetName());
 		if (iter == context->parent->functions.end())
 			Error("Function '" + name->GetName() + "' is not defined", token);
-		fun = iter->second;//context->parent->functions[dynamic_cast<NameExpression*>(left)->GetName()];
+		fun = iter->second;
 
 		fun->Load(context->parent);
 
@@ -332,13 +316,11 @@ CValue CallExpression::Compile(CompilerContext* context)
 	{
 		//im a struct yo
 		std::string name = dynamic_cast<StringExpression*>(index->index)->GetValue();
-		//fun = 
 
 		fun = index->GetBaseType(context)->data->functions[name];
 
 		fun->Load(context->parent);
 
-		//std::string fname = name;//mangle me
 		f = context->parent->module->getFunction(fun->name);
 
 		//push in the this pointer argument kay
@@ -372,12 +354,12 @@ CValue NameExpression::Compile(CompilerContext* context)
 
 CValue OperatorAssignExpression::Compile(CompilerContext* context)
 {
-	context->CurrentToken(&token);
-
 	//try and cast right side to left
 	auto lhs = this->left->Compile(context);
 	auto rhs = this->right->Compile(context);
 	rhs = context->DoCast(lhs.type, rhs);
+
+	context->CurrentToken(&token);
 
 	auto res = context->BinaryOperation(token.type, lhs, rhs);
 
@@ -461,8 +443,8 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 std::string FunctionExpression::GetRealName()
 {
 	std::string fname;
-	if (name)
-		fname = static_cast<NameExpression*>(name)->GetName();
+	if (name.text.length() > 0)
+		fname = name.text;
 	else
 		fname = "_lambda_id_";
 	auto Struct = dynamic_cast<StructExpression*>(this->Parent);
@@ -474,13 +456,10 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	context->CurrentToken(&token);
 
 	std::string fname;
-	if (name)
-		fname = static_cast<NameExpression*>(name)->GetName();
+	if (name.text.length() > 0)
+		fname = name.text;
 	else
 		fname = "_lambda_id_";
-
-	auto Struct = dynamic_cast<StructExpression*>(this->Parent);
-	//fname = this->GetRealName();// Struct ? "__" + Struct->GetName() + "_" + fname : fname;
 
 	//build list of types of vars
 	std::vector<std::pair<Type*, std::string>> argsv;
@@ -489,11 +468,13 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 		argsv.push_back({ context->parent->LookupType(ii.first), ii.second });
 	}
 
+	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
+	CompilerContext* function = context->AddFunction(this->GetRealName(), context->parent->LookupType(this->ret_type), argsv, Struct.length() > 0 ? true : false);// , this->varargs);
+	if (Struct.length() > 0)
+		context->parent->types[Struct]->data->functions[fname]->f = function->f;
+	//else
+		//context->parent->functions[fname] = function->f;
 
-	CompilerContext* function = context->AddFunction(this->GetRealName(), context->parent->LookupType(this->ret_type), argsv, Struct ? true : false);// , this->varargs);
-	if (Struct)
-		context->parent->types[Struct->GetName()]->data->functions[fname]->f = function->f;
-	
 	//alloc args
 	auto AI = function->f->arg_begin();
 	for (unsigned Idx = 0, e = args->size(); Idx != e; ++Idx, ++AI) {
@@ -538,21 +519,21 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 void FunctionExpression::CompileDeclarations(CompilerContext* context)
 {
 	std::string fname;
-	if (name)
-		fname = static_cast<NameExpression*>(name)->GetName();
+	if (name.text.length() > 0)
+		fname = name.text;
 	else
 		fname = "_lambda_id_";
 
 	Function* fun = new Function;
 	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type);
 
-	auto Struct = dynamic_cast<StructExpression*>(this->Parent);
-	if (Struct)
+	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
+	if (Struct.length() > 0)
 	{
 		//im a member function
 
 		//insert first arg, which is me
-		this->args->push_back({ Struct->GetName() + "*", "this" });
+		this->args->push_back({ Struct + "*", "this" });
 		//auto type = context->parent->AdvanceTypeLookup(Struct->GetName());
 		//fun->argst.push_back({ type, "this" });
 	}
@@ -565,10 +546,10 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	}
 
 	//todo: modulate actual name of function
-	fun->name = this->GetRealName();// Struct ? "__" + Struct->GetName() + "_" + fname : fname;
+	fun->name = this->GetRealName();
 	fun->f = 0;
-	if (Struct)
-		context->parent->types[Struct->GetName()]->data->functions[fname] = fun;
+	if (Struct.length() > 0)
+		context->parent->types[Struct]->data->functions[fname] = fun;
 	else
 		context->parent->functions[fname] = fun;
 }
@@ -581,7 +562,6 @@ CValue ExternExpression::Compile(CompilerContext* context)
 void ExternExpression::CompileDeclarations(CompilerContext* context)
 {
 	std::string fname = name.text;
-
 
 	Function* fun = new Function;
 	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type);
