@@ -181,9 +181,25 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 	parser->Consume(TokenType::LeftBrace);
 
 	auto elements = new std::vector < std::pair<std::string, std::string> > ;
+	auto functions = new std::vector < FunctionExpression* > ;
 	while (parser->MatchAndConsume(TokenType::RightBrace) == false)
 	{
 		//first read type
+		if (parser->Match(TokenType::Function))
+		{
+			//parse the function
+
+			auto* expr = parser->ParseStatement(true);
+
+			if (auto fun = dynamic_cast<FunctionExpression*>(expr))
+			{
+				functions->push_back(fun);
+				continue;
+			}
+
+			ParserError("Not implemented!", token);
+		}
+
 		std::string type = ParseType(parser);
 
 		Token name = parser->Consume(TokenType::Name);//then read name
@@ -219,7 +235,8 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		//add member functions!!!
 	}
 	//done
-	return new StructExpression(name, name.text, elements);
+
+	return new StructExpression(name, name.text, elements, functions);
 }
 
 Expression* FunctionParselet::parse(Parser* parser, Token token)
@@ -272,8 +289,18 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 
 	std::string ret_type = ParseType(parser);
 
-	auto name = new NameExpression(parser->Consume(TokenType::Name));
+	Token name = parser->Consume(TokenType::Name);
 	auto arguments = new std::vector<std::pair<std::string, std::string>>;
+
+	std::string stru;
+	if (parser->MatchAndConsume(TokenType::Colon))
+	{
+		parser->Consume(TokenType::Colon);
+
+		//its a struct definition
+		stru = name.text;
+		name = parser->Consume(TokenType::Name);//parse the real function name
+	}
 
 	NameExpression* varargs = 0;
 	parser->Consume(TokenType::LeftParen);
@@ -307,7 +334,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 		parser->Consume(TokenType::RightParen);
 	}
 
-	return new ExternExpression(token, name, ret_type, arguments);
+	return new ExternExpression(token, name, ret_type, arguments, stru);
 }
 
 

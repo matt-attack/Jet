@@ -449,18 +449,10 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Bindings.h" />
     <ClInclude Include="Compiler.h" />
     <ClInclude Include="Expressions.h" />
-    <ClInclude Include="GarbageCollector.h" />
-    <ClInclude Include="JetArray.h" />
-    <ClInclude Include="JetContext.h" />
-    <ClInclude Include="JetInstructions.h" />
     <ClInclude Include="JIT.h" />
     <ClInclude Include="Lexer.h" />
-    <ClInclude Include="Libraries\File.h" />
-    <ClInclude Include="Libraries\Math.h" />
-    <ClInclude Include="Libraries\Net.h" />
     <ClInclude Include="Parselets.h" />
     <ClInclude Include="Parser.h" />
     <ClInclude Include="Source.h" />
@@ -469,10 +461,9 @@
     <ClInclude Include="Token.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="UniquePtr.h" />
-    <ClInclude Include="VMStack.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AsmVM.cpp" />
+    <ClCompile Include="jetc.cpp" />
     <ClCompile Include="Compiler.cpp" />
     <ClCompile Include="Expressions.cpp" />
     <ClCompile Include="Lexer.cpp" />

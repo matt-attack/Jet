@@ -226,8 +226,9 @@ namespace Jet
 
 	class IndexExpression : public Expression, public IStorableExpression
 	{
-		Expression*index;
+		
 	public:
+		Expression* index;
 		Expression* left;
 		Token token;
 		IndexExpression(Expression* left, Expression* index, Token t)
@@ -246,6 +247,10 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		CValue GetGEP(CompilerContext* context);
+		CValue GetBaseGEP(CompilerContext* context);
+
+		Type* GetType(CompilerContext* context);
+		Type* GetBaseType(CompilerContext* context);
 
 		void CompileStore(CompilerContext* context, CValue right);
 
@@ -294,7 +299,7 @@ namespace Jet
 			this->left = l;
 			this->right = r;
 		}
-
+		//come up with classes/traits/inheritance stuff
 		~OperatorAssignExpression()
 		{
 			delete this->right;
@@ -928,6 +933,13 @@ namespace Jet
 			delete args;
 		}
 
+		std::string GetRealName();
+
+		void MakeMemberFunction()
+		{
+
+		}
+
 		void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
@@ -943,31 +955,30 @@ namespace Jet
 
 	class ExternExpression : public Expression
 	{
-		Expression* name;
+		Token name;
+		std::string Struct;
 		std::vector<std::pair<std::string, std::string>>* args;
 		Token token;
 		std::string ret_type;
 	public:
 
-		ExternExpression(Token token, Expression* name, std::string& ret_type, std::vector<std::pair<std::string, std::string>>* args)
+		ExternExpression(Token token, Token name, std::string& ret_type, std::vector<std::pair<std::string, std::string>>* args, std::string str = "")
 		{
 			this->args = args;
 			this->name = name;
 			this->token = token;
 			this->ret_type = ret_type;
+			this->Struct = str;
 		}
 
 		~ExternExpression()
 		{
-			delete name;
 			delete args;
 		}
 
 		void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
-			if (name)
-				name->SetParent(this);
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -979,26 +990,41 @@ namespace Jet
 	{
 		std::string name;
 		std::vector<std::pair<std::string, std::string>>* elements;
+		std::vector<FunctionExpression*>* functions;
 		Token token;
 		std::string ret_type;
 	public:
 
-		StructExpression(Token token, std::string& name, std::vector<std::pair<std::string, std::string>>* elements)
+		StructExpression(Token token, std::string& name, std::vector<std::pair<std::string, std::string>>* elements, std::vector<FunctionExpression*>* functions)
 		{
 			this->elements = elements;
 			this->name = name;
 			this->token = token;
 			this->ret_type = ret_type;
+			this->functions = functions;
 		}
 
 		~StructExpression()
 		{
+			if (functions)
+				for (auto fun : *functions)
+					delete fun;
+			delete functions;
 			delete elements;
+		}
+
+		std::string GetName()
+		{
+			return this->name;
 		}
 
 		void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
+			for (auto ii : *this->functions)
+			{
+				ii->SetParent(this);
+			}
 		}
 
 		CValue Compile(CompilerContext* context);

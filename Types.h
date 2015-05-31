@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <map>
 
 namespace llvm
 {
@@ -59,11 +60,14 @@ namespace Jet
 		//}
 	};
 
+	class Function;
 	struct Struct
 	{
 		std::string name;
 		std::vector<std::pair<std::string, Type*>> members;
 		llvm::Type* type;
+
+		std::map<std::string, Function*> functions;
 
 		bool loaded;
 

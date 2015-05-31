@@ -134,7 +134,7 @@ void Compiler::Compile(const char* code, const char* filename)
 	//	return;
 }
 
-CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args)
+CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member)
 {
 	Function* func = parent->functions[fname];
 	if (func == 0)
@@ -155,7 +155,8 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
 		n->function = func;
 		func->f = n->f;
-		this->parent->functions[fname] = func;
+		if (member == false)
+			this->parent->functions[fname] = func;
 
 		llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "entry", n->f);
 		parent->builder.SetInsertPoint(bb);
@@ -767,6 +768,8 @@ void Compiler::OutputPackage()
 	std::string function;
 	for (auto ii : this->functions)
 	{
+		if (ii.second == 0)
+			continue;//shouldnt happen, but w/e
 		function += "extern fun " + ii.second->return_type->ToString() + " ";
 		function += ii.first + "(";
 		bool first = false;
@@ -794,7 +797,25 @@ void Compiler::OutputPackage()
 				types += var.second->ToString() + " ";
 				types += var.first + ";";
 			}
-			types += "};";
+			types += "}";
+
+			//output member functions
+			for (auto fun : ii.second->data->functions)
+			{
+				function += "extern fun " + fun.second->return_type->ToString() + " " + ii.second->data->name + "::";
+				function += fun.first + "(";
+				bool first = false;
+				for (auto arg : fun.second->argst)
+				{
+					if (first)
+						function += ",";
+					else
+						first = true;
+
+					function += arg.first->ToString() + " " + arg.second;
+				}
+				function += ");";
+			}
 		}
 	}
 
@@ -803,8 +824,8 @@ void Compiler::OutputPackage()
 
 	//todo: only do this if im a library
 	std::ofstream stable("build/symbols.jlib");
-	stable.write(function.data(), function.length());
 	stable.write(types.data(), types.length());
+	stable.write(function.data(), function.length());
 	stable.close();
 }
 
