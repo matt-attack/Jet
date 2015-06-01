@@ -18,7 +18,7 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 		auto p = dynamic_cast<IndexExpression*>(right);
 		if (i)
 		{
-			auto var = context->named_values[i->GetName()];
+			auto var = context->GetVariable(i->GetName());// context->named_values[i->GetName()];
 			return CValue(context->parent->LookupType(var.type->ToString() + "*"), var.val);
 		}
 		else if (p)
@@ -95,7 +95,7 @@ Type* IndexExpression::GetBaseType(CompilerContext* context)
 	auto i = dynamic_cast<IndexExpression*>(left);
 
 	if (p)
-		return context->named_values[p->GetName()].type;
+		return context->GetVariable(p->GetName()).type;// context->named_values[p->GetName()].type;
 	else if (i)
 		return i->GetType(context);
 
@@ -108,7 +108,7 @@ CValue IndexExpression::GetBaseGEP(CompilerContext* context)
 	auto i = dynamic_cast<IndexExpression*>(left);
 
 	if (p)
-		return context->named_values[p->GetName()];
+		return context->GetVariable(p->GetName());// named_values[p->GetName()];
 	else if (i)
 		return i->GetGEP(context);
 
@@ -125,7 +125,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 	{
 		CValue lhs;
 		if (p)
-			lhs = context->named_values[p->GetName()];
+			lhs = context->GetVariable(p->GetName());// context->named_values[p->GetName()];
 		else if (i)
 			lhs = i->GetGEP(context);
 
@@ -163,7 +163,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 	{
 		CValue lhs;
 		if (p)
-			lhs = context->named_values[p->GetName()];
+			lhs = context->GetVariable(p->GetName());// context->named_values[p->GetName()];
 		else if (i)
 			lhs = i->GetGEP(context);
 
@@ -288,60 +288,32 @@ CValue CallExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->token);
 
-	Function* fun = 0;
-	llvm::Function* f = 0;
-	std::vector<llvm::Value*> argsv;
-	int i = 0;
+	std::vector<CValue> argsv;
 
-	//check if function exists!!!
+	std::string fname;
+	Type* stru = 0;
 	if (auto name = dynamic_cast<NameExpression*>(left))
 	{
 		//ok handle what to do if im an index expression
-		auto iter = context->parent->functions.find(name->GetName());
-		if (iter == context->parent->functions.end())
-			Error("Function '" + name->GetName() + "' is not defined", token);
-		fun = iter->second;
-
-		fun->Load(context->parent);
-
-		f = context->parent->module->getFunction(name->GetName());
-
-		if (args->size() != f->arg_size())
-		{
-			//todo: add better checks later
-			Error("Mismatched function parameters in call", token);
-		}
+		fname = name->GetName();
 	}
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
 	{
 		//im a struct yo
-		std::string name = dynamic_cast<StringExpression*>(index->index)->GetValue();
-
-		fun = index->GetBaseType(context)->data->functions[name];
-
-		fun->Load(context->parent);
-
-		f = context->parent->module->getFunction(fun->name);
+		fname = dynamic_cast<StringExpression*>(index->index)->GetValue();
+		stru = index->GetBaseType(context);
 
 		//push in the this pointer argument kay
-		argsv.push_back(index->GetBaseGEP(context).val);
-
-		if (args->size() + 1 != f->arg_size())
-		{
-			//todo: add better checks later
-			Error("Mismatched function parameters in call", token);
-		}
+		argsv.push_back(CValue(context->parent->LookupType(stru->ToString()+"*"),index->GetBaseGEP(context).val));
 	}
 
 	//build arg list
 	for (auto ii : *this->args)
 	{
-		//try and cast to the correct type if we can
-		argsv.push_back(context->DoCast(fun->argst[i++].first, ii->Compile(context)).val);
+		argsv.push_back(ii->Compile(context));
 	}
 
-	//get actual method signature, and then lets do conversions
-	return CValue(fun->return_type, context->parent->builder.CreateCall(f, argsv));
+	return context->Call(fname, argsv, stru);
 }
 
 CValue NameExpression::Compile(CompilerContext* context)
@@ -489,7 +461,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 		AI->setName(aname);
 
 		// Add arguments to variable symbol table.
-		function->named_values[aname] = CValue(argsv[Idx].first, Alloca);
+		function->scope->named_values[aname] = CValue(argsv[Idx].first, Alloca);
 	}
 
 	block->Compile(function);
@@ -611,25 +583,59 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		auto aname = ii.second.text;
 
 		llvm::IRBuilder<> TmpB(&context->f->getEntryBlock(), context->f->getEntryBlock().begin());
-
-		Type* type = context->parent->LookupType(ii.first);
+		Type* type = 0;
 		llvm::AllocaInst* Alloca = 0;
-		if (type->type == Types::Array)
-			Alloca = TmpB.CreateAlloca(GetType(type), context->parent->builder.getInt32(type->size), aname);
-		else
-			Alloca = TmpB.CreateAlloca(GetType(type), 0, aname);
-
-		// Store the initial value into the alloca.
-		if (this->_right)
+		if (ii.first.length() > 0)//type was specified
 		{
+			type = context->parent->LookupType(ii.first);
+			
+			if (type->type == Types::Array)
+				Alloca = TmpB.CreateAlloca(GetType(type), context->parent->builder.getInt32(type->size), aname);
+			else
+				Alloca = TmpB.CreateAlloca(GetType(type), 0, aname);
+
+			// Store the initial value into the alloca.
+			if (this->_right)
+			{
+				auto val = (*this->_right)[i++]->Compile(context);
+				//cast it
+				val = context->DoCast(type, val);
+				context->parent->builder.CreateStore(val.val, Alloca);
+			}
+		}
+		else if (this->_right)
+		{
+			//infer the type
 			auto val = (*this->_right)[i++]->Compile(context);
-			//cast it
-			val = context->DoCast(type, val);
+			type = val.type;
+			if (val.type->type == Types::Array)
+				Alloca = TmpB.CreateAlloca(GetType(val.type), context->parent->builder.getInt32(val.type->size), aname);
+			else
+				Alloca = TmpB.CreateAlloca(GetType(val.type), 0, aname);
+
 			context->parent->builder.CreateStore(val.val, Alloca);
 		}
+		else
+			Error("Cannot infer type from nothing!", ii.second);
 
 		// Add arguments to variable symbol table.
-		context->named_values[aname] = CValue(type, Alloca);
+		//fix "symbol table thing" and use stacks again
+		context->scope->named_values[aname] = CValue(type, Alloca);
+
+		//construct it!
+		if (this->_right == 0 && type->type == Types::Class)
+		{
+			//call default construct if it exists
+			auto iter = type->data->functions.find("construct");// type->data->name);
+			if (iter != type->data->functions.end())
+			{
+				//this is the constructor, call it
+
+			//todo: move implicit casts for operators and assignment into functions in compilercontext
+				//	will make it easier to implement operator overloads
+				context->Call("construct", { CValue(context->parent->LookupType(type->ToString() + "*"), Alloca) }, type);
+			}
+		}
 	}
 
 	return CValue();
@@ -680,3 +686,26 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	}
 };
 
+CValue CaseExpression::Compile(CompilerContext* context)
+{
+	context->CurrentToken(&token);
+
+	SwitchExpression* sw = dynamic_cast<SwitchExpression*>(this->Parent);
+	if (sw == 0)
+		Error("Cannot use case expression outside of a switch!", token);
+
+	//todo
+		return CValue();
+}
+
+CValue SwitchExpression::Compile(CompilerContext* context)
+{
+	context->CurrentToken(&token);
+
+	CValue value = this->var->Compile(context);
+	//context->parent->builder.create
+
+	this->block->Compile(context);
+
+	return CValue();
+}

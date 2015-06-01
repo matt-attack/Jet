@@ -115,6 +115,8 @@ Parser::Parser(Lexer* l)
 	this->Register(TokenType::Function, new FunctionParselet());
 	this->Register(TokenType::Ret, new ReturnParselet());
 	this->Register(TokenType::For, new ForParselet());
+	this->Register(TokenType::Switch, new SwitchParselet());
+	this->Register(TokenType::Case, new CaseParselet());
 	this->Register(TokenType::Local, new LocalParselet());
 
 	this->Register(TokenType::Extern, new ExternParselet());

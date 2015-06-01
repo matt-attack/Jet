@@ -87,6 +87,15 @@ Expression* WhileParselet::parse(Parser* parser, Token token)
 	return new WhileExpression(token, condition.Release(), block);
 }
 
+Expression* CaseParselet::parse(Parser* parser, Token token)
+{
+	int number = std::stol(parser->Consume(TokenType::Number).text);
+
+	parser->Consume(TokenType::Semicolon);
+
+	return new CaseExpression(token, number);
+}
+
 Expression* ForParselet::parse(Parser* parser, Token token)
 {
 	parser->Consume(TokenType::LeftParen);
@@ -118,6 +127,17 @@ Expression* ForParselet::parse(Parser* parser, Token token)
 
 	auto block = new ScopeExpression(parser->parseBlock());
 	return new ForExpression(token, initial.Release(), condition.Release(), increment.Release(), block);
+}
+
+Expression* SwitchParselet::parse(Parser* parser, Token token)
+{
+	parser->Consume(TokenType::LeftParen);
+	UniquePtr<Expression*> var = parser->parseExpression();
+	parser->Consume(TokenType::RightParen);
+
+	BlockExpression* block = parser->parseBlock(false);
+
+	return new SwitchExpression(token, var.Release(), block);
 }
 
 Expression* IfParselet::parse(Parser* parser, Token token)
@@ -416,7 +436,8 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 
 	do
 	{
-		std::string type = ParseType(parser);
+		auto next = parser->LookAhead(1);
+		std::string type = next.type == TokenType::Assign ? "" : ParseType(parser);
 		
 		Token name = parser->Consume(TokenType::Name);
 

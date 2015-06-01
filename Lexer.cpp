@@ -113,6 +113,9 @@ public:
 		keywords["yield"] = TokenType::Yield;
 		keywords["resume"] = TokenType::Resume;
 
+		keywords["switch"] = TokenType::Switch;
+		keywords["case"] = TokenType::Case;
+
 
 		keywords["extern"] = TokenType::Extern;
 		keywords["struct"] = TokenType::Struct;
@@ -136,6 +139,8 @@ public:
 				operatorsearch[ii->first[0]].push_back(std::pair<std::string, TokenType>(ii->first, ii->second));
 			}
 		}
+
+		TokenToString[TokenType::Name] = "name";
 	};
 };
 

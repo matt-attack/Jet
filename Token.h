@@ -74,6 +74,8 @@ namespace Jet
 		Continue,
 		Yield,
 		Resume,
+		Switch,
+		Case,
 
 		//newkeywords
 		Extern,

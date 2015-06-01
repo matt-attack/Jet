@@ -62,11 +62,10 @@ namespace Jet
 		{
 			//need to do cast if necessary
 			context->CurrentToken(&token);
-			auto iter = context->named_values.find(token.text);
-			if (iter == context->named_values.end())
-				Error("undeclared identifier '" + token.text + "'", token);
+			//auto iter = context->named_values.find(token.text);
+			//if (iter == context->named_values.end())
+				//Error("undeclared identifier '" + token.text + "'", token);
 
-			right = context->DoCast(iter->second.type, right);
 			context->Store(token.text, right);
 		}
 
@@ -379,9 +378,11 @@ namespace Jet
 				auto p = dynamic_cast<IndexExpression*>(this->right);
 				if (i)
 				{
-					auto var = context->named_values[i->GetName()];
+					//auto var = context->named_values[i->GetName()];
+					auto var = context->Load(i->GetName());
 					auto val = context->parent->builder.CreateLoad(var.val);
-
+					
+					//context->Store(i->GetName(), val);
 					right = context->DoCast(var.type->base, right);
 
 					context->parent->builder.CreateStore(right.val, val);
@@ -536,10 +537,12 @@ namespace Jet
 			//push scope
 			context->PushScope();
 
-			return BlockExpression::Compile(context);
+			CValue tmp = BlockExpression::Compile(context);
 
 			//pop scope
 			context->PopScope();
+
+			return tmp;
 		}
 	};
 
@@ -758,6 +761,60 @@ namespace Jet
 	}
 	};*/
 
+	class CaseExpression : public Expression
+	{
+		int value;
+		Token token;
+	public:
+		CaseExpression(Token token, int value)
+		{
+			this->value = value;
+			this->token = token;
+		}
+
+		~CaseExpression()
+		{
+		}
+
+		virtual void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+		}
+
+		CValue Compile(CompilerContext* context);
+
+		void CompileDeclarations(CompilerContext* context) {};
+	};
+
+	class SwitchExpression : public Expression
+	{
+		Expression* var;
+		BlockExpression* block;
+		Token token;
+	public:
+		SwitchExpression(Token token, Expression* var, BlockExpression* block)
+		{
+			this->var = var;
+			this->block = block;
+			this->token = token;
+		}
+
+		~SwitchExpression()
+		{
+			delete block;
+		}
+
+		virtual void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+			this->var->SetParent(this);
+			this->block->SetParent(this);
+		}
+
+		CValue Compile(CompilerContext* context);
+
+		void CompileDeclarations(CompilerContext* context) {};
+	};
 
 	struct Branch
 	{

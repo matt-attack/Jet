@@ -269,6 +269,17 @@ namespace Jet
 		}
 	};
 
+	class CaseParselet : public StatementParselet
+	{
+	public:
+		CaseParselet()
+		{
+			this->TrailingSemicolon = false;
+		}
+
+		Expression* parse(Parser* parser, Token token);
+	};
+
 	class BreakParselet: public StatementParselet
 	{
 	public:
@@ -342,6 +353,17 @@ namespace Jet
 	{
 	public:
 		ForParselet()
+		{
+			this->TrailingSemicolon = false;
+		}
+
+		Expression* parse(Parser* parser, Token token);
+	};
+
+	class SwitchParselet : public StatementParselet
+	{
+	public:
+		SwitchParselet()
 		{
 			this->TrailingSemicolon = false;
 		}

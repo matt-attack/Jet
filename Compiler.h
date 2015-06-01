@@ -114,13 +114,13 @@ namespace Jet
 
 		void OutputIR(const char* filename);
 		void OutputPackage();
-		
+
 		void Dump()
 		{
 			if (module)
 				module->dump();
 		}
-		
+
 		//get array types inside of structs working
 		Type* AdvanceTypeLookup(const std::string& name)
 		{
@@ -198,7 +198,7 @@ namespace Jet
 						if (name[p] == '[')
 							break;
 
-					auto len = name.substr(p+1, name.length()-p-2);
+					auto len = name.substr(p + 1, name.length() - p - 2);
 
 					auto tname = name.substr(0, p);
 					auto t = this->LookupType(tname);
@@ -227,22 +227,37 @@ namespace Jet
 		}
 	};
 
+	struct Scope
+	{
+		std::map<std::string, CValue> named_values;
+		Scope* next;
+		Scope* prev;
+	};
+
 	//compiles functions
 	class CompilerContext
 	{
 
 	public:
+		Scope* scope;
 		Compiler* parent;
 
 		llvm::Function* f;
 
-		std::map<std::string, CValue> named_values;
+		//std::map<std::string, CValue> named_values;
 
 		Function* function;
 
 		CompilerContext(Compiler* parent)
 		{
 			this->parent = parent;
+			this->scope = new Scope;
+			this->scope->next = this->scope->prev = 0;
+		}
+
+		~CompilerContext()
+		{
+			delete this->scope;
 		}
 
 		CValue Number(double value)
@@ -264,24 +279,43 @@ namespace Jet
 			return CValue(this->parent->LookupType("char*"), res);
 		}
 
+		CValue GetVariable(const std::string& name)
+		{
+			auto cur = this->scope;
+			CValue value;
+			do
+			{
+				auto iter = cur->named_values.find(name);
+				if (iter != cur->named_values.end())
+				{
+					value = iter->second;
+					break;
+				}
+				cur = cur->prev;
+			} while (cur);
+			if (value.type->type == Types::Void)
+				Error("undeclared identifier '" + name + "'", *current_token);
+			return value;
+		}
+
 		llvm::StoreInst* Store(const std::string& name, CValue val)
 		{
-			auto iter = named_values.find(name);
-			if (iter == named_values.end())
-				Error("undeclared identifier '" + name + "'", *current_token);
+			//for each scope
+			CValue value = GetVariable(name);
 
 			//iter->second.val->dump();
 			//val.val->dump();
 			//val.val->getType()->dump();
-			return parent->builder.CreateStore(val.val, iter->second.val);
+			val = this->DoCast(value.type, val);
+
+			return parent->builder.CreateStore(val.val, value.val);
 		}
 
 		CValue Load(const std::string& name)
 		{
-			auto iter = named_values.find(name);
-			if (iter == named_values.end())
-				Error("undeclared identifier '"+name+"'", *current_token);
-			return CValue(iter->second.type, parent->builder.CreateLoad(iter->second.val, name.c_str()));
+			CValue value = GetVariable(name);
+
+			return CValue(value.type, parent->builder.CreateLoad(value.val, name.c_str()));
 		}
 
 
@@ -324,11 +358,29 @@ namespace Jet
 		{
 			//try and cast if we can
 			if (this->function == 0)
-			{
 				Error("Cannot return from outside function!", *current_token);
-			}
 
-			ret = this->DoCast(this->function->return_type, ret);
+			//call destructors
+			auto cur = this->scope;
+			do
+			{
+				for (auto ii: cur->named_values)
+				{
+					if (ii.second.type->type == Types::Class)
+					{
+						//look for destructor
+						auto destructor = ii.second.type->data->functions.find("destroy");
+						if (destructor != ii.second.type->data->functions.end())
+						{
+							//call it
+							this->Call("destroy", { CValue(this->parent->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
+						}
+					}
+				}
+				cur = cur->prev;
+			} while (cur);
+
+				ret = this->DoCast(this->function->return_type, ret);
 			return parent->builder.CreateRet(ret.val);
 		}
 
@@ -341,11 +393,37 @@ namespace Jet
 		void PushScope()
 		{
 			//todo
+			auto temp = this->scope;
+			this->scope = new Scope;
+			this->scope->prev = temp;
+			this->scope->next = 0;
+			temp->next = this->scope;
 		}
 
 		void PopScope()
 		{
-			//todo
+			//call destructors
+			if (this->scope->prev != 0 && this->scope->prev->prev != 0)
+			{
+				for (auto ii : this->scope->named_values)
+				{
+					if (ii.second.type->type == Types::Class)
+					{
+						//look for destructor
+						auto destructor = ii.second.type->data->functions.find("destroy");
+						if (destructor != ii.second.type->data->functions.end())
+						{
+							//call it
+							this->Call("destroy", { CValue(this->parent->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
+						}
+					}
+				}
+			}
+
+			auto temp = this->scope;
+			this->scope = this->scope->prev;
+			delete temp;
+			//call destructors
 		}
 
 		CValue DoCast(Type* t, CValue value)
@@ -398,7 +476,7 @@ namespace Jet
 						//lets just try it
 						//fixme later
 						/*std::vector<llvm::Value*> arr = { parent->builder.getInt32(0) };// , parent->builder.getInt32(0)
-		
+
 						value.val->dump();
 						value.val = parent->builder.CreateGEP(value.val, arr, "array2ptr");
 						value.val->dump();
@@ -411,6 +489,50 @@ namespace Jet
 		}
 
 		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member);
+
+		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0)
+		{
+			llvm::Function* f = 0;
+			Function* fun = 0;
+
+			if (Struct == 0)
+			{
+				//global function?
+				auto iter = this->parent->functions.find(name);
+				if (iter == this->parent->functions.end())
+					Error("Function '" + name + "' is not defined", *this->current_token);
+
+				fun = iter->second;
+			}
+			else
+			{
+				//im a struct yo
+				auto iter = Struct->data->functions.find(name);
+				if (iter == Struct->data->functions.end())
+					Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+
+				fun = iter->second;
+			}
+
+			fun->Load(this->parent);
+
+			f = this->parent->module->getFunction(fun->name);
+
+			if (args.size() != f->arg_size())
+			{
+				//todo: add better checks later
+				Error("Mismatched function parameters in call", *this->current_token);
+			}
+
+			std::vector<llvm::Value*> argsv;
+			int i = 0;
+			for (auto ii : args)
+			{
+				//try and cast to the correct type if we can
+				argsv.push_back(this->DoCast(fun->argst[i++].first, ii).val);
+			}
+			return CValue(fun->return_type, this->parent->builder.CreateCall(f, argsv));
+		}
 	};
 };
 #endif

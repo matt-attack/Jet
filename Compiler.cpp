@@ -788,6 +788,7 @@ void Compiler::OutputPackage()
 		function += ");";
 	}
 
+	//need to add generics
 	std::string types;
 	for (auto ii : this->types)
 	{
@@ -795,6 +796,7 @@ void Compiler::OutputPackage()
 		{
 			//export me
 			types += "struct " + ii.second->data->name + "{";
+			//fix exporting arrays in structs
 			for (auto var : ii.second->data->members)
 			{
 				types += var.second->ToString() + " ";
