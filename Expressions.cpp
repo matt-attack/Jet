@@ -466,6 +466,12 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 
 	block->Compile(function);
 
+	if (function->f->getBasicBlockList().back().getTerminator() == 0)
+		if (this->ret_type == "void")
+			function->Return(CValue());
+		else
+			Error("Function must return a value!", token);
+
 	//if last instruction was a return, dont insert another one
 	/*if (block->statements.size() > 0)
 	{
@@ -619,7 +625,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			Error("Cannot infer type from nothing!", ii.second);
 
 		// Add arguments to variable symbol table.
-		//fix "symbol table thing" and use stacks again
 		context->scope->named_values[aname] = CValue(type, Alloca);
 
 		//construct it!

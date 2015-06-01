@@ -78,7 +78,10 @@ int main(int argc, char* argv[])
 	if (argc > 1)//if we get a command, just try and build the project at that path
 	{
 		Jet::Compiler c;
-		c.Compile(argv[1]);
+		if (strcmp(argv[1], "build") == 0)
+			c.Compile("");
+		else
+			c.Compile(argv[1]);
 
 		return 0;
 	}
