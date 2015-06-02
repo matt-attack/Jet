@@ -62,9 +62,6 @@ namespace Jet
 		{
 			//need to do cast if necessary
 			context->CurrentToken(&token);
-			//auto iter = context->named_values.find(token.text);
-			//if (iter == context->named_values.end())
-				//Error("undeclared identifier '" + token.text + "'", token);
 
 			context->Store(token.text, right);
 		}

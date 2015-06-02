@@ -137,7 +137,7 @@ void Compiler::Compile(const char* code, const char* filename)
 CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member)
 {
 	auto iter = parent->functions.find(fname);
-	Function* func;// = parent->functions[fname];
+	Function* func;
 	if (iter == parent->functions.end())
 	{
 		//no function exists
@@ -393,7 +393,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			//todo
 		default:
 			Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
-			//throw 7;
+
 			break;
 		}
 
@@ -401,8 +401,6 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 	}
 
 	Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
-	//throw 7;
-	//return res;
 }
 
 #include <llvm/ADT/Triple.h>

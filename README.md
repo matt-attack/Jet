@@ -4,7 +4,9 @@
 
 A work in progress compiled language that uses a LLVM backend. Currently the language is much like C, but many things will change as time goes on.
 
-Currently the build only works on Windows, but it shouldn't take much more than changing a few function calls and creating a makefile/CMake project to port to Linux/Mac.
+Currently the build only works on Windows, but it shouldn't take much more than changing a few function calls to port to Linux/Mac.
+
+In order to build the compiler you need to have LLVM and in order to use the compiler you need Clang.
 
 #### Notable Features So Far:
 - Structs

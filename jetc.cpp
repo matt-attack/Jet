@@ -1,6 +1,4 @@
-// AsmVM.cpp : Defines the entry point for the console application.
-//
-//add multiple returns perhaps?
+
 /*#ifdef _DEBUG
 #ifndef DBG_NEW
 #define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
@@ -13,14 +11,13 @@
 
 #include <stdio.h>
 
-typedef wchar_t     _TCHAR;
+//typedef wchar_t     _TCHAR;
 
 #include <stack>
 #include <vector>
 
 #define CODE(code) #code
 
-//#include "JetContext.h"
 #include "Compiler.h"
 
 #include <iostream>
@@ -35,11 +32,10 @@ typedef wchar_t     _TCHAR;
 #endif
 #include <functional>
 
-
 using namespace Jet;
 
 
-#pragma comment (lib, "LLVMSupport.lib")
+/*#pragma comment (lib, "LLVMSupport.lib")
 #pragma comment (lib, "LLVMCore.lib")
 #pragma comment (lib, "LLVMInstCombine.lib")
 #pragma comment (lib, "LLVMScalarOpts.lib")
@@ -66,9 +62,7 @@ using namespace Jet;
 #pragma comment (lib, "LLVMSelectionDAG.lib")
 #pragma comment (lib, "LLVMCodeGen.lib")
 #pragma comment (lib, "LLVMAsmPrinter.lib")
-#pragma comment (lib, "LLVMAsmParser.lib")
-
-
+#pragma comment (lib, "LLVMAsmParser.lib")*/
 
 
 #include <sstream>
