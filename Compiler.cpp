@@ -489,6 +489,11 @@ void Compiler::Compile(const char* projectdir)
 		}
 	}
 
+	if (files.size() == 0)
+	{
+		//if no files, then just add all.jet files in the directory
+	}
+
 	char olddir[500];
 	getcwd(olddir, 500);
 	std::string path = projectdir;

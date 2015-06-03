@@ -18,7 +18,7 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 		auto p = dynamic_cast<IndexExpression*>(right);
 		if (i)
 		{
-			auto var = context->GetVariable(i->GetName());// context->named_values[i->GetName()];
+			auto var = context->GetVariable(i->GetName());
 			return CValue(context->parent->LookupType(var.type->ToString() + "*"), var.val);
 		}
 		else if (p)
@@ -39,30 +39,6 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 			storable->CompileStore(context, res);
 
 	return res;
-
-	/*switch (this->_operator.type)
-	{
-	case TokenType::BNot:
-	case TokenType::Minus:
-	{
-	if (dynamic_cast<BlockExpression*>(this->Parent))
-	context->Pop();
-	break;
-	}
-	default://operators that also do a store, like ++ and --
-	{
-	auto location = dynamic_cast<IStorableExpression*>(this->right);
-	if (location)
-	{
-	if (dynamic_cast<BlockExpression*>(this->Parent) == 0)
-	context->Duplicate();
-
-	location->CompileStore(context);
-	}
-	else if (dynamic_cast<BlockExpression*>(this->Parent) != 0)
-	context->Pop();
-	}
-	}*/
 }
 
 CValue PostfixExpression::Compile(CompilerContext* context)
@@ -95,7 +71,7 @@ Type* IndexExpression::GetBaseType(CompilerContext* context)
 	auto i = dynamic_cast<IndexExpression*>(left);
 
 	if (p)
-		return context->GetVariable(p->GetName()).type;// context->named_values[p->GetName()].type;
+		return context->GetVariable(p->GetName()).type;
 	else if (i)
 		return i->GetType(context);
 
@@ -108,7 +84,7 @@ CValue IndexExpression::GetBaseGEP(CompilerContext* context)
 	auto i = dynamic_cast<IndexExpression*>(left);
 
 	if (p)
-		return context->GetVariable(p->GetName());// named_values[p->GetName()];
+		return context->GetVariable(p->GetName());
 	else if (i)
 		return i->GetGEP(context);
 
@@ -125,7 +101,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 	{
 		CValue lhs;
 		if (p)
-			lhs = context->GetVariable(p->GetName());// context->named_values[p->GetName()];
+			lhs = context->GetVariable(p->GetName());
 		else if (i)
 			lhs = i->GetGEP(context);
 
@@ -163,7 +139,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 	{
 		CValue lhs;
 		if (p)
-			lhs = context->GetVariable(p->GetName());// context->named_values[p->GetName()];
+			lhs = context->GetVariable(p->GetName());
 		else if (i)
 			lhs = i->GetGEP(context);
 
@@ -304,7 +280,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 		stru = index->GetBaseType(context);
 
 		//push in the this pointer argument kay
-		argsv.push_back(CValue(context->parent->LookupType(stru->ToString()+"*"),index->GetBaseGEP(context).val));
+		argsv.push_back(CValue(context->parent->LookupType(stru->ToString() + "*"), index->GetBaseGEP(context).val));
 	}
 
 	//build arg list
@@ -319,8 +295,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 CValue NameExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&token);
-	//add load variable instruction
-	//todo make me detect if this is a local or not
+
 	return context->Load(token.text);
 }
 
@@ -391,17 +366,11 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 
 		context->f->getBasicBlockList().push_back(end_block);
 		context->parent->builder.SetInsertPoint(end_block);
+
 		auto phi = context->parent->builder.CreatePHI(GetType(cond.type), 2, "lor");
 		phi->addIncoming(cond.val, cur_block);
 		phi->addIncoming(cond2.val, else_block);
 		return CValue(&BoolType, phi);
-		//std::string label = "_endor" + context->GetUUID();
-		//this->left->Compile(context);
-		//context->JumpTruePeek(label.c_str());//jump to endor if true
-		//context->Pop();
-		//this->right->Compile(context);
-		//context->Label(label);//put endor label here
-		//return;
 	}
 
 	auto lhs = this->left->Compile(context);
@@ -445,7 +414,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	if (Struct.length() > 0)
 		context->parent->types[Struct]->data->functions[fname]->f = function->f;
 	//else
-		//context->parent->functions[fname] = function->f;
+	//context->parent->functions[fname] = function->f;
 
 	//alloc args
 	auto AI = function->f->arg_begin();
@@ -466,31 +435,13 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 
 	block->Compile(function);
 
+	//check for return, and insert one or error if there isnt one
 	if (function->f->getBasicBlockList().back().getTerminator() == 0)
 		if (this->ret_type == "void")
 			function->Return(CValue());
 		else
 			Error("Function must return a value!", token);
 
-	//if last instruction was a return, dont insert another one
-	/*if (block->statements.size() > 0)
-	{
-	if (dynamic_cast<ReturnExpression*>(block->statements.at(block->statements.size()-1)) == 0)
-	{
-	function->Null();//return nil
-	function->Return();
-	}
-	}
-	else
-	{
-	function->Null();//return nil
-	function->Return();
-	}
-
-	context->FinalizeFunction(function);*/
-
-	//todo add dummy return
-	//vm will pop off locals when it removes the call stack
 	return CValue();
 }
 
@@ -509,11 +460,8 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	if (Struct.length() > 0)
 	{
 		//im a member function
-
 		//insert first arg, which is me
 		this->args->push_back({ Struct + "*", "this" });
-		//auto type = context->parent->AdvanceTypeLookup(Struct->GetName());
-		//fun->argst.push_back({ type, "this" });
 	}
 
 	for (auto ii : *this->args)
@@ -594,7 +542,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		if (ii.first.length() > 0)//type was specified
 		{
 			type = context->parent->LookupType(ii.first);
-			
+
 			if (type->type == Types::Array)
 				Alloca = TmpB.CreateAlloca(GetType(type), context->parent->builder.getInt32(type->size), aname);
 			else
@@ -636,7 +584,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			{
 				//this is the constructor, call it
 
-			//todo: move implicit casts for operators and assignment into functions in compilercontext
+				//todo: move implicit casts for operators and assignment into functions in compilercontext
 				//	will make it easier to implement operator overloads
 				context->Call("construct", { CValue(context->parent->LookupType(type->ToString() + "*"), Alloca) }, type);
 			}
@@ -695,12 +643,24 @@ CValue CaseExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&token);
 
-	SwitchExpression* sw = dynamic_cast<SwitchExpression*>(this->Parent);
+	SwitchExpression* sw = dynamic_cast<SwitchExpression*>(this->Parent->Parent);
 	if (sw == 0)
 		Error("Cannot use case expression outside of a switch!", token);
 
-	//todo
-		return CValue();
+	//create a new block for this case
+	llvm::BasicBlock* block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "case"+std::to_string(value));
+
+	//add the case to the switch
+	bool is_first = sw->AddCase(context->parent->builder.getInt32(this->value), block);
+
+	//jump to end block
+	if (!is_first)
+		context->parent->builder.CreateBr(sw->switch_end);
+
+	//start using our new block
+	context->f->getBasicBlockList().push_back(block);
+	context->parent->builder.SetInsertPoint(block);
+	return CValue();
 }
 
 CValue SwitchExpression::Compile(CompilerContext* context)
@@ -708,9 +668,55 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	context->CurrentToken(&token);
 
 	CValue value = this->var->Compile(context);
+	if (value.type->type != Types::Int)
+		Error("Argument to Case Statement Must Be an Integer", token);
 	//context->parent->builder.create
 
+	this->switch_end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchend");
+
+	//look for all case expressions
+	llvm::BasicBlock* def = 0;
+
+	std::vector < CaseExpression* > cases;
+	for (auto expr : this->block->statements)
+	{
+		auto Case = dynamic_cast<CaseExpression*>(expr);
+		if (Case)
+		{
+			cases.push_back(Case);
+		}
+		//else if (auto def = dynamic_cast<DefaultExpression*>(expr))
+		//{
+		//do default
+		//}
+	}
+	
+	bool no_def = def ? false : true;
+	if (def == 0)
+	{
+		//create default block at end if there isnt one
+		def = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefau");
+	}
+
+	//create the switch instruction
+	this->sw = context->parent->builder.CreateSwitch(value.val, def, cases.size());
+
+	//compile the block
 	this->block->Compile(context);
+
+	if (no_def)
+	{
+		//insert the default
+		//insert branch
+		context->parent->builder.CreateBr(this->switch_end);
+		context->f->getBasicBlockList().push_back(def);
+		context->parent->builder.SetInsertPoint(def);
+		context->parent->builder.CreateBr(this->switch_end);
+	}
+
+	//start using end
+	context->f->getBasicBlockList().push_back(this->switch_end);
+	context->parent->builder.SetInsertPoint(this->switch_end);
 
 	return CValue();
 }

@@ -91,7 +91,7 @@ Expression* CaseParselet::parse(Parser* parser, Token token)
 {
 	int number = std::stol(parser->Consume(TokenType::Number).text);
 
-	parser->Consume(TokenType::Semicolon);
+	parser->Consume(TokenType::Colon);
 
 	return new CaseExpression(token, number);
 }

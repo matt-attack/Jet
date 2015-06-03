@@ -760,9 +760,10 @@ namespace Jet
 
 	class CaseExpression : public Expression
 	{
-		int value;
+		
 		Token token;
 	public:
+		int value;
 		CaseExpression(Token token, int value)
 		{
 			this->value = value;
@@ -788,9 +789,15 @@ namespace Jet
 		Expression* var;
 		BlockExpression* block;
 		Token token;
+		llvm::SwitchInst* sw;
 	public:
+
+		llvm::BasicBlock* switch_end;
+
+		bool first_case;
 		SwitchExpression(Token token, Expression* var, BlockExpression* block)
 		{
+			this->first_case = true;
 			this->var = var;
 			this->block = block;
 			this->token = token;
@@ -799,6 +806,14 @@ namespace Jet
 		~SwitchExpression()
 		{
 			delete block;
+		}
+
+		bool AddCase(llvm::ConstantInt* value, llvm::BasicBlock* dest)
+		{
+			bool tmp = this->first_case;
+			this->first_case = false;
+			this->sw->addCase(value, dest);
+			return tmp;
 		}
 
 		virtual void SetParent(Expression* parent)
