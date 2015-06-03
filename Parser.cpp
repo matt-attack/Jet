@@ -4,35 +4,6 @@
 
 using namespace Jet;
 
-char* Jet::Operator(TokenType t)
-{
-	if (t == TokenType::Plus)
-		return "+";
-	else if (t == TokenType::Minus)
-		return "-";
-	else if (t == TokenType::Asterisk)
-		return "*";
-	else if (t == TokenType::Slash)
-		return "/";
-	else if (t == TokenType::Modulo)
-		return "%";
-	else if (t == TokenType::Comma)
-		return ",";
-	else if (t == TokenType::Increment)
-		return "++";
-	else if (t == TokenType::Decrement)
-		return "--";
-	else if (t == TokenType::Equals)
-		return "==";
-	else if (t == TokenType::NotEqual)
-		return "!=";
-	else if (t == TokenType::Semicolon)
-		return ";";
-	else if (t == TokenType::RightBrace)
-		return "}";
-	return "";
-}
-
 Parser::Parser(Lexer* l)
 {
 	this->lexer = l;
@@ -115,8 +86,11 @@ Parser::Parser(Lexer* l)
 	this->Register(TokenType::Function, new FunctionParselet());
 	this->Register(TokenType::Ret, new ReturnParselet());
 	this->Register(TokenType::For, new ForParselet());
+
 	this->Register(TokenType::Switch, new SwitchParselet());
 	this->Register(TokenType::Case, new CaseParselet());
+	this->Register(TokenType::Default, new DefaultParselet());
+
 	this->Register(TokenType::Local, new LocalParselet());
 
 	this->Register(TokenType::Extern, new ExternParselet());

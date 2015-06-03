@@ -784,6 +784,29 @@ namespace Jet
 		void CompileDeclarations(CompilerContext* context) {};
 	};
 
+	class DefaultExpression : public Expression
+	{
+		Token token;
+	public:
+		DefaultExpression(Token token)
+		{
+			this->token = token;
+		}
+
+		~DefaultExpression()
+		{
+		}
+
+		virtual void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+		}
+
+		CValue Compile(CompilerContext* context);
+
+		void CompileDeclarations(CompilerContext* context) {};
+	};
+
 	class SwitchExpression : public Expression
 	{
 		Expression* var;
@@ -792,6 +815,7 @@ namespace Jet
 		llvm::SwitchInst* sw;
 	public:
 
+		llvm::BasicBlock* def;
 		llvm::BasicBlock* switch_end;
 
 		bool first_case;
@@ -801,6 +825,7 @@ namespace Jet
 			this->var = var;
 			this->block = block;
 			this->token = token;
+			this->def = 0;
 		}
 
 		~SwitchExpression()
@@ -813,6 +838,14 @@ namespace Jet
 			bool tmp = this->first_case;
 			this->first_case = false;
 			this->sw->addCase(value, dest);
+			return tmp;
+		}
+
+		bool AddDefault(llvm::BasicBlock* dest)
+		{
+			bool tmp = this->first_case;
+			this->first_case = false;
+			this->def = dest;
 			return tmp;
 		}
 

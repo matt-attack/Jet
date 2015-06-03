@@ -280,6 +280,17 @@ namespace Jet
 		Expression* parse(Parser* parser, Token token);
 	};
 
+	class DefaultParselet : public StatementParselet
+	{
+	public:
+		DefaultParselet()
+		{
+			this->TrailingSemicolon = false;
+		}
+
+		Expression* parse(Parser* parser, Token token);
+	};
+
 	class BreakParselet: public StatementParselet
 	{
 	public:

@@ -96,6 +96,15 @@ Expression* CaseParselet::parse(Parser* parser, Token token)
 	return new CaseExpression(token, number);
 }
 
+Expression* DefaultParselet::parse(Parser* parser, Token token)
+{
+	//int number = std::stol(parser->Consume(TokenType::Number).text);
+
+	parser->Consume(TokenType::Colon);
+
+	return new DefaultExpression(token);
+}
+
 Expression* ForParselet::parse(Parser* parser, Token token)
 {
 	parser->Consume(TokenType::LeftParen);

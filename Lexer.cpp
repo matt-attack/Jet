@@ -115,6 +115,7 @@ public:
 
 		keywords["switch"] = TokenType::Switch;
 		keywords["case"] = TokenType::Case;
+		keywords["default"] = TokenType::Default;
 
 
 		keywords["extern"] = TokenType::Extern;

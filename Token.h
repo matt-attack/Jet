@@ -74,8 +74,10 @@ namespace Jet
 		Continue,
 		Yield,
 		Resume,
+
 		Switch,
 		Case,
+		Default,
 
 		//newkeywords
 		Extern,
@@ -101,8 +103,6 @@ namespace Jet
 
 		EoF
 	};
-
-	char* Operator(TokenType t);
 
 	struct Range
 	{

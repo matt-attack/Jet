@@ -639,6 +639,31 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	}
 };
 
+CValue DefaultExpression::Compile(CompilerContext* context)
+{
+	context->CurrentToken(&token);
+
+	SwitchExpression* sw = dynamic_cast<SwitchExpression*>(this->Parent->Parent);
+	if (sw == 0)
+		Error("Cannot use default expression outside of a switch!", token);
+
+	//create a new block for this case
+	llvm::BasicBlock* block = sw->def;// lvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefault");
+
+	//add the case to the switch
+	bool is_first = sw->first_case;// AddCase(context->parent->builder.getInt32(this->value), block);
+	sw->first_case = false;
+
+	//jump to end block
+	if (!is_first)
+		context->parent->builder.CreateBr(sw->switch_end);
+
+	//start using our new block
+	context->f->getBasicBlockList().push_back(block);
+	context->parent->builder.SetInsertPoint(block);
+	return CValue();
+}
+
 CValue CaseExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&token);
@@ -670,13 +695,10 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	CValue value = this->var->Compile(context);
 	if (value.type->type != Types::Int)
 		Error("Argument to Case Statement Must Be an Integer", token);
-	//context->parent->builder.create
 
 	this->switch_end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchend");
 
-	//look for all case expressions
-	llvm::BasicBlock* def = 0;
-
+	//look for all case and default expressions
 	std::vector < CaseExpression* > cases;
 	for (auto expr : this->block->statements)
 	{
@@ -685,17 +707,21 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 		{
 			cases.push_back(Case);
 		}
-		//else if (auto def = dynamic_cast<DefaultExpression*>(expr))
-		//{
-		//do default
-		//}
+		//add default parser and expression
+		else if (auto def = dynamic_cast<DefaultExpression*>(expr))
+		{
+			//do default
+			if (this->def)
+				Error("Multiple defaults defined for the same switch!", token);
+			this->def = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefault");
+		}
 	}
 	
 	bool no_def = def ? false : true;
 	if (def == 0)
 	{
 		//create default block at end if there isnt one
-		def = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefau");
+		this->def = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefault");
 	}
 
 	//create the switch instruction
@@ -704,11 +730,11 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	//compile the block
 	this->block->Compile(context);
 
+	context->parent->builder.CreateBr(this->switch_end);
+
 	if (no_def)
 	{
-		//insert the default
-		//insert branch
-		context->parent->builder.CreateBr(this->switch_end);
+		//insert and create a dummy default
 		context->f->getBasicBlockList().push_back(def);
 		context->parent->builder.SetInsertPoint(def);
 		context->parent->builder.CreateBr(this->switch_end);
