@@ -32,7 +32,7 @@ void Jet::Error(const std::string& msg, Token token)
 		else
 			underline += ' ';
 	}
-	printf("[error] %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", token.line, startrow, token.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
+	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", current_source->filename.c_str(), token.line, startrow, token.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
 	throw 7;
 }
 
@@ -51,7 +51,7 @@ void Jet::ParserError(const std::string& msg, Token token)
 		else
 			underline += ' ';
 	}
-	printf("[error] %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", token.line, startrow, token.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
+	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", current_source->filename.c_str(), token.line, startrow, token.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
 	throw 7;
 }
 
@@ -137,7 +137,7 @@ void Compiler::Compile(const char* code, const char* filename)
 CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member)
 {
 	auto iter = parent->functions.find(fname);
-	Function* func;
+	Function* func = 0;
 	if (iter == parent->functions.end())
 	{
 		//no function exists
@@ -157,7 +157,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		n->function = func;
 		func->f = n->f;
 		if (member == false)
-			this->parent->functions[fname] = func;
+			this->parent->functions.insert({ fname, func });// [fname] = func;
 
 		llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "entry", n->f);
 		parent->builder.SetInsertPoint(bb);
@@ -165,7 +165,15 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 	}
 	else
 	{
-		func = iter->second;
+		//select the right one
+		auto range = parent->functions.equal_range(fname);
+		for (auto ii = range.first; ii != range.second; ii++)
+		{
+			//printf("found option for %s with %i args\n", fname.c_str(), ii->second->argst.size());
+			if (ii->second->argst.size() == args.size())
+				func = ii->second;
+		}
+		//func = iter->second;
 	}
 
 	func->Load(this->parent);

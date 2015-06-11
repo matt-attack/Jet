@@ -98,8 +98,6 @@ Expression* CaseParselet::parse(Parser* parser, Token token)
 
 Expression* DefaultParselet::parse(Parser* parser, Token token)
 {
-	//int number = std::stol(parser->Consume(TokenType::Number).text);
-
 	parser->Consume(TokenType::Colon);
 
 	return new DefaultExpression(token);

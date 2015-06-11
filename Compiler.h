@@ -34,7 +34,8 @@
 #include "llvm/Transforms/Scalar.h"
 
 
-
+//lets get functions with the same name but different args working for structs
+//then add templates/generics
 namespace Jet
 {
 	void Error(const std::string& msg, Token token);
@@ -67,7 +68,9 @@ namespace Jet
 		llvm::IRBuilder<> builder;
 		llvm::LLVMContext& context;
 		llvm::Module* module;
-		std::map<std::string, Function*> functions;
+
+		std::multimap<std::string, Function*> functions;
+
 		CompilerContext* current_function;
 
 		Compiler() : builder(llvm::getGlobalContext()), context(llvm::getGlobalContext())
@@ -237,14 +240,12 @@ namespace Jet
 	//compiles functions
 	class CompilerContext
 	{
+		Scope* scope;
 
 	public:
-		Scope* scope;
 		Compiler* parent;
 
 		llvm::Function* f;
-
-		//std::map<std::string, CValue> named_values;
 
 		Function* function;
 
@@ -263,6 +264,11 @@ namespace Jet
 		CValue Number(double value)
 		{
 			return CValue(&DoubleType, llvm::ConstantFP::get(parent->context, llvm::APFloat(value)));
+		}
+
+		void RegisterLocal(const std::string& name, CValue val)
+		{
+			this->scope->named_values[name] = val;
 		}
 
 		CValue String(const std::string& str)
@@ -342,6 +348,9 @@ namespace Jet
 				Error("Cannot continue from outside loop!", *current_token);
 
 			this->parent->builder.CreateBr(loops.top().second);
+
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "post.continue", this->f);
+			this->parent->builder.SetInsertPoint(bb);
 		}
 
 		void Break()
@@ -352,6 +361,9 @@ namespace Jet
 				Error("Cannot break from outside loop!", *current_token);
 
 			this->parent->builder.CreateBr(loops.top().first);
+
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "post.break", this->f);
+			this->parent->builder.SetInsertPoint(bb);
 		}
 
 		llvm::ReturnInst* Return(CValue ret)
@@ -364,7 +376,7 @@ namespace Jet
 			auto cur = this->scope;
 			do
 			{
-				for (auto ii: cur->named_values)
+				for (auto ii : cur->named_values)
 				{
 					if (ii.second.type->type == Types::Class)
 					{
@@ -380,7 +392,7 @@ namespace Jet
 				cur = cur->prev;
 			} while (cur);
 
-				ret = this->DoCast(this->function->return_type, ret);
+			ret = this->DoCast(this->function->return_type, ret);
 			return parent->builder.CreateRet(ret.val);
 		}
 
@@ -502,7 +514,20 @@ namespace Jet
 				if (iter == this->parent->functions.end())
 					Error("Function '" + name + "' is not defined", *this->current_token);
 
-				fun = iter->second;
+				//look for the best one
+				auto range = this->parent->functions.equal_range(name);
+				for (auto ii = range.first; ii != range.second; ii++)
+				{
+					//printf("found function option for %s\n", name.c_str());
+
+					//pick one with the right number of args
+					if (ii->second->argst.size() == args.size())
+						fun = ii->second;
+				}
+
+				if (fun == 0)
+					Error("Mismatched function parameters in call", *this->current_token);
+				//fun = iter->second;
 			}
 			else
 			{

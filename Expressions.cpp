@@ -430,7 +430,8 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 		AI->setName(aname);
 
 		// Add arguments to variable symbol table.
-		function->scope->named_values[aname] = CValue(argsv[Idx].first, Alloca);
+		function->RegisterLocal(aname, CValue(argsv[Idx].first, Alloca));
+		//function->scope->named_values[aname] = CValue(argsv[Idx].first, Alloca);
 	}
 
 	block->Compile(function);
@@ -477,7 +478,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	if (Struct.length() > 0)
 		context->parent->types[Struct]->data->functions[fname] = fun;
 	else
-		context->parent->functions[fname] = fun;
+		context->parent->functions.insert({ fname, fun });// [fname] = fun;
 }
 
 CValue ExternExpression::Compile(CompilerContext* context)
@@ -524,7 +525,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	}
 	else
 	{
-		context->parent->functions[fname] = fun;
+		context->parent->functions.insert({ fname, fun });// [fname] = fun;
 	}
 }
 
@@ -573,7 +574,8 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			Error("Cannot infer type from nothing!", ii.second);
 
 		// Add arguments to variable symbol table.
-		context->scope->named_values[aname] = CValue(type, Alloca);
+		context->RegisterLocal(aname, CValue(type, Alloca));
+		//context->scope->named_values[aname] = CValue(type, Alloca);
 
 		//construct it!
 		if (this->_right == 0 && type->type == Types::Class)
