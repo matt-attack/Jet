@@ -299,6 +299,7 @@ namespace Jet
 				}
 				cur = cur->prev;
 			} while (cur);
+
 			if (value.type->type == Types::Void)
 				Error("undeclared identifier '" + name + "'", *current_token);
 			return value;
@@ -342,8 +343,6 @@ namespace Jet
 
 		void Continue()
 		{
-			//todo
-			//insert new label after this
 			if (loops.empty())
 				Error("Cannot continue from outside loop!", *current_token);
 
@@ -355,8 +354,6 @@ namespace Jet
 
 		void Break()
 		{
-			//todo
-			//insert new label after this
 			if (loops.empty())
 				Error("Cannot break from outside loop!", *current_token);
 
@@ -381,11 +378,12 @@ namespace Jet
 					if (ii.second.type->type == Types::Class)
 					{
 						//look for destructor
-						auto destructor = ii.second.type->data->functions.find("destroy");
+						auto name = "~" + ii.second.type->data->name;
+						auto destructor = ii.second.type->data->functions.find(name);
 						if (destructor != ii.second.type->data->functions.end())
 						{
 							//call it
-							this->Call("destroy", { CValue(this->parent->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
+							this->Call(name, { CValue(this->parent->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
 						}
 					}
 				}

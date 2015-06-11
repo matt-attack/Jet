@@ -271,7 +271,10 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	//read in type
 	std::string ret_type = ParseType(parser);
 
+	bool destructor = parser->MatchAndConsume(TokenType::BNot);
 	Token name = parser->Consume(TokenType::Name);
+	if (destructor)
+		name.text = "~" + name.text;
 	auto arguments = new std::vector<std::pair<std::string, std::string>>;
 
 	Token stru;

@@ -581,14 +581,14 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		if (this->_right == 0 && type->type == Types::Class)
 		{
 			//call default construct if it exists
-			auto iter = type->data->functions.find("construct");// type->data->name);
+			auto iter = type->data->functions.find(type->data->name);
 			if (iter != type->data->functions.end())
 			{
 				//this is the constructor, call it
 
 				//todo: move implicit casts for operators and assignment into functions in compilercontext
 				//	will make it easier to implement operator overloads
-				context->Call("construct", { CValue(context->parent->LookupType(type->ToString() + "*"), Alloca) }, type);
+				context->Call(type->data->name, { CValue(context->parent->LookupType(type->ToString() + "*"), Alloca) }, type);
 			}
 		}
 	}
