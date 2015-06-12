@@ -1008,6 +1008,8 @@ namespace Jet
 
 	class FunctionExpression : public Expression
 	{
+		friend class Compiler;
+		friend class Type;
 		Token name;
 		std::vector<std::pair<std::string, std::string>>* args;
 		ScopeExpression* block;
@@ -1088,17 +1090,41 @@ namespace Jet
 		void CompileDeclarations(CompilerContext* context);
 	};
 
+	class TraitExpression : public Expression
+	{
+		Token token;
+	public:
+		TraitExpression(Token name)
+		{
+			this->token = name;
+		}
+
+		CValue Compile(CompilerContext* context)
+		{
+			return CValue();
+		}
+
+		void CompileDeclarations(CompilerContext* context)
+		{
+			context->parent->traits[token.text] = new Trait;
+		}
+	};
+
 	class StructExpression : public Expression
 	{
+		friend class Compiler;
+		friend class Type;
 		std::string name;
 		std::vector<std::pair<std::string, std::string>>* elements;
 		std::vector<FunctionExpression*>* functions;
+		std::vector<std::pair<Token, Token>>* templates;
 		Token token;
 		std::string ret_type;
 	public:
 
-		StructExpression(Token token, std::string& name, std::vector<std::pair<std::string, std::string>>* elements, std::vector<FunctionExpression*>* functions)
+		StructExpression(Token token, std::string& name, std::vector<std::pair<std::string, std::string>>* elements, std::vector<FunctionExpression*>* functions, std::vector<std::pair<Token, Token>>* templates)
 		{
+			this->templates = templates;
 			this->elements = elements;
 			this->name = name;
 			this->token = token;
@@ -1130,6 +1156,47 @@ namespace Jet
 		}
 
 		CValue Compile(CompilerContext* context);
+
+		void InstantiateTemplate(CompilerContext* context, std::vector<Type*> types)
+		{
+			//build data about the struct
+			//get or add the struct type from the type table
+			Type* str = 0;
+			auto ii = context->parent->types.find(this->name);
+			if (ii == context->parent->types.end())//its new
+			{
+				str = new Type;
+				context->parent->types[this->name] = str;
+			}
+			else
+			{
+				str = ii->second;
+				if (str->type != Types::Invalid)
+				{
+					Error("Struct '" + this->name + "' Already Defined", this->token);
+				}
+			}
+
+			str->type = Types::Class;
+			str->data = new Struct;
+			str->data->name = this->name;
+			for (auto ii : *this->elements)
+			{
+				auto type = context->parent->AdvanceTypeLookup(ii.first);
+
+				str->data->members.push_back({ ii.second, type });
+			}
+
+			for (auto ii : *this->functions)
+			{
+				ii->CompileDeclarations(context);
+			}
+
+			for (auto ii : *this->functions)
+			{
+				ii->Compile(context);
+			}
+		}
 
 		void CompileDeclarations(CompilerContext* context);
 	};

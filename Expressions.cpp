@@ -285,9 +285,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 
 	//build arg list
 	for (auto ii : *this->args)
-	{
 		argsv.push_back(ii->Compile(context));
-	}
 
 	return context->Call(fname, argsv, stru);
 }
@@ -334,7 +332,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		context->f->getBasicBlockList().push_back(else_block);
 		context->parent->builder.SetInsertPoint(else_block);
 		auto cond2 = this->right->Compile(context);
-		//cond2.val->dump();
+		
 		cond2 = context->DoCast(&BoolType, cond2);
 		context->parent->builder.CreateBr(end_block);
 
@@ -342,9 +340,8 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		context->parent->builder.SetInsertPoint(end_block);
 		auto phi = context->parent->builder.CreatePHI(GetType(cond.type), 2, "land");
 		phi->addIncoming(cond.val, cur_block);
-		//cond2.val->dump();
 		phi->addIncoming(cond2.val, else_block);
-		//phi->dump();
+
 		return CValue(&BoolType, phi);
 	}
 
@@ -376,8 +373,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 	auto lhs = this->left->Compile(context);
 	auto rhs = this->right->Compile(context);
 	rhs = context->DoCast(lhs.type, rhs);
-	//rhs.val->dump();
-	//lhs.val->dump();
+
 	return context->BinaryOperation(this->_operator.type, lhs, rhs);
 }
 
@@ -431,7 +427,6 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 
 		// Add arguments to variable symbol table.
 		function->RegisterLocal(aname, CValue(argsv[Idx].first, Alloca));
-		//function->scope->named_values[aname] = CValue(argsv[Idx].first, Alloca);
 	}
 
 	block->Compile(function);
@@ -441,7 +436,10 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 		if (this->ret_type == "void")
 			function->Return(CValue());
 		else
+		{
+			//function->f->dump();
 			Error("Function must return a value!", token);
+		}
 
 	return CValue();
 }
@@ -478,7 +476,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	if (Struct.length() > 0)
 		context->parent->types[Struct]->data->functions[fname] = fun;
 	else
-		context->parent->functions.insert({ fname, fun });// [fname] = fun;
+		context->parent->functions.insert({ fname, fun });
 }
 
 CValue ExternExpression::Compile(CompilerContext* context)
@@ -575,20 +573,20 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 		// Add arguments to variable symbol table.
 		context->RegisterLocal(aname, CValue(type, Alloca));
-		//context->scope->named_values[aname] = CValue(type, Alloca);
-
+		
 		//construct it!
 		if (this->_right == 0 && type->type == Types::Class)
 		{
 			//call default construct if it exists
-			auto iter = type->data->functions.find(type->data->name);
+			const std::string& constructor_name = type->data->template_base ? type->data->template_base->name : type->data->name;
+			auto iter = type->data->functions.find(constructor_name);
 			if (iter != type->data->functions.end())
 			{
 				//this is the constructor, call it
 
 				//todo: move implicit casts for operators and assignment into functions in compilercontext
 				//	will make it easier to implement operator overloads
-				context->Call(type->data->name, { CValue(context->parent->LookupType(type->ToString() + "*"), Alloca) }, type);
+				context->Call(constructor_name, { CValue(context->parent->LookupType(type->ToString() + "*"), Alloca) }, type);
 			}
 		}
 	}
@@ -598,6 +596,12 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 CValue StructExpression::Compile(CompilerContext* context)
 {
+	if (this->templates)
+	{
+		//compile l8r
+		return CValue();
+	}
+
 	for (auto fun : *this->functions)
 	{
 		fun->Compile(context);
@@ -628,6 +632,15 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	str->type = Types::Class;
 	str->data = new Struct;
 	str->data->name = this->name;
+	str->data->expression = this;
+	if (this->templates)
+	{
+		for (auto ii : *this->templates)
+		{
+			str->data->templates.push_back({ ii.first.text, ii.second.text });
+		}
+	}
+	//str->data->templates = this->templates;
 	for (auto ii : *this->elements)
 	{
 		auto type = context->parent->AdvanceTypeLookup(ii.first);
@@ -635,9 +648,12 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		str->data->members.push_back({ ii.second, type });
 	}
 
-	for (auto ii : *this->functions)
+	if (this->templates == 0)
 	{
-		ii->CompileDeclarations(context);
+		for (auto ii : *this->functions)
+		{
+			ii->CompileDeclarations(context);
+		}
 	}
 };
 
@@ -675,7 +691,7 @@ CValue CaseExpression::Compile(CompilerContext* context)
 		Error("Cannot use case expression outside of a switch!", token);
 
 	//create a new block for this case
-	llvm::BasicBlock* block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "case"+std::to_string(value));
+	llvm::BasicBlock* block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "case" + std::to_string(value));
 
 	//add the case to the switch
 	bool is_first = sw->AddCase(context->parent->builder.getInt32(this->value), block);
@@ -718,7 +734,7 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 			this->def = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefault");
 		}
 	}
-	
+
 	bool no_def = def ? false : true;
 	if (def == 0)
 	{

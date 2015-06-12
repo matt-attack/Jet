@@ -61,6 +61,47 @@ void Type::Load(Compiler* compiler)
 	this->loaded = true;
 }
 
+//#include "Expressions.h"
+Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
+{
+	//register the types
+	int i = 0;
+	for (auto ii : this->data->templates)
+	{
+		//lets be stupid and just register the type
+		Type* t = compiler->types[ii.second];
+		if (t == 0)
+			compiler->types[ii.second] = types[i++];
+		else
+		{
+			//define the type
+			*t = *(types[i++]);
+		}
+	}
+	//printf("tried to instantiate template");
+
+
+	//duplicate and load
+	Struct* str = new Struct;
+	//str->functions = this->data->functions;
+	str->members = this->data->members;
+	str->template_base = this->data;
+	str->name = this->data->name + "<";
+	for (int i = 0; i < this->data->templates.size(); i++)
+	{
+		str->name += types[i]->ToString();
+		if (i < this->data->templates.size()-1)
+			str->name += ',';
+	}
+	str->name += ">";
+	str->expression = this->data->expression;
+
+	Type* t = new Type(Types::Class, str);
+	t->Load(compiler);
+
+	return t;
+}
+
 std::string Type::ToString()
 {
 	switch (type)
@@ -85,6 +126,8 @@ std::string Type::ToString()
 		return "short";
 	case Types::Void:
 		return "void";
+	case Types::Invalid:
+		return "Undefined Type";
 	}
 }
 
@@ -103,7 +146,7 @@ void Struct::Load(Compiler* compiler)
 		elementss.push_back(GetType(type));
 	}
 	this->type = llvm::StructType::create(elementss, this->name);
-
+	//this->type->dump();
 	this->loaded = true;
 }
 

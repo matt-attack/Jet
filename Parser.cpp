@@ -95,6 +95,7 @@ Parser::Parser(Lexer* l)
 
 	this->Register(TokenType::Extern, new ExternParselet());
 	this->Register(TokenType::Struct, new StructParselet());
+	this->Register(TokenType::Trait, new TraitParselet());
 
 	this->Register(TokenType::Break, new BreakParselet());
 	this->Register(TokenType::Continue, new ContinueParselet());

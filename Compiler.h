@@ -70,6 +70,7 @@ namespace Jet
 		llvm::Module* module;
 
 		std::multimap<std::string, Function*> functions;
+		std::map<std::string, Trait*> traits;
 
 		CompilerContext* current_function;
 
@@ -176,58 +177,7 @@ namespace Jet
 		}
 
 		std::map<std::string, Type*> types;
-		Type* LookupType(const std::string& name)
-		{
-			auto type = types[name];
-			if (type == 0)
-			{
-				//time to handle pointers yo
-				if (name[name.length() - 1] == '*')
-				{
-					//its a pointer
-					auto t = this->LookupType(name.substr(0, name.length() - 1));
-
-					type = new Type;
-					type->base = t;
-					type->type = Types::Pointer;
-
-					types[name] = type;
-				}
-				else if (name[name.length() - 1] == ']')
-				{
-					//its an array
-					int p = 0;
-					for (p = 0; p < name.length(); p++)
-						if (name[p] == '[')
-							break;
-
-					auto len = name.substr(p + 1, name.length() - p - 2);
-
-					auto tname = name.substr(0, p);
-					auto t = this->LookupType(tname);
-
-					type = new Type;
-					type->base = t;
-					type->type = Types::Array;
-					type->size = std::stoi(len);//cheat for now
-					types[name] = type;
-				}
-				else
-				{
-					printf("Error: Couldn't Find Type: %s\n", name.c_str());
-					throw 7;
-				}
-			}
-
-			//load it if it hasnt been loaded
-			if (type->loaded == false)
-			{
-				type->Load(this);
-				type->loaded = true;
-			}
-
-			return type;
-		}
+		Type* LookupType(const std::string& name);
 	};
 
 	struct Scope
@@ -378,7 +328,7 @@ namespace Jet
 					if (ii.second.type->type == Types::Class)
 					{
 						//look for destructor
-						auto name = "~" + ii.second.type->data->name;
+						auto name = "~" + (ii.second.type->data->template_base ? ii.second.type->data->template_base->name : ii.second.type->data->name);
 						auto destructor = ii.second.type->data->functions.find(name);
 						if (destructor != ii.second.type->data->functions.end())
 						{
@@ -543,6 +493,7 @@ namespace Jet
 
 			if (args.size() != f->arg_size())
 			{
+				f->dump();
 				//todo: add better checks later
 				Error("Mismatched function parameters in call", *this->current_token);
 			}
@@ -553,7 +504,10 @@ namespace Jet
 			{
 				//try and cast to the correct type if we can
 				argsv.push_back(this->DoCast(fun->argst[i++].first, ii).val);
+				//argsv.back()->dump();
 			}
+			//fun->f->dump();
+			//parent->module->dump();
 			return CValue(fun->return_type, this->parent->builder.CreateCall(f, argsv));
 		}
 	};

@@ -117,6 +117,8 @@ public:
 		keywords["case"] = TokenType::Case;
 		keywords["default"] = TokenType::Default;
 
+		keywords["trait"] = TokenType::Trait;
+
 
 		keywords["extern"] = TokenType::Extern;
 		keywords["struct"] = TokenType::Struct;

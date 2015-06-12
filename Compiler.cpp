@@ -845,6 +845,7 @@ void Compiler::OutputPackage()
 	stable.close();
 }
 
+#include "Expressions.h"
 void Compiler::OutputIR(const char* filename)
 {
 	std::error_code ec;
@@ -852,4 +853,122 @@ void Compiler::OutputIR(const char* filename)
 	llvm::formatted_raw_ostream o(str);
 	llvm::AssemblyAnnotationWriter writer;
 	module->print(str, &writer);
+}
+
+Jet::Type* Compiler::LookupType(const std::string& name)
+{
+	auto type = types[name];
+	if (type == 0)
+	{
+		//time to handle pointers yo
+		if (name[name.length() - 1] == '*')
+		{
+			//its a pointer
+			auto t = this->LookupType(name.substr(0, name.length() - 1));
+
+			type = new Type;
+			type->base = t;
+			type->type = Types::Pointer;
+
+			types[name] = type;
+		}
+		else if (name[name.length() - 1] == ']')
+		{
+			//its an array
+			int p = 0;
+			for (p = 0; p < name.length(); p++)
+				if (name[p] == '[')
+					break;
+
+			auto len = name.substr(p + 1, name.length() - p - 2);
+
+			auto tname = name.substr(0, p);
+			auto t = this->LookupType(tname);
+
+			type = new Type;
+			type->base = t;
+			type->type = Types::Array;
+			type->size = std::stoi(len);//cheat for now
+			types[name] = type;
+		}
+		else if (name[name.length() - 1] == '>')
+		{
+			//its a template
+			//get first bit, then we can instatiate it
+			int p = 0;
+			for (p = 0; p < name.length(); p++)
+				if (name[p] == '<')
+					break;
+
+			std::string base = name.substr(0, p);
+
+			//parse types
+			std::vector<Type*> types;
+			p++;
+			do
+			{
+				//lets cheat for the moment ok
+				std::string subtype;
+				do
+				{
+					subtype += name[p];
+					p++;
+				} while (name[p] != ',' && name[p] != '>');
+
+				Type* t = this->LookupType(subtype);
+				types.push_back(t);
+			} while (name[p++] != '>');
+
+			//look up the base, and lets instantiate it
+			auto t = this->types.find(base);
+			if (t == this->types.end())
+				Error("Reference To Undefined Type '" + base + "'", *this->current_function->current_token);
+
+			Type* res = t->second->Instantiate(this, types);
+			//printf("instantiated template type %s!!!\n", name.c_str());
+			this->types[name] = res;
+
+			//compile its functions
+			if (res->data->expression->functions && res->data->expression->functions->size() > 0)
+			{
+				StructExpression* expr = dynamic_cast<StructExpression*>(res->data->expression->functions->back()->Parent);
+				auto oldname = expr->name;
+				expr->name = res->data->name;
+				
+				//store then restore insertion point
+				auto rp = this->builder.GetInsertBlock();
+
+				for (auto ii : *res->data->expression->functions)
+				{
+					ii->CompileDeclarations(this->current_function);
+				}
+		
+				for (auto fun : *res->data->expression->functions)
+				{
+					fun->Compile(this->current_function);//the context used may not be proper, but it works
+					fun->args->clear();//this clears the arguments stored in each fun created when compiledeclarations is called
+				}
+
+				this->builder.SetInsertPoint(rp);
+				expr->name = oldname;
+			}
+
+			type = res;
+		}
+		else
+		{
+			Error("Reference To Undefined Type '"+name+"'", *this->current_function->current_token);
+			//printf("Error: Couldn't Find Type: %s\n", name.c_str());
+			//throw 7;
+		}
+	}
+
+	//load it if it hasnt been loaded
+	if (type->loaded == false)
+	{
+		type->Load(this);
+		type->loaded = true;
+	}
+
+	return type;
 }

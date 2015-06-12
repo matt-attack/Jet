@@ -52,6 +52,8 @@ namespace Jet
 
 		void Load(Compiler* compiler);
 
+		Type* Instantiate(Compiler* compiler, const std::vector<Type*>& types);
+
 		std::string ToString();
 
 		//Type* GetPointerType()
@@ -60,20 +62,32 @@ namespace Jet
 		//}
 	};
 
+	struct Trait
+	{
+		
+	};
+
+	class StructExpression;
 	class Function;
 	struct Struct
 	{
 		std::string name;
-		std::vector<std::pair<std::string, Type*>> members;
 		llvm::Type* type;
 
+		std::vector<std::pair<std::string, Type*>> members;
 		std::map<std::string, Function*> functions;
+
+		Struct* template_base;//for templates
+		std::vector<std::pair<std::string, std::string>> templates;
+		StructExpression* expression;
 
 		bool loaded;
 
 		Struct()
 		{
+			template_base = 0;
 			type = 0;
+			expression = 0;
 			loaded = false;
 		}
 

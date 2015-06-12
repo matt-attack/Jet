@@ -198,12 +198,58 @@ std::string ParseType(Parser* parser)
 		//its a pointer
 		out += '*';
 	}
+	//parse templates
+	if (parser->MatchAndConsume(TokenType::LessThan))
+	{
+		out += "<";
+		//recursively parse the rest
+		bool first = true;
+		do
+		{
+			if (first == false)
+				out += ",";
+			first = false;
+			out += ParseType(parser);
+		} while (parser->MatchAndConsume(TokenType::Comma));
+		
+		parser->Consume(TokenType::GreaterThan);
+		out += ">";
+	}
 	return out;
+}
+
+Expression* TraitParselet::parse(Parser* parser, Token token)
+{
+	Token name = parser->Consume(TokenType::Name);
+
+	parser->Consume(TokenType::LeftBrace);
+
+	//do this later
+
+	parser->Consume(TokenType::RightBrace);
+
+	return new TraitExpression(name);
 }
 
 Expression* StructParselet::parse(Parser* parser, Token token)
 {
 	Token name = parser->Consume(TokenType::Name);
+
+	//parse templates
+	std::vector<std::pair<Token, Token>>* templated = 0;
+	if (parser->MatchAndConsume(TokenType::LessThan))
+	{
+		templated = new std::vector < std::pair<Token, Token> > ;
+		//parse types and stuff
+		do
+		{
+			Token ttname = parser->Consume(TokenType::Name);
+			Token tname = parser->Consume(TokenType::Name);
+
+			templated->push_back({ ttname, tname });
+		} while (parser->MatchAndConsume(TokenType::Comma));
+		parser->Consume(TokenType::GreaterThan);
+	}
 
 	parser->Consume(TokenType::LeftBrace);
 
@@ -263,7 +309,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 	}
 	//done
 
-	return new StructExpression(name, name.text, elements, functions);
+	return new StructExpression(name, name.text, elements, functions, templated);
 }
 
 Expression* FunctionParselet::parse(Parser* parser, Token token)
