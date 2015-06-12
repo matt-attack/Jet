@@ -1157,47 +1157,6 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context);
 
-		void InstantiateTemplate(CompilerContext* context, std::vector<Type*> types)
-		{
-			//build data about the struct
-			//get or add the struct type from the type table
-			Type* str = 0;
-			auto ii = context->parent->types.find(this->name);
-			if (ii == context->parent->types.end())//its new
-			{
-				str = new Type;
-				context->parent->types[this->name] = str;
-			}
-			else
-			{
-				str = ii->second;
-				if (str->type != Types::Invalid)
-				{
-					Error("Struct '" + this->name + "' Already Defined", this->token);
-				}
-			}
-
-			str->type = Types::Class;
-			str->data = new Struct;
-			str->data->name = this->name;
-			for (auto ii : *this->elements)
-			{
-				auto type = context->parent->AdvanceTypeLookup(ii.first);
-
-				str->data->members.push_back({ ii.second, type });
-			}
-
-			for (auto ii : *this->functions)
-			{
-				ii->CompileDeclarations(context);
-			}
-
-			for (auto ii : *this->functions)
-			{
-				ii->Compile(context);
-			}
-		}
-
 		void CompileDeclarations(CompilerContext* context);
 	};
 

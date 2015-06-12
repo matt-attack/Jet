@@ -438,7 +438,7 @@ std::string exec(const char* cmd) {
 	return result;
 }
 
-void Compiler::Compile(const char* projectdir)
+std::vector<std::string> Compiler::Compile(const char* projectdir)
 {
 	std::vector<std::string> files;
 	std::vector<std::string> dependencies;
@@ -450,7 +450,7 @@ void Compiler::Compile(const char* projectdir)
 	if (pf.is_open() == false)
 	{
 		printf("Error: Could not find project file\n");
-		return;
+		return std::vector<std::string>();
 	}
 
 	bool is_executable = true;
@@ -515,11 +515,17 @@ void Compiler::Compile(const char* projectdir)
 
 	//build each dependency
 	std::vector<char*> lib_symbols;
-	for (auto ii : dependencies)
+	int deps = dependencies.size();
+	for (int i = 0; i < deps; i++)
 	{
+		auto ii = dependencies[i];
 		//spin up new compiler instance and build it
 		Compiler compiler;
-		compiler.Compile(ii.c_str());
+		auto subdeps = compiler.Compile(ii.c_str());
+
+		//add the subdependencies to the list
+		for (auto d : subdeps)
+			dependencies.push_back(d);
 
 		std::string path = ii;
 		/*int i = path.length();
@@ -534,7 +540,7 @@ void Compiler::Compile(const char* projectdir)
 		if (symbols.is_open() == false)
 		{
 			printf("Dependency compilation failed: could not find symbol file!\n");
-			return;
+			return std::vector<std::string>();
 		}
 
 		//parse symbols
@@ -705,7 +711,6 @@ error:
 			std::string cmd = "clang ";
 			for (auto ii : dependencies)
 			{
-				//todo: compile in the dependencies of dependencies
 				cmd += ii + "/build/output.o ";
 			}
 			cmd += "build/output.o ";
@@ -719,7 +724,7 @@ error:
 
 	//restore working directory
 	chdir(olddir);
-	return;
+	return dependencies;
 }
 
 void Compiler::OutputPackage()

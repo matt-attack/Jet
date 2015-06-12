@@ -86,7 +86,8 @@ namespace Jet
 			types["void"] = &VoidType;// new Type(Types::Void);
 		}
 
-		void Compile(const char* projectfile);
+		//returns paths to dependencies
+		std::vector<std::string> Compile(const char* projectfile);
 
 		void Compile(const char* code, const char* filename);
 
