@@ -1,5 +1,6 @@
 #include "Types.h"
 #include "Compiler.h"
+#include "CompilerContext.h"
 
 using namespace Jet;
 
@@ -26,7 +27,7 @@ llvm::Type* Jet::GetType(Type* t)
 		return llvm::Type::getInt16Ty(llvm::getGlobalContext());
 	case Types::Bool:
 		return llvm::Type::getInt1Ty(llvm::getGlobalContext());
-	case Types::Class:
+	case Types::Struct:
 		return t->data->type;
 	case Types::Array:
 		return llvm::ArrayType::get(GetType(t->base), t->size);
@@ -42,7 +43,7 @@ void Type::Load(Compiler* compiler)
 	if (loaded == true)
 		return;
 
-	if (type == Types::Class)
+	if (type == Types::Struct)
 	{
 		data->Load(compiler);
 	}
@@ -96,7 +97,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	str->name += ">";
 	str->expression = this->data->expression;
 
-	Type* t = new Type(Types::Class, str);
+	Type* t = new Type(Types::Struct, str);
 	t->Load(compiler);
 
 	return t;
@@ -106,7 +107,7 @@ std::string Type::ToString()
 {
 	switch (type)
 	{
-	case Types::Class:
+	case Types::Struct:
 		return this->data->name;
 	case Types::Pointer:
 		return this->base->ToString() + "*";

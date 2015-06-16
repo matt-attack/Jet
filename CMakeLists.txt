@@ -17,6 +17,7 @@ include_directories("${PROJECT_BINARY_DIR}")
 add_executable(Jet 
 	jetc.cpp
 	Compiler.cpp
+	CompilerContext.cpp
 	Expressions.cpp
 	Parser.cpp
 	Parselets.cpp

@@ -105,7 +105,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 		else if (i)
 			lhs = i->GetGEP(context);
 
-		if (string && lhs.type->type == Types::Class)
+		if (string && lhs.type->type == Types::Struct)
 		{
 			int index = 0;
 			for (; index < lhs.type->data->members.size(); index++)
@@ -143,7 +143,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		else if (i)
 			lhs = i->GetGEP(context);
 
-		if (string && lhs.type->type == Types::Class)
+		if (string && lhs.type->type == Types::Struct)
 		{
 			int index = 0;
 			for (; index < lhs.type->data->members.size(); index++)
@@ -515,7 +515,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		}
 		else
 		{
-			if (ii->second->type != Types::Class)
+			if (ii->second->type != Types::Struct)
 				Error("Cannot define a function for a type that is not a struct", token);
 
 			ii->second->data->functions[fname] = fun;
@@ -575,7 +575,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		context->RegisterLocal(aname, CValue(type, Alloca));
 		
 		//construct it!
-		if (this->_right == 0 && type->type == Types::Class)
+		if (this->_right == 0 && type->type == Types::Struct)
 		{
 			//call default construct if it exists
 			const std::string& constructor_name = type->data->template_base ? type->data->template_base->name : type->data->name;
@@ -629,7 +629,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		}
 	}
 
-	str->type = Types::Class;
+	str->type = Types::Struct;
 	str->data = new Struct;
 	str->data->name = this->name;
 	str->data->expression = this;

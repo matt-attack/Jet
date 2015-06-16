@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "Compiler.h"
+#include "CompilerContext.h"
 
 namespace Jet
 {

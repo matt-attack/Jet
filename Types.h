@@ -22,7 +22,7 @@ namespace Jet
 		Short,
 		Bool,
 
-		Class,//value type
+		Struct,//value type
 		Function,
 
 		Pointer,
@@ -74,14 +74,16 @@ namespace Jet
 		std::string name;
 		llvm::Type* type;
 
-		std::vector<std::pair<std::string, Type*>> members;
-		std::map<std::string, Function*> functions;
+		std::vector<std::pair<std::string, Type*>> members;//member variables
 
-		Struct* template_base;//for templates
-		std::vector<std::pair<std::string, std::string>> templates;
-		StructExpression* expression;
+		std::map<std::string, Function*> functions;//member functions
 
 		bool loaded;
+
+		//template stuff
+		Struct* template_base;
+		std::vector<std::pair<std::string, std::string>> templates;
+		StructExpression* expression;
 
 		Struct()
 		{
@@ -93,7 +95,7 @@ namespace Jet
 
 		void Load(Compiler* compiler);
 	};
-
+	
 	struct Function
 	{
 		std::string name;

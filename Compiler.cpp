@@ -1,4 +1,5 @@
 #include "Compiler.h"
+#include "CompilerContext.h"
 
 #include "Source.h"
 #include "Parser.h"
@@ -134,283 +135,6 @@ void Compiler::Compile(const char* code, const char* filename)
 	//	return;
 }
 
-CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member)
-{
-	auto iter = parent->functions.find(fname);
-	Function* func = 0;
-	if (iter == parent->functions.end())
-	{
-		//no function exists
-		func = new Function;
-		func->return_type = ret;
-		func->argst = args;
-		func->name = fname;
-		for (int i = 0; i < args.size(); i++)
-		{
-			func->args.push_back(GetType(args[i].first));
-		}
-
-		auto n = new CompilerContext(this->parent);
-
-		auto ft = llvm::FunctionType::get(GetType(ret), func->args, false);
-		n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
-		n->function = func;
-		func->f = n->f;
-		if (member == false)
-			this->parent->functions.insert({ fname, func });// [fname] = func;
-
-		llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "entry", n->f);
-		parent->builder.SetInsertPoint(bb);
-		return n;
-	}
-	else
-	{
-		//select the right one
-		auto range = parent->functions.equal_range(fname);
-		for (auto ii = range.first; ii != range.second; ii++)
-		{
-			//printf("found option for %s with %i args\n", fname.c_str(), ii->second->argst.size());
-			if (ii->second->argst.size() == args.size())
-				func = ii->second;
-		}
-		//func = iter->second;
-	}
-
-	func->Load(this->parent);
-
-
-	auto n = new CompilerContext(this->parent);
-	n->f = func->f;
-	n->function = func;
-
-	llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "entry", n->f);
-	parent->builder.SetInsertPoint(bb);
-
-	this->parent->current_function = n;
-	return n;
-}
-
-CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
-{
-	llvm::Value* res = 0;
-
-	if (operation == TokenType::BAnd)
-	{
-		//this should already have been done elsewhere, so error
-		throw 7;
-	}
-
-	if (value.type->type == Types::Float || value.type->type == Types::Double)
-	{
-		switch (operation)
-		{
-			/*case TokenType::Increment:
-				parent->builder.create
-				throw 7;
-				//res = parent->builder.CreateFAdd(left.val, right.val);
-				break;
-				case TokenType::Decrement:
-				throw 7;
-				//res = parent->builder.CreateFSub(left.val, right.val);
-				break;*/
-		case TokenType::Minus:
-			res = parent->builder.CreateFNeg(value.val);// parent->builder.CreateFMul(left.val, right.val);
-			break;
-		default:
-			Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
-			break;
-		}
-
-		return CValue(value.type, res);
-	}
-	else if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
-	{
-		//integer probably
-		switch (operation)
-		{
-		case TokenType::Increment:
-			res = parent->builder.CreateAdd(value.val, parent->builder.getInt32(1));
-			break;
-		case TokenType::Decrement:
-			res = parent->builder.CreateSub(value.val, parent->builder.getInt32(1));
-			break;
-		case TokenType::Minus:
-			res = parent->builder.CreateNeg(value.val);// parent->builder.CreateFMul(left.val, right.val);
-			break;
-		case TokenType::BNot:
-			res = parent->builder.CreateNot(value.val);
-			break;
-		default:
-			Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
-			break;
-		}
-
-		return CValue(value.type, res);
-	}
-	else if (value.type->type == Types::Pointer)
-	{
-		switch (operation)
-		{
-		case TokenType::Asterisk:
-			return CValue(value.type->base, this->parent->builder.CreateLoad(value.val));
-		default:
-			Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
-		}
-
-	}
-	//throw 7;
-	Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
-}
-
-CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue right)
-{
-	llvm::Value* res = 0;
-
-	//should this be a floating point calc?
-	if (left.type->type != right.type->type)
-	{
-		//conversion time!!
-
-		throw 7;
-	}
-
-	if (left.type->type == Types::Float || left.type->type == Types::Double)
-	{
-		switch (op)
-		{
-		case TokenType::AddAssign:
-		case TokenType::Plus:
-			res = parent->builder.CreateFAdd(left.val, right.val);
-			break;
-		case TokenType::SubtractAssign:
-		case TokenType::Minus:
-			res = parent->builder.CreateFSub(left.val, right.val);
-			break;
-		case TokenType::MultiplyAssign:
-		case TokenType::Asterisk:
-			res = parent->builder.CreateFMul(left.val, right.val);
-			break;
-		case TokenType::DivideAssign:
-		case TokenType::Slash:
-			res = parent->builder.CreateFDiv(left.val, right.val);
-			break;
-		case TokenType::LessThan:
-			//use U or O?
-			res = parent->builder.CreateFCmpULT(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::LessThanEqual:
-			res = parent->builder.CreateFCmpULE(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::GreaterThan:
-			res = parent->builder.CreateFCmpUGT(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::GreaterThanEqual:
-			res = parent->builder.CreateFCmpUGE(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::Equals:
-			res = parent->builder.CreateFCmpUEQ(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::NotEqual:
-			res = parent->builder.CreateFCmpUNE(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		default:
-			Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
-			//throw 7;
-			break;
-		}
-
-		return CValue(left.type, res);
-	}
-	else if (left.type->type == Types::Int || left.type->type == Types::Short || left.type->type == Types::Char)
-	{
-		//integer probably
-		switch (op)
-		{
-		case TokenType::AddAssign:
-		case TokenType::Plus:
-			res = parent->builder.CreateAdd(left.val, right.val);
-			break;
-		case TokenType::SubtractAssign:
-		case TokenType::Minus:
-			res = parent->builder.CreateSub(left.val, right.val);
-			break;
-		case TokenType::MultiplyAssign:
-		case TokenType::Asterisk:
-			res = parent->builder.CreateMul(left.val, right.val);
-			break;
-		case TokenType::DivideAssign:
-		case TokenType::Slash:
-			if (true)//signed
-				res = parent->builder.CreateSDiv(left.val, right.val);
-			else//unsigned
-				res = parent->builder.CreateUDiv(left.val, right.val);
-			break;
-		case TokenType::Modulo:
-			if (true)//signed
-				res = parent->builder.CreateSRem(left.val, right.val);
-			else//unsigned
-				res = parent->builder.CreateURem(left.val, right.val);
-			break;
-			//todo add unsigned
-		case TokenType::LessThan:
-			//use U or S?
-			res = parent->builder.CreateICmpSLT(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::LessThanEqual:
-			res = parent->builder.CreateICmpSLE(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::GreaterThan:
-			res = parent->builder.CreateICmpSGT(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::GreaterThanEqual:
-			res = parent->builder.CreateICmpSGE(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::Equals:
-			res = parent->builder.CreateICmpEQ(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::NotEqual:
-			res = parent->builder.CreateICmpNE(left.val, right.val);
-			return CValue(&BoolType, res);
-			break;
-		case TokenType::BAnd:
-		case TokenType::AndAssign:
-			res = parent->builder.CreateAnd(left.val, right.val);
-			break;
-		case TokenType::BOr:
-		case TokenType::OrAssign:
-			res = parent->builder.CreateOr(left.val, right.val);
-			break;
-		case TokenType::Xor:
-		case TokenType::XorAssign:
-			res = parent->builder.CreateXor(left.val, right.val);
-			break;
-		case TokenType::LeftShift:
-			//todo
-		case TokenType::RightShift:
-			//todo
-		default:
-			Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
-
-			break;
-		}
-
-		return CValue(left.type, res);
-	}
-
-	Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
-}
-
 #include <llvm/ADT/Triple.h>
 #include <llvm/Support/Host.h>
 #include <llvm\Target\TargetLibraryInfo.h>
@@ -443,13 +167,11 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	std::vector<std::string> files;
 	std::vector<std::string> dependencies;
 
-	printf("Compiling Project: %s\n", projectdir);
-
 	//ok, lets parse the jp file
-	std::ifstream pf(std::string(projectdir) +"/project.jp", std::ios::in | std::ios::binary);
+	std::ifstream pf(std::string(projectdir) + "/project.jp", std::ios::in | std::ios::binary);
 	if (pf.is_open() == false)
 	{
-		printf("Error: Could not find project file\n");
+		printf("Error: Could not find project file %s\n", projectdir);
 		return std::vector<std::string>();
 	}
 
@@ -555,7 +277,45 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 		lib_symbols.push_back(buffer);
 	}
 
-	//check if I need a rebuild
+	printf("\nCompiling Project: %s\n", projectdir);
+
+	//read in buildtimes
+	std::vector<std::pair<int, int>> buildtimes;
+	std::ifstream rebuild("build/rebuild.txt");
+	std::string compiler_version;
+	if (rebuild.is_open())
+	{
+		bool first = true;
+		do
+		{
+			std::string line;
+			std::getline(rebuild, line, '\n');
+			if (line.length() == 0)
+				break;
+			int hi, lo;
+			sscanf(line.c_str(), "%i,%i", &hi, &lo);
+
+			if (first)
+			{
+				compiler_version = line;
+				first = false;
+			}
+			else
+			{
+				buildtimes.push_back({ hi, lo });
+			}
+		} while (true);
+	}
+
+
+	std::vector<std::pair<int, int>> modifiedtimes;
+	auto file = CreateFileA("project.jp", GENERIC_READ, FILE_SHARE_READ, NULL,
+		OPEN_EXISTING, 0, NULL);
+	FILETIME create, modified, access;
+	GetFileTime(file, &create, &access, &modified);
+
+	CloseHandle(file);
+	modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
 	for (auto ii : files)
 	{
 		auto file = CreateFileA(ii.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
@@ -563,9 +323,33 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 		FILETIME create, modified, access;
 		GetFileTime(file, &create, &access, &modified);
 
-		SYSTEMTIME syst;
-		FileTimeToSystemTime(&modified, &syst);
+		//SYSTEMTIME syst;
+		//FileTimeToSystemTime(&modified, &syst);
 		CloseHandle(file);
+		modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
+	}
+
+
+	if (strcmp(__TIME__, compiler_version.c_str()) != 0)//see if the compiler was the same
+	{
+		//do a rebuild compiler version is different
+	}
+	else if (modifiedtimes.size() == buildtimes.size())//check if files were modified
+	{
+		for (int i = 0; i < modifiedtimes.size(); i++)
+		{
+			if (modifiedtimes[i].first == buildtimes[i].first && modifiedtimes[i].second == buildtimes[i].second)
+			{
+				if (i == modifiedtimes.size() - 1)
+				{
+					printf("No Changes Detected, Compiling Skipped\n");
+
+					//restore working directory
+					chdir(olddir);
+					return dependencies;
+				}
+			}
+		}
 	}
 
 	//JITHelper = new MCJITHelper(this->context);
@@ -621,7 +405,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 		}
 		else
 		{
-			printf("Could not find file!");
+			printf("Could not find file '%s'!\n", file.c_str());
 			errors = 1;
 			goto error;
 		}
@@ -695,8 +479,6 @@ error:
 	{
 		//make the output folder
 		mkdir("build/");
-		//try and link and shizzle
-		//module->dump();
 
 		//output the IR for debugging
 		this->OutputIR("build/output.ir");
@@ -719,12 +501,50 @@ error:
 			printf(res.c_str());
 		}
 
+		//output build times
+		std::ofstream rebuild("build/rebuild.txt");
+		//output compiler version
+		rebuild.write(__TIME__, strlen(__TIME__));
+		rebuild.write("\n", 1);
+		for (auto ii : modifiedtimes)
+		{
+			char str[150];
+			int len = sprintf(str, "%i,%i\n", ii.first, ii.second);
+			rebuild.write(str, len);
+		}
+
 		printf("Project built successfully.\n\n");
 	}
 
 	//restore working directory
 	chdir(olddir);
 	return dependencies;
+}
+
+void Compiler::Optimize()
+{
+	llvm::legacy::FunctionPassManager OurFPM(module);
+	// Set up the optimizer pipeline.  Start with registering info about how the
+	// target lays out data structures.
+	//TheModule->setDataLayout(*TheExecutionEngine->getDataLayout());
+	// Provide basic AliasAnalysis support for GVN.
+	OurFPM.add(llvm::createBasicAliasAnalysisPass());
+	// Do simple "peephole" optimizations and bit-twiddling optzns.
+	OurFPM.add(llvm::createInstructionCombiningPass());
+	// Reassociate expressions.
+	OurFPM.add(llvm::createReassociatePass());
+	// Eliminate Common SubExpressions.
+	OurFPM.add(llvm::createGVNPass());
+	// Simplify the control flow graph (deleting unreachable blocks, etc).
+	OurFPM.add(llvm::createCFGSimplificationPass());
+
+	OurFPM.doInitialization();
+
+	for (auto ii : this->functions)
+	{
+		if (ii.second->f)
+			OurFPM.run(*ii.second->f);
+	}
 }
 
 void Compiler::OutputPackage()
@@ -760,7 +580,7 @@ void Compiler::OutputPackage()
 	module->setDataLayout(Target->getSubtargetImpl()->getDataLayout());
 
 	llvm::legacy::PassManager MPM;
-	
+
 	//std::string code = "";
 	//llvm::raw_string_ostream str(code);
 	std::error_code ec;
@@ -808,15 +628,23 @@ void Compiler::OutputPackage()
 	std::string types;
 	for (auto ii : this->types)
 	{
-		if (ii.second->type == Types::Class)
+		if (ii.second->type == Types::Struct)
 		{
 			//export me
 			types += "struct " + ii.second->data->name + "{";
-			//fix exporting arrays in structs
 			for (auto var : ii.second->data->members)
 			{
-				types += var.second->ToString() + " ";
-				types += var.first + ";";
+				if (var.second->type == Types::Array)
+				{
+					//todo handle multidimensional arrays later
+					types += var.second->base->ToString() + " ";
+					types += var.first + "[" + std::to_string(var.second->size) + "];";
+				}
+				else
+				{
+					types += var.second->ToString() + " ";
+					types += var.first + ";";
+				}
 			}
 			types += "}";
 
@@ -839,9 +667,6 @@ void Compiler::OutputPackage()
 			}
 		}
 	}
-
-	//output to file
-	//printf("%s %s\n", function.c_str(), types.c_str());
 
 	//todo: only do this if im a library
 	std::ofstream stable("build/symbols.jlib");
@@ -939,7 +764,7 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 				StructExpression* expr = dynamic_cast<StructExpression*>(res->data->expression->functions->back()->Parent);
 				auto oldname = expr->name;
 				expr->name = res->data->name;
-				
+
 				//store then restore insertion point
 				auto rp = this->builder.GetInsertBlock();
 
@@ -947,7 +772,7 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 				{
 					ii->CompileDeclarations(this->current_function);
 				}
-		
+
 				for (auto fun : *res->data->expression->functions)
 				{
 					fun->Compile(this->current_function);//the context used may not be proper, but it works
@@ -962,7 +787,7 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 		}
 		else
 		{
-			Error("Reference To Undefined Type '"+name+"'", *this->current_function->current_token);
+			Error("Reference To Undefined Type '" + name + "'", *this->current_function->current_token);
 			//printf("Error: Couldn't Find Type: %s\n", name.c_str());
 			//throw 7;
 		}
