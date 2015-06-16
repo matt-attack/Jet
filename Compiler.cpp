@@ -329,10 +329,15 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 		modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
 	}
 
-
+	FILE* jlib = fopen("build/symbols.jlib", "rb");
+	FILE* output = fopen("build/output.o", "rb");
 	if (strcmp(__TIME__, compiler_version.c_str()) != 0)//see if the compiler was the same
 	{
 		//do a rebuild compiler version is different
+	}
+	else if (jlib == 0 || output == 0)//check if .jlib or .o exists
+	{
+		//output file missing, do a rebuild
 	}
 	else if (modifiedtimes.size() == buildtimes.size())//check if files were modified
 	{
@@ -351,6 +356,8 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 			}
 		}
 	}
+	if (jlib) fclose(jlib);
+	if (output) fclose(output);
 
 	//JITHelper = new MCJITHelper(this->context);
 
