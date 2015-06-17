@@ -162,6 +162,36 @@ std::string exec(const char* cmd) {
 	return result;
 }
 
+std::string GetNameFromPath(const std::string& path)
+{
+	std::string name;
+	bool first = false;
+	int i = path.length() - 1;
+	for (; i >= 0; i--)
+	{
+		if (path[i] == '/' || path[i] == '\\')
+		{
+			if (first)
+				break;
+			first = true;
+		}
+		else if (first == false)
+		{
+			first = true;
+		}
+	}
+	if (i < 0)
+		i = 0;
+
+	for (; i < path.length(); i++)
+	{
+		if (path[i] != '/' && path[i] != '\\')
+			name.push_back(path[i]);
+	}
+
+	return name;
+}
+
 std::vector<std::string> Compiler::Compile(const char* projectdir)
 {
 	std::vector<std::string> files;
@@ -171,12 +201,13 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	std::ifstream pf(std::string(projectdir) + "/project.jp", std::ios::in | std::ios::binary);
 	if (pf.is_open() == false)
 	{
-		printf("Error: Could not find project file %s\n", projectdir);
+		printf("Error: Could not find project file %s/project.jp\n", projectdir);
 		return std::vector<std::string>();
 	}
 
 	bool is_executable = true;
 	int current_block = 0;
+	std::string project_name = GetNameFromPath(projectdir);
 	while (pf.peek() != EOF)
 	{
 		std::string file;//read in a filename
@@ -213,8 +244,13 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 				dependencies.push_back(file);
 			break;//do me later
 		case 3:
+			//if (file.length() > 0)
+			//project_name = file;
 			break;
 		default:
+			//if (project_name == "program" && file.length() > 0)
+			//project_name = file;
+			//else
 			printf("Malformatted Project File!\n");
 		}
 	}
@@ -246,8 +282,8 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 		auto subdeps = compiler.Compile(ii.c_str());
 
 		//add the subdependencies to the list
-		for (auto d : subdeps)
-			dependencies.push_back(d);
+		//for (auto d : subdeps)
+		//dependencies.push_back(d);
 
 		std::string path = ii;
 		/*int i = path.length();
@@ -330,7 +366,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	}
 
 	FILE* jlib = fopen("build/symbols.jlib", "rb");
-	FILE* output = fopen("build/output.o", "rb");
+	FILE* output = fopen(("build/"+project_name+".o").c_str(), "rb");
 	if (strcmp(__TIME__, compiler_version.c_str()) != 0)//see if the compiler was the same
 	{
 		//do a rebuild compiler version is different
@@ -348,6 +384,10 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 				if (i == modifiedtimes.size() - 1)
 				{
 					printf("No Changes Detected, Compiling Skipped\n");
+
+					//delete symbols
+					for (auto ii : lib_symbols)
+						delete[] ii;
 
 					//restore working directory
 					chdir(olddir);
@@ -374,6 +414,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	std::map<std::string, Source*> sources;
 	std::map<std::string, BlockExpression*> asts;
 
+	//read in symbols from lib
 	for (auto buffer : lib_symbols)
 	{
 		Source src(buffer, "symbols");
@@ -395,6 +436,8 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 		}
 	}
 
+	//read in each file
+	//these two blocks could be multithreaded! theoretically
 	for (auto file : files)
 	{
 		std::ifstream t(file, std::ios::in | std::ios::binary);
@@ -491,21 +534,67 @@ error:
 		this->OutputIR("build/output.ir");
 
 		//output the .o file for this package
-		this->OutputPackage();
+		this->OutputPackage(project_name);
 
 		//then, if and only if I am an executable, make the .exe
 		if (is_executable)
 		{
 			printf("Compiling Executable...\n");
-			std::string cmd = "clang ";
+			std::string cmd = "clang -L. ";
+			//need to link each dependency
 			for (auto ii : dependencies)
 			{
-				cmd += ii + "/build/output.o ";
+				cmd += "-L" + ii + "/build/ ";
+
+				cmd += "-l" + GetNameFromPath(ii) + " ";
 			}
-			cmd += "build/output.o ";
+			cmd += "build/" + project_name + ".o ";
 			cmd += "-o program.exe";
 			auto res = exec(cmd.c_str());
 			printf(res.c_str());
+		}
+		else
+		{
+			std::vector<std::string> temps;
+
+			//need to put this stuff in the .jlib file later
+			printf("Compiling Lib...\n");
+			std::string cmd = "ar rcs build/lib" + project_name + ".a ";
+			cmd += "build/" + project_name + ".o ";
+			
+			for (auto ii : dependencies)
+			{
+				//need to extract then merge
+				std::string cm = "ar x " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
+				auto res = exec(cm.c_str());
+				printf(res.c_str());
+
+				//get a list of the extracted files
+				cm = "ar t " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
+				res = exec(cm.c_str());
+				int i = 0;
+				while (true)
+				{
+					std::string file;
+					if (i >= res.length())
+						break;
+					while (res[i] != '\n')
+					{
+						file += res[i++];
+					}
+					i++;
+
+					temps.push_back(file);
+					cmd += file + " ";
+				}
+			}
+
+			auto res = exec(cmd.c_str());
+			printf(res.c_str());
+
+			//delete temporary files
+			for (auto ii : temps)
+				DeleteFile(ii.c_str());
 		}
 
 		//output build times
@@ -554,7 +643,7 @@ void Compiler::Optimize()
 	}
 }
 
-void Compiler::OutputPackage()
+void Compiler::OutputPackage(const std::string& project_name)
 {
 	llvm::InitializeNativeTarget();
 	llvm::InitializeNativeTargetAsmParser();
@@ -591,7 +680,7 @@ void Compiler::OutputPackage()
 	//std::string code = "";
 	//llvm::raw_string_ostream str(code);
 	std::error_code ec;
-	llvm::raw_fd_ostream strr("build/output.o", ec, llvm::sys::fs::OpenFlags::F_None);
+	llvm::raw_fd_ostream strr("build/" + project_name + ".o", ec, llvm::sys::fs::OpenFlags::F_None);
 	llvm::formatted_raw_ostream oo(strr);
 	llvm::AssemblyAnnotationWriter writer;
 

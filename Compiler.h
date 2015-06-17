@@ -94,7 +94,7 @@ namespace Jet
 		void Optimize();
 
 		void OutputIR(const char* filename);
-		void OutputPackage();
+		void OutputPackage(const std::string& project_name);
 
 		void Dump()
 		{
