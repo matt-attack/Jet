@@ -26,6 +26,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 
 		auto ft = llvm::FunctionType::get(GetType(ret), func->args, false);
 		n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
+		//n->f->dump();
 		n->function = func;
 		func->f = n->f;
 		if (member == false)

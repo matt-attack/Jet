@@ -143,6 +143,11 @@ public:
 			}
 		}
 
+		for (auto ii : keywords)
+		{
+			TokenToString[ii.second] = ii.first;
+		}
+
 		TokenToString[TokenType::Name] = "name";
 	};
 };

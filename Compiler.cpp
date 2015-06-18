@@ -403,7 +403,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 
 	//spin off children and lets compile this!
 	//module = JITHelper->getModuleForNewFunction();
-	module = new llvm::Module("hi", context);
+	module = new llvm::Module("hi.im.jet", context);
 
 	//compile it
 	//first lets create the global context!!
@@ -549,7 +549,7 @@ error:
 				cmd += "-l" + GetNameFromPath(ii) + " ";
 			}
 			cmd += "build/" + project_name + ".o ";
-			cmd += "-o program.exe";
+			cmd += "-o build/" + project_name + ".exe";
 			auto res = exec(cmd.c_str());
 			printf(res.c_str());
 		}
@@ -578,10 +578,9 @@ error:
 					std::string file;
 					if (i >= res.length())
 						break;
+
 					while (res[i] != '\n')
-					{
 						file += res[i++];
-					}
 					i++;
 
 					temps.push_back(file);
@@ -726,6 +725,15 @@ void Compiler::OutputPackage(const std::string& project_name)
 	{
 		if (ii.second->type == Types::Struct)
 		{
+			if (ii.second->data->templates.size() > 0 && ii.second->data->template_base == 0)
+			{
+				continue;
+			}
+			else if (ii.second->data->template_base)
+			{
+				continue;//dont bother exporting instantiated templates for now
+			}
+
 			//export me
 			types += "struct " + ii.second->data->name + "{";
 			for (auto var : ii.second->data->members)
@@ -854,6 +862,7 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 			//printf("instantiated template type %s!!!\n", name.c_str());
 			this->types[name] = res;
 
+
 			//compile its functions
 			if (res->data->expression->functions && res->data->expression->functions->size() > 0)
 			{
@@ -872,7 +881,7 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 				for (auto fun : *res->data->expression->functions)
 				{
 					fun->Compile(this->current_function);//the context used may not be proper, but it works
-					fun->args->clear();//this clears the arguments stored in each fun created when compiledeclarations is called
+					//fun->args->clear();//this clears the arguments stored in each fun created when compiledeclarations is called
 				}
 
 				this->builder.SetInsertPoint(rp);

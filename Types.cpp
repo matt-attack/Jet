@@ -62,7 +62,7 @@ void Type::Load(Compiler* compiler)
 	this->loaded = true;
 }
 
-//#include "Expressions.h"
+#include "Expressions.h"
 Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 {
 	//register the types
@@ -71,21 +71,31 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	{
 		//lets be stupid and just register the type
 		Type* t = compiler->types[ii.second];
-		if (t == 0)
+		//if (t == 0)
 			compiler->types[ii.second] = types[i++];
-		else
-		{
+		//else
+		//{
 			//define the type
-			*t = *(types[i++]);
-		}
+			//t = *(types[i++]);
+		//}
 	}
 	//printf("tried to instantiate template");
+
+	
 
 
 	//duplicate and load
 	Struct* str = new Struct;
 	//str->functions = this->data->functions;
-	str->members = this->data->members;
+	//str->members = this->data->members;
+	//build members
+	for (auto ii : *this->data->expression->elements)
+	{
+		auto type = compiler->AdvanceTypeLookup(ii.first);
+
+		str->members.push_back({ ii.second, type });
+	}
+
 	str->template_base = this->data;
 	str->name = this->data->name + "<";
 	for (int i = 0; i < this->data->templates.size(); i++)

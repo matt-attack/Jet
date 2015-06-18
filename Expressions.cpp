@@ -400,12 +400,23 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 
 	//build list of types of vars
 	std::vector<std::pair<Type*, std::string>> argsv;
+	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
+	if (Struct.length() > 0)
+	{
+		//im a member function
+		//insert first arg, which is me
+		auto type = context->parent->LookupType(Struct + "*");
+
+		argsv.push_back({ type, "this" });
+		//this->args->insert(this->args->begin(), { Struct + "*", "this" });
+		//this->args->push_back({ Struct + "*", "this" });
+	}
 	for (auto ii : *this->args)
 	{
 		argsv.push_back({ context->parent->LookupType(ii.first), ii.second });
 	}
 
-	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
+	//auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 	CompilerContext* function = context->AddFunction(this->GetRealName(), context->parent->LookupType(this->ret_type), argsv, Struct.length() > 0 ? true : false);// , this->varargs);
 	if (Struct.length() > 0)
 		context->parent->types[Struct]->data->functions[fname]->f = function->f;
@@ -414,9 +425,9 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 
 	//alloc args
 	auto AI = function->f->arg_begin();
-	for (unsigned Idx = 0, e = args->size(); Idx != e; ++Idx, ++AI) {
+	for (unsigned Idx = 0, e = argsv.size(); Idx != e; ++Idx, ++AI) {
 		// Create an alloca for this variable.
-		auto aname = (*this->args)[Idx].second;
+		auto aname = argsv[Idx].second;
 
 		llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
 		auto Alloca = TmpB.CreateAlloca(GetType(argsv[Idx].first), 0, aname);
@@ -460,7 +471,11 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	{
 		//im a member function
 		//insert first arg, which is me
-		this->args->push_back({ Struct + "*", "this" });
+		auto type = context->parent->AdvanceTypeLookup(Struct + "*");
+
+		fun->argst.push_back({ type, "this" });
+		//this->args->insert(this->args->begin(), { Struct + "*", "this" });
+		//this->args->push_back({ Struct + "*", "this" });
 	}
 
 	for (auto ii : *this->args)
@@ -641,15 +656,17 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		}
 	}
 	//str->data->templates = this->templates;
-	for (auto ii : *this->elements)
-	{
-		auto type = context->parent->AdvanceTypeLookup(ii.first);
-
-		str->data->members.push_back({ ii.second, type });
-	}
+	
 
 	if (this->templates == 0)
 	{
+		for (auto ii : *this->elements)
+		{
+			auto type = context->parent->AdvanceTypeLookup(ii.first);
+
+			str->data->members.push_back({ ii.second, type });
+		}
+
 		for (auto ii : *this->functions)
 		{
 			ii->CompileDeclarations(context);

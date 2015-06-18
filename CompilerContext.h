@@ -346,7 +346,7 @@ namespace Jet
 
 			if (args.size() != f->arg_size())
 			{
-				f->dump();
+				//f->dump();
 				//todo: add better checks later
 				Error("Mismatched function parameters in call", *this->current_token);
 			}
