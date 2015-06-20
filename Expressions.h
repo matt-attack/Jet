@@ -223,7 +223,7 @@ namespace Jet
 
 	class IndexExpression : public Expression, public IStorableExpression
 	{
-		
+		std::string member;
 	public:
 		Expression* index;
 		Expression* left;
@@ -233,6 +233,14 @@ namespace Jet
 			this->token = t;
 			this->left = left;
 			this->index = index;
+		}
+
+		IndexExpression(Expression* left, std::string index, Token t)
+		{
+			this->token = t;
+			this->left = left;
+			this->index = 0;
+			this->member = index;
 		}
 
 		~IndexExpression()

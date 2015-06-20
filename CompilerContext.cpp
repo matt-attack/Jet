@@ -323,8 +323,13 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			if (type->type == Types::Struct)
 			{
 				//look for a constructor
-				auto constructor = type->data->functions.find(name);
-				if (constructor != type->data->functions.end() && constructor->second->argst.size() == args.size() + 1)
+				auto range = type->data->functions.equal_range(name);
+				for (auto ii = range.first; ii != range.second; ii++)
+				{
+					if (ii->second->argst.size() == args.size() + 1)
+						fun = ii->second;
+				}
+				if (fun)//constructor != type->data->functions.end() && constructor->second->argst.size() == args.size() + 1)
 				{
 					//ok, we allocate, call then 
 					//printf("calling constructor\n");
@@ -340,17 +345,17 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 					for (auto ii : args)
 					{
 						//try and cast to the correct type if we can
-						argsv.push_back(this->DoCast(constructor->second->argst[i++].first, ii).val);
+						argsv.push_back(this->DoCast(fun->argst[i++].first, ii).val);
 						//argsv.back()->dump();
 					}
 
-					constructor->second->Load(this->parent);
+					fun->Load(this->parent);
 
 					//constructor->second->f->dump();
 					//parent->module->dump();
 					//auto fun = this->parent->module->getFunction(constructor->second->name);
 
-					this->parent->builder.CreateCall(constructor->second->f, argsv);
+					this->parent->builder.CreateCall(fun->f, argsv);
 
 					return CValue(type, this->parent->builder.CreateLoad(Alloca));
 				}

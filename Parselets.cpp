@@ -617,6 +617,23 @@ Expression* MemberParselet::parse(Parser* parser, Expression* left, Token token)
 	return ret;
 }
 
+Expression* PointerMemberParselet::parse(Parser* parser, Expression* left, Token token)
+{
+	//this is for const members
+	Expression* member = parser->parseExpression(Precedence::CALL);
+	UniquePtr<NameExpression*> name = dynamic_cast<NameExpression*>(member);
+	if (name == 0)
+	{
+		delete member; delete left;
+		ParserError("Cannot access member name that is not a string", token);
+		//throw CompilerException(parser->filename, token.line, "Cannot access member name that is not a string");
+	}
+
+	auto ret = new IndexExpression(left, name->GetName(), token);
+
+	return ret;
+}
+
 /*Expression* ObjectParselet::parse(Parser* parser, Token token)
 {
 	if (parser->MatchAndConsume(TokenType::RightBrace))

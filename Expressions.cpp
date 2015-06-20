@@ -135,7 +135,39 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 	auto i = dynamic_cast<IndexExpression*>(left);
 
 	auto string = dynamic_cast<StringExpression*>(index);
-	if (p || i)
+	if (index == 0)
+	{
+		CValue lhs;
+		if (p)
+			lhs = context->GetVariable(p->GetName());
+		else if (i)
+			lhs = i->GetGEP(context);
+
+		if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
+		{
+			lhs.val = context->parent->builder.CreateLoad(lhs.val);
+
+			auto type = lhs.type->base;
+			int index = 0;
+			for (; index < type->data->members.size(); index++)
+			{
+				if (type->data->members[index].name == this->member)
+					break;
+			}
+			if (index >= type->data->members.size())
+			{
+				Error("Struct Member '" + this->member + "' of Struct '" + type->data->name + "' Not Found", this->token);
+			}
+
+			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
+
+			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
+			return CValue(type->data->members[index].type, loc);
+		}
+
+		Error("unimplemented!", this->token);
+	}
+	else if (p || i)
 	{
 		CValue lhs;
 		if (p)
@@ -172,6 +204,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		}
 		Error("Cannot index type '" + lhs.type->ToString() + "'", this->token);
 	}
+
 	Error("Unimplemented", this->token);
 }
 

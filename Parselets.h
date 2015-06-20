@@ -223,6 +223,18 @@ namespace Jet
 		}
 	};
 
+	class PointerMemberParselet : public InfixParselet
+	{
+	public:
+		Expression* parse(Parser* parser, Expression* left, Token token);
+
+		int getPrecedence()
+		{
+			//replace precedence here
+			return 9;// 3;//maybe?
+		}
+	};
+
 	class CallParselet: public InfixParselet
 	{
 	public:
