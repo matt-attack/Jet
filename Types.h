@@ -46,9 +46,11 @@ namespace Jet
 		};
 		unsigned int size;//for arrays
 
+		std::string name;
+
 		Type() { data = 0; type = Types::Void; loaded = false; size = 0; }
-		Type(Types type, Struct* data = 0) : type(type), data(data), loaded(false), size(0) {}
-		Type(Types type, Type* base, int size = 0) : type(type), base(base), loaded(false), size(size) {}
+		Type(std::string name, Types type, Struct *data = 0) : type(type), data(data), loaded(false), size(0), name(name) {}
+		Type(std::string name, Types type, Type* base, int size = 0) : type(type), base(base), loaded(false), size(size), name(name) {}
 
 		void Load(Compiler* compiler);
 

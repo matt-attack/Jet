@@ -774,16 +774,16 @@ void Compiler::OutputPackage(const std::string& project_name)
 				//fix templated types in return and arg types
 				for (auto fun : ii.second->data->functions)
 				{
-					types += "fun " + fun.second->return_type->ToString() + " " + ii.second->data->name + "(";
+					types += "fun " + fun.second->return_type->name + " " + fun.first + "(";
 					bool first = false;
-					for (auto arg : fun.second->argst)
+					for (int i = 1; i < fun.second->argst.size(); i++)/// auto arg : fun.second->argst)
 					{
 						if (first)
-							types += ",";
+							function += ",";
 						else
 							first = true;
 
-						types += arg.first->ToString() + " " + arg.second;
+						function += fun.second->argst[i].first->ToString() + " " + fun.second->argst[i].second;
 					}
 					types += ") {}";
 				}
@@ -798,14 +798,14 @@ void Compiler::OutputPackage(const std::string& project_name)
 				function += "extern fun " + fun.second->return_type->ToString() + " " + ii.second->data->name + "::";
 				function += fun.first + "(";
 				bool first = false;
-				for (auto arg : fun.second->argst)
+				for (int i = 1; i < fun.second->argst.size(); i++)/// auto arg : fun.second->argst)
 				{
 					if (first)
 						function += ",";
 					else
 						first = true;
 
-					function += arg.first->ToString() + " " + arg.second;
+					function += fun.second->argst[i].first->ToString() + " " + fun.second->argst[i].second;
 				}
 				function += ");";
 			}
@@ -840,6 +840,7 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 			auto t = this->LookupType(name.substr(0, name.length() - 1));
 
 			type = new Type;
+			type->name = name;
 			type->base = t;
 			type->type = Types::Pointer;
 
@@ -859,6 +860,7 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 			auto t = this->LookupType(tname);
 
 			type = new Type;
+			type->name = name;
 			type->base = t;
 			type->type = Types::Array;
 			type->size = std::stoi(len);//cheat for now

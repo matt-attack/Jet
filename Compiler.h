@@ -77,11 +77,11 @@ namespace Jet
 		Compiler() : builder(llvm::getGlobalContext()), context(llvm::getGlobalContext())
 		{
 			//insert basic types
-			types["double"] = new Type(Types::Double);
-			types["float"] = &DoubleType;// new Type(Types::Float);
+			types["float"] = new Type("float", Types::Float);
+			types["double"] = &DoubleType;// new Type(Types::Float);
 			types["int"] = &IntType;// new Type(Types::Int);
-			types["short"] = new Type(Types::Short);
-			types["char"] = new Type(Types::Char);
+			types["short"] = new Type("short", Types::Short);
+			types["char"] = new Type("char", Types::Char);
 			types["bool"] = &BoolType;// new Type(Types::Bool);
 			types["void"] = &VoidType;// new Type(Types::Void);
 		}
@@ -115,6 +115,7 @@ namespace Jet
 					auto t = types[name.substr(0, name.length() - 1)];
 
 					Type* type = new Type;
+					type->name = name;
 					type->base = t;
 					type->type = Types::Pointer;
 
@@ -136,6 +137,7 @@ namespace Jet
 
 					Type* type = new Type;
 					type->base = t;
+					type->name = name;
 					type->type = Types::Array;
 					type->size = std::stoi(len);//cheat for now
 					types[name] = type;
@@ -144,6 +146,7 @@ namespace Jet
 
 				//who knows what type it is, create a dummy one
 				Type* type = new Type;
+				type->name = name;
 				type->type = Types::Invalid;
 				type->data = 0;
 				types[name] = type;

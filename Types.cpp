@@ -5,10 +5,10 @@
 
 using namespace Jet;
 
-Type Jet::VoidType(Types::Void);
-Type Jet::BoolType(Types::Bool);
-Type Jet::DoubleType(Types::Double);
-Type Jet::IntType(Types::Int);
+Type Jet::VoidType("void", Types::Void);
+Type Jet::BoolType("bool", Types::Bool);
+Type Jet::DoubleType("double", Types::Double);
+Type Jet::IntType("int", Types::Int);
 
 llvm::Type* Jet::GetType(Type* t)
 {
@@ -98,7 +98,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	str->name += ">";
 	str->expression = this->data->expression;
 
-	Type* t = new Type(Types::Struct, str);
+	Type* t = new Type(str->name, Types::Struct, str);
 	t->Load(compiler);
 
 	return t;

@@ -310,7 +310,6 @@ CValue CallExpression::Compile(CompilerContext* context)
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
 	{
 		//im a struct yo
-
 		if (index->member.length() > 0)
 			fname = index->member;
 		else
