@@ -82,7 +82,7 @@ namespace Jet
 		};
 		std::vector<StructMember/*std::pair<std::string, Type*>*/> members;//member variables
 
-		std::map<std::string, Function*> functions;//member functions
+		std::multimap<std::string, Function*> functions;//member functions
 
 		bool loaded;
 

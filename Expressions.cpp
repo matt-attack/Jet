@@ -170,8 +170,9 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 
 			return CValue(lhs.type->base, loc);
 		}
+		Error("Cannot index type '" + lhs.type->ToString() + "'", this->token);
 	}
-	Error("Not Implemented", this->token);
+	Error("Unimplemented", this->token);
 }
 
 
@@ -419,7 +420,17 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	//auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 	CompilerContext* function = context->AddFunction(this->GetRealName(), context->parent->LookupType(this->ret_type), argsv, Struct.length() > 0 ? true : false);// , this->varargs);
 	if (Struct.length() > 0)
-		context->parent->types[Struct]->data->functions[fname]->f = function->f;
+	{
+		auto range = context->parent->types[Struct]->data->functions.equal_range(fname);
+		for (auto ii = range.first; ii != range.second; ii++)
+		{
+			//printf("found function option for %s\n", name.c_str());
+
+			//pick one with the right number of args
+			if (ii->second->argst.size() == argsv.size())
+				ii->second->f = function->f;
+		}
+	}
 	//else
 	//context->parent->functions[fname] = function->f;
 
@@ -489,7 +500,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	fun->name = this->GetRealName();
 	fun->f = 0;
 	if (Struct.length() > 0)
-		context->parent->types[Struct]->data->functions[fname] = fun;
+		context->parent->types[Struct]->data->functions.insert({ fname, fun });
 	else
 		context->parent->functions.insert({ fname, fun });
 }
@@ -533,7 +544,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 			if (ii->second->type != Types::Struct)
 				Error("Cannot define a function for a type that is not a struct", token);
 
-			ii->second->data->functions[fname] = fun;
+			ii->second->data->functions.insert({ fname, fun });
 		}
 	}
 	else

@@ -24,7 +24,14 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		auto type = this->parent->LookupType(str);
 
 		std::string fname2 = fname.substr(++i, fname.length() - i);
-		func = type->data->functions[fname2];
+
+		auto range = type->data->functions.equal_range(fname2);
+		for (auto ii = range.first; ii != range.second; ii++)
+		{
+			//printf("found option for %s with %i args\n", fname.c_str(), ii->second->argst.size());
+			if (ii->second->argst.size() == args.size())
+				func = ii->second;
+		}
 	}
 	if (iter == parent->functions.end() && member == false)
 	{
@@ -298,4 +305,115 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 	}
 
 	Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
+}
+
+CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct)
+{
+	llvm::Function* f = 0;
+	Function* fun = 0;
+
+	if (Struct == 0)
+	{
+		//global function?
+		auto iter = this->parent->functions.find(name);
+		if (iter == this->parent->functions.end())
+		{
+			//check if its a type, if so try and find a constructor
+			auto type = this->parent->LookupType(name);
+			if (type->type == Types::Struct)
+			{
+				//look for a constructor
+				auto constructor = type->data->functions.find(name);
+				if (constructor != type->data->functions.end() && constructor->second->argst.size() == args.size() + 1)
+				{
+					//ok, we allocate, call then 
+					//printf("calling constructor\n");
+
+					//allocate thing
+					auto Alloca = this->parent->builder.CreateAlloca(GetType(type), 0, "constructortemp");
+
+					std::vector<llvm::Value*> argsv;
+					int i = 1;
+
+					//add struct
+					argsv.push_back(Alloca);
+					for (auto ii : args)
+					{
+						//try and cast to the correct type if we can
+						argsv.push_back(this->DoCast(constructor->second->argst[i++].first, ii).val);
+						//argsv.back()->dump();
+					}
+
+					constructor->second->Load(this->parent);
+
+					//constructor->second->f->dump();
+					//parent->module->dump();
+					//auto fun = this->parent->module->getFunction(constructor->second->name);
+
+					this->parent->builder.CreateCall(constructor->second->f, argsv);
+
+					return CValue(type, this->parent->builder.CreateLoad(Alloca));
+				}
+			}
+			Error("Function '" + name + "' is not defined", *this->current_token);
+		}
+
+		//look for the best one
+		auto range = this->parent->functions.equal_range(name);
+		for (auto ii = range.first; ii != range.second; ii++)
+		{
+			//printf("found function option for %s\n", name.c_str());
+
+			//pick one with the right number of args
+			if (ii->second->argst.size() == args.size())
+				fun = ii->second;
+		}
+
+		if (fun == 0)
+			Error("Mismatched function parameters in call", *this->current_token);
+		//fun = iter->second;
+	}
+	else
+	{
+		//im a struct yo
+		//look for the best one
+		auto range = Struct->data->functions.equal_range(name);
+		for (auto ii = range.first; ii != range.second; ii++)
+		{
+			//printf("found function option for %s\n", name.c_str());
+
+			//pick one with the right number of args
+			if (ii->second->argst.size() == args.size())
+				fun = ii->second;
+		}
+
+		//auto iter = Struct->data->functions.find(name);
+		if (fun == 0)//iter == Struct->data->functions.end())
+			Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+
+		//fun = iter->second;
+	}
+
+	fun->Load(this->parent);
+
+	f = this->parent->module->getFunction(fun->name);
+
+	if (args.size() != f->arg_size())
+	{
+		//f->dump();
+		//todo: add better checks later
+		Error("Mismatched function parameters in call", *this->current_token);
+	}
+
+	std::vector<llvm::Value*> argsv;
+	int i = 0;
+	for (auto ii : args)
+	{
+		//try and cast to the correct type if we can
+		argsv.push_back(this->DoCast(fun->argst[i++].first, ii).val);
+		//argsv.back()->dump();
+	}
+	//fun->f->dump();
+	//parent->module->dump();
+	return CValue(fun->return_type, this->parent->builder.CreateCall(f, argsv));
 }

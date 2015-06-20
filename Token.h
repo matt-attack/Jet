@@ -96,6 +96,8 @@ namespace Jet
 		//Dereference,
 		//AddressOf,
 
+		Pointy, 
+
 		Operator,
 
 		LineComment,

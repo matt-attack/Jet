@@ -84,6 +84,9 @@ public:
 		operators["/*"] = TokenType::CommentBegin;
 		operators["*/"] = TokenType::CommentEnd;
 
+		//dereference member
+		operators["->"] = TokenType::Pointy;
+
 		//keywords
 		keywords["while"] = TokenType::While;
 		keywords["mientras"] = TokenType::While;
