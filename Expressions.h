@@ -223,8 +223,9 @@ namespace Jet
 
 	class IndexExpression : public Expression, public IStorableExpression
 	{
-		std::string member;
+		
 	public:
+		std::string member;
 		Expression* index;
 		Expression* left;
 		Token token;

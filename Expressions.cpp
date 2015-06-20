@@ -310,11 +310,24 @@ CValue CallExpression::Compile(CompilerContext* context)
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
 	{
 		//im a struct yo
-		fname = dynamic_cast<StringExpression*>(index->index)->GetValue();
+
+		if (index->member.length() > 0)
+			fname = index->member;
+		else
+			fname = dynamic_cast<StringExpression*>(index->index)->GetValue();
 		stru = index->GetBaseType(context);
 
+		llvm::Value* self;
+		if (index->member.length() > 0)
+		{
+			stru = stru->base;
+			self = context->parent->builder.CreateLoad(index->GetBaseGEP(context).val);
+		}
+		else
+			self = index->GetBaseGEP(context).val;
+
 		//push in the this pointer argument kay
-		argsv.push_back(CValue(context->parent->LookupType(stru->ToString() + "*"), index->GetBaseGEP(context).val));
+		argsv.push_back(CValue(context->parent->LookupType(stru->ToString() + "*"), self));
 	}
 
 	//build arg list
