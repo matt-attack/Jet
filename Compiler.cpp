@@ -4,6 +4,7 @@
 #include "Source.h"
 #include "Parser.h"
 #include "Lexer.h"
+#include "Expressions.h"
 
 #include <direct.h>
 
@@ -725,30 +726,69 @@ void Compiler::OutputPackage(const std::string& project_name)
 	{
 		if (ii.second->type == Types::Struct)
 		{
-			if (ii.second->data->templates.size() > 0 && ii.second->data->template_base == 0)
-			{
-				continue;
-			}
-			else if (ii.second->data->template_base)
+			if (ii.second->data->template_base)
 			{
 				continue;//dont bother exporting instantiated templates for now
 			}
 
 			//export me
-			types += "struct " + ii.second->data->name + "{";
+			if (ii.second->data->templates.size() > 0)
+			{
+				types += "struct " + ii.second->data->name + "<";
+				for (int i = 0; i < ii.second->data->templates.size(); i++)
+				{
+					types += ii.second->data->templates[i].first + " ";
+					types += ii.second->data->templates[i].second;
+					if (i < ii.second->data->templates.size() - 1)
+						types += ',';
+				}
+				types += ">{";
+			}
+			else
+			{
+				types += "struct " + ii.second->data->name + "{";
+			}
 			for (auto var : ii.second->data->members)
 			{
-				if (var.second->type == Types::Array)
+				if (var.type->type == Types::Array)
 				{
 					//todo handle multidimensional arrays later
-					types += var.second->base->ToString() + " ";
-					types += var.first + "[" + std::to_string(var.second->size) + "];";
+					types += var.type->base->ToString() + " ";
+					types += var.name + "[" + std::to_string(var.type->size) + "];";
+				}
+				else if (var.type->type == Types::Invalid)//its a template probably?
+				{
+					types += var.type_name + " ";
+					types += var.name + ";";
 				}
 				else
 				{
-					types += var.second->ToString() + " ";
-					types += var.first + ";";
+					types += var.type->ToString() + " ";
+					types += var.name + ";";
 				}
+			}
+
+			if (ii.second->data->templates.size() > 0 && ii.second->data->template_base == 0)
+			{
+				//output member functions somehow?
+				//fix templated types in return and arg types
+				for (auto fun : ii.second->data->functions)
+				{
+					types += "fun " + fun.second->return_type->ToString() + " " + ii.second->data->name + "(";
+					bool first = false;
+					for (auto arg : fun.second->argst)
+					{
+						if (first)
+							types += ",";
+						else
+							first = true;
+
+						types += arg.first->ToString() + " " + arg.second;
+					}
+					types += ") {}";
+				}
+				types += "}";
+				continue;
 			}
 			types += "}";
 
@@ -779,7 +819,6 @@ void Compiler::OutputPackage(const std::string& project_name)
 	stable.close();
 }
 
-#include "Expressions.h"
 void Compiler::OutputIR(const char* filename)
 {
 	std::error_code ec;
@@ -874,15 +913,10 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 				auto rp = this->builder.GetInsertBlock();
 
 				for (auto ii : *res->data->expression->functions)
-				{
 					ii->CompileDeclarations(this->current_function);
-				}
 
 				for (auto fun : *res->data->expression->functions)
-				{
 					fun->Compile(this->current_function);//the context used may not be proper, but it works
-					//fun->args->clear();//this clears the arguments stored in each fun created when compiledeclarations is called
-				}
 
 				this->builder.SetInsertPoint(rp);
 				expr->name = oldname;

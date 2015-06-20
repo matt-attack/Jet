@@ -74,7 +74,13 @@ namespace Jet
 		std::string name;
 		llvm::Type* type;
 
-		std::vector<std::pair<std::string, Type*>> members;//member variables
+		struct StructMember
+		{
+			std::string name;
+			std::string type_name;
+			Type* type;
+		};
+		std::vector<StructMember/*std::pair<std::string, Type*>*/> members;//member variables
 
 		std::map<std::string, Function*> functions;//member functions
 

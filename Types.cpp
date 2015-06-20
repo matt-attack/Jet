@@ -1,6 +1,7 @@
 #include "Types.h"
 #include "Compiler.h"
 #include "CompilerContext.h"
+#include "Expressions.h"
 
 using namespace Jet;
 
@@ -62,7 +63,6 @@ void Type::Load(Compiler* compiler)
 	this->loaded = true;
 }
 
-#include "Expressions.h"
 Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 {
 	//register the types
@@ -70,19 +70,10 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	for (auto ii : this->data->templates)
 	{
 		//lets be stupid and just register the type
-		Type* t = compiler->types[ii.second];
-		//if (t == 0)
-			compiler->types[ii.second] = types[i++];
-		//else
-		//{
-			//define the type
-			//t = *(types[i++]);
-		//}
+		//CHANGE ME LATER, THIS OVERRIDES TYPES, OR JUST RESTORE AFTER THIS
+		compiler->types[ii.second] = types[i++];
 	}
 	//printf("tried to instantiate template");
-
-	
-
 
 	//duplicate and load
 	Struct* str = new Struct;
@@ -93,7 +84,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	{
 		auto type = compiler->AdvanceTypeLookup(ii.first);
 
-		str->members.push_back({ ii.second, type });
+		str->members.push_back({ ii.second, ii.first, type });
 	}
 
 	str->template_base = this->data;
@@ -151,8 +142,8 @@ void Struct::Load(Compiler* compiler)
 	std::vector<llvm::Type*> elementss;
 	for (auto ii : this->members)
 	{
-		auto type = ii.second;
-		ii.second->Load(compiler);
+		auto type = ii.type;
+		ii.type->Load(compiler);
 
 		elementss.push_back(GetType(type));
 	}

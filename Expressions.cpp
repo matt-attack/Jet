@@ -110,7 +110,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 			int index = 0;
 			for (; index < lhs.type->data->members.size(); index++)
 			{
-				if (lhs.type->data->members[index].first == string->GetValue())
+				if (lhs.type->data->members[index].name == string->GetValue())
 					break;
 			}
 
@@ -120,7 +120,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 				//not found;
 			}
 
-			return lhs.type->data->members[index].second;
+			return lhs.type->data->members[index].type;
 		}
 		else if (lhs.type->type == Types::Array && string == 0)//or pointer!!(later)
 		{
@@ -148,7 +148,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 			int index = 0;
 			for (; index < lhs.type->data->members.size(); index++)
 			{
-				if (lhs.type->data->members[index].first == string->GetValue())
+				if (lhs.type->data->members[index].name == string->GetValue())
 					break;
 			}
 			if (index >= lhs.type->data->members.size())
@@ -160,7 +160,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-			return CValue(lhs.type->data->members[index].second, loc);
+			return CValue(lhs.type->data->members[index].type, loc);
 		}
 		else if (lhs.type->type == Types::Array && string == 0)//or pointer!!(later)
 		{
@@ -657,21 +657,20 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	}
 	//str->data->templates = this->templates;
 	
-
-	if (this->templates == 0)
+	for (auto ii : *this->elements)
 	{
-		for (auto ii : *this->elements)
-		{
-			auto type = context->parent->AdvanceTypeLookup(ii.first);
+		auto type = context->parent->AdvanceTypeLookup(ii.first);
+		
+		str->data->members.push_back({ ii.second, ii.first, type });
+	}
 
-			str->data->members.push_back({ ii.second, type });
-		}
-
+	//if (this->templates == 0)
+	//{
 		for (auto ii : *this->functions)
 		{
 			ii->CompileDeclarations(context);
 		}
-	}
+	//}
 };
 
 CValue DefaultExpression::Compile(CompilerContext* context)

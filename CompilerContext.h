@@ -313,7 +313,46 @@ namespace Jet
 				//global function?
 				auto iter = this->parent->functions.find(name);
 				if (iter == this->parent->functions.end())
+				{
+					//check if its a type, if so try and find a constructor
+					auto type = this->parent->LookupType(name);
+					if (type->type == Types::Struct)
+					{
+						//look for a constructor
+						auto constructor = type->data->functions.find(name);
+						if (constructor != type->data->functions.end() && constructor->second->argst.size() == args.size() + 1)
+						{
+							//ok, we allocate, call then 
+							//printf("calling constructor\n");
+
+							//allocate thing
+							auto Alloca = this->parent->builder.CreateAlloca(GetType(type), 0, "constructortemp");
+
+							std::vector<llvm::Value*> argsv;
+							int i = 1;
+
+							//add struct
+							argsv.push_back(Alloca);
+							for (auto ii : args)
+							{
+								//try and cast to the correct type if we can
+								argsv.push_back(this->DoCast(constructor->second->argst[i++].first, ii).val);
+								//argsv.back()->dump();
+							}
+
+							constructor->second->Load(this->parent);
+
+							//constructor->second->f->dump();
+							//parent->module->dump();
+							//auto fun = this->parent->module->getFunction(constructor->second->name);
+
+							this->parent->builder.CreateCall(constructor->second->f, argsv);
+							
+							return CValue(type, this->parent->builder.CreateLoad(Alloca));
+						}
+					}
 					Error("Function '" + name + "' is not defined", *this->current_token);
+				}
 
 				//look for the best one
 				auto range = this->parent->functions.equal_range(name);

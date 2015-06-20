@@ -10,7 +10,23 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 {
 	auto iter = parent->functions.find(fname);
 	Function* func = 0;
-	if (iter == parent->functions.end())
+	if (member)
+	{
+		std::string str;
+		int i = 2;
+		for (; i < fname.length(); i++)
+		{
+			if (fname[i] == '_')
+				break;
+
+			str += fname[i];
+		}
+		auto type = this->parent->LookupType(str);
+
+		std::string fname2 = fname.substr(++i, fname.length() - i);
+		func = type->data->functions[fname2];
+	}
+	if (iter == parent->functions.end() && member == false)
 	{
 		//no function exists
 		func = new Function;
@@ -25,6 +41,8 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		auto n = new CompilerContext(this->parent);
 
 		auto ft = llvm::FunctionType::get(GetType(ret), func->args, false);
+		//this->parent->module->getOrInsertFunction()
+		
 		n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
 		//n->f->dump();
 		n->function = func;
@@ -36,7 +54,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		parent->builder.SetInsertPoint(bb);
 		return n;
 	}
-	else
+	else if (func == 0)
 	{
 		//select the right one
 		auto range = parent->functions.equal_range(fname);
@@ -46,7 +64,6 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 			if (ii->second->argst.size() == args.size())
 				func = ii->second;
 		}
-		//func = iter->second;
 	}
 
 	func->Load(this->parent);
@@ -108,7 +125,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 			res = parent->builder.CreateSub(value.val, parent->builder.getInt32(1));
 			break;
 		case TokenType::Minus:
-			res = parent->builder.CreateNeg(value.val);// parent->builder.CreateFMul(left.val, right.val);
+			res = parent->builder.CreateNeg(value.val);
 			break;
 		case TokenType::BNot:
 			res = parent->builder.CreateNot(value.val);
@@ -131,7 +148,6 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		}
 
 	}
-	//throw 7;
 	Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 }
 
@@ -194,7 +210,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			break;
 		default:
 			Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
-			//throw 7;
+
 			break;
 		}
 
