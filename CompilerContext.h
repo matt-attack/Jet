@@ -293,8 +293,10 @@ namespace Jet
 					{
 						//lets just try it
 						//fixme later
-						/*std::vector<llvm::Value*> arr = { parent->builder.getInt32(0) };// , parent->builder.getInt32(0)
+						//ok, this doesnt work because the value is getting loaded beforehand!!!
+						/*std::vector<llvm::Value*> arr = { parent->builder.getInt32(0), parent->builder.getInt32(0) };
 
+						this->f->dump();
 						value.val->dump();
 						value.val = parent->builder.CreateGEP(value.val, arr, "array2ptr");
 						value.val->dump();

@@ -237,6 +237,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 {
 	std::vector<std::string> files;
 	std::vector<std::string> dependencies;
+	std::vector<std::string> libs;//libraries to link to
 
 	//ok, lets parse the jp file
 	std::ifstream pf(std::string(projectdir) + "/project.jp", std::ios::in | std::ios::binary);
@@ -273,6 +274,11 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 			is_executable = false;
 			continue;
 		}
+		else if (file == "libs:")
+		{
+			current_block = 4;
+			continue;
+		}
 
 		switch (current_block)
 		{
@@ -287,6 +293,10 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 		case 3:
 			//if (file.length() > 0)
 			//project_name = file;
+			break;
+		case 4:
+			if (file.length() > 0)
+				libs.push_back(file);
 			break;
 		default:
 			//if (project_name == "program" && file.length() > 0)
@@ -577,6 +587,10 @@ error:
 		{
 			printf("Compiling Executable...\n");
 			std::string cmd = "clang -L. ";
+
+			cmd += "build/" + project_name + ".o ";
+			cmd += "-o build/" + project_name + ".exe";
+
 			//need to link each dependency
 			for (auto ii : dependencies)
 			{
@@ -584,8 +598,11 @@ error:
 
 				cmd += "-l" + GetNameFromPath(ii) + " ";
 			}
-			cmd += "build/" + project_name + ".o ";
-			cmd += "-o build/" + project_name + ".exe";
+
+			cmd += " -L.";
+			for (auto ii : libs)
+				cmd += " -l" + ii;
+
 			auto res = exec(cmd.c_str());
 			printf(res.c_str());
 		}
@@ -650,11 +667,11 @@ error:
 	//delete stuff
 	for (auto ii : asts)
 	{
-		//std::string out;
+		std::string out;
 
-		//MemberRenamer renamer("string", "length", "apples", this);
-		//ii.second->Visit(&renamer);
-		//ii.second->Print(out, sources[ii.first]);
+		MemberRenamer renamer("string", "length", "apples", this);
+		ii.second->Visit(&renamer);
+		ii.second->Print(out, sources[ii.first]);
 		//printf("%s",out.c_str());
 
 		
