@@ -10,7 +10,83 @@
 
 namespace Jet
 {
+	class Source;
 	class Compiler;
+
+	//typedef std::function<void(Expression*)> ExpressionVisitor;
+	class NameExpression;
+	class LocalExpression;
+	class NumberExpression;
+	class StringExpression;
+	class IndexExpression;
+	class AssignExpression;
+	class OperatorAssignExpression;
+	class PrefixExpression;
+	class PostfixExpression;
+	class OperatorExpression;
+	class ScopeExpression;
+	class BlockExpression;
+	class WhileExpression;
+	class ForExpression;
+	class SwitchExpression;
+	class CaseExpression;
+	class DefaultExpression;
+	class IfExpression;
+	class CallExpression;
+	class FunctionExpression;
+	class ExternExpression;
+	class TraitExpression;
+	class StructExpression;
+	class ReturnExpression;
+	class BreakExpression;
+	class ContinueExpression;
+	class ExpressionVisitor
+	{
+	public:
+
+		virtual void Visit(NameExpression* exp) {};
+
+		virtual void Visit(LocalExpression* exp) {};
+
+		virtual void Visit(NumberExpression* exp) {};
+		virtual void Visit(StringExpression* exp) {};
+
+		virtual void Visit(IndexExpression* exp) {};
+
+		virtual void Visit(AssignExpression* exp) {};
+		virtual void Visit(OperatorAssignExpression* exp) {};
+
+		virtual void Visit(PrefixExpression* exp) {};
+		virtual void Visit(PostfixExpression* exp) {};
+
+		virtual void Visit(OperatorExpression* exp) {};
+
+		//idk what to do about these really
+		virtual void Visit(BlockExpression* exp) {};
+		virtual void Visit(ScopeExpression* exp) {};
+
+		virtual void Visit(WhileExpression* exp) {};
+		virtual void Visit(ForExpression* exp) {};
+
+		virtual void Visit(SwitchExpression* exp) {};
+		virtual void Visit(CaseExpression* exp) {};
+		virtual void Visit(DefaultExpression* exp) {};
+
+		virtual void Visit(IfExpression* exp) {};
+
+		virtual void Visit(CallExpression* exp) {};
+
+		virtual void Visit(FunctionExpression* exp) {};
+		virtual void Visit(ExternExpression* exp) {};
+
+		virtual void Visit(TraitExpression* exp) {};
+		virtual void Visit(StructExpression* exp) {};
+
+		virtual void Visit(ReturnExpression* exp) {};
+
+		virtual void Visit(BreakExpression* exp) {};
+		virtual void Visit(ContinueExpression* exp) {};
+	};
 
 	class Expression
 	{
@@ -35,6 +111,10 @@ namespace Jet
 		virtual CValue Compile(CompilerContext* context) = 0;
 
 		virtual void CompileDeclarations(CompilerContext* context) = 0;
+
+		virtual void Print(std::string& output, Source* source) = 0;
+
+		virtual void Visit(ExpressionVisitor* visitor) = 0;//visits all subexpressions
 	};
 
 	class IStorableExpression
@@ -45,8 +125,9 @@ namespace Jet
 
 	class NameExpression : public Expression, public IStorableExpression
 	{
-		Token token;
+
 	public:
+		Token token;
 		NameExpression(Token name)
 		{
 			this->token = name;
@@ -68,6 +149,13 @@ namespace Jet
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source) { token.Print(output, source); }
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
 	};
 
 	/*class ArrayExpression: public Expression
@@ -136,11 +224,13 @@ namespace Jet
 
 	class LocalExpression : public Expression
 	{
-		std::vector<std::pair<std::string, Token>>* _names;
+		Token token;
+		std::vector<std::pair<Token, Token>>* _names;
 		std::vector<Expression*>* _right;
 	public:
-		LocalExpression(std::vector<std::pair<std::string, Token>>* names, std::vector<Expression*>* right)
+		LocalExpression(Token token, std::vector<std::pair<Token, Token>>* names, std::vector<Expression*>* right)
 		{
+			this->token = token;
 			this->_names = names;
 			this->_right = right;
 		}
@@ -166,15 +256,50 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			this->token.Print(output, source);
+
+			int i = 0;
+			for (auto ii : *_names)
+			{
+				//output += " " + ii.first;
+				if (ii.first.text.length() > 0)
+					ii.first.Print(output, source);
+				ii.second.Print(output, source);
+
+				if (_right && i < _right->size())
+				{
+					output += " =";
+					(*_right)[i++]->Print(output, source);
+				}
+			}
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+
+			if (this->_right)
+			{
+				for (auto ii : *this->_right)
+				{
+					ii->Visit(visitor);
+				}
+			}
+		}
 	};
 
 	class NumberExpression : public Expression
 	{
 		double value;
+		Token token;
 	public:
-		NumberExpression(double value)
+		NumberExpression(double value, Token token)
 		{
 			this->value = value;
+			this->token = token;
 		}
 
 		double GetValue()
@@ -185,6 +310,16 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
 	};
 
 	/*class NullExpression: public Expression
@@ -204,11 +339,13 @@ namespace Jet
 
 	class StringExpression : public Expression
 	{
+		Token token;
 		std::string value;
 	public:
-		StringExpression(std::string value)
+		StringExpression(std::string value, Token token)
 		{
 			this->value = value;
+			this->token = token;
 		}
 
 		std::string GetValue()
@@ -219,13 +356,34 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+
+			output += "\"";
+			//fixme!
+			auto cur = token.text_ptr + 1;
+			do
+			{
+				if (*cur == '\"' && *(cur - 1) != '\\')
+					break;
+				output += *cur;
+			} while (*cur++ != 0);
+			//token.Print(output, source);
+			output += "\"";
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
 	};
 
 	class IndexExpression : public Expression, public IStorableExpression
 	{
-		
+
 	public:
-		std::string member;
+		Token member;
 		Expression* index;
 		Expression* left;
 		Token token;
@@ -236,7 +394,7 @@ namespace Jet
 			this->index = index;
 		}
 
-		IndexExpression(Expression* left, std::string index, Token t)
+		IndexExpression(Expression* left, Token index, Token t)
 		{
 			this->token = t;
 			this->left = left;
@@ -257,19 +415,45 @@ namespace Jet
 
 		Type* GetType(CompilerContext* context);
 		Type* GetBaseType(CompilerContext* context);
+		Type* GetBaseType(Compiler* compiler);
 
 		void CompileStore(CompilerContext* context, CValue right);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			this->left->Print(output, source);
+			token.Print(output, source);
+			if (token.type == TokenType::Dot || token.type == TokenType::Pointy)
+				member.Print(output, source);
+			else if (token.type == TokenType::LeftBracket)
+			{
+				index->Print(output, source);
+				output += ']';
+			}
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+
+			if (index)
+				index->Visit(visitor);
+			if (left)
+				left->Visit(visitor);
+		}
 	};
 
 	class AssignExpression : public Expression
 	{
+		Token token;
 		Expression* left;
 		Expression* right;
 	public:
-		AssignExpression(Expression* l, Expression* r)
+		AssignExpression(Token token, Expression* l, Expression* r)
 		{
+			this->token = token;
 			this->left = l;
 			this->right = r;
 		}
@@ -290,6 +474,21 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			left->Print(output, source);
+			token.Print(output, source);
+			right->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+
+			left->Visit(visitor);
+			right->Visit(visitor);
+		}
 	};
 
 	class OperatorAssignExpression : public Expression
@@ -322,6 +521,20 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			left->Print(output, source);
+			token.Print(output, source);
+			right->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			right->Visit(visitor);
+			left->Visit(visitor);
+		}
 	};
 
 	/*class SwapExpression: public Expression
@@ -388,7 +601,7 @@ namespace Jet
 					//auto var = context->named_values[i->GetName()];
 					auto var = context->Load(i->GetName());
 					auto val = context->parent->builder.CreateLoad(var.val);
-					
+
 					//context->Store(i->GetName(), val);
 					right = context->DoCast(var.type->base, right);
 
@@ -414,6 +627,18 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			_operator.Print(output, source);
+			right->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			right->Visit(visitor);
+		}
 	};
 
 	class PostfixExpression : public Expression
@@ -442,6 +667,18 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			left->Print(output, source);
+			_operator.Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			left->Visit(visitor);
+		}
 	};
 
 	class OperatorExpression : public Expression
@@ -474,6 +711,20 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			left->Print(output, source);
+			_operator.Print(output, source);
+			right->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			left->Visit(visitor);
+			right->Visit(visitor);
+		}
 	};
 
 	class StatementExpression : public Expression
@@ -483,17 +734,21 @@ namespace Jet
 
 	class BlockExpression : public Expression
 	{
-
+		friend class ScopeExpression;
+		bool no_brackets;
+		Token start, end;
 	public:
 		std::vector<Expression*> statements;
-		BlockExpression(Token token, std::vector<Expression*>&& statements) : statements(statements)
+		BlockExpression(Token start_bracket, Token end_bracket, std::vector<Expression*>&& statements) : statements(statements)
 		{
-
+			this->no_brackets = false;
+			this->start = start_bracket;
+			this->end = end_bracket;
 		}
 
 		BlockExpression(std::vector<Expression*>&& statements) : statements(statements)
 		{
-
+			this->no_brackets = true;
 		}
 
 		~BlockExpression()
@@ -524,25 +779,52 @@ namespace Jet
 			for (auto ii : statements)
 				ii->CompileDeclarations(context);
 		};
+
+		void Print(std::string& output, Source* source)
+		{
+			//fix these { later
+			if (!no_brackets)
+				this->start.Print(output, source);// output += "{";
+			for (auto ii : statements)
+			{
+				ii->Print(output, source);
+				output += ";";
+			}
+			if (!no_brackets)
+				this->end.Print(output, source);// output += "}";
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+
+			for (auto ii : this->statements)
+				ii->Visit(visitor);
+		}
 	};
 
 	class ScopeExpression : public BlockExpression
 	{
-
+		
 	public:
-		//add a list of local variables here mayhaps?
+		Scope* scope;//debug shizzle
 
 		ScopeExpression(BlockExpression* r)
 		{
+			this->no_brackets = r->no_brackets;
+			this->start = r->start;
+			this->end = r->end;
 			this->statements = r->statements;
 			r->statements.clear();
 			delete r;
+
+			this->scope = 0;
 		}
 
 		CValue Compile(CompilerContext* context)
 		{
 			//push scope
-			context->PushScope();
+			this->scope = context->PushScope();
 
 			CValue tmp = BlockExpression::Compile(context);
 
@@ -550,6 +832,14 @@ namespace Jet
 			context->PopScope();
 
 			return tmp;
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+
+			for (auto ii : this->statements)
+				ii->Visit(visitor);
 		}
 	};
 
@@ -614,6 +904,24 @@ namespace Jet
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			//add tokens for the ( )
+			token.Print(output, source);
+			output += "(";
+			this->condition->Print(output, source);
+			output += ")";
+
+			this->block->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			condition->Visit(visitor);
+			block->Visit(visitor);
+		}
 	};
 
 	class ForExpression : public Expression
@@ -693,6 +1001,30 @@ namespace Jet
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			//add tokens for the ( )
+			token.Print(output, source);
+			output += "(";
+			this->initial->Print(output, source);
+			output += ";";
+			this->condition->Print(output, source);
+			output += ";";
+			this->incr->Print(output, source);
+			output += ")";
+
+			this->block->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			initial->Visit(visitor);
+			condition->Visit(visitor);
+			incr->Visit(visitor);
+			block->Visit(visitor);
+		}
 	};
 
 	/*class ForEachExpression: public Expression
@@ -770,7 +1102,7 @@ namespace Jet
 
 	class CaseExpression : public Expression
 	{
-		
+
 		Token token;
 	public:
 		int value;
@@ -792,6 +1124,19 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			//add tokens for the ( )
+			token.Print(output, source);
+
+			throw 7; //todo
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
 	};
 
 	class DefaultExpression : public Expression
@@ -815,6 +1160,19 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			//add tokens for the ( )
+			token.Print(output, source);
+
+			throw 7; //todo
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
 	};
 
 	class SwitchExpression : public Expression
@@ -869,15 +1227,35 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			//add tokens for the ( )
+			token.Print(output, source);
+			output += "(";
+			var->Print(output, source);
+			output += ")";
+
+			this->block->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			var->Visit(visitor);
+			block->Visit(visitor);
+		}
 	};
 
 	struct Branch
 	{
+		Token token;
 		BlockExpression* block;
 		Expression* condition;
 
-		Branch(BlockExpression* block, Expression* condition)
+		Branch(Token token, BlockExpression* block, Expression* condition)
 		{
+			this->token = token;
 			this->block = block;
 			this->condition = condition;
 		}
@@ -975,6 +1353,42 @@ namespace Jet
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			//this->token.Print(output, source);
+
+			for (auto ii : this->branches)
+			{
+				ii->token.Print(output, source);
+				output += " (";
+				ii->condition->Print(output, source);
+				output += ")";
+				ii->block->Print(output, source);
+			}
+			if (this->Else)
+			{
+				this->Else->token.Print(output, source);
+
+				//this->Else->condition->Print(output, source);
+				this->Else->block->Print(output, source);
+			}
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+
+			for (auto ii : this->branches)
+			{
+				ii->condition->Visit(visitor);
+				ii->block->Visit(visitor);
+			}
+			if (this->Else)
+			{
+				this->Else->block->Visit(visitor);
+			}
+		}
 	};
 
 	class CallExpression : public Expression
@@ -1014,6 +1428,35 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			//add tokens for the ( )
+			this->left->Print(output, source);
+
+			token.Print(output, source);
+			int i = 0;
+			for (auto ii : *this->args)
+			{
+				ii->Print(output, source);
+
+				if (i != args->size() - 1)
+					output += ",";
+				i++;
+			}
+			output += ")";
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			left->Visit(visitor);
+			if (this->args)
+			{
+				for (auto ii : *this->args)
+					ii->Visit(visitor);
+			}
+		}
 	};
 
 	class FunctionExpression : public Expression
@@ -1027,11 +1470,11 @@ namespace Jet
 
 		Token Struct;
 
-		std::string ret_type;
+		Token ret_type;
 		NameExpression* varargs;
 	public:
 
-		FunctionExpression(Token token, Token name, std::string& ret_type, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct)
+		FunctionExpression(Token token, Token name, Token ret_type, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct)
 		{
 			this->ret_type = ret_type;
 			this->args = args;
@@ -1051,11 +1494,6 @@ namespace Jet
 
 		std::string GetRealName();
 
-		void MakeMemberFunction()
-		{
-
-		}
-
 		void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
@@ -1065,6 +1503,38 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context);
+
+		void Print(std::string& output, Source* source)
+		{
+			//add tokens for the ( )
+			token.Print(output, source);
+
+			ret_type.Print(output, source);
+			//output += " " + ret_type;
+
+			name.Print(output, source);
+
+			output += "(";
+			int i = 0;
+			for (auto ii : *this->args)
+			{
+				output += ii.first + " " + ii.second;
+				if (i != args->size() - 1)
+					output += ", ";
+				//ii->Print(output, source);
+				i++;
+			}
+			//this->condition->Print(output, source);
+			output += ")";
+
+			this->block->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			block->Visit(visitor);
+		}
 	};
 
 	class ExternExpression : public Expression
@@ -1073,10 +1543,10 @@ namespace Jet
 		std::string Struct;
 		std::vector<std::pair<std::string, std::string>>* args;
 		Token token;
-		std::string ret_type;
+		Token ret_type;
 	public:
 
-		ExternExpression(Token token, Token name, std::string& ret_type, std::vector<std::pair<std::string, std::string>>* args, std::string str = "")
+		ExternExpression(Token token, Token name, Token ret_type, std::vector<std::pair<std::string, std::string>>* args, std::string str = "")
 		{
 			this->args = args;
 			this->name = name;
@@ -1098,15 +1568,46 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context);
+
+		void Print(std::string& output, Source* source)
+		{
+			//add tokens for the ( )
+			token.Print(output, source);
+
+			output += " fun";
+			ret_type.Print(output, source);
+			//output += " " + ret_type;
+
+			name.Print(output, source);
+
+			output += "(";
+			int i = 0;
+			for (auto ii : *this->args)
+			{
+				output += ii.first + " " + ii.second;
+				if (i != args->size() - 1)
+					output += ", ";
+				//ii->Print(output, source);
+				i++;
+			}
+			output += ")";
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
 	};
 
 	class TraitExpression : public Expression
 	{
 		Token token;
+		Token name;
 	public:
-		TraitExpression(Token name)
+		TraitExpression(Token token, Token name)
 		{
-			this->token = name;
+			this->token = token;
+			this->name = name;
 		}
 
 		CValue Compile(CompilerContext* context)
@@ -1116,58 +1617,150 @@ namespace Jet
 
 		void CompileDeclarations(CompilerContext* context)
 		{
-			context->parent->traits[token.text] = new Trait;
+			context->parent->traits[name.text] = new Trait;
+		}
+
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+			name.Print(output, source);
+
+			output += "{}";
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
 		}
 	};
 
+	struct StructMember
+	{
+		enum MemberType
+		{
+			FunctionMember,
+			VariableMember,
+		};
+		MemberType type;
+
+		FunctionExpression* function;
+		std::pair<Token, Token> variable;
+	};
 	class StructExpression : public Expression
 	{
 		friend class Compiler;
-		friend class Type;
-		std::string name;
-		std::vector<std::pair<std::string, std::string>>* elements;
-		std::vector<FunctionExpression*>* functions;
-		std::vector<std::pair<Token, Token>>* templates;
+		friend struct Type;
+
 		Token token;
-		std::string ret_type;
+		Token name;
+
+		std::vector<std::pair<Token, Token>>* templates;
+
+		Token start;
+
+		//std::vector<std::pair<std::string, std::string>>* elements;
+		//std::vector<FunctionExpression*>* functions;
+
+		
+		Token end;
 	public:
 
-		StructExpression(Token token, std::string& name, std::vector<std::pair<std::string, std::string>>* elements, std::vector<FunctionExpression*>* functions, std::vector<std::pair<Token, Token>>* templates)
+		std::vector<StructMember> members;
+
+
+		StructExpression(Token token, Token name, Token start, Token end, std::vector<StructMember>&& members, /*std::vector<std::pair<std::string, std::string>>* elements, std::vector<FunctionExpression*>* functions,*/ std::vector<std::pair<Token, Token>>* templates)
 		{
 			this->templates = templates;
-			this->elements = elements;
+			this->members = members;
+			//this->elements = elements;
 			this->name = name;
 			this->token = token;
-			this->ret_type = ret_type;
-			this->functions = functions;
+			//this->functions = functions;
+			this->start = start;
+			this->end = end;
 		}
 
 		~StructExpression()
 		{
-			if (functions)
-				for (auto fun : *functions)
-					delete fun;
-			delete functions;
-			delete elements;
+			for (auto ii : members)
+				if (ii.type == StructMember::FunctionMember)
+					delete ii.function;
 		}
 
 		std::string GetName()
 		{
-			return this->name;
+			return this->name.text;
 		}
 
 		void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
-			for (auto ii : *this->functions)
+			for (auto ii : this->members)
 			{
-				ii->SetParent(this);
+				if (ii.type == StructMember::FunctionMember)
+					ii.function->SetParent(this);
 			}
 		}
 
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context);
+
+		void Print(std::string& output, Source* source)
+		{
+			//add tokens for the ( )
+			token.Print(output, source);
+
+			name.Print(output, source);
+			//output templates
+			if (this->templates && this->templates->size() > 0)
+			{
+				output += "<";
+
+				int i = 0;
+				for (auto ii : *this->templates)
+				{
+					ii.first.Print(output, source);
+					ii.second.Print(output, source);
+					if (i != this->templates->size() - 1)
+						output += ",";
+					i++;
+				}
+				output += ">";
+			}
+			this->start.Print(output, source);
+
+			for (auto ii : this->members)
+			{
+				if (ii.type == StructMember::FunctionMember)
+					ii.function->Print(output, source);
+				else
+				{
+					ii.variable.first.Print(output, source);
+					ii.variable.second.Print(output, source);
+					output += ";";
+				}
+			}
+
+			this->end.Print(output, source);
+			//throw 7;
+			//output += "(";
+			//this->condition->Print(output, source);
+			//output += ")";
+
+			//this->block->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+
+			for (auto ii : members)
+			{
+				if (ii.type == StructMember::FunctionMember)
+					ii.function->Visit(visitor);
+			}
+		}
 	};
 
 	class ReturnExpression : public Expression
@@ -1207,6 +1800,18 @@ namespace Jet
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+			right->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			right->Visit(visitor);
+		}
 	};
 
 	class BreakExpression : public Expression
@@ -1219,7 +1824,7 @@ namespace Jet
 		{
 			this->Parent = parent;
 		}
-		
+
 		CValue Compile(CompilerContext* context)
 		{
 			context->CurrentToken(&token);
@@ -1229,6 +1834,16 @@ namespace Jet
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
 	};
 
 	class ContinueExpression : public Expression
@@ -1251,6 +1866,16 @@ namespace Jet
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
 	};
 
 	/*class YieldExpression: public Expression

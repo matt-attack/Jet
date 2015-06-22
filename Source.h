@@ -38,6 +38,16 @@ namespace Jet
 			return memcmp(op.c_str(), &text[index - 1], op.length()) == 0;
 		}
 
+		int GetIndex()
+		{
+			return this->index;
+		}
+
+		const char* GetSubstring(int start, int end)
+		{
+			return &this->text[start];
+		}
+
 		std::string filename;
 
 		//current position in file

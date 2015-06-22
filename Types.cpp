@@ -80,11 +80,14 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	//str->functions = this->data->functions;
 	//str->members = this->data->members;
 	//build members
-	for (auto ii : *this->data->expression->elements)
+	for (auto ii : this->data->expression->members)
 	{
-		auto type = compiler->AdvanceTypeLookup(ii.first);
+		if (ii.type == StructMember::VariableMember)
+		{
+			auto type = compiler->AdvanceTypeLookup(ii.variable.first.text);
 
-		str->members.push_back({ ii.second, ii.first, type });
+			str->members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
+		}
 	}
 
 	str->template_base = this->data;

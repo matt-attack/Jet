@@ -104,6 +104,7 @@ namespace Jet
 		void Load(Compiler* compiler);
 	};
 	
+	class FunctionExpression;
 	struct Function
 	{
 		std::string name;
@@ -115,10 +116,14 @@ namespace Jet
 
 		Type* return_type;
 
+		//for use with templates
+		FunctionExpression* expression;
+
 		bool loaded;
 
 		Function()
 		{
+			expression = 0;
 			loaded = false;
 		}
 

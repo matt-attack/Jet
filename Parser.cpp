@@ -178,11 +178,11 @@ BlockExpression* Parser::parseBlock(bool allowsingle)
 	{
 		auto res = this->ParseStatement();
 		if (res)
-		statements.push_back(res);
+			statements.push_back(res);
 		return new BlockExpression(std::move(statements));
 	}
 
-	Consume(TokenType::LeftBrace);
+	auto start = Consume(TokenType::LeftBrace);
 
 	while (!Match(TokenType::RightBrace))
 	{
@@ -191,8 +191,8 @@ BlockExpression* Parser::parseBlock(bool allowsingle)
 			statements.push_back(res);
 	}
 
-	Consume(TokenType::RightBrace);
-	return new BlockExpression(std::move(statements));
+	auto end = Consume(TokenType::RightBrace);
+	return new BlockExpression(start, end, std::move(statements));
 }
 
 BlockExpression* Parser::parseAll()
@@ -230,7 +230,7 @@ Token Parser::Consume(TokenType expected)
 		throw 7;
 
 		mRead.pop_front();
-		return Token(temp.line, temp.column, expected, "uh");
+		return Token(0, 0, temp.line, temp.column, expected, "uh");
 	}
 	mRead.pop_front();
 	return temp;
@@ -248,7 +248,7 @@ Token Parser::LookAhead(unsigned int num)
 			return ii;
 	}
 
-	return Token(0, 0, TokenType::EoF, "EOF");
+	return Token(0, 0, 0, 0, TokenType::EoF, "EOF");
 }
 
 bool Parser::Match(TokenType expected)

@@ -78,6 +78,39 @@ Type* IndexExpression::GetBaseType(CompilerContext* context)
 	Error("wat", token);
 }
 
+Type* IndexExpression::GetBaseType(Compiler* compiler)
+{
+	auto p = dynamic_cast<NameExpression*>(left);
+	auto i = dynamic_cast<IndexExpression*>(left);
+
+	if (p)
+	{
+		//look for neareast scope
+		auto current = this->Parent;
+		do
+		{
+			auto scope = dynamic_cast<ScopeExpression*>(current);
+			if (scope)
+			{
+				//search for it now
+				auto curscope = scope->scope;
+				do
+				{
+					auto res = curscope->named_values.find(p->GetName());
+					if (res != curscope->named_values.end())
+						return res->second.type;
+				} while (curscope = curscope->prev);
+				break;
+			}
+		} while (current = current->Parent);
+	}
+	//return context->GetVariable(p->GetName()).type;
+	else if (i)
+		Error("todo", token);// throw 7;// return i->GetType(context);
+
+	Error("wat", token);
+}
+
 CValue IndexExpression::GetBaseGEP(CompilerContext* context)
 {
 	auto p = dynamic_cast<NameExpression*>(left);
@@ -134,8 +167,8 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
 
-	auto string = dynamic_cast<StringExpression*>(index);
-	if (index == 0)
+	//auto string = dynamic_cast<StringExpression*>(index);
+	if (index == 0 && this->token.type == TokenType::Pointy)
 	{
 		CValue lhs;
 		if (p)
@@ -151,12 +184,12 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 			int index = 0;
 			for (; index < type->data->members.size(); index++)
 			{
-				if (type->data->members[index].name == this->member)
+				if (type->data->members[index].name == this->member.text)
 					break;
 			}
 			if (index >= type->data->members.size())
 			{
-				Error("Struct Member '" + this->member + "' of Struct '" + type->data->name + "' Not Found", this->token);
+				Error("Struct Member '" + this->member.text + "' of Struct '" + type->data->name + "' Not Found", this->token);
 			}
 
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
@@ -175,17 +208,17 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		else if (i)
 			lhs = i->GetGEP(context);
 
-		if (string && lhs.type->type == Types::Struct)
+		if (this->member.text.length() && lhs.type->type == Types::Struct)
 		{
 			int index = 0;
 			for (; index < lhs.type->data->members.size(); index++)
 			{
-				if (lhs.type->data->members[index].name == string->GetValue())
+				if (lhs.type->data->members[index].name == this->member.text)
 					break;
 			}
 			if (index >= lhs.type->data->members.size())
 			{
-				Error("Struct Member '" + string->GetValue() + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
+				Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
 				//not found;
 			}
 
@@ -194,7 +227,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
 			return CValue(lhs.type->data->members[index].type, loc);
 		}
-		else if (lhs.type->type == Types::Array && string == 0)//or pointer!!(later)
+		else if (lhs.type->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
 		{
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->DoCast(&IntType, index->Compile(context)).val };
 
@@ -310,14 +343,15 @@ CValue CallExpression::Compile(CompilerContext* context)
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
 	{
 		//im a struct yo
-		if (index->member.length() > 0)
-			fname = index->member;
-		else
-			fname = dynamic_cast<StringExpression*>(index->index)->GetValue();
+		fname = index->member.text;
+		//if (index->member.length() > 0)
+		//	fname = index->member;
+		//else
+		//	fname = dynamic_cast<StringExpression*>(index->index)->GetValue();
 		stru = index->GetBaseType(context);
 
 		llvm::Value* self;
-		if (index->member.length() > 0)
+		if (index->token.type == TokenType::Pointy)// && index->token.type != TokenType::Dot)//->member.length() > 0)
 		{
 			stru = stru->base;
 			self = context->parent->builder.CreateLoad(index->GetBaseGEP(context).val);
@@ -378,7 +412,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		context->f->getBasicBlockList().push_back(else_block);
 		context->parent->builder.SetInsertPoint(else_block);
 		auto cond2 = this->right->Compile(context);
-		
+
 		cond2 = context->DoCast(&BoolType, cond2);
 		context->parent->builder.CreateBr(end_block);
 
@@ -463,7 +497,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	}
 
 	//auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
-	CompilerContext* function = context->AddFunction(this->GetRealName(), context->parent->LookupType(this->ret_type), argsv, Struct.length() > 0 ? true : false);// , this->varargs);
+	CompilerContext* function = context->AddFunction(this->GetRealName(), context->parent->LookupType(this->ret_type.text), argsv, Struct.length() > 0 ? true : false);// , this->varargs);
 	if (Struct.length() > 0)
 	{
 		auto range = context->parent->types[Struct]->data->functions.equal_range(fname);
@@ -500,7 +534,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 
 	//check for return, and insert one or error if there isnt one
 	if (function->f->getBasicBlockList().back().getTerminator() == 0)
-		if (this->ret_type == "void")
+		if (this->ret_type.text == "void")
 			function->Return(CValue());
 		else
 		{
@@ -520,7 +554,8 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		fname = "_lambda_id_";
 
 	Function* fun = new Function;
-	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type);
+	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type.text);
+	fun->expression = this;
 
 	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 	if (Struct.length() > 0)
@@ -560,7 +595,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	std::string fname = name.text;
 
 	Function* fun = new Function;
-	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type);
+	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type.text);
 
 	for (auto ii : *this->args)
 	{
@@ -609,9 +644,9 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		llvm::IRBuilder<> TmpB(&context->f->getEntryBlock(), context->f->getEntryBlock().begin());
 		Type* type = 0;
 		llvm::AllocaInst* Alloca = 0;
-		if (ii.first.length() > 0)//type was specified
+		if (ii.first.text.length() > 0)//type was specified
 		{
-			type = context->parent->LookupType(ii.first);
+			type = context->parent->LookupType(ii.first.text);
 
 			if (type->type == Types::Array)
 				Alloca = TmpB.CreateAlloca(GetType(type), context->parent->builder.getInt32(type->size), aname);
@@ -644,7 +679,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 		// Add arguments to variable symbol table.
 		context->RegisterLocal(aname, CValue(type, Alloca));
-		
+
 		//construct it!
 		if (this->_right == 0 && type->type == Types::Struct)
 		{
@@ -673,9 +708,10 @@ CValue StructExpression::Compile(CompilerContext* context)
 		return CValue();
 	}
 
-	for (auto fun : *this->functions)
+	for (auto ii : this->members)
 	{
-		fun->Compile(context);
+		if (ii.type == StructMember::FunctionMember)
+			ii.function->Compile(context);
 	}
 	return CValue();
 }
@@ -685,24 +721,24 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	//build data about the struct
 	//get or add the struct type from the type table
 	Type* str = 0;
-	auto ii = context->parent->types.find(this->name);
+	auto ii = context->parent->types.find(this->name.text);
 	if (ii == context->parent->types.end())//its new
 	{
 		str = new Type;
-		context->parent->types[this->name] = str;
+		context->parent->types[this->name.text] = str;
 	}
 	else
 	{
 		str = ii->second;
 		if (str->type != Types::Invalid)
 		{
-			Error("Struct '" + this->name + "' Already Defined", this->token);
+			Error("Struct '" + this->name.text + "' Already Defined", this->token);
 		}
 	}
 
 	str->type = Types::Struct;
 	str->data = new Struct;
-	str->data->name = this->name;
+	str->data->name = this->name.text;
 	str->data->expression = this;
 	if (this->templates)
 	{
@@ -712,20 +748,27 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		}
 	}
 	//str->data->templates = this->templates;
-	
-	for (auto ii : *this->elements)
+
+	for (auto ii : this->members)
 	{
-		auto type = context->parent->AdvanceTypeLookup(ii.first);
-		
-		str->data->members.push_back({ ii.second, ii.first, type });
+		if (ii.type == StructMember::VariableMember)
+		{
+			auto type = context->parent->AdvanceTypeLookup(ii.variable.first.text);
+
+			str->data->members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
+		}
+		else
+		{
+			ii.function->CompileDeclarations(context);
+		}
 	}
 
 	//if (this->templates == 0)
 	//{
-		for (auto ii : *this->functions)
-		{
-			ii->CompileDeclarations(context);
-		}
+	/*for (auto ii : *this->functions)
+	{
+		ii->CompileDeclarations(context);
+	}*/
 	//}
 };
 

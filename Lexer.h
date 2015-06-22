@@ -20,6 +20,8 @@ namespace Jet
 
 		//std::string text;
 		Source* src;
+		int last_index;//location where last token ended, used for tracking whitespace
+
 		//std::vector<std::pair<const char*, unsigned int>> lines;
 	public:
 		Lexer(Source* source);// std::istream* input, std::string filename);

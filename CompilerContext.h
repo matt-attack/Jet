@@ -35,7 +35,8 @@ namespace Jet
 	struct Scope
 	{
 		std::map<std::string, CValue> named_values;
-		Scope* next;
+		//Scope* next;
+		std::vector<Scope*> next;
 		Scope* prev;
 	};
 
@@ -56,11 +57,13 @@ namespace Jet
 		{
 			this->parent = parent;
 			this->scope = new Scope;
-			this->scope->next = this->scope->prev = 0;
+			this->scope->prev = 0;
 		}
 
 		~CompilerContext()
 		{
+			for (auto ii : this->scope->next)
+				delete ii;
 			delete this->scope;
 		}
 
@@ -71,6 +74,8 @@ namespace Jet
 
 		void RegisterLocal(const std::string& name, CValue val)
 		{
+			if (this->scope->named_values.find(name) != this->scope->named_values.end())
+				Error("Variable '" + name + "' already defined", *this->current_token);
 			this->scope->named_values[name] = val;
 		}
 
@@ -203,14 +208,14 @@ namespace Jet
 			current_token = token;
 		}
 
-		void PushScope()
+		Scope* PushScope()
 		{
-			//todo
 			auto temp = this->scope;
 			this->scope = new Scope;
 			this->scope->prev = temp;
-			this->scope->next = 0;
-			temp->next = this->scope;
+
+			temp->next.push_back(this->scope);
+			return this->scope;
 		}
 
 		void PopScope()
@@ -236,7 +241,7 @@ namespace Jet
 
 			auto temp = this->scope;
 			this->scope = this->scope->prev;
-			delete temp;
+			//delete temp;
 		}
 
 		CValue DoCast(Type* t, CValue value)

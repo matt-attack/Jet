@@ -193,6 +193,46 @@ std::string GetNameFromPath(const std::string& path)
 	return name;
 }
 
+//get traits working
+//generate trait from struct
+class MemberRenamer : public ExpressionVisitor
+{
+	std::string stru, member, newname;
+	Compiler* compiler;
+public:
+
+	MemberRenamer(std::string stru, std::string member, std::string newname, Compiler* compiler) :stru(stru), member(member), newname(newname), compiler(compiler)
+	{
+
+	}
+	//lets make a waywo demo for this :D
+	virtual void Visit(StructExpression* expr)
+	{
+		if (expr->GetName() == stru)
+		{
+			for (auto ii : expr->members)
+			{
+				if (ii.type == StructMember::VariableMember)
+				{
+					ii.variable.second.text = newname;
+				}
+			}
+		}
+	}
+
+	virtual void Visit(IndexExpression* expr)
+	{
+		if (expr->member.text.length() > 0 && expr->member.text == member)
+		{
+			auto type = expr->GetBaseType(compiler);
+			if ((expr->token.type == TokenType::Dot && type->type == Types::Struct && type->data->name == stru) || (expr->token.type == TokenType::Pointy && type->base->type == Types::Struct))
+			{
+				expr->member.text = newname;
+			}
+		}
+	}
+};
+
 std::vector<std::string> Compiler::Compile(const char* projectdir)
 {
 	std::vector<std::string> files;
@@ -367,7 +407,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	}
 
 	FILE* jlib = fopen("build/symbols.jlib", "rb");
-	FILE* output = fopen(("build/"+project_name+".o").c_str(), "rb");
+	FILE* output = fopen(("build/" + project_name + ".o").c_str(), "rb");
 	if (strcmp(__TIME__, compiler_version.c_str()) != 0)//see if the compiler was the same
 	{
 		//do a rebuild compiler version is different
@@ -514,11 +554,6 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	//todo: put intializers here and have this call main()
 
 error:
-	for (auto ii : sources)
-		delete ii.second;
-
-	for (auto ii : asts)
-		delete ii.second;
 
 	if (errors > 0)
 	{
@@ -562,7 +597,7 @@ error:
 			printf("Compiling Lib...\n");
 			std::string cmd = "ar rcs build/lib" + project_name + ".a ";
 			cmd += "build/" + project_name + ".o ";
-			
+
 			for (auto ii : dependencies)
 			{
 				//need to extract then merge
@@ -611,6 +646,23 @@ error:
 
 		printf("Project built successfully.\n\n");
 	}
+
+	//delete stuff
+	for (auto ii : asts)
+	{
+		//std::string out;
+
+		//MemberRenamer renamer("string", "length", "apples", this);
+		//ii.second->Visit(&renamer);
+		//ii.second->Print(out, sources[ii.first]);
+		//printf("%s",out.c_str());
+
+		
+		delete ii.second;
+	}
+
+	for (auto ii : sources)
+		delete ii.second;
 
 	//restore working directory
 	chdir(olddir);
@@ -774,18 +826,22 @@ void Compiler::OutputPackage(const std::string& project_name)
 				//fix templated types in return and arg types
 				for (auto fun : ii.second->data->functions)
 				{
-					types += "fun " + fun.second->return_type->name + " " + fun.first + "(";
+					/*types += "fun " + fun.second->return_type->name + " " + fun.first + "(";
 					bool first = false;
 					for (int i = 1; i < fun.second->argst.size(); i++)/// auto arg : fun.second->argst)
 					{
-						if (first)
-							function += ",";
-						else
-							first = true;
+					if (first)
+					function += ",";
+					else
+					first = true;
 
-						function += fun.second->argst[i].first->ToString() + " " + fun.second->argst[i].second;
+					function += fun.second->argst[i].first->ToString() + " " + fun.second->argst[i].second;
 					}
-					types += ") {}";
+					types += ") {}";*/
+					std::string source;
+					fun.second->expression->Print(source, current_source);
+					types += source;
+					//printf("%s", source.c_str());
 				}
 				types += "}";
 				continue;
@@ -905,20 +961,22 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 
 
 			//compile its functions
-			if (res->data->expression->functions && res->data->expression->functions->size() > 0)
+			if (res->data->expression->members.size() > 0)
 			{
-				StructExpression* expr = dynamic_cast<StructExpression*>(res->data->expression->functions->back()->Parent);
+				StructExpression* expr = dynamic_cast<StructExpression*>(res->data->expression);// ->functions->back()->Parent);
 				auto oldname = expr->name;
-				expr->name = res->data->name;
+				expr->name.text = res->data->name;
 
 				//store then restore insertion point
 				auto rp = this->builder.GetInsertBlock();
 
-				for (auto ii : *res->data->expression->functions)
-					ii->CompileDeclarations(this->current_function);
+				for (auto ii : res->data->expression->members)//functions)
+					if (ii.type == StructMember::FunctionMember)
+						ii.function->CompileDeclarations(this->current_function);
 
-				for (auto fun : *res->data->expression->functions)
-					fun->Compile(this->current_function);//the context used may not be proper, but it works
+				for (auto ii : res->data->expression->members)//functions)
+					if (ii.type == StructMember::FunctionMember)
+						ii.function->Compile(this->current_function);//the context used may not be proper, but it works
 
 				this->builder.SetInsertPoint(rp);
 				expr->name = oldname;

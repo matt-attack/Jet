@@ -4,7 +4,7 @@
 
 using namespace Jet;
 
-std::map<TokenType,std::string> Jet::TokenToString; 
+std::map<TokenType, std::string> Jet::TokenToString;
 
 class LexerStatic
 {
@@ -165,6 +165,7 @@ bool Jet::IsNumber(char c)
 
 Lexer::Lexer(Source* source)// std::istream* input, std::string filename)
 {
+	this->last_index = 0;
 	this->src = source;
 	//this->stream = input;
 	//this->linenumber = 1;
@@ -175,12 +176,12 @@ Lexer::Lexer(Source* source)// std::istream* input, std::string filename)
 
 /*Lexer::Lexer(std::string text, std::string filename)
 {
-	//this->stream = 0;
-	//this->column = 0;
-	//this->linenumber = 1;
-	//this->index = 0;
-	//this->text = text;
-	this->filename = filename;
+//this->stream = 0;
+//this->column = 0;
+//this->linenumber = 1;
+//this->index = 0;
+//this->text = text;
+this->filename = filename;
 }*/
 
 
@@ -196,6 +197,9 @@ Token Lexer::Next()
 	static LexerStatic ls;
 	while (src->IsAtEnd() == false)
 	{
+		int trivia_length = src->GetIndex() - this->last_index;
+		const char* t_ptr = src->GetSubstring(src->GetIndex(), 0);
+
 		char c = src->ConsumeChar();
 		std::string str;
 		str += c;// = text.substr(index - 1, 1);
@@ -261,9 +265,9 @@ Token Lexer::Next()
 						break;
 					}
 					else if (c == 0)
-						ParserError("Missing end to comment block starting at line " + std::to_string(startline), Token(src->linenumber, src->column, TokenType::String, ""));
+						ParserError("Missing end to comment block starting at line " + std::to_string(startline), Token(t_ptr, 0, src->linenumber, src->column, TokenType::String, ""));
 
-						//throw CompilerException(this->filename, this->linenumber, "Missing end to comment block starting at line " + std::to_string(startline));
+					//throw CompilerException(this->filename, this->linenumber, "Missing end to comment block starting at line " + std::to_string(startline));
 				}
 
 				continue;
@@ -298,8 +302,11 @@ Token Lexer::Next()
 						case '"':
 							txt.push_back('"');
 							break;
+						case '0':
+							txt.push_back(0);
+							break;
 						default:
-							ParserError("Invalid Escape Sequence '\\" + std::to_string(c) + "'", Token(src->linenumber, src->column, TokenType::String, ""));
+							ParserError("Invalid Escape Sequence '\\" + std::to_string(c) + "'", Token(t_ptr, 0, src->linenumber, src->column, TokenType::String, ""));
 
 							//throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'");
 						}
@@ -316,63 +323,65 @@ Token Lexer::Next()
 						txt.push_back(src->ConsumeChar());// text[index++]);
 					}
 				}
+				this->last_index = src->GetIndex();
 
 				//index++;
-				return Token(src->linenumber, src->column, toktype, txt);
+				return Token(t_ptr, trivia_length, src->linenumber, src->column, toktype, txt);
 			}
 			else if (toktype == TokenType::BlockString)
 			{
-				ParserError("Block Strings Not Implemented", Token(src->linenumber, src->column, TokenType::String, ""));
+				ParserError("Block Strings Not Implemented", Token(t_ptr, 0, src->linenumber, src->column, TokenType::String, ""));
 
 				/*std::string txt;
 
 				int start = index;
 				while (src->IsAtEnd() == false)//index < text.length())
 				{
-					if (text[index] == '\\')
-					{
-						//handle escape sequences
-						char c = text[index + 1];
-						switch (c)
-						{
-						case 'n':
-							txt.push_back('\n');
-							break;
-						case 'b':
-							txt.push_back('\b');
-							break;
-						case 't':
-							txt.push_back('\t');
-							break;
-						case '\\':
-							txt.push_back('\\');
-							break;
-						case '"':
-							txt.push_back('"');
-							break;
-						default:
-							ParserError("Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'", Token(src->linenumber, src->column, TokenType::String, ""));
+				if (text[index] == '\\')
+				{
+				//handle escape sequences
+				char c = text[index + 1];
+				switch (c)
+				{
+				case 'n':
+				txt.push_back('\n');
+				break;
+				case 'b':
+				txt.push_back('\b');
+				break;
+				case 't':
+				txt.push_back('\t');
+				break;
+				case '\\':
+				txt.push_back('\\');
+				break;
+				case '"':
+				txt.push_back('"');
+				break;
+				default:
+				ParserError("Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'", Token(src->linenumber, src->column, TokenType::String, ""));
 
-							//throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'");
-						}
+				//throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'");
+				}
 
-						index += 2;
-					}
-					else if (text[index] == ']' && text[index + 1] == ']' && text[index + 2] == '-')
-					{
-						break;
-					}
-					else
-					{
-						txt.push_back(text[index++]);
-					}
+				index += 2;
+				}
+				else if (text[index] == ']' && text[index + 1] == ']' && text[index + 2] == '-')
+				{
+				break;
+				}
+				else
+				{
+				txt.push_back(text[index++]);
+				}
 				}
 
 				index += 3;
 				return Token(src->linenumber, src->column, TokenType::String, txt);*/
 			}
+			this->last_index = src->GetIndex();
 
-			return Token(src->linenumber, src->column, toktype, str);
+			return Token(t_ptr, trivia_length, src->linenumber, src->column, toktype, str);
 		}
 		else if (IsLetter(c) || c == '_')//word
 		{
@@ -389,13 +398,15 @@ Token Lexer::Next()
 				name += src->ConsumeChar();
 			}
 
+			this->last_index = src->GetIndex();
+
 			//std::string name = text.substr(start, index - start);
 			//check if it is a keyword
 			auto keyword = ls.keywords.find(name);
 			if (keyword != ls.keywords.end())//is keyword?
-				return Token(src->linenumber, src->column, keyword->second, name);
+				return Token(t_ptr, trivia_length, src->linenumber, src->column, keyword->second, name);
 			else//just a variable name
-				return Token(src->linenumber, src->column, TokenType::Name, name);
+				return Token(t_ptr, trivia_length, src->linenumber, src->column, TokenType::Name, name);
 		}
 		else if (IsNumber(c))//number
 		{
@@ -413,8 +424,11 @@ Token Lexer::Next()
 
 					num += src->ConsumeChar();
 				}
+
+				this->last_index = src->GetIndex();
+
 				//std::string num = text.substr(start, index - start);
-				return Token(src->linenumber, src->column, TokenType::Number, num);
+				return Token(t_ptr, trivia_length, src->linenumber, src->column, TokenType::Number, num);
 			}
 			else
 			{
@@ -434,8 +448,10 @@ Token Lexer::Next()
 
 						num += src->ConsumeChar();
 					}
+					this->last_index = src->GetIndex();
+
 					//std::string num = text.substr(start, index - start);
-					return Token(src->linenumber, src->column, TokenType::Number, num);
+					return Token(t_ptr, trivia_length, src->linenumber, src->column, TokenType::Number, num);
 					break;
 				}
 				case 'x'://hex literal
@@ -450,8 +466,10 @@ Token Lexer::Next()
 
 						num += src->ConsumeChar();
 					}
+					this->last_index = src->GetIndex();
+
 					//std::string num = text.substr(start, index - start);
-					return Token(src->linenumber, src->column, TokenType::Number, num);
+					return Token(t_ptr, trivia_length, src->linenumber, src->column, TokenType::Number, num);
 					break;
 				}
 				default:
@@ -464,8 +482,10 @@ Token Lexer::Next()
 
 						str += src->ConsumeChar();
 					}
+					this->last_index = src->GetIndex();
+
 					//std::string num = text.substr(start, index - start);
-					return Token(src->linenumber, src->column, TokenType::Number, str);
+					return Token(t_ptr, trivia_length, src->linenumber, src->column, TokenType::Number, str);
 				}
 				}
 			}
@@ -495,7 +515,7 @@ Token Lexer::Next()
 					cc = '\'';
 					break;
 				default:
-					ParserError("Invalid Escape Sequence '\\" + std::to_string(cc)/*text.substr(index - 1, 1)*/ + "'", Token(src->linenumber, src->column, TokenType::String, ""));
+					ParserError("Invalid Escape Sequence '\\" + std::to_string(cc)/*text.substr(index - 1, 1)*/ + "'", Token(t_ptr, 0, src->linenumber, src->column, TokenType::String, ""));
 
 					//throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index - 1, 1) + "'");
 				}
@@ -504,10 +524,12 @@ Token Lexer::Next()
 
 			char endc = src->ConsumeChar();
 			if (endc != '\'')
-				ParserError("Closing ' expected for character literal.", Token(src->linenumber, src->column, TokenType::String, ""));
+				ParserError("Closing ' expected for character literal.", Token(t_ptr, 0, src->linenumber, src->column, TokenType::String, ""));
+
+			this->last_index = src->GetIndex();
 
 			//	throw CompilerException(filename, linenumber, "Closing ' expected for character literal.");
-			return Token(src->linenumber, src->column, TokenType::Number, num);
+			return Token(t_ptr, trivia_length, src->linenumber, src->column, TokenType::Number, num);
 		}
 		else
 		{
@@ -515,10 +537,12 @@ Token Lexer::Next()
 			if (c == ' ' || c == '\t' || c == '\n' || c == '\r')
 				continue;
 			else
-				ParserError("Unexpected character: '" + str + "'", Token(src->linenumber, src->column, TokenType::String, ""));
-				//throw CompilerException(this->filename, this->linenumber, "Unexpected character: '" + str + "'");
+				ParserError("Unexpected character: '" + str + "'", Token(t_ptr, 0, src->linenumber, src->column, TokenType::String, ""));
+			//throw CompilerException(this->filename, this->linenumber, "Unexpected character: '" + str + "'");
 		}
 	}
-	return Token(src->linenumber, src->column, TokenType::EoF, "EOF");
+	this->last_index = src->GetIndex();
+
+	return Token(0, 0, src->linenumber, src->column, TokenType::EoF, "EOF");
 }
 

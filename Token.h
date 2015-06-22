@@ -93,9 +93,6 @@ namespace Jet
 		Increment,
 		Decrement,
 
-		//Dereference,
-		//AddressOf,
-
 		Pointy, 
 
 		Operator,
@@ -112,12 +109,16 @@ namespace Jet
 		unsigned int index;
 		unsigned int length;
 	};
+
+	class Source;
 	struct Token
 	{
 		TokenType type;
 		std::string text;
 		
 		//Range text;
+		const char* text_ptr;
+		int trivia_length;//length of preceding whitespace/comments
 
 		unsigned int line;
 		unsigned int column;
@@ -127,13 +128,17 @@ namespace Jet
 
 		}
 
-		Token(unsigned int line, unsigned int column, TokenType type, std::string txt)
+		Token(const char* txtptr, unsigned int trivia_length, unsigned int line, unsigned int column, TokenType type, std::string txt)
 		{
+			this->text_ptr = txtptr;
+			this->trivia_length = trivia_length;
 			this->type = type;
 			this->text = txt;
 			this->line = line;
 			this->column = column;
 		}
+
+		void Print(std::string& str, Source* source);
 	};
 }
 
