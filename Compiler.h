@@ -86,6 +86,8 @@ namespace Jet
 			types["void"] = &VoidType;// new Type(Types::Void);
 		}
 
+		~Compiler();
+
 		//returns paths to dependencies
 		std::vector<std::string> Compile(const char* projectfile);
 
@@ -158,6 +160,9 @@ namespace Jet
 
 		std::map<std::string, Type*> types;
 		Type* LookupType(const std::string& name);
+		
+		std::map<std::string, CValue> globals;
+		CValue AddGlobal(const std::string& name, Type* t);
 	};
 };
 #endif

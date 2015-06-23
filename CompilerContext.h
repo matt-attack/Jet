@@ -29,13 +29,12 @@
 //then add templates/generics
 namespace Jet
 {
-	//add global variables
 	//global compiler context
 
 	struct Scope
 	{
 		std::map<std::string, CValue> named_values;
-		//Scope* next;
+
 		std::vector<Scope*> next;
 		Scope* prev;
 	};
@@ -114,7 +113,14 @@ namespace Jet
 			} while (cur);
 
 			if (value.type->type == Types::Void)
-				Error("undeclared identifier '" + name + "'", *current_token);
+			{
+				//ok, now search globals
+				auto global = this->parent->globals.find(name);
+				if (global != this->parent->globals.end())
+					return global->second;
+
+				Error("Undeclared identifier '" + name + "'", *current_token);
+			}
 			return value;
 		}
 

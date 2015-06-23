@@ -57,6 +57,13 @@ void Jet::ParserError(const std::string& msg, Token token)
 	throw 7;
 }
 
+Compiler::~Compiler()
+{
+	for (auto ii : this->types)
+		if (ii.second->type == Types::Struct)//add more later
+			delete ii.second;
+}
+
 void Compiler::Compile(const char* code, const char* filename)
 {
 	//	JITHelper = new MCJITHelper(this->context);
@@ -503,7 +510,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	for (auto file : sources)
 	{
 		current_source = file.second;
-		Lexer lexer = Lexer(file.second);
+		Lexer lexer(file.second);
 		Parser parser = Parser(&lexer);
 
 		BlockExpression* result = 0;
@@ -1003,4 +1010,18 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 	}
 
 	return type;
+}
+
+#include <llvm\IR\GlobalVariable.h>
+CValue Compiler::AddGlobal(const std::string& name, Jet::Type* t)//, bool Extern = false)
+{
+	auto global = this->globals.find(name);
+	if (global != this->globals.end())
+		Error("Global variable '" + name + "' already exists", *this->current_function->current_token);
+
+	//auto cons = this->module->getOrInsertGlobal(name, GetType(value.type));
+	auto ng = new llvm::GlobalVariable( *module, GetType(t), false, llvm::GlobalValue::LinkageTypes::ExternalLinkage, 0, name);
+	
+	this->globals[name] = CValue(t, ng);
+	return CValue(t, ng);
 }

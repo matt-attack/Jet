@@ -673,6 +673,21 @@ CValue LocalExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&(*_names)[0].second);
 
+	if (this->Parent->Parent == 0)
+	{
+		//im in global scope
+		auto type = context->parent->LookupType(this->_names->front().first.text);
+		auto global = context->parent->AddGlobal(this->_names->front().second.text, type);
+
+		//should I add a constructor?
+		if (this->_right && this->_right->size() > 0)
+		{
+			Error("Initializing global variables not yet implemented", token);
+		}
+		
+		return CValue();
+	}
+
 	int i = 0;
 	for (auto ii : *this->_names) {
 		auto aname = ii.second.text;

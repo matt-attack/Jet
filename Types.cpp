@@ -70,8 +70,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 		//CHANGE ME LATER, THIS OVERRIDES TYPES, OR JUST RESTORE AFTER THIS
 		compiler->types[ii.second] = types[i++];
 	}
-	//printf("tried to instantiate template");
-
+	
 	//duplicate and load
 	Struct* str = new Struct;
 	//str->functions = this->data->functions;
@@ -148,7 +147,7 @@ void Struct::Load(Compiler* compiler)
 		elementss.push_back(GetType(type));
 	}
 	this->type = llvm::StructType::create(elementss, this->name);
-	//this->type->dump();
+
 	this->loaded = true;
 }
 
