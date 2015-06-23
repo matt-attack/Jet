@@ -50,10 +50,7 @@ void Type::Load(Compiler* compiler)
 	}
 	else if (type == Types::Invalid)
 	{
-		//get a good error here!!!
-		Error("Tried To Use Undefined Type", *compiler->current_function->current_token);
-		//printf("Tried to use undefined type\n");
-		//throw 7;
+		Error("Tried To Use Undefined Type '" + this->name + "'", *compiler->current_function->current_token);
 	}
 	else if (type == Types::Pointer)
 	{

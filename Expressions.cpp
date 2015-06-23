@@ -164,7 +164,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 
 			return lhs.type->data->members[index].type;
 		}
-		else if (lhs.type->type == Types::Array && string == 0)//or pointer!!(later)
+		else if ((lhs.type->type == Types::Array || lhs.type->type == Types::Pointer) && string == 0)//or pointer!!(later)
 		{
 			return lhs.type->base;
 		}
@@ -241,12 +241,27 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->DoCast(&IntType, index->Compile(context)).val };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
+			
+			return CValue(lhs.type->base, loc);
+		}
+		else if (lhs.type->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
+		{
+			std::vector<llvm::Value*> iindex = { /*context->parent->builder.getInt32(0),*/ context->DoCast(&IntType, index->Compile(context)).val };
+
+			//loadme!!!
+			lhs.val = context->parent->builder.CreateLoad(lhs.val);
+			//llllload my index
+			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
 
 			return CValue(lhs.type->base, loc);
 		}
+		else if (lhs.type->type == Types::Struct && this->member.text.length() == 0)
+		{
+			Error("Indexing Structs Not Implemented", this->token);
+		}
 		Error("Cannot index type '" + lhs.type->ToString() + "'", this->token);
 	}
-
+	
 	Error("Unimplemented", this->token);
 }
 
