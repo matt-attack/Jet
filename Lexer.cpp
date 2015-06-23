@@ -122,6 +122,10 @@ public:
 
 		keywords["extern"] = TokenType::Extern;
 		keywords["struct"] = TokenType::Struct;
+
+		//internal "functions"
+		keywords["sizeof"] = TokenType::SizeOf;
+		keywords["offsetof"] = TokenType::OffsetOf;
 		//keywords["const"] = TokenType::Const;
 
 		//keywords["operator"] = TokenType::Operator;

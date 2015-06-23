@@ -174,6 +174,7 @@ void Function::Load(Compiler* compiler)
 	llvm::FunctionType *ft = llvm::FunctionType::get(GetType(this->return_type), this->args, false);
 
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
+	
 	/*if (this->name[0] == 'R')
 	{
 		//f->setDLLStorageClass(llvm::Function::DLLImportStorageClass);

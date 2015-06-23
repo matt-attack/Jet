@@ -67,9 +67,14 @@ namespace Jet
 			delete this->scope;
 		}
 
-		CValue Number(double value)
+		CValue Float(double value)
 		{
 			return CValue(&DoubleType, llvm::ConstantFP::get(parent->context, llvm::APFloat(value)));
+		}
+
+		CValue Integer(int value)
+		{
+			return CValue(&IntType, llvm::ConstantInt::get(parent->context, llvm::APInt(32, value, true)));
 		}
 
 		void RegisterLocal(const std::string& name, CValue val)
@@ -244,7 +249,7 @@ namespace Jet
 			//delete temp;
 		}
 
-		CValue DoCast(Type* t, CValue value)
+		CValue DoCast(Type* t, CValue value, bool Explicit = false)
 		{
 			if (value.type->type == t->type && value.type->data == t->data)
 				return value;
@@ -287,6 +292,14 @@ namespace Jet
 				//pointer to bool
 				if (t->type == Types::Bool)
 					return CValue(t, parent->builder.CreateIsNotNull(value.val));
+				if (Explicit)
+				{
+					if (t->type == Types::Pointer)
+					{
+						//pointer to pointer cast;
+						return CValue(t,parent->builder.CreatePointerCast(value.val, GetType(t), "ptr2ptr"));
+					}
+				}
 			}
 			if (value.type->type == Types::Array)
 			{

@@ -58,6 +58,54 @@ Expression* PrefixOperatorParselet::parse(Parser* parser, Token token)
 	return new PrefixExpression(token, right);
 }
 
+Token ParseType(Parser* parser)
+{
+	Token name = parser->Consume(TokenType::Name);
+	std::string out = name.text;
+	while (parser->MatchAndConsume(TokenType::Asterisk))
+	{
+		//its a pointer
+		out += '*';
+	}
+	//parse templates
+	if (parser->MatchAndConsume(TokenType::LessThan))
+	{
+		out += "<";
+		//recursively parse the rest
+		bool first = true;
+		do
+		{
+			if (first == false)
+				out += ",";
+			first = false;
+			out += ParseType(parser).text;
+		} while (parser->MatchAndConsume(TokenType::Comma));
+
+		parser->Consume(TokenType::GreaterThan);
+		out += ">";
+	}
+
+	Token ret;
+	ret.column = name.column;
+	ret.line = name.line;
+	ret.trivia_length = name.trivia_length;
+	ret.text_ptr = name.text_ptr;
+	ret.text = out;
+	return ret;
+}
+
+Expression* CastParselet::parse(Parser* parser, Token token)
+{
+	Token type = ParseType(parser);// parser->Consume(TokenType::Name);
+	Token end = parser->Consume(TokenType::GreaterThan);
+
+	auto right = parser->parseExpression(Precedence::PREFIX);
+	if (right == 0)
+		ParserError("CastParselet: Right hand side missing!", token);
+
+	return new CastExpression(type, token, right, end);
+}
+
 Expression* BinaryOperatorParselet::parse(Parser* parser, Expression* left, Token token)
 {
 	Expression* right = parser->parseExpression(precedence - (isRight ? 1 : 0));
@@ -192,42 +240,6 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 	}
 
 	return new IfExpression(token, std::move(branches), Else);
-}
-
-Token ParseType(Parser* parser)
-{
-	Token name = parser->Consume();
-	std::string out = name.text;
-	while (parser->MatchAndConsume(TokenType::Asterisk))
-	{
-		//its a pointer
-		out += '*';
-	}
-	//parse templates
-	if (parser->MatchAndConsume(TokenType::LessThan))
-	{
-		out += "<";
-		//recursively parse the rest
-		bool first = true;
-		do
-		{
-			if (first == false)
-				out += ",";
-			first = false;
-			out += ParseType(parser).text;
-		} while (parser->MatchAndConsume(TokenType::Comma));
-		
-		parser->Consume(TokenType::GreaterThan);
-		out += ">";
-	}
-
-	Token ret;
-	ret.column = name.column;
-	ret.line = name.line;
-	ret.trivia_length = name.trivia_length;
-	ret.text_ptr = name.text_ptr;
-	ret.text = out;
-	return ret;
 }
 
 Expression* TraitParselet::parse(Parser* parser, Token token)

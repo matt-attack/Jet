@@ -29,6 +29,7 @@ namespace Jet
 	class ReturnExpression;
 	class BreakExpression;
 	class ContinueExpression;
+	class CastExpression;
 	class ExpressionVisitor
 	{
 	public:
@@ -75,6 +76,8 @@ namespace Jet
 
 		virtual void Visit(BreakExpression* exp) {};
 		virtual void Visit(ContinueExpression* exp) {};
+
+		virtual void Visit(CastExpression* exp) {};
 	};
 }
 

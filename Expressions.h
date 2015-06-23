@@ -493,6 +493,55 @@ namespace Jet
 	void Compile(CompilerContext* context);
 	};*/
 
+	class CastExpression : public Expression//, public IStorableExpression
+	{
+		Token begin, end;
+		Token type;
+		Expression* right;
+	public:
+		CastExpression(Token type, Token begin, Expression* r, Token end)
+		{
+			this->type = type;
+			this->begin = begin;
+			this->right = r;
+			this->end = end;
+		}
+
+		~CastExpression()
+		{
+			delete this->right;
+		}
+
+		void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+			right->SetParent(this);
+		}
+
+		CValue Compile(CompilerContext* context)
+		{
+			auto t = context->parent->LookupType(type.text);
+
+			return context->DoCast(t, right->Compile(context), true);
+		}
+
+		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			begin.Print(output, source);
+			type.Print(output, source);
+			end.Print(output, source);
+			right->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			right->Visit(visitor);
+		}
+	};
+
 	class PrefixExpression : public Expression, public IStorableExpression
 	{
 		Token _operator;

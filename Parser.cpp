@@ -44,6 +44,9 @@ Parser::Parser(Lexer* l)
 	this->Register(TokenType::BNot, new PrefixOperatorParselet(Precedence::PREFIX));
 	this->Register(TokenType::BAnd, new PrefixOperatorParselet(Precedence::PREFIX));
 	this->Register(TokenType::Asterisk, new PrefixOperatorParselet(Precedence::PREFIX));
+	
+	//casting!
+	this->Register(TokenType::LessThan, new CastParselet());
 
 	//postfix stuff
 	this->Register(TokenType::Increment, new PostfixOperatorParselet(Precedence::POSTFIX));
@@ -100,6 +103,8 @@ Parser::Parser(Lexer* l)
 
 	this->Register(TokenType::Break, new BreakParselet());
 	this->Register(TokenType::Continue, new ContinueParselet());
+
+	//this->Register(TokenType::SizeOf, new SizeofParselet());
 
 	//this->Register(TokenType::Const, new ConstParselet());
 	//this->Register(TokenType::Null, new NullParselet());

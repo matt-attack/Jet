@@ -101,6 +101,9 @@ namespace Jet
 		CommentBegin,
 		CommentEnd,
 
+		SizeOf,
+		OffsetOf,
+
 		EoF
 	};
 

@@ -291,17 +291,12 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 				dependencies.push_back(file);
 			break;//do me later
 		case 3:
-			//if (file.length() > 0)
-			//project_name = file;
 			break;
 		case 4:
 			if (file.length() > 0)
 				libs.push_back(file);
 			break;
 		default:
-			//if (project_name == "program" && file.length() > 0)
-			//project_name = file;
-			//else
 			printf("Malformatted Project File!\n");
 		}
 	}
@@ -315,11 +310,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	getcwd(olddir, 500);
 	std::string path = projectdir;
 	path += '/';
-	/*int i = path.length();
-	for (; i >= 0; i--)
-	if (path[i] == '\\' || path[i] == '/')
-	break;
-	path = path.substr(0, i);*/
+
 	chdir(path.c_str());
 
 	//build each dependency
@@ -336,15 +327,8 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 		//for (auto d : subdeps)
 		//dependencies.push_back(d);
 
-		std::string path = ii;
-		/*int i = path.length();
-		for (; i >= 0; i--)
-		if (path[i] == '\\' || path[i] == '/')
-		break;
-		path = path.substr(0, i);*/
-
 		//read in declarations for each dependency
-		std::string symbol_filepath = path + "/build/symbols.jlib";
+		std::string symbol_filepath = ii + "/build/symbols.jlib";
 		std::ifstream symbols(symbol_filepath);
 		if (symbols.is_open() == false)
 		{
@@ -445,6 +429,10 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 					return dependencies;
 				}
 			}
+			else
+			{
+				break;
+			}
 		}
 	}
 	if (jlib) fclose(jlib);
@@ -533,9 +521,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 
 		//do this for each file
 		for (auto ii : result->statements)
-		{
 			ii->CompileDeclarations(global);
-		}
 	}
 
 	for (auto result : asts)
@@ -552,7 +538,6 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 			}
 			catch (...)
 			{
-				//printf("Exception Compiling Line\n");
 				errors++;
 			}
 		}
@@ -825,16 +810,15 @@ void Compiler::OutputPackage(const std::string& project_name)
 			}
 			for (auto var : ii.second->data->members)
 			{
-				if (var.type->type == Types::Array)
-				{
-					//todo handle multidimensional arrays later
-					types += var.type->base->ToString() + " ";
-					types += var.name + "[" + std::to_string(var.type->size) + "];";
-				}
-				else if (var.type->type == Types::Invalid)//its a template probably?
+				if (var.type == 0 || var.type->type == Types::Invalid)//its a template probably?
 				{
 					types += var.type_name + " ";
 					types += var.name + ";";
+				}
+				else if (var.type->type == Types::Array)
+				{
+					types += var.type->base->ToString() + " ";
+					types += var.name + "[" + std::to_string(var.type->size) + "];";
 				}
 				else
 				{
@@ -846,7 +830,6 @@ void Compiler::OutputPackage(const std::string& project_name)
 			if (ii.second->data->templates.size() > 0 && ii.second->data->template_base == 0)
 			{
 				//output member functions somehow?
-				//fix templated types in return and arg types
 				for (auto fun : ii.second->data->functions)
 				{
 					/*types += "fun " + fun.second->return_type->name + " " + fun.first + "(";
@@ -877,7 +860,7 @@ void Compiler::OutputPackage(const std::string& project_name)
 				function += "extern fun " + fun.second->return_type->ToString() + " " + ii.second->data->name + "::";
 				function += fun.first + "(";
 				bool first = false;
-				for (int i = 1; i < fun.second->argst.size(); i++)/// auto arg : fun.second->argst)
+				for (int i = 1; i < fun.second->argst.size(); i++)
 				{
 					if (first)
 						function += ",";
@@ -979,7 +962,6 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 				Error("Reference To Undefined Type '" + base + "'", *this->current_function->current_token);
 
 			Type* res = t->second->Instantiate(this, types);
-			//printf("instantiated template type %s!!!\n", name.c_str());
 			this->types[name] = res;
 
 
@@ -1010,8 +992,6 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 		else
 		{
 			Error("Reference To Undefined Type '" + name + "'", *this->current_function->current_token);
-			//printf("Error: Couldn't Find Type: %s\n", name.c_str());
-			//throw 7;
 		}
 	}
 

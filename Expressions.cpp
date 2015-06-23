@@ -300,8 +300,19 @@ context->Pop();
 
 CValue NumberExpression::Compile(CompilerContext* context)
 {
+	bool isint = true;
+	for (int i = 0; i < this->token.text.length(); i++)
+	{
+		if (this->token.text[i] == '.')
+			isint = false;
+	}
+	//ok, lets get the type from what kind of constant it is
 	//get type from the constant
-	return context->Number(this->value);
+	//this is pretty terrible, come back later
+	if (isint)
+		return context->Integer(std::stoi(this->token.text));
+	else
+		return context->Float(this->value);
 }
 
 /*void SwapExpression::Compile(CompilerContext* context)
@@ -754,7 +765,9 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	{
 		if (ii.type == StructMember::VariableMember)
 		{
-			auto type = context->parent->AdvanceTypeLookup(ii.variable.first.text);
+			Type* type = 0;
+			if (this->templates == 0)
+				type = context->parent->AdvanceTypeLookup(ii.variable.first.text);
 
 			str->data->members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
 		}
