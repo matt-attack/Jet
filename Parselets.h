@@ -341,6 +341,17 @@ namespace Jet
 		}
 	};
 
+	class SizeofParselet : public PrefixParselet
+	{
+	public:
+		SizeofParselet()
+		{
+			
+		}
+
+		Expression* parse(Parser* parser, Token token);
+	};
+
 	class WhileParselet: public StatementParselet
 	{
 	public:

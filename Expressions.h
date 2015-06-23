@@ -1225,6 +1225,8 @@ namespace Jet
 		}
 	};
 
+
+
 	struct Branch
 	{
 		Token token;
@@ -1366,6 +1368,43 @@ namespace Jet
 			{
 				this->Else->block->Visit(visitor);
 			}
+		}
+	};
+
+	class SizeofExpression : public Expression//, public IStorableExpression
+	{
+		Token begin, end;
+		Token type;
+		Token token;
+	public:
+		SizeofExpression(Token token, Token begin, Token type, Token end)
+		{
+			this->type = type;
+			this->begin = begin;
+			this->token = token;
+			this->end = end;
+		}
+
+		void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+		}
+
+		CValue Compile(CompilerContext* context);
+
+		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+			begin.Print(output, source);
+			type.Print(output, source);
+			end.Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
 		}
 	};
 

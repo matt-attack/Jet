@@ -104,7 +104,7 @@ Parser::Parser(Lexer* l)
 	this->Register(TokenType::Break, new BreakParselet());
 	this->Register(TokenType::Continue, new ContinueParselet());
 
-	//this->Register(TokenType::SizeOf, new SizeofParselet());
+	this->Register(TokenType::SizeOf, new SizeofParselet());
 
 	//this->Register(TokenType::Const, new ConstParselet());
 	//this->Register(TokenType::Null, new NullParselet());

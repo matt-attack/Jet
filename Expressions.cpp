@@ -41,6 +41,15 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 	return res;
 }
 
+CValue SizeofExpression::Compile(CompilerContext* context)
+{
+	auto t = context->parent->LookupType(type.text);
+	auto null = llvm::ConstantPointerNull::get(GetType(t)->getPointerTo());
+	auto ptr = context->parent->builder.CreateGEP(null, context->parent->builder.getInt32(1));
+	ptr = context->parent->builder.CreatePtrToInt(ptr, GetType(&IntType), "sizeof");
+	return CValue(&IntType, ptr);// context->DoCast(t, right->Compile(context), true);
+}
+
 CValue PostfixExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->_operator);

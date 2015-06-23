@@ -94,6 +94,14 @@ Token ParseType(Parser* parser)
 	return ret;
 }
 
+Expression* SizeofParselet::parse(Parser* parser, Token token)
+{
+	Token left = parser->Consume(TokenType::LeftParen);
+	Token type = ParseType(parser);
+	Token right = parser->Consume(TokenType::RightParen);
+	return new SizeofExpression(token, left, type, right);
+}
+
 Expression* CastParselet::parse(Parser* parser, Token token)
 {
 	Token type = ParseType(parser);// parser->Consume(TokenType::Name);
