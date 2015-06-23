@@ -760,6 +760,12 @@ void Compiler::OutputPackage(const std::string& project_name)
 	MPM.add(new llvm::DataLayoutPass());
 	Target->addPassesToEmitFile(MPM, oo, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
 
+	//std::error_code ecc;
+	//llvm::raw_fd_ostream strrr("build/" + project_name + ".s", ecc, llvm::sys::fs::OpenFlags::F_None);
+	//llvm::formatted_raw_ostream oo2(strrr);
+
+	//Target->addPassesToEmitFile(MPM, oo2, llvm::TargetMachine::CodeGenFileType::CGFT_AssemblyFile, false);
+
 	MPM.run(*module);
 
 	//auto mod = JITHelper->getModuleForNewFunction();

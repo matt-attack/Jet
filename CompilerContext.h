@@ -277,6 +277,10 @@ namespace Jet
 					return CValue(t, parent->builder.CreateSIToFP(value.val, tt));
 				if (t->type == Types::Bool)
 					return CValue(t, parent->builder.CreateIsNotNull(value.val));
+				if (t->type == Types::Pointer)
+				{
+					return CValue(t, parent->builder.CreateIntToPtr(value.val, GetType(t)));
+				}
 			}
 			if (value.type->type == Types::Pointer)
 			{

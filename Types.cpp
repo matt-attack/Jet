@@ -95,7 +95,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	for (int i = 0; i < this->data->templates.size(); i++)
 	{
 		str->name += types[i]->ToString();
-		if (i < this->data->templates.size()-1)
+		if (i < this->data->templates.size() - 1)
 			str->name += ',';
 	}
 	str->name += ">";
@@ -155,6 +155,9 @@ void Struct::Load(Compiler* compiler)
 	this->loaded = true;
 }
 
+//#include <llvm/IR/Attributes.h>
+//#include <llvm/IR/Argument.h>
+//#include <llvm/ADT/ilist.h>
 void Function::Load(Compiler* compiler)
 {
 	if (this->loaded)
@@ -169,8 +172,39 @@ void Function::Load(Compiler* compiler)
 	}
 
 	llvm::FunctionType *ft = llvm::FunctionType::get(GetType(this->return_type), this->args, false);
-	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
 
+	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
+	/*if (this->name[0] == 'R')
+	{
+		//f->setDLLStorageClass(llvm::Function::DLLImportStorageClass);
+		//f->setCallingConv(llvm::CallingConv::X86_StdCall);
+
+		int i = 0;
+		for (auto ii : this->argst)
+		{
+			if (ii.first->type == Types::Struct)
+			{
+
+				auto list = f->args();
+				
+				//for (auto arg = list.begin(); arg != list.end(); ++arg)
+				//{
+				//	arg->dump();
+				//	llvm::AttributeSet set;
+				//	//set.
+				//	llvm::AttrBuilder builder;
+
+				//	builder.addAttribute(llvm::Attribute::AttrKind::ByVal);
+				//	set = set.addAttribute(compiler->context, 0, llvm::Attribute::AttrKind::ByVal);
+				//	//set.addAttribute()
+				//	arg->addAttr(set);
+				//	printf("hi");
+				//}
+
+			}
+			i++;
+		}
+	}*/
 	//alloc args
 	auto AI = f->arg_begin();
 	for (unsigned Idx = 0, e = argst.size(); Idx != e; ++Idx, ++AI)

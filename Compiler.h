@@ -112,7 +112,7 @@ namespace Jet
 				if (name[name.length() - 1] == '*')
 				{
 					//its a pointer
-					auto t = types[name.substr(0, name.length() - 1)];
+					auto t = this->AdvanceTypeLookup(name.substr(0, name.length() - 1));
 
 					Type* type = new Type;
 					type->name = name;

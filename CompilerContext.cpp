@@ -401,7 +401,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 	fun->Load(this->parent);
 
-	f = this->parent->module->getFunction(fun->name);
+	f = fun->f;// this->parent->module->getFunction(fun->name);
 
 	if (args.size() != f->arg_size())
 	{

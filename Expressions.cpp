@@ -611,6 +611,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	{
 		fun->name = "__" + Struct + "_" + fname;//mangled name
 
+		
 		//add to struct
 		auto ii = context->parent->types.find(Struct);
 		if (ii == context->parent->types.end())//its new
