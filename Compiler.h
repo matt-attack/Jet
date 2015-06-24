@@ -105,58 +105,7 @@ namespace Jet
 		}
 
 		//get array types inside of structs working
-		Type* AdvanceTypeLookup(const std::string& name)
-		{
-			auto type = types.find(name);
-			if (type == types.end())
-			{
-				//create it, its not a basic type, todo later
-				if (name[name.length() - 1] == '*')
-				{
-					//its a pointer
-					auto t = this->AdvanceTypeLookup(name.substr(0, name.length() - 1));
-
-					Type* type = new Type;
-					type->name = name;
-					type->base = t;
-					type->type = Types::Pointer;
-
-					types[name] = type;
-					return type;
-				}
-				else if (name[name.length() - 1] == ']')
-				{
-					//its an array
-					int p = 0;
-					for (p = 0; p < name.length(); p++)
-						if (name[p] == '[')
-							break;
-
-					auto len = name.substr(p + 1, name.length() - p - 2);
-
-					auto tname = name.substr(0, p);
-					auto t = this->LookupType(tname);
-
-					Type* type = new Type;
-					type->base = t;
-					type->name = name;
-					type->type = Types::Array;
-					type->size = std::stoi(len);//cheat for now
-					types[name] = type;
-					return type;
-				}
-
-				//who knows what type it is, create a dummy one
-				Type* type = new Type;
-				type->name = name;
-				type->type = Types::Invalid;
-				type->data = 0;
-				types[name] = type;
-
-				return type;
-			}
-			return type->second;
-		}
+		Type* AdvanceTypeLookup(const std::string& name);
 
 		std::map<std::string, Type*> types;
 		Type* LookupType(const std::string& name);

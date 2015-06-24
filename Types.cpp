@@ -50,7 +50,68 @@ void Type::Load(Compiler* compiler)
 	}
 	else if (type == Types::Invalid)
 	{
-		Error("Tried To Use Undefined Type '" + this->name + "'", *compiler->current_function->current_token);
+		if (this->name.back() == '>')
+		{
+			//im a template!
+			//get first bit, then we can instatiate it
+			int p = 0;
+			for (p = 0; p < name.length(); p++)
+				if (name[p] == '<')
+					break;
+
+			std::string base = name.substr(0, p);
+
+			//parse types
+			std::vector<Type*> types;
+			p++;
+			do
+			{
+				//lets cheat for the moment ok
+				std::string subtype;
+				do
+				{
+					subtype += name[p];
+					p++;
+				} while (name[p] != ',' && name[p] != '>');
+
+				Type* t = compiler->LookupType(subtype);
+				types.push_back(t);
+			} while (name[p++] != '>');
+
+			//look up the base, and lets instantiate it
+			auto t = compiler->types.find(base);
+			if (t == compiler->types.end())
+				Error("Reference To Undefined Type '" + base + "'", *compiler->current_function->current_token);
+
+			Type* res = t->second->Instantiate(compiler, types);
+			*this = *res;
+			//compiler->types[name] = res;
+
+			//compile its functions
+			if (res->data->expression->members.size() > 0)
+			{
+				StructExpression* expr = dynamic_cast<StructExpression*>(res->data->expression);// ->functions->back()->Parent);
+				auto oldname = expr->name;
+				expr->name.text = res->data->name;
+
+				//store then restore insertion point
+				auto rp = compiler->builder.GetInsertBlock();
+
+				for (auto ii : res->data->expression->members)//functions)
+					if (ii.type == StructMember::FunctionMember)
+						ii.function->CompileDeclarations(compiler->current_function);
+
+				for (auto ii : res->data->expression->members)//functions)
+					if (ii.type == StructMember::FunctionMember)
+						ii.function->Compile(compiler->current_function);//the context used may not be proper, but it works
+
+				compiler->builder.SetInsertPoint(rp);
+				expr->name = oldname;
+			}
+			//Error("Not implemented", *compiler->current_function->current_token);
+		}
+		else
+			Error("Tried To Use Undefined Type '" + this->name + "'", *compiler->current_function->current_token);
 	}
 	else if (type == Types::Pointer)
 	{
@@ -70,7 +131,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 		//CHANGE ME LATER, THIS OVERRIDES TYPES, OR JUST RESTORE AFTER THIS
 		compiler->types[ii.second] = types[i++];
 	}
-	
+
 	//duplicate and load
 	Struct* str = new Struct;
 	//str->functions = this->data->functions;
@@ -170,37 +231,37 @@ void Function::Load(Compiler* compiler)
 	llvm::FunctionType *ft = llvm::FunctionType::get(GetType(this->return_type), this->args, false);
 
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
-	
+
 	/*if (this->name[0] == 'R')
 	{
-		//f->setDLLStorageClass(llvm::Function::DLLImportStorageClass);
-		//f->setCallingConv(llvm::CallingConv::X86_StdCall);
+	//f->setDLLStorageClass(llvm::Function::DLLImportStorageClass);
+	//f->setCallingConv(llvm::CallingConv::X86_StdCall);
 
-		int i = 0;
-		for (auto ii : this->argst)
-		{
-			if (ii.first->type == Types::Struct)
-			{
+	int i = 0;
+	for (auto ii : this->argst)
+	{
+	if (ii.first->type == Types::Struct)
+	{
 
-				auto list = f->args();
-				
-				//for (auto arg = list.begin(); arg != list.end(); ++arg)
-				//{
-				//	arg->dump();
-				//	llvm::AttributeSet set;
-				//	//set.
-				//	llvm::AttrBuilder builder;
+	auto list = f->args();
 
-				//	builder.addAttribute(llvm::Attribute::AttrKind::ByVal);
-				//	set = set.addAttribute(compiler->context, 0, llvm::Attribute::AttrKind::ByVal);
-				//	//set.addAttribute()
-				//	arg->addAttr(set);
-				//	printf("hi");
-				//}
+	//for (auto arg = list.begin(); arg != list.end(); ++arg)
+	//{
+	//	arg->dump();
+	//	llvm::AttributeSet set;
+	//	//set.
+	//	llvm::AttrBuilder builder;
 
-			}
-			i++;
-		}
+	//	builder.addAttribute(llvm::Attribute::AttrKind::ByVal);
+	//	set = set.addAttribute(compiler->context, 0, llvm::Attribute::AttrKind::ByVal);
+	//	//set.addAttribute()
+	//	arg->addAttr(set);
+	//	printf("hi");
+	//}
+
+	}
+	i++;
+	}
 	}*/
 	//alloc args
 	auto AI = f->arg_begin();

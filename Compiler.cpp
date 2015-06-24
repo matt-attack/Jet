@@ -21,8 +21,8 @@ Source* current_source = 0;
 
 void Jet::Error(const std::string& msg, Token token)
 {
-	int startrow = token.column - token.text.length();
-	int endrow = token.column;
+	int startrow = token.column;// -token.text.length();
+	int endrow = token.column + token.text.length();
 	std::string code = current_source->GetLine(token.line);
 	std::string underline = "";
 	for (int i = 0; i < code.length(); i++)
@@ -40,8 +40,8 @@ void Jet::Error(const std::string& msg, Token token)
 
 void Jet::ParserError(const std::string& msg, Token token)
 {
-	int startrow = token.column - token.text.length();
-	int endrow = token.column;
+	int startrow = token.column;// -token.text.length();
+	int endrow = token.column + token.text.length();
 	std::string code = current_source->GetLine(token.line);
 	std::string underline = "";
 	for (int i = 0; i < code.length(); i++)
@@ -62,6 +62,12 @@ Compiler::~Compiler()
 	for (auto ii : this->types)
 		if (ii.second->type == Types::Struct)//add more later
 			delete ii.second;
+
+	for (auto ii : this->functions)
+		delete ii.second;
+
+	for (auto ii : this->traits)
+		delete ii.second;
 }
 
 void Compiler::Compile(const char* code, const char* filename)
@@ -541,6 +547,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 			//catch any exceptions
 			try
 			{
+				this->current_function = global;
 				ii->Compile(global);
 			}
 			catch (...)
@@ -666,7 +673,7 @@ error:
 		ii.second->Print(out, sources[ii.first]);
 		//printf("%s",out.c_str());
 
-		
+
 		delete ii.second;
 	}
 
@@ -897,6 +904,60 @@ void Compiler::OutputIR(const char* filename)
 	module->print(str, &writer);
 }
 
+
+Jet::Type* Compiler::AdvanceTypeLookup(const std::string& name)
+{
+	auto type = types.find(name);
+	if (type == types.end())
+	{
+		//create it, its not a basic type, todo later
+		if (name[name.length() - 1] == '*')
+		{
+			//its a pointer
+			auto t = this->AdvanceTypeLookup(name.substr(0, name.length() - 1));
+
+			Type* type = new Type;
+			type->name = name;
+			type->base = t;
+			type->type = Types::Pointer;
+
+			types[name] = type;
+			return type;
+		}
+		else if (name[name.length() - 1] == ']')
+		{
+			//its an array
+			int p = 0;
+			for (p = 0; p < name.length(); p++)
+				if (name[p] == '[')
+					break;
+
+			auto len = name.substr(p + 1, name.length() - p - 2);
+
+			auto tname = name.substr(0, p);
+			auto t = this->LookupType(tname);
+
+			Type* type = new Type;
+			type->base = t;
+			type->name = name;
+			type->type = Types::Array;
+			type->size = std::stoi(len);//cheat for now
+			types[name] = type;
+			return type;
+		}
+
+		//who knows what type it is, create a dummy one
+		Type* type = new Type;
+		type->name = name;
+		type->type = Types::Invalid;
+		type->data = 0;
+		types[name] = type;
+
+		return type;
+	}
+	return type->second;
+}
+
 Jet::Type* Compiler::LookupType(const std::string& name)
 {
 	auto type = types[name];
@@ -1020,8 +1081,8 @@ CValue Compiler::AddGlobal(const std::string& name, Jet::Type* t)//, bool Extern
 		Error("Global variable '" + name + "' already exists", *this->current_function->current_token);
 
 	//auto cons = this->module->getOrInsertGlobal(name, GetType(value.type));
-	auto ng = new llvm::GlobalVariable( *module, GetType(t), false, llvm::GlobalValue::LinkageTypes::ExternalLinkage, 0, name);
-	
+	auto ng = new llvm::GlobalVariable(*module, GetType(t), false, llvm::GlobalValue::LinkageTypes::ExternalLinkage, 0, name);
+
 	this->globals[name] = CValue(t, ng);
 	return CValue(t, ng);
 }

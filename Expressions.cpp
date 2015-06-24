@@ -531,8 +531,11 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 		argsv.push_back({ context->parent->LookupType(ii.first), ii.second });
 	}
 
+	context->CurrentToken(&this->ret_type);
+	auto ret = context->parent->LookupType(this->ret_type.text);
+
 	//auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
-	CompilerContext* function = context->AddFunction(this->GetRealName(), context->parent->LookupType(this->ret_type.text), argsv, Struct.length() > 0 ? true : false);// , this->varargs);
+	CompilerContext* function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? true : false);// , this->varargs);
 	if (Struct.length() > 0)
 	{
 		auto range = context->parent->types[Struct]->data->functions.equal_range(fname);
