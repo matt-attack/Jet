@@ -155,7 +155,7 @@ public:
 		std::ifstream pf(std::string(projectdir) + "/project.jp", std::ios::in | std::ios::binary);
 		if (pf.is_open() == false)
 		{
-			printf("Error: Could not find project file %s/project.jp\n", projectdir);
+			printf("Error: Could not find project file %s/project.jp\n", projectdir.c_str());
 			return false;
 		}
 

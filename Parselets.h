@@ -374,6 +374,17 @@ namespace Jet
 		Expression* parse(Parser* parser, Token token);
 	};
 
+	class TypedefParselet : public StatementParselet
+	{
+	public:
+		TypedefParselet()
+		{
+			this->TrailingSemicolon = true;
+		}
+
+		Expression* parse(Parser* parser, Token token);
+	};
+
 	class StructParselet : public StatementParselet
 	{
 	public:

@@ -744,3 +744,11 @@ Expression* ResumePrefixParselet::parse(Parser* parser, Token token)
 
 	return new ResumeExpression(token, right);
 }*/
+
+Expression* TypedefParselet::parse(Parser* parser, Token token)
+{
+	Token new_type = parser->Consume(TokenType::Name);
+	Token equals = parser->Consume(TokenType::Assign);
+	Token other_type = ParseType(parser);
+	return new TypedefExpression(token, new_type, equals, other_type);
+}

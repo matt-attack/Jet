@@ -783,7 +783,7 @@ namespace Jet
 
 	class ScopeExpression : public BlockExpression
 	{
-		
+
 	public:
 		Scope* scope;//debug shizzle
 
@@ -1678,7 +1678,7 @@ namespace Jet
 		//std::vector<std::pair<std::string, std::string>>* elements;
 		//std::vector<FunctionExpression*>* functions;
 
-		
+
 		Token end;
 	public:
 
@@ -1887,6 +1887,57 @@ namespace Jet
 		void Print(std::string& output, Source* source)
 		{
 			token.Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
+	};
+
+	class TypedefExpression : public Expression
+	{
+		Token token;
+		Token new_type;
+		Token equals;
+		Token other_type;
+	public:
+		TypedefExpression(Token token, Token new_type, Token equals, Token other_type) : token(token), new_type(new_type),
+			equals(equals), other_type(other_type) {}
+
+		void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+		}
+
+		CValue Compile(CompilerContext* context)
+		{
+			if (this->Parent->Parent != 0)
+				Error("Cannot use typedef outside of global scope", token);
+
+			return CValue();
+		}
+
+		void CompileDeclarations(CompilerContext* context)
+		{
+			if (this->Parent->Parent != 0)
+				Error("Cannot use typedef outside of global scope", token);
+
+			context->CurrentToken(&other_type);
+			auto type = context->parent->AdvanceTypeLookup(other_type.text);
+
+			auto iter = context->parent->types.find(new_type.text);
+			if (iter != context->parent->types.end())
+				Error("Type '" + new_type.text + "'already defined!", new_type);
+			context->parent->types[new_type.text] = type;
+		};
+
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+			new_type.Print(output, source);
+			equals.Print(output, source);
+			other_type.Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)

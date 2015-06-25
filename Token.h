@@ -104,6 +104,8 @@ namespace Jet
 		SizeOf,
 		OffsetOf,
 
+		Typedef, 
+
 		EoF
 	};
 
