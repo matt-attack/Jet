@@ -311,7 +311,10 @@ Token Lexer::Next()
 							txt.push_back(0);
 							break;
 						default:
-							ParserError("Invalid Escape Sequence '\\" + std::to_string(c) + "'", Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
+							std::string ch;
+							ch += c;
+							ParserError("Invalid Escape Sequence '\\" + ch/*text.substr(index - 1, 1)*/ + "'", Token(t_ptr, 0, src->linenumber, src->column-2, TokenType::String, std::string("\\")+ch));
+							//ParserError("Invalid Escape Sequence '\\" + std::to_string(c) + "'", Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
 
 							//throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'");
 						}
@@ -520,9 +523,11 @@ Token Lexer::Next()
 					cc = '\'';
 					break;
 				default:
-					ParserError("Invalid Escape Sequence '\\" + std::to_string(cc)/*text.substr(index - 1, 1)*/ + "'", Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
-
-					//throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index - 1, 1) + "'");
+				{
+					std::string ch;
+					ch += cc;
+					ParserError("Invalid Escape Sequence '\\" + ch/*text.substr(index - 1, 1)*/ + "'", Token(t_ptr, 0, src->linenumber, src->column - 2, TokenType::String, std::string("\\") + ch));
+				}
 				}
 			}
 			std::string num = std::to_string((int)cc);

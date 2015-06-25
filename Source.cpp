@@ -1,4 +1,5 @@
 #include "Source.h"
+#include "Parser.h"
 
 using namespace Jet;
 
@@ -80,4 +81,14 @@ char Source::PeekChar()
 bool Source::IsAtEnd()
 {
 	return this->index >= length;
+}
+
+extern Source* current_source;
+BlockExpression* Source::GetAST()
+{
+	current_source = this;
+	Lexer lexer(this);
+	Parser parser(&lexer);
+
+	return parser.parseAll();
 }

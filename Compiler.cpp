@@ -70,85 +70,6 @@ Compiler::~Compiler()
 		delete ii.second;
 }
 
-void Compiler::Compile(const char* code, const char* filename)
-{
-	//	JITHelper = new MCJITHelper(this->context);
-	//
-	//	//spin off children and lets compile this!
-	//	module = JITHelper->getModuleForNewFunction();// new llvm::Module(filename, context);
-	//
-	//	Lexer lexer = Lexer(code, filename);
-	//	Parser parser = Parser(&lexer);
-	//
-	//	//printf("In: %s\n\nResult:\n", code);
-	//	//result->print();
-	//	//printf("\n\n");
-	//	//compile it
-	//	//first lets create the global context!!
-	//	//ok this will be the main entry point it initializes everything, then calls the program's entry point
-	//	int errors = 0;
-	//	auto global = new CompilerContext(this);
-	//
-	//	BlockExpression* result = 0;
-	//	try
-	//	{
-	//		result = parser.parseAll();
-	//	}
-	//	catch (...)
-	//	{
-	//		printf("Compilation Stopped, Parser Error\n");
-	//		errors = 1;
-	//		goto error;
-	//	}
-	//
-	//	//do this for each file
-	//	for (auto ii : result->statements)
-	//	{
-	//		ii->CompileDeclarations(global);
-	//	}
-	//
-	//	//then do this for each file
-	//	for (auto ii : result->statements)
-	//	{
-	//		//catch any exceptions
-	//		try
-	//		{
-	//			ii->Compile(global);
-	//		}
-	//		catch (...)
-	//		{
-	//			printf("Exception Compiling Line\n");
-	//			errors++;
-	//		}
-	//	}
-	//
-	//	auto init = global->AddFunction("global", &IntType, {});
-	//	init->Return(global->Number(6));
-	//	//todo: put intializers here and have this call main()
-	//	delete result;
-	//
-	//error:
-	//	if (errors > 0)
-	//	{
-	//		printf("Compiling Failed: %d Errors Found\n", errors);
-	//		delete module;
-	//		module = 0;
-	//	}
-	//
-	//	llvm::InitializeNativeTarget();
-	//	llvm::InitializeNativeTargetAsmParser();
-	//	llvm::InitializeNativeTargetAsmPrinter();
-	//	//llvm::InitializeNativeTargetAsmParser();
-	//	auto mod = JITHelper->getModuleForNewFunction();
-	//	void* res = JITHelper->getPointerToFunction(this->functions["main"]->f);
-	//	//try and jit
-	//	//llvm::EngineBuilder(this-)
-	//	//go through global scope
-	//	int(*FP)() = (int(*)())(intptr_t)res;
-	//	FP();
-	//	return;
-}
-
 #include <llvm/ADT/Triple.h>
 #include <llvm/Support/Host.h>
 #include <llvm\Target\TargetLibraryInfo.h>
@@ -162,6 +83,8 @@ void Compiler::Compile(const char* code, const char* filename)
 #include <llvm\Target\TargetSubtargetInfo.h>
 
 #include <Windows.h>
+
+#include "UniquePtr.h"
 
 std::string exec(const char* cmd) {
 	FILE* pipe = _popen(cmd, "r");
@@ -206,6 +129,126 @@ std::string GetNameFromPath(const std::string& path)
 	return name;
 }
 
+class JetProject
+{
+	bool opened, is_executable;
+public:
+	
+	std::string project_name;
+	std::vector<std::string> files;
+	std::vector<std::string> dependencies;
+	std::vector<std::string> libs;//libraries to link to
+
+	JetProject()
+	{
+		opened = false;
+	}
+
+	bool IsExecutable()
+	{
+		return this->is_executable;
+	}
+
+	bool Load(const std::string& projectdir)
+	{
+		//ok, lets parse the jp file
+		std::ifstream pf(std::string(projectdir) + "/project.jp", std::ios::in | std::ios::binary);
+		if (pf.is_open() == false)
+		{
+			printf("Error: Could not find project file %s/project.jp\n", projectdir);
+			return false;
+		}
+
+		is_executable = true;
+		int current_block = 0;
+		project_name = GetNameFromPath(projectdir);
+		while (pf.peek() != EOF)
+		{
+			std::string file;//read in a filename
+			while (pf.peek() != ' ' && pf.peek() != EOF && pf.peek() != '\r' && pf.peek() != '\n' && pf.peek() != '\t')
+				file += pf.get();
+
+			pf.get();
+
+			if (file == "files:")
+			{
+				current_block = 1;
+				continue;
+			}
+			else if (file == "requires:")
+			{
+				current_block = 2;
+				continue;
+			}
+			else if (file == "lib:")
+			{
+				current_block = 3;
+				is_executable = false;
+				continue;
+			}
+			else if (file == "libs:")
+			{
+				current_block = 4;
+				continue;
+			}
+
+			switch (current_block)
+			{
+			case 1:
+				if (file.length() > 0)
+					files.push_back(file);
+				break;
+			case 2:
+				if (file.length() > 0)
+					dependencies.push_back(file);
+				break;//do me later
+			case 3:
+				break;
+			case 4:
+				if (file.length() > 0)
+					libs.push_back(file);
+				break;
+			default:
+				printf("Malformatted Project File!\n");
+			}
+		}
+
+		if (files.size() == 0)
+		{
+			//if no files, then just add all.jet files in the directory
+		}
+		this->opened = true;
+		return true;
+	}
+
+	std::map<std::string, Source*> GetSources()
+	{
+		std::map<std::string, Source*> sources;
+		for (auto file : files)
+		{
+			std::ifstream t(file, std::ios::in | std::ios::binary);
+			if (t)
+			{
+				t.seekg(0, std::ios::end);    // go to the end
+				std::streamoff length = t.tellg();           // report location (this is the length)
+				t.seekg(0, std::ios::beg);    // go back to the beginning
+				char* buffer = new char[length + 1];    // allocate memory for a buffer of appropriate dimension
+				t.read(buffer, length);       // read the whole file into the buffer
+				buffer[length] = 0;
+				t.close();
+
+				sources[file] = new Source(buffer, file);
+			}
+			else
+			{
+				sources[file] = 0;
+			}
+		}
+		return sources;
+	}
+};
+
+
 //get traits working
 //generate trait from struct
 class MemberRenamer : public ExpressionVisitor
@@ -248,76 +291,9 @@ public:
 
 std::vector<std::string> Compiler::Compile(const char* projectdir)
 {
-	std::vector<std::string> files;
-	std::vector<std::string> dependencies;
-	std::vector<std::string> libs;//libraries to link to
-
-	//ok, lets parse the jp file
-	std::ifstream pf(std::string(projectdir) + "/project.jp", std::ios::in | std::ios::binary);
-	if (pf.is_open() == false)
-	{
-		printf("Error: Could not find project file %s/project.jp\n", projectdir);
+	JetProject project;
+	if (project.Load(projectdir) == false)
 		return std::vector<std::string>();
-	}
-
-	bool is_executable = true;
-	int current_block = 0;
-	std::string project_name = GetNameFromPath(projectdir);
-	while (pf.peek() != EOF)
-	{
-		std::string file;//read in a filename
-		while (pf.peek() != ' ' && pf.peek() != EOF && pf.peek() != '\r' && pf.peek() != '\n' && pf.peek() != '\t')
-			file += pf.get();
-
-		pf.get();
-
-		if (file == "files:")
-		{
-			current_block = 1;
-			continue;
-		}
-		else if (file == "requires:")
-		{
-			current_block = 2;
-			continue;
-		}
-		else if (file == "lib:")
-		{
-			current_block = 3;
-			is_executable = false;
-			continue;
-		}
-		else if (file == "libs:")
-		{
-			current_block = 4;
-			continue;
-		}
-
-		switch (current_block)
-		{
-		case 1:
-			if (file.length() > 0)
-				files.push_back(file);
-			break;
-		case 2:
-			if (file.length() > 0)
-				dependencies.push_back(file);
-			break;//do me later
-		case 3:
-			break;
-		case 4:
-			if (file.length() > 0)
-				libs.push_back(file);
-			break;
-		default:
-			printf("Malformatted Project File!\n");
-		}
-	}
-
-	if (files.size() == 0)
-	{
-		//if no files, then just add all.jet files in the directory
-	}
 
 	char olddir[500];
 	getcwd(olddir, 500);
@@ -328,10 +304,10 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 
 	//build each dependency
 	std::vector<char*> lib_symbols;
-	int deps = dependencies.size();
+	int deps = project.dependencies.size();
 	for (int i = 0; i < deps; i++)
 	{
-		auto ii = dependencies[i];
+		auto ii = project.dependencies[i];
 		//spin up new compiler instance and build it
 		Compiler compiler;
 		auto subdeps = compiler.Compile(ii.c_str());
@@ -400,7 +376,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 
 	CloseHandle(file);
 	modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
-	for (auto ii : files)
+	for (auto ii : project.files)
 	{
 		auto file = CreateFileA(ii.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
 			OPEN_EXISTING, 0, NULL);
@@ -414,7 +390,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	}
 
 	FILE* jlib = fopen("build/symbols.jlib", "rb");
-	FILE* output = fopen(("build/" + project_name + ".o").c_str(), "rb");
+	FILE* output = fopen(("build/" + project.project_name + ".o").c_str(), "rb");
 	if (strcmp(__TIME__, compiler_version.c_str()) != 0)//see if the compiler was the same
 	{
 		//do a rebuild compiler version is different
@@ -439,7 +415,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 
 					//restore working directory
 					chdir(olddir);
-					return dependencies;
+					return project.dependencies;
 				}
 			}
 			else
@@ -463,25 +439,24 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	int errors = 0;
 	auto global = new CompilerContext(this);
 
-	std::map<std::string, Source*> sources;
+	std::map<std::string, Source*> sources = project.GetSources();
 	std::map<std::string, BlockExpression*> asts;
 
 	//read in symbols from lib
 	for (auto buffer : lib_symbols)
 	{
 		Source src(buffer, "symbols");
-		current_source = &src;
-		Lexer lexer = Lexer(&src);
-		Parser parser = Parser(&lexer);
 
 		BlockExpression* result = 0;
 		try
 		{
-			result = parser.parseAll();
+			result = src.GetAST();
 			result->CompileDeclarations(global);
+			delete result;
 		}
 		catch (...)
 		{
+			delete result;
 			printf("Compilation Stopped, Error Parsing Symbols\n");
 			errors = 1;
 			goto error;
@@ -490,39 +465,19 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 
 	//read in each file
 	//these two blocks could be multithreaded! theoretically
-	for (auto file : files)
+	for (auto file : sources)
 	{
-		std::ifstream t(file, std::ios::in | std::ios::binary);
-		if (t)
+		if (file.second == 0)
 		{
-			t.seekg(0, std::ios::end);    // go to the end
-			std::streamoff length = t.tellg();           // report location (this is the length)
-			t.seekg(0, std::ios::beg);    // go back to the beginning
-			char* buffer = new char[length + 1];    // allocate memory for a buffer of appropriate dimension
-			t.read(buffer, length);       // read the whole file into the buffer
-			buffer[length] = 0;
-			t.close();
-
-			sources[file] = new Source(buffer, file);
-		}
-		else
-		{
-			printf("Could not find file '%s'!\n", file.c_str());
+			printf("Could not find file '%s'!\n", file.first.c_str());
 			errors = 1;
 			goto error;
 		}
-	}
-
-	for (auto file : sources)
-	{
-		current_source = file.second;
-		Lexer lexer(file.second);
-		Parser parser = Parser(&lexer);
 
 		BlockExpression* result = 0;
 		try
 		{
-			result = parser.parseAll();
+			result = file.second->GetAST();
 		}
 		catch (...)
 		{
@@ -534,7 +489,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 
 		//do this for each file
 		for (auto ii : result->statements)
-			ii->CompileDeclarations(global);
+			ii->CompileDeclarations(global);//guaranteed not to throw?
 	}
 
 	for (auto result : asts)
@@ -579,19 +534,19 @@ error:
 		this->OutputIR("build/output.ir");
 
 		//output the .o file for this package
-		this->OutputPackage(project_name);
+		this->OutputPackage(project.project_name);
 
 		//then, if and only if I am an executable, make the .exe
-		if (is_executable)
+		if (project.IsExecutable())
 		{
 			printf("Compiling Executable...\n");
 			std::string cmd = "clang -L. ";
 
-			cmd += "build/" + project_name + ".o ";
-			cmd += "-o build/" + project_name + ".exe";
+			cmd += "build/" + project.project_name + ".o ";
+			cmd += "-o build/" + project.project_name + ".exe";
 
 			//need to link each dependency
-			for (auto ii : dependencies)
+			for (auto ii : project.dependencies)
 			{
 				cmd += "-L" + ii + "/build/ ";
 
@@ -599,7 +554,7 @@ error:
 			}
 
 			cmd += " -L.";
-			for (auto ii : libs)
+			for (auto ii : project.libs)
 				cmd += " -l" + ii;
 
 			auto res = exec(cmd.c_str());
@@ -611,10 +566,10 @@ error:
 
 			//need to put this stuff in the .jlib file later
 			printf("Compiling Lib...\n");
-			std::string cmd = "ar rcs build/lib" + project_name + ".a ";
-			cmd += "build/" + project_name + ".o ";
+			std::string cmd = "ar rcs build/lib" + project.project_name + ".a ";
+			cmd += "build/" + project.project_name + ".o ";
 
-			for (auto ii : dependencies)
+			for (auto ii : project.dependencies)
 			{
 				//need to extract then merge
 				std::string cm = "ar x " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
@@ -677,12 +632,12 @@ error:
 		delete ii.second;
 	}
 
-	for (auto ii : sources)
+for (auto ii : sources)
 		delete ii.second;
 
 	//restore working directory
 	chdir(olddir);
-	return dependencies;
+	return project.dependencies;
 }
 
 void Compiler::Optimize()

@@ -6,6 +6,7 @@
 
 namespace Jet
 {
+	class BlockExpression;
 	class Source
 	{
 		unsigned int index;
@@ -18,6 +19,19 @@ namespace Jet
 
 		//takes ownership
 		Source(const char* source, const std::string& filename);
+		Source(Source&& source)
+		{
+			this->text = source.text;
+			this->index = source.index;
+			this->length = source.length;
+			this->filename = source.filename;
+			this->column = source.column;
+			this->linenumber = source.linenumber;
+			this->lines = std::move(source.lines);
+
+			source.lines.clear();
+			source.text = 0;
+		}
 		~Source();
 
 		std::string GetLine(unsigned int line);
@@ -47,6 +61,9 @@ namespace Jet
 		{
 			return &this->text[start];
 		}
+
+		//throw this in a try catch statement, as it can throw errors
+		BlockExpression* GetAST();
 
 		std::string filename;
 
