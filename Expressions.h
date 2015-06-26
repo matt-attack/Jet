@@ -568,7 +568,7 @@ namespace Jet
 		void CompileStore(CompilerContext* context, CValue right)
 		{
 			if (_operator.type != TokenType::Asterisk)
-				throw 7;//invalid atm
+				Error("Unimplemented!", _operator);
 
 			if (this->_operator.type == TokenType::Asterisk)
 			{
@@ -576,11 +576,9 @@ namespace Jet
 				auto p = dynamic_cast<IndexExpression*>(this->right);
 				if (i)
 				{
-					//auto var = context->named_values[i->GetName()];
 					auto var = context->Load(i->GetName());
 					auto val = context->parent->builder.CreateLoad(var.val);
 
-					//context->Store(i->GetName(), val);
 					right = context->DoCast(var.type->base, right);
 
 					context->parent->builder.CreateStore(right.val, val);
@@ -597,9 +595,18 @@ namespace Jet
 					context->parent->builder.CreateStore(right.val, val);
 					return;
 				}
-				throw 7;
+				else
+				{
+					auto loc = this->right->Compile(context);
+
+					right = context->DoCast(loc.type->base, right);
+
+					context->parent->builder.CreateStore(right.val, loc.val);
+					return;
+				}
+				Error("Unimplemented!", _operator);
 			}
-			throw 7;//implement me
+			Error("Unimplemented!", _operator);
 		}
 
 		CValue Compile(CompilerContext* context);

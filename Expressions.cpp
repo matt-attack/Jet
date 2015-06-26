@@ -325,15 +325,20 @@ context->Pop();
 CValue NumberExpression::Compile(CompilerContext* context)
 {
 	bool isint = true;
+	bool ishex = false;
 	for (int i = 0; i < this->token.text.length(); i++)
 	{
 		if (this->token.text[i] == '.')
 			isint = false;
+		else if (!(this->token.text[i] <= '9' && this->token.text[i] >= '0'))
+			ishex = true;
 	}
 	//ok, lets get the type from what kind of constant it is
 	//get type from the constant
 	//this is pretty terrible, come back later
-	if (isint)
+	if (ishex)
+		return context->Integer(std::stoi(this->token.text, 0, 16));
+	else if (isint)
 		return context->Integer(std::stoi(this->token.text));
 	else
 		return context->Float(this->value);

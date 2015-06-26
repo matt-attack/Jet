@@ -150,6 +150,10 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		{
 		case TokenType::Asterisk:
 			return CValue(value.type->base, this->parent->builder.CreateLoad(value.val));
+		case TokenType::Increment:
+			return CValue(value.type->base, this->parent->builder.CreateGEP(value.val, parent->builder.getInt32(1)));
+		case TokenType::Decrement:
+			return CValue(value.type->base, this->parent->builder.CreateGEP(value.val, parent->builder.getInt32(-1)));
 		default:
 			Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 		}

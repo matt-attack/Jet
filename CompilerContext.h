@@ -292,6 +292,11 @@ namespace Jet
 				{
 					return CValue(t, parent->builder.CreateIntToPtr(value.val, GetType(t)));
 				}
+
+				if (value.type->type == Types::Int && (t->type == Types::Char || t->type == Types::Short))
+				{
+					return CValue(t, parent->builder.CreateTrunc(value.val, GetType(t)));
+				}
 			}
 			if (value.type->type == Types::Pointer)
 			{
