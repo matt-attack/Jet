@@ -568,43 +568,17 @@ namespace Jet
 		void CompileStore(CompilerContext* context, CValue right)
 		{
 			if (_operator.type != TokenType::Asterisk)
-				Error("Unimplemented!", _operator);
+				Error("Cannot store into this expression!", _operator);
 
 			if (this->_operator.type == TokenType::Asterisk)
 			{
-				auto i = dynamic_cast<NameExpression*>(this->right);
-				auto p = dynamic_cast<IndexExpression*>(this->right);
-				if (i)
-				{
-					auto var = context->Load(i->GetName());
-					auto val = context->parent->builder.CreateLoad(var.val);
 
-					right = context->DoCast(var.type->base, right);
+				auto loc = this->right->Compile(context);
 
-					context->parent->builder.CreateStore(right.val, val);
+				right = context->DoCast(loc.type->base, right);
 
-					return;
-				}
-				else if (p)
-				{
-					auto var = p->GetGEP(context);
-					auto val = context->parent->builder.CreateLoad(var.val);
-
-					right = context->DoCast(var.type->base, right);
-
-					context->parent->builder.CreateStore(right.val, val);
-					return;
-				}
-				else
-				{
-					auto loc = this->right->Compile(context);
-
-					right = context->DoCast(loc.type->base, right);
-
-					context->parent->builder.CreateStore(right.val, loc.val);
-					return;
-				}
-				Error("Unimplemented!", _operator);
+				context->parent->builder.CreateStore(right.val, loc.val);
+				return;
 			}
 			Error("Unimplemented!", _operator);
 		}
