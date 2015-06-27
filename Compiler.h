@@ -58,12 +58,23 @@ namespace Jet
 		CValue(Type* type, llvm::Value* val) : type(type), val(val) {}
 	};
 
+	struct CompilerOptions
+	{
+		int optimization;//from 0-3
+		bool force;
+		CompilerOptions()
+		{
+			this->force = false;
+			this->optimization = 0;
+		}
+	};
+
 	//add global variables
 	//global compiler context
 	class CompilerContext;
 	class Compiler
 	{
-
+		llvm::TargetMachine* target;
 	public:
 		llvm::IRBuilder<> builder;
 		llvm::LLVMContext& context;
@@ -76,9 +87,12 @@ namespace Jet
 
 		Compiler() : builder(llvm::getGlobalContext()), context(llvm::getGlobalContext())
 		{
+			this->target = 0;
+
 			//insert basic types
 			types["float"] = new Type("float", Types::Float);
 			types["double"] = &DoubleType;// new Type(Types::Float);
+			types["long"] = new Type("long", Types::Long);
 			types["int"] = &IntType;// new Type(Types::Int);
 			types["short"] = new Type("short", Types::Short);
 			types["char"] = new Type("char", Types::Char);
@@ -89,9 +103,7 @@ namespace Jet
 		~Compiler();
 
 		//returns paths to dependencies
-		std::vector<std::string> Compile(const char* projectfile);
-
-		void Compile(const char* code, const char* filename);
+		std::vector<std::string> Compile(const char* projectfile, CompilerOptions* options = 0);
 
 		void Optimize();
 
@@ -103,6 +115,8 @@ namespace Jet
 			if (module)
 				module->dump();
 		}
+
+		void SetTarget();//make this customizable later
 
 		//get array types inside of structs working
 		Type* AdvanceTypeLookup(const std::string& name);

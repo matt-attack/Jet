@@ -20,7 +20,7 @@ namespace Jet
 	class Expression
 	{
 	public:
-
+		Token semicolon;
 		Expression()
 		{
 			Parent = 0;
@@ -747,7 +747,8 @@ namespace Jet
 			for (auto ii : statements)
 			{
 				ii->Print(output, source);
-				output += ";";
+				if (ii->semicolon.text.length())
+					ii->semicolon.Print(output, source);
 			}
 			if (!no_brackets)
 				this->end.Print(output, source);// output += "}";
@@ -1802,13 +1803,15 @@ namespace Jet
 		void Print(std::string& output, Source* source)
 		{
 			token.Print(output, source);
-			right->Print(output, source);
+			if (right)
+				right->Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
 			visitor->Visit(this);
-			right->Visit(visitor);
+			if (right)
+				right->Visit(visitor);
 		}
 	};
 

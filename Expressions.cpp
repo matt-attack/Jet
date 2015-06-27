@@ -241,7 +241,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->DoCast(&IntType, index->Compile(context)).val };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-			
+
 			return CValue(lhs.type->base, loc);
 		}
 		else if (lhs.type->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
@@ -261,7 +261,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		}
 		Error("Cannot index type '" + lhs.type->ToString() + "'", this->token);
 	}
-	
+
 	Error("Unimplemented", this->token);
 }
 
@@ -505,7 +505,10 @@ std::string FunctionExpression::GetRealName()
 	else
 		fname = "_lambda_id_";
 	auto Struct = dynamic_cast<StructExpression*>(this->Parent);
-	return Struct ? "__" + Struct->GetName() + "_" + fname : fname;
+	if (this->Struct.text.length() > 0)
+		return "__" + this->Struct.text + "_" + fname;
+	else
+		return Struct ? "__" + Struct->GetName() + "_" + fname : fname;
 }
 
 CValue FunctionExpression::Compile(CompilerContext* context)
@@ -600,12 +603,12 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type.text);
 	fun->expression = this;
 
-	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
-	if (Struct.length() > 0)
+	auto str = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
+	if (str.length() > 0)
 	{
 		//im a member function
 		//insert first arg, which is me
-		auto type = context->parent->AdvanceTypeLookup(Struct + "*");
+		auto type = context->parent->AdvanceTypeLookup(str + "*");
 
 		fun->argst.push_back({ type, "this" });
 		//this->args->insert(this->args->begin(), { Struct + "*", "this" });
@@ -622,8 +625,8 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	//todo: modulate actual name of function
 	fun->name = this->GetRealName();
 	fun->f = 0;
-	if (Struct.length() > 0)
-		context->parent->types[Struct]->data->functions.insert({ fname, fun });
+	if (str.length() > 0)
+		context->parent->types[str]->data->functions.insert({ fname, fun });
 	else
 		context->parent->functions.insert({ fname, fun });
 }
@@ -654,7 +657,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	{
 		fun->name = "__" + Struct + "_" + fname;//mangled name
 
-		
+
 		//add to struct
 		auto ii = context->parent->types.find(Struct);
 		if (ii == context->parent->types.end())//its new
@@ -692,7 +695,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		{
 			Error("Initializing global variables not yet implemented", token);
 		}
-		
+
 		return CValue();
 	}
 
@@ -828,7 +831,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	//{
 	/*for (auto ii : *this->functions)
 	{
-		ii->CompileDeclarations(context);
+	ii->CompileDeclarations(context);
 	}*/
 	//}
 };

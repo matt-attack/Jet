@@ -20,6 +20,8 @@ llvm::Type* Jet::GetType(Type* t)
 		return llvm::Type::getFloatTy(llvm::getGlobalContext());
 	case Types::Int:
 		return llvm::Type::getInt32Ty(llvm::getGlobalContext());
+	case Types::Long:
+		return llvm::Type::getInt64Ty(llvm::getGlobalContext());
 	case Types::Void:
 		return llvm::Type::getVoidTy(llvm::getGlobalContext());
 	case Types::Char:

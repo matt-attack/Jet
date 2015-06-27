@@ -163,7 +163,7 @@ Expression* Parser::ParseStatement(bool takeTrailingSemicolon)//call this until 
 		UniquePtr<Expression*> result(parseExpression());
 
 		if (takeTrailingSemicolon)
-			Consume(TokenType::Semicolon);
+			result->semicolon = Consume(TokenType::Semicolon);
 
 		return result.Release();
 	}
@@ -172,7 +172,7 @@ Expression* Parser::ParseStatement(bool takeTrailingSemicolon)//call this until 
 	UniquePtr<Expression*> result(statement->parse(this, token));
 
 	if (takeTrailingSemicolon && statement->TrailingSemicolon)
-		Consume(TokenType::Semicolon);
+		result->semicolon = Consume(TokenType::Semicolon);
 
 	return result.Release();
 }

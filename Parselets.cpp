@@ -436,7 +436,10 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 
 		//its a struct definition
 		stru = name.text;
+		bool destructor = parser->MatchAndConsume(TokenType::BNot);
 		name = parser->Consume(TokenType::Name);//parse the real function name
+		if (destructor)
+			name.text = "~" + name.text;
 	}
 
 	NameExpression* varargs = 0;
@@ -576,7 +579,7 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 	}
 	while (parser->MatchAndConsume(TokenType::Comma));
 
-	if (parser->MatchAndConsume(TokenType::Semicolon))
+	if (parser->Match(TokenType::Semicolon))
 		return new LocalExpression(token, names.Release(), 0);
 
 	parser->Consume(TokenType::Assign);//its possible this wont be here and it may just be a mentioning, but no assignment
@@ -591,7 +594,7 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 	}
 	while (parser->MatchAndConsume(TokenType::Comma));
 
-	parser->Consume(TokenType::Semicolon);
+	//parser->Consume(TokenType::Semicolon);
 
 	return new LocalExpression(token, names.Release(), rights.Release());
 }

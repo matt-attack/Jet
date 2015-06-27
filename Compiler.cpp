@@ -133,7 +133,7 @@ class JetProject
 {
 	bool opened, is_executable;
 public:
-	
+
 	std::string project_name;
 	std::vector<std::string> files;
 	std::vector<std::string> dependencies;
@@ -189,6 +189,10 @@ public:
 			else if (file == "libs:")
 			{
 				current_block = 4;
+				continue;
+			}
+			else if (file == "\n" || file == "")
+			{
 				continue;
 			}
 
@@ -289,7 +293,7 @@ public:
 	}
 };
 
-std::vector<std::string> Compiler::Compile(const char* projectdir)
+std::vector<std::string> Compiler::Compile(const char* projectdir, CompilerOptions* options)
 {
 	JetProject project;
 	if (project.Load(projectdir) == false)
@@ -318,7 +322,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 
 		//read in declarations for each dependency
 		std::string symbol_filepath = ii + "/build/symbols.jlib";
-		std::ifstream symbols(symbol_filepath);
+		std::ifstream symbols(symbol_filepath, std::ios_base::binary);
 		if (symbols.is_open() == false)
 		{
 			printf("Dependency compilation failed: could not find symbol file!\n");
@@ -391,7 +395,11 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 
 	FILE* jlib = fopen("build/symbols.jlib", "rb");
 	FILE* output = fopen(("build/" + project.project_name + ".o").c_str(), "rb");
-	if (strcmp(__TIME__, compiler_version.c_str()) != 0)//see if the compiler was the same
+	if (options && options->force)
+	{
+		//the rebuild was forced
+	}
+	else if (strcmp(__TIME__, compiler_version.c_str()) != 0)//see if the compiler was the same
 	{
 		//do a rebuild compiler version is different
 	}
@@ -443,16 +451,19 @@ std::vector<std::string> Compiler::Compile(const char* projectdir)
 	std::map<std::string, BlockExpression*> asts;
 
 	//read in symbols from lib
+	std::vector<Expression*> symbol_asts;
+	std::vector<Source*> symbol_sources;
 	for (auto buffer : lib_symbols)
 	{
-		Source src(buffer, "symbols");
+		Source* src = new Source(buffer, "symbols");
 
 		BlockExpression* result = 0;
 		try
 		{
-			result = src.GetAST();
+			result = src->GetAST();
 			result->CompileDeclarations(global);
-			delete result;
+			symbol_asts.push_back(result);
+			symbol_sources.push_back(src);
 		}
 		catch (...)
 		{
@@ -530,6 +541,15 @@ error:
 		//make the output folder
 		mkdir("build/");
 
+		//set target
+		this->SetTarget();
+
+		if (options)
+		{
+			if (options->optimization > 0)
+				this->Optimize();
+		}
+
 		//output the IR for debugging
 		this->OutputIR("build/output.ir");
 
@@ -543,7 +563,7 @@ error:
 			std::string cmd = "clang -L. ";
 
 			cmd += "build/" + project.project_name + ".o ";
-			cmd += "-o build/" + project.project_name + ".exe";
+			cmd += "-o build/" + project.project_name + ".exe ";
 
 			//need to link each dependency
 			for (auto ii : project.dependencies)
@@ -623,16 +643,24 @@ error:
 	{
 		std::string out;
 
-		MemberRenamer renamer("string", "length", "apples", this);
-		ii.second->Visit(&renamer);
-		ii.second->Print(out, sources[ii.first]);
+		if (errors == 0)
+		{
+			MemberRenamer renamer("string", "length", "apples", this);
+			ii.second->Visit(&renamer);
+			ii.second->Print(out, sources[ii.first]);
+		}
 		//printf("%s",out.c_str());
-
 
 		delete ii.second;
 	}
 
-for (auto ii : sources)
+	for (auto ii: symbol_asts)
+		delete ii;
+
+	for (auto ii : symbol_sources)
+		delete ii;
+
+	for (auto ii : sources)
 		delete ii.second;
 
 	//restore working directory
@@ -646,12 +674,16 @@ void Compiler::Optimize()
 	// Set up the optimizer pipeline.  Start with registering info about how the
 	// target lays out data structures.
 	//TheModule->setDataLayout(*TheExecutionEngine->getDataLayout());
+	// Do the main datalayout
+	OurFPM.add(new DataLayoutPass());
 	// Provide basic AliasAnalysis support for GVN.
 	OurFPM.add(llvm::createBasicAliasAnalysisPass());
 	// Do simple "peephole" optimizations and bit-twiddling optzns.
 	OurFPM.add(llvm::createInstructionCombiningPass());
 	// Reassociate expressions.
 	OurFPM.add(llvm::createReassociatePass());
+	// Promote allocas to registers
+	OurFPM.add(llvm::createPromoteMemoryToRegisterPass());
 	// Eliminate Common SubExpressions.
 	OurFPM.add(llvm::createGVNPass());
 	// Simplify the control flow graph (deleting unreachable blocks, etc).
@@ -664,9 +696,22 @@ void Compiler::Optimize()
 		if (ii.second->f)
 			OurFPM.run(*ii.second->f);
 	}
+
+	//run it on member functions
+	for (auto ii : this->types)
+	{
+		if (ii.second->type == Types::Struct)
+		{
+			for (auto fun : ii.second->data->functions)
+			{
+				if (fun.second->f)
+					OurFPM.run(*fun.second->f);
+			}
+		}
+	}
 }
 
-void Compiler::OutputPackage(const std::string& project_name)
+void Compiler::SetTarget()
 {
 	llvm::InitializeNativeTarget();
 	llvm::InitializeNativeTargetAsmParser();
@@ -693,26 +738,28 @@ void Compiler::OutputPackage(const std::string& project_name)
 	//llvm::TargetMachine Target(*(llvm::Target*)TheTarget, TheTriple.getTriple(), MCPU, FeaturesStr, Options);
 	auto RelocModel = llvm::Reloc::Default;
 	auto CodeModel = llvm::CodeModel::Default;
-	auto Target = TheTarget->createTargetMachine(TheTriple.getTriple(), MCPU, FeaturesStr, Options, RelocModel, CodeModel, OLvl);
+	this->target = TheTarget->createTargetMachine(TheTriple.getTriple(), MCPU, FeaturesStr, Options, RelocModel, CodeModel, OLvl);
 
+	module->setDataLayout(this->target->getSubtargetImpl()->getDataLayout());
+}
 
-	module->setDataLayout(Target->getSubtargetImpl()->getDataLayout());
-
+void Compiler::OutputPackage(const std::string& project_name)
+{
 	llvm::legacy::PassManager MPM;
 
-	//std::string code = "";
-	//llvm::raw_string_ostream str(code);
 	std::error_code ec;
 	llvm::raw_fd_ostream strr("build/" + project_name + ".o", ec, llvm::sys::fs::OpenFlags::F_None);
 	llvm::formatted_raw_ostream oo(strr);
 	llvm::AssemblyAnnotationWriter writer;
 
+	//no idea what this does LOL
 	llvm::TargetLibraryInfo *TLI = new llvm::TargetLibraryInfo();
 	if (true)
 		TLI->disableAllFunctions();
 	MPM.add(TLI);
+
 	MPM.add(new llvm::DataLayoutPass());
-	Target->addPassesToEmitFile(MPM, oo, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
+	target->addPassesToEmitFile(MPM, oo, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
 
 	//std::error_code ecc;
 	//llvm::raw_fd_ostream strrr("build/" + project_name + ".s", ecc, llvm::sys::fs::OpenFlags::F_None);
@@ -749,16 +796,13 @@ void Compiler::OutputPackage(const std::string& project_name)
 		function += ");";
 	}
 
-	//need to add generics
 	std::string types;
 	for (auto ii : this->types)
 	{
 		if (ii.second->type == Types::Struct)
 		{
 			if (ii.second->data->template_base)
-			{
 				continue;//dont bother exporting instantiated templates for now
-			}
 
 			//export me
 			if (ii.second->data->templates.size() > 0)
@@ -844,7 +888,7 @@ void Compiler::OutputPackage(const std::string& project_name)
 	}
 
 	//todo: only do this if im a library
-	std::ofstream stable("build/symbols.jlib");
+	std::ofstream stable("build/symbols.jlib", std::ios_base::binary);
 	stable.write(types.data(), types.length());
 	stable.write(function.data(), function.length());
 	stable.close();

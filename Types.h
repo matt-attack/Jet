@@ -17,6 +17,7 @@ namespace Jet
 		Void,
 		Double,
 		Float,
+		Long,
 		Int,
 		Char,
 		Short,

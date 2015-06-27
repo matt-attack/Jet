@@ -445,7 +445,7 @@ namespace Jet
 	public:
 		LocalParselet()
 		{
-			this->TrailingSemicolon = false;
+			this->TrailingSemicolon = true;
 		}
 
 		Expression* parse(Parser* parser, Token token);
