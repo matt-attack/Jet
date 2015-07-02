@@ -135,9 +135,6 @@ int main(int argc, char* argv[])
 	{
 		printf("\n>");
 		char command[800];
-		char arg[150]; char command2[150];
-		memset(arg, 0, 150);
-		memset(command2, 0, 150);
 		std::cin.getline(command, 800);
 
 		Jet::Compiler c2;

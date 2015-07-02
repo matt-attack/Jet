@@ -13,7 +13,7 @@ Expression* NameParselet::parse(Parser* parser, Token token)
 
 Expression* AssignParselet::parse(Parser* parser, Expression* left, Token token)
 {
-	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT-1/*assignment prcedence -1 */);
+	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
 
 	if (dynamic_cast<IStorableExpression*>(left) == 0)
 	{
@@ -28,24 +28,24 @@ Expression* OperatorAssignParselet::parse(Parser* parser, Expression* left, Toke
 {
 	if (dynamic_cast<IStorableExpression*>(left) == 0)
 		ParserError("OperatorAssignParselet: Left hand side must be a storable location!", token);
-		//throw CompilerException(parser->filename, token.line, "OperatorAssignParselet: Left hand side must be a storable location!");
+	//throw CompilerException(parser->filename, token.line, "OperatorAssignParselet: Left hand side must be a storable location!");
 
-	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT-1);
+	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT - 1);
 
 	return new OperatorAssignExpression(token, left, right);
 }
 
 /*Expression* SwapParselet::parse(Parser* parser, Expression* left, Token token)
 {
-	if (dynamic_cast<IStorableExpression*>(left) == 0)
-		throw CompilerException(parser->filename, token.line, "SwapParselet: Left hand side must be a storable location!");
+if (dynamic_cast<IStorableExpression*>(left) == 0)
+throw CompilerException(parser->filename, token.line, "SwapParselet: Left hand side must be a storable location!");
 
-	UniquePtr<Expression*> right = parser->parseExpression(Precedence::ASSIGNMENT-1);
+UniquePtr<Expression*> right = parser->parseExpression(Precedence::ASSIGNMENT-1);
 
-	if (dynamic_cast<IStorableExpression*>((Expression*)right) == 0)
-		throw CompilerException(parser->filename, token.line, "SwapParselet: Right hand side must be a storable location!");
+if (dynamic_cast<IStorableExpression*>((Expression*)right) == 0)
+throw CompilerException(parser->filename, token.line, "SwapParselet: Right hand side must be a storable location!");
 
-	return new SwapExpression(left, right.Release());
+return new SwapExpression(left, right.Release());
 }*/
 
 Expression* PrefixOperatorParselet::parse(Parser* parser, Token token)
@@ -53,7 +53,7 @@ Expression* PrefixOperatorParselet::parse(Parser* parser, Token token)
 	Expression* right = parser->parseExpression(precedence);
 	if (right == 0)
 		ParserError("PrefixOperatorParselet: Right hand side missing!", token);
-		//throw CompilerException(parser->filename, token.line, "PrefixOperatorParselet: Right hand side missing!");
+	//throw CompilerException(parser->filename, token.line, "PrefixOperatorParselet: Right hand side missing!");
 
 	return new PrefixExpression(token, right);
 }
@@ -119,7 +119,7 @@ Expression* BinaryOperatorParselet::parse(Parser* parser, Expression* left, Toke
 	Expression* right = parser->parseExpression(precedence - (isRight ? 1 : 0));
 	if (right == 0)
 		ParserError("BinaryOperatorParselet: Right hand side missing!", token);
-		//throw CompilerException(parser->filename, token.line, "BinaryOperatorParselet: Right hand side missing!");
+	//throw CompilerException(parser->filename, token.line, "BinaryOperatorParselet: Right hand side missing!");
 
 	return new OperatorExpression(left, token, right);
 }
@@ -216,7 +216,7 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 	branches.push_back(new Branch(token, ifblock, ifcondition.Release()));
 
 	Branch* Else = 0;
-	while(true)
+	while (true)
 	{
 		//look for elses
 		Token t = parser->LookAhead();
@@ -255,12 +255,36 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 	Token name = parser->Consume(TokenType::Name);
 
 	parser->Consume(TokenType::LeftBrace);
+	
+	std::vector<TraitFunction> functions;
+	while (parser->MatchAndConsume(TokenType::RightBrace) == false)
+	{
+		TraitFunction func;
+		Token tfunc = parser->Consume(TokenType::Function);
+		func.ret_type = ParseType(parser);
+		func.name = parser->Consume(TokenType::Name);
 
-	//do this later
+		parser->Consume(TokenType::LeftParen);
+		
+		bool first = true;
+		while (parser->MatchAndConsume(TokenType::RightParen) == false)
+		{
+			if (first)
+				first = false;
+			else
+				parser->Consume(TokenType::Comma);
 
-	parser->Consume(TokenType::RightBrace);
+			//parse args
+			func.args.push_back(ParseType(parser));
+			Token arg = parser->Consume(TokenType::Name);
+		} 
 
-	return new TraitExpression(token, name);
+		functions.push_back(func);
+
+		parser->Consume(TokenType::Semicolon);
+	}
+
+	return new TraitExpression(token, name, std::move(functions));
 }
 
 Expression* StructParselet::parse(Parser* parser, Token token)
@@ -283,6 +307,13 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		parser->Consume(TokenType::GreaterThan);
 	}
 
+	//parse base type
+	Token base_name;
+	if (parser->MatchAndConsume(TokenType::Colon))
+	{
+		base_name = parser->Consume(TokenType::Name);
+	}
+
 	auto start = parser->Consume(TokenType::LeftBrace);
 
 	//auto elements = new std::vector < std::pair<std::string, std::string> > ;
@@ -297,7 +328,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 			end = parser->Consume(TokenType::RightBrace);
 			break;
 		}
-		
+
 		//Expression* statement = parser->ParseStatement(true);
 
 		//first read type
@@ -348,7 +379,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 			}
 		}
 
-		parser->Consume(TokenType::Semicolon);		
+		parser->Consume(TokenType::Semicolon);
 
 		StructMember member;
 		member.type = StructMember::VariableMember;
@@ -360,7 +391,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 	}
 	//done
 
-	return new StructExpression(token, name, start, end, std::move(members), /*elements, functions,*/ templated);
+	return new StructExpression(token, name, start, end, std::move(members), /*elements, functions,*/ templated, base_name);
 }
 
 Expression* FunctionParselet::parse(Parser* parser, Token token)
@@ -372,7 +403,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	Token name = parser->Consume(TokenType::Name);
 	if (destructor)
 		name.text = "~" + name.text;
-	auto arguments = new std::vector<std::pair<std::string, std::string>>;
+	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
 
 	Token stru;
 	if (parser->MatchAndConsume(TokenType::Colon))
@@ -396,13 +427,13 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 			Token name = parser->Consume();
 			if (name.type == TokenType::Name)
 			{
-				arguments->push_back({type.text, name.text});// new NameExpression(name.text));
+				arguments->push_back({ type.text, name.text });// new NameExpression(name.text));
 			}
 			/*else if (name.type == TokenType::Ellipses)
 			{
-				varargs = new NameExpression(parser->Consume(TokenType::Name).getText());
+			varargs = new NameExpression(parser->Consume(TokenType::Name).getText());
 
-				break;//this is end of parsing arguments
+			break;//this is end of parsing arguments
 			}*/
 			else
 			{
@@ -410,8 +441,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 				ParserError(str, name);
 				//throw CompilerException(parser->filename, name.line, str);
 			}
-		}
-		while(parser->MatchAndConsume(TokenType::Comma));
+		} while (parser->MatchAndConsume(TokenType::Comma));
 
 		parser->Consume(TokenType::RightParen);
 	}
@@ -427,7 +457,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	Token ret_type = ParseType(parser);
 
 	Token name = parser->Consume(TokenType::Name);
-	auto arguments = new std::vector<std::pair<std::string, std::string>>;
+	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
 
 	std::string stru;
 	if (parser->MatchAndConsume(TokenType::Colon))
@@ -457,9 +487,9 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 			}
 			/*else if (name.type == TokenType::Ellipses)
 			{
-				varargs = new NameExpression(parser->Consume(TokenType::Name).getText());
+			varargs = new NameExpression(parser->Consume(TokenType::Name).getText());
 
-				break;//this is end of parsing arguments
+			break;//this is end of parsing arguments
 			}*/
 			else
 			{
@@ -480,51 +510,50 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 
 /*Expression* LambdaParselet::parse(Parser* parser, Token token)
 {
-	parser->Consume(TokenType::LeftParen);
+parser->Consume(TokenType::LeftParen);
 
-	NameExpression* varargs = 0;
-	auto arguments = new std::vector<Expression*>;
-	if (parser->LookAhead().type != TokenType::RightParen)
-	{
-		do
-		{
-			Token name = parser->Consume();
-			if (name.type == TokenType::Name)
-			{
-				arguments->push_back(new NameExpression(name.getText()));
-			}
-			else if (name.type == TokenType::Ellipses)
-			{
-				varargs = new NameExpression(parser->Consume(TokenType::Name).getText());
+NameExpression* varargs = 0;
+auto arguments = new std::vector<Expression*>;
+if (parser->LookAhead().type != TokenType::RightParen)
+{
+do
+{
+Token name = parser->Consume();
+if (name.type == TokenType::Name)
+{
+arguments->push_back(new NameExpression(name.getText()));
+}
+else if (name.type == TokenType::Ellipses)
+{
+varargs = new NameExpression(parser->Consume(TokenType::Name).getText());
 
-				break;//this is end of parsing arguments
-			}
-			else
-			{
-				std::string str = "Consume: TokenType not as expected! Expected Name or Ellises Got: " + name.text;
-				throw CompilerException(parser->filename, name.line, str);
-			}
-		}
-		while(parser->MatchAndConsume(TokenType::Comma));
-	}
+break;//this is end of parsing arguments
+}
+else
+{
+std::string str = "Consume: TokenType not as expected! Expected Name or Ellises Got: " + name.text;
+throw CompilerException(parser->filename, name.line, str);
+}
+}
+while(parser->MatchAndConsume(TokenType::Comma));
+}
 
-	parser->Consume(TokenType::RightParen);
+parser->Consume(TokenType::RightParen);
 
-	auto block = new ScopeExpression(parser->parseBlock());
-	return new FunctionExpression(token, 0, arguments, block, varargs);
+auto block = new ScopeExpression(parser->parseBlock());
+return new FunctionExpression(token, 0, arguments, block, varargs);
 }*/
 
 Expression* CallParselet::parse(Parser* parser, Expression* left, Token token)
 {
-	UniquePtr<std::vector<Expression*>*> arguments = new std::vector<Expression*>;
+	UniquePtr<std::vector<Expression*>*> arguments = new std::vector < Expression* > ;
 
 	if (!parser->MatchAndConsume(TokenType::RightParen))
 	{
 		do
 		{
 			arguments->push_back(parser->parseExpression(Precedence::ASSIGNMENT));
-		}
-		while( parser->MatchAndConsume(TokenType::Comma));
+		} while (parser->MatchAndConsume(TokenType::Comma));
 
 		parser->Consume(TokenType::RightParen);
 	}
@@ -542,7 +571,7 @@ Expression* ReturnParselet::parse(Parser* parser, Token token)
 
 Expression* LocalParselet::parse(Parser* parser, Token token)
 {
-	UniquePtr<std::vector<std::pair<Token, Token>>*> names = new std::vector<std::pair<Token, Token>>;
+	UniquePtr<std::vector<std::pair<Token, Token>>*> names = new std::vector < std::pair<Token, Token> > ;
 
 	do
 	{
@@ -576,8 +605,7 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 			}
 		}
 		names->push_back({ type, name });
-	}
-	while (parser->MatchAndConsume(TokenType::Comma));
+	} while (parser->MatchAndConsume(TokenType::Comma));
 
 	if (parser->Match(TokenType::Semicolon))
 		return new LocalExpression(token, names.Release(), 0);
@@ -585,14 +613,13 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 	parser->Consume(TokenType::Assign);//its possible this wont be here and it may just be a mentioning, but no assignment
 
 	//handle multiple comma expressions
-	UniquePtr<std::vector<Expression*>*> rights = new std::vector<Expression*>;
+	UniquePtr<std::vector<Expression*>*> rights = new std::vector < Expression* > ;
 	do
 	{
-		Expression* right = parser->parseExpression(Precedence::ASSIGNMENT-1/*assignment prcedence -1 */);
+		Expression* right = parser->parseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
 
 		rights->push_back(right);
-	}
-	while (parser->MatchAndConsume(TokenType::Comma));
+	} while (parser->MatchAndConsume(TokenType::Comma));
 
 	//parser->Consume(TokenType::Semicolon);
 
@@ -604,25 +631,23 @@ Expression* ConstParselet::parse(Parser* parser, Token token)
 	ParserError("Not Implemented", token);
 	//throw CompilerException("", 0, "Const keyword not implemented!");
 
-	auto names = new std::vector<std::pair<Token,Token>>;
+	auto names = new std::vector < std::pair<Token, Token> > ;
 	do
 	{
 		Token name = parser->Consume(TokenType::Name);
 		//names->push_back(name);
-	}
-	while (parser->MatchAndConsume(TokenType::Comma));
+	} while (parser->MatchAndConsume(TokenType::Comma));
 
 	parser->Consume(TokenType::Assign);//its possible this wont be here and it may just be a mentioning, but no assignment
 
 	//do somethign with multiple comma expressions
-	std::vector<Expression*>* rights = new std::vector<Expression*>;
+	std::vector<Expression*>* rights = new std::vector < Expression* > ;
 	do
 	{
-		Expression* right = parser->parseExpression(Precedence::ASSIGNMENT-1/*assignment prcedence -1 */);
+		Expression* right = parser->parseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
 
 		rights->push_back(right);
-	}
-	while (parser->MatchAndConsume(TokenType::Comma));
+	} while (parser->MatchAndConsume(TokenType::Comma));
 
 	parser->Consume(TokenType::Semicolon);
 	//do stuff with this and store and what not
@@ -633,18 +658,18 @@ Expression* ConstParselet::parse(Parser* parser, Token token)
 
 /*Expression* ArrayParselet::parse(Parser* parser, Token token)
 {
-	std::vector<Expression*> inits;// = new std::vector<Expression*>;
-	while(parser->LookAhead().getType() != TokenType::RightBracket)
-	{
-		Expression* e = parser->parseExpression(2);
+std::vector<Expression*> inits;// = new std::vector<Expression*>;
+while(parser->LookAhead().getType() != TokenType::RightBracket)
+{
+Expression* e = parser->parseExpression(2);
 
-		inits.push_back(e);
+inits.push_back(e);
 
-		if (!parser->MatchAndConsume(TokenType::Comma))//check if more
-			break;//we are done
-	}
-	parser->Consume(TokenType::RightBracket);
-	return new ArrayExpression(std::move(inits));
+if (!parser->MatchAndConsume(TokenType::Comma))//check if more
+break;//we are done
+}
+parser->Consume(TokenType::RightBracket);
+return new ArrayExpression(std::move(inits));
 }*/
 
 Expression* IndexParselet::parse(Parser* parser, Expression* left, Token token)
@@ -691,61 +716,61 @@ Expression* PointerMemberParselet::parse(Parser* parser, Expression* left, Token
 
 /*Expression* ObjectParselet::parse(Parser* parser, Token token)
 {
-	if (parser->MatchAndConsume(TokenType::RightBrace))
-	{
-		//we are done, return null object
-		return new ObjectExpression();
-	}
+if (parser->MatchAndConsume(TokenType::RightBrace))
+{
+//we are done, return null object
+return new ObjectExpression();
+}
 
-	//parse initial values
-	std::vector<std::pair<std::string, Expression*>>* inits = new std::vector<std::pair<std::string, Expression*>>;
-	while(parser->LookAhead().type == TokenType::Name || parser->LookAhead().type == TokenType::String || parser->LookAhead().type == TokenType::Number)
-	{
-		Token name = parser->Consume();
+//parse initial values
+std::vector<std::pair<std::string, Expression*>>* inits = new std::vector<std::pair<std::string, Expression*>>;
+while(parser->LookAhead().type == TokenType::Name || parser->LookAhead().type == TokenType::String || parser->LookAhead().type == TokenType::Number)
+{
+Token name = parser->Consume();
 
-		parser->Consume(TokenType::Assign);
+parser->Consume(TokenType::Assign);
 
-		//parse the data;
-		Expression* e = parser->parseExpression(Precedence::LOGICAL);
+//parse the data;
+Expression* e = parser->parseExpression(Precedence::LOGICAL);
 
-		inits->push_back(std::pair<std::string, Expression*>(name.text, e));
-		if (!parser->MatchAndConsume(TokenType::Comma))//is there more to parse?
-			break;//we are done
-	}
-	parser->Consume(TokenType::RightBrace);//end part
-	return new ObjectExpression(inits);
+inits->push_back(std::pair<std::string, Expression*>(name.text, e));
+if (!parser->MatchAndConsume(TokenType::Comma))//is there more to parse?
+break;//we are done
+}
+parser->Consume(TokenType::RightBrace);//end part
+return new ObjectExpression(inits);
 };
 
 Expression* YieldParselet::parse(Parser* parser, Token token)
 {
-	Expression* right = 0;
-	if (parser->Match(TokenType::Semicolon) == false)
-		right = parser->parseExpression(Precedence::ASSIGNMENT);
+Expression* right = 0;
+if (parser->Match(TokenType::Semicolon) == false)
+right = parser->parseExpression(Precedence::ASSIGNMENT);
 
-	return new YieldExpression(token, right);
+return new YieldExpression(token, right);
 }
 
 Expression* InlineYieldParselet::parse(Parser* parser, Token token)
 {
-	Expression* right = 0;
-	if (parser->Match(TokenType::Semicolon) == false && parser->LookAhead().type != TokenType::RightParen)
-		right = parser->parseExpression(Precedence::ASSIGNMENT);
+Expression* right = 0;
+if (parser->Match(TokenType::Semicolon) == false && parser->LookAhead().type != TokenType::RightParen)
+right = parser->parseExpression(Precedence::ASSIGNMENT);
 
-	return new YieldExpression(token, right);
+return new YieldExpression(token, right);
 }
 
 Expression* ResumeParselet::parse(Parser* parser, Token token)
 {
-	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT);
+Expression* right = parser->parseExpression(Precedence::ASSIGNMENT);
 
-	return new ResumeExpression(token, right);
+return new ResumeExpression(token, right);
 }
 
 Expression* ResumePrefixParselet::parse(Parser* parser, Token token)
 {
-	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT);
+Expression* right = parser->parseExpression(Precedence::ASSIGNMENT);
 
-	return new ResumeExpression(token, right);
+return new ResumeExpression(token, right);
 }*/
 
 Expression* TypedefParselet::parse(Parser* parser, Token token)

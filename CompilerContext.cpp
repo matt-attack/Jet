@@ -197,27 +197,27 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 		case TokenType::LessThan:
 			//use U or O?
 			res = parent->builder.CreateFCmpULT(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::LessThanEqual:
 			res = parent->builder.CreateFCmpULE(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::GreaterThan:
 			res = parent->builder.CreateFCmpUGT(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::GreaterThanEqual:
 			res = parent->builder.CreateFCmpUGE(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::Equals:
 			res = parent->builder.CreateFCmpUEQ(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::NotEqual:
 			res = parent->builder.CreateFCmpUNE(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		default:
 			Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
@@ -261,27 +261,27 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 		case TokenType::LessThan:
 			//use U or S?
 			res = parent->builder.CreateICmpSLT(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::LessThanEqual:
 			res = parent->builder.CreateICmpSLE(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::GreaterThan:
 			res = parent->builder.CreateICmpSGT(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::GreaterThanEqual:
 			res = parent->builder.CreateICmpSGE(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::Equals:
 			res = parent->builder.CreateICmpEQ(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::NotEqual:
 			res = parent->builder.CreateICmpNE(left.val, right.val);
-			return CValue(&BoolType, res);
+			return CValue(parent->BoolType, res);
 			break;
 		case TokenType::BAnd:
 		case TokenType::AndAssign:
@@ -385,7 +385,6 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 	else
 	{
 		//im a struct yo
-		//look for the best one
 		auto range = Struct->data->functions.equal_range(name);
 		for (auto ii = range.first; ii != range.second; ii++)
 		{
@@ -398,9 +397,25 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 		//auto iter = Struct->data->functions.find(name);
 		if (fun == 0)//iter == Struct->data->functions.end())
-			Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+		{
+			//	check for trait extension methods
+			auto ttraits = Struct->GetTraits(this->parent);
+			for (auto tr : ttraits)
+			{
+				auto frange = tr->extension_methods.equal_range(name);
+				for (auto ii = frange.first; ii != frange.second; ii++)
+				{
+					//printf("found function option for %s\n", name.c_str());
 
-		//fun = iter->second;
+					//pick one with the right number of args
+					if (ii->second->argst.size() == args.size())
+						fun = ii->second;
+				}
+			}
+
+			if (fun == 0)
+				Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+		}
 	}
 
 	fun->Load(this->parent);

@@ -844,7 +844,7 @@ namespace Jet
 			context->parent->builder.SetInsertPoint(start);
 
 			auto cond = this->condition->Compile(context);
-			cond = context->DoCast(&BoolType, cond);
+			cond = context->DoCast(context->parent->BoolType, cond);
 			context->parent->builder.CreateCondBr(cond.val, body, end);
 
 
@@ -933,7 +933,7 @@ namespace Jet
 			context->parent->builder.SetInsertPoint(start);
 
 			auto cond = this->condition->Compile(context);
-			cond = context->DoCast(&BoolType, cond);
+			cond = context->DoCast(context->parent->BoolType, cond);
 
 			context->parent->builder.CreateCondBr(cond.val, body, end);
 
@@ -1285,7 +1285,7 @@ namespace Jet
 					context->parent->builder.SetInsertPoint(NextBB);
 
 				auto cond = ii->condition->Compile(context);
-				cond = context->DoCast(&BoolType, cond);//try and cast to bool
+				cond = context->DoCast(context->parent->BoolType, cond);//try and cast to bool
 
 				llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "then", context->f);
 				NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(llvm::getGlobalContext(), "elseif", context->f);
@@ -1598,15 +1598,25 @@ namespace Jet
 		}
 	};
 
+	struct TraitFunction
+	{
+		Token name;
+		Token ret_type;
+
+		std::vector<Token> args;
+	};
+
 	class TraitExpression : public Expression
 	{
 		Token token;
 		Token name;
+		std::vector<TraitFunction> funcs;
 	public:
-		TraitExpression(Token token, Token name)
+		TraitExpression(Token token, Token name, std::vector<TraitFunction>&& funcs)
 		{
 			this->token = token;
 			this->name = name;
+			this->funcs = funcs;
 		}
 
 		CValue Compile(CompilerContext* context)
@@ -1616,7 +1626,31 @@ namespace Jet
 
 		void CompileDeclarations(CompilerContext* context)
 		{
-			context->parent->traits[name.text] = new Trait;
+			//check if trait already exists, if its in the table and set as invalid, then we can just fill in the blanks
+			Trait* t;
+			auto tr = context->parent->traits.find(name.text);
+			if (tr == context->parent->traits.end())
+			{
+				t = new Trait;
+				context->parent->traits[name.text] = t;
+			}
+			else if (tr->second->valid == false)//make sure it is set as invalid
+				t = tr->second;
+			else
+				Error("Trait '"+name.text+"' already exists", token);
+			t->valid = true;
+			t->name = this->name.text;
+			for (auto ii : this->funcs)
+			{
+				Function* func = new Function;
+				func->return_type = context->parent->AdvanceTypeLookup(ii.ret_type.text);
+				for (auto arg : ii.args)
+				{
+					func->argst.push_back({ context->parent->AdvanceTypeLookup(arg.text), "dummy" });
+				}
+
+				t->funcs.insert({ ii.name.text, func });
+			}
 		}
 
 		void Print(std::string& output, Source* source)
@@ -1656,25 +1690,20 @@ namespace Jet
 		std::vector<std::pair<Token, Token>>* templates;
 
 		Token start;
-
-		//std::vector<std::pair<std::string, std::string>>* elements;
-		//std::vector<FunctionExpression*>* functions;
-
-
 		Token end;
+
+		Token base_type;
 	public:
 
 		std::vector<StructMember> members;
 
-
-		StructExpression(Token token, Token name, Token start, Token end, std::vector<StructMember>&& members, /*std::vector<std::pair<std::string, std::string>>* elements, std::vector<FunctionExpression*>* functions,*/ std::vector<std::pair<Token, Token>>* templates)
+		StructExpression(Token token, Token name, Token start, Token end, std::vector<StructMember>&& members, /*std::vector<std::pair<std::string, std::string>>* elements, std::vector<FunctionExpression*>* functions,*/ std::vector<std::pair<Token, Token>>* templates, Token base_type)
 		{
 			this->templates = templates;
 			this->members = members;
-			//this->elements = elements;
+			this->base_type = base_type;
 			this->name = name;
 			this->token = token;
-			//this->functions = functions;
 			this->start = start;
 			this->end = end;
 		}
@@ -1742,12 +1771,6 @@ namespace Jet
 			}
 
 			this->end.Print(output, source);
-			//throw 7;
-			//output += "(";
-			//this->condition->Print(output, source);
-			//output += ")";
-
-			//this->block->Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)

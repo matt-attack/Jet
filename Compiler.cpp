@@ -60,7 +60,7 @@ void Jet::ParserError(const std::string& msg, Token token)
 Compiler::~Compiler()
 {
 	for (auto ii : this->types)
-		if (ii.second->type == Types::Struct)//add more later
+		if (ii.second && ii.second->type == Types::Struct)//Types::Void)//add more later
 			delete ii.second;
 
 	for (auto ii : this->functions)
@@ -503,6 +503,11 @@ std::vector<std::string> Compiler::Compile(const char* projectdir, CompilerOptio
 			ii->CompileDeclarations(global);//guaranteed not to throw?
 	}
 
+	//load all types
+	//for (auto ii : this->types)
+		//if (!(ii.second->type == Types::Struct && ii.second->data->templates.size()))
+		//	ii.second->Load(this);
+
 	for (auto result : asts)
 	{
 		current_source = sources[result.first];
@@ -654,7 +659,7 @@ error:
 		delete ii.second;
 	}
 
-	for (auto ii: symbol_asts)
+	for (auto ii : symbol_asts)
 		delete ii;
 
 	for (auto ii : symbol_sources)
@@ -810,7 +815,7 @@ void Compiler::OutputPackage(const std::string& project_name)
 				types += "struct " + ii.second->data->name + "<";
 				for (int i = 0; i < ii.second->data->templates.size(); i++)
 				{
-					types += ii.second->data->templates[i].first + " ";
+					types += ii.second->data->templates[i].first->name + " ";
 					types += ii.second->data->templates[i].second;
 					if (i < ii.second->data->templates.size() - 1)
 						types += ',';
@@ -887,6 +892,28 @@ void Compiler::OutputPackage(const std::string& project_name)
 		}
 	}
 
+	//output traits
+	for (auto ii : this->traits)
+	{
+		types += "trait " + ii.first + "{";
+		for (auto fun : ii.second->funcs)
+		{
+			types += " fun " + fun.second->return_type->ToString() + " " + fun.first + "(";
+			bool first = false;
+			for (auto arg : fun.second->argst)
+			{
+				if (first)
+					function += ",";
+				else
+					first = true;
+
+				types += arg.first->ToString() + " " + arg.second;
+			}
+			types += ");";
+		}
+		types += "}";
+	}
+
 	//todo: only do this if im a library
 	std::ofstream stable("build/symbols.jlib", std::ios_base::binary);
 	stable.write(types.data(), types.length());
@@ -903,6 +930,23 @@ void Compiler::OutputIR(const char* filename)
 	module->print(str, &writer);
 }
 
+
+Trait* Compiler::AdvanceTraitLookup(const std::string& name)
+{
+	auto trait = traits.find(name);
+	if (trait == traits.end())
+	{
+		//make a new one
+		Trait* t = new Trait;
+		t->valid = false;
+		t->name = name;
+		this->traits[name] = t;
+
+		return t;
+	}
+
+	return trait->second;
+}
 
 Jet::Type* Compiler::AdvanceTypeLookup(const std::string& name)
 {

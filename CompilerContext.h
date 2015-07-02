@@ -68,12 +68,12 @@ namespace Jet
 
 		CValue Float(double value)
 		{
-			return CValue(&DoubleType, llvm::ConstantFP::get(parent->context, llvm::APFloat(value)));
+			return CValue(parent->DoubleType, llvm::ConstantFP::get(parent->context, llvm::APFloat(value)));
 		}
 
 		CValue Integer(int value)
 		{
-			return CValue(&IntType, llvm::ConstantInt::get(parent->context, llvm::APInt(32, value, true)));
+			return CValue(parent->IntType, llvm::ConstantInt::get(parent->context, llvm::APInt(32, value, true)));
 		}
 
 		void RegisterLocal(const std::string& name, CValue val)

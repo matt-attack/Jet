@@ -46,8 +46,8 @@ CValue SizeofExpression::Compile(CompilerContext* context)
 	auto t = context->parent->LookupType(type.text);
 	auto null = llvm::ConstantPointerNull::get(GetType(t)->getPointerTo());
 	auto ptr = context->parent->builder.CreateGEP(null, context->parent->builder.getInt32(1));
-	ptr = context->parent->builder.CreatePtrToInt(ptr, GetType(&IntType), "sizeof");
-	return CValue(&IntType, ptr);// context->DoCast(t, right->Compile(context), true);
+	ptr = context->parent->builder.CreatePtrToInt(ptr, GetType(context->parent->IntType), "sizeof");
+	return CValue(context->parent->IntType, ptr);// context->DoCast(t, right->Compile(context), true);
 }
 
 CValue PostfixExpression::Compile(CompilerContext* context)
@@ -115,7 +115,9 @@ Type* IndexExpression::GetBaseType(Compiler* compiler)
 	}
 	//return context->GetVariable(p->GetName()).type;
 	else if (i)
+	{
 		Error("todo", token);// throw 7;// return i->GetType(context);
+	}
 
 	Error("wat", token);
 }
@@ -163,6 +165,23 @@ Type* IndexExpression::GetType(CompilerContext* context)
 			}
 
 			return lhs.type->data->members[index].type;
+		}
+		else if (this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
+		{
+			int index = 0;
+			for (; index < lhs.type->base->data->members.size(); index++)
+			{
+				if (lhs.type->base->data->members[index].name == this->member.text)
+					break;
+			}
+
+			if (index >= lhs.type->base->data->members.size())
+			{
+				Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->data->name + "' Not Found", this->token);
+				//not found;
+			}
+
+			return lhs.type->base->data->members[index].type;
 		}
 		else if ((lhs.type->type == Types::Array || lhs.type->type == Types::Pointer) && string == 0)//or pointer!!(later)
 		{
@@ -238,7 +257,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		}
 		else if (lhs.type->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
 		{
-			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->DoCast(&IntType, index->Compile(context)).val };
+			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->DoCast(context->parent->IntType, index->Compile(context)).val };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
 
@@ -246,7 +265,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		}
 		else if (lhs.type->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
 		{
-			std::vector<llvm::Value*> iindex = { /*context->parent->builder.getInt32(0),*/ context->DoCast(&IntType, index->Compile(context)).val };
+			std::vector<llvm::Value*> iindex = { /*context->parent->builder.getInt32(0),*/ context->DoCast(context->parent->IntType, index->Compile(context)).val };
 
 			//loadme!!!
 			lhs.val = context->parent->builder.CreateLoad(lhs.val);
@@ -397,7 +416,9 @@ CValue CallExpression::Compile(CompilerContext* context)
 			self = context->parent->builder.CreateLoad(index->GetBaseGEP(context).val);
 		}
 		else
+		{
 			self = index->GetBaseGEP(context).val;
+		}
 
 		//push in the this pointer argument kay
 		argsv.push_back(CValue(context->parent->LookupType(stru->ToString() + "*"), self));
@@ -446,14 +467,14 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		auto cur_block = context->parent->builder.GetInsertBlock();
 
 		auto cond = this->left->Compile(context);
-		cond = context->DoCast(&BoolType, cond);
+		cond = context->DoCast(context->parent->BoolType, cond);
 		context->parent->builder.CreateCondBr(cond.val, else_block, end_block);
 
 		context->f->getBasicBlockList().push_back(else_block);
 		context->parent->builder.SetInsertPoint(else_block);
 		auto cond2 = this->right->Compile(context);
 
-		cond2 = context->DoCast(&BoolType, cond2);
+		cond2 = context->DoCast(context->parent->BoolType, cond2);
 		context->parent->builder.CreateBr(end_block);
 
 		context->f->getBasicBlockList().push_back(end_block);
@@ -462,7 +483,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		phi->addIncoming(cond.val, cur_block);
 		phi->addIncoming(cond2.val, else_block);
 
-		return CValue(&BoolType, phi);
+		return CValue(context->parent->BoolType, phi);
 	}
 
 	if (this->_operator.type == TokenType::Or)
@@ -472,13 +493,13 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		auto cur_block = context->parent->builder.GetInsertBlock();
 
 		auto cond = this->left->Compile(context);
-		cond = context->DoCast(&BoolType, cond);
+		cond = context->DoCast(context->parent->BoolType, cond);
 		context->parent->builder.CreateCondBr(cond.val, end_block, else_block);
 
 		context->f->getBasicBlockList().push_back(else_block);
 		context->parent->builder.SetInsertPoint(else_block);
 		auto cond2 = this->right->Compile(context);
-		cond2 = context->DoCast(&BoolType, cond2);
+		cond2 = context->DoCast(context->parent->BoolType, cond2);
 		context->parent->builder.CreateBr(end_block);
 
 		context->f->getBasicBlockList().push_back(end_block);
@@ -487,7 +508,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		auto phi = context->parent->builder.CreatePHI(GetType(cond.type), 2, "lor");
 		phi->addIncoming(cond.val, cur_block);
 		phi->addIncoming(cond2.val, else_block);
-		return CValue(&BoolType, phi);
+		return CValue(context->parent->BoolType, phi);
 	}
 
 	auto lhs = this->left->Compile(context);
@@ -559,6 +580,8 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	//else
 	//context->parent->functions[fname] = function->f;
 
+	context->parent->current_function = function;
+
 	//alloc args
 	auto AI = function->f->arg_begin();
 	for (unsigned Idx = 0, e = argsv.size(); Idx != e; ++Idx, ++AI) {
@@ -577,7 +600,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	}
 
 	block->Compile(function);
-
+	
 	//check for return, and insert one or error if there isnt one
 	if (function->f->getBasicBlockList().back().getTerminator() == 0)
 		if (this->ret_type.text == "void")
@@ -588,6 +611,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 			Error("Function must return a value!", token);
 		}
 
+	context->parent->current_function = context;
 	return CValue();
 }
 
@@ -775,6 +799,7 @@ CValue StructExpression::Compile(CompilerContext* context)
 		if (ii.type == StructMember::FunctionMember)
 			ii.function->Compile(context);
 	}
+
 	return CValue();
 }
 
@@ -802,14 +827,17 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	str->data = new Struct;
 	str->data->name = this->name.text;
 	str->data->expression = this;
+	if (this->base_type.text.length())
+	{
+		str->data->parent = context->parent->AdvanceTypeLookup(this->base_type.text);
+	}
 	if (this->templates)
 	{
 		for (auto ii : *this->templates)
 		{
-			str->data->templates.push_back({ ii.first.text, ii.second.text });
+			str->data->templates.push_back({ context->parent->AdvanceTraitLookup(ii.first.text), ii.second.text });
 		}
 	}
-	//str->data->templates = this->templates;
 
 	for (auto ii : this->members)
 	{

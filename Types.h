@@ -36,8 +36,13 @@ namespace Jet
 	//todo: add void* like type
 	class Compiler;
 	struct Struct;
-	struct Type
+	struct Trait;
+	class Type
 	{
+		std::vector<Trait*> traits;//all the traits that apply to this type
+
+	public:
+
 		Types type : 8;
 		bool loaded : 8;
 		union
@@ -49,6 +54,9 @@ namespace Jet
 
 		std::string name;
 
+
+		std::vector<Trait*> GetTraits(Compiler* compiler);
+		
 		Type() { data = 0; type = Types::Void; loaded = false; size = 0; }
 		Type(std::string name, Types type, Struct *data = 0) : type(type), data(data), loaded(false), size(0), name(name) {}
 		Type(std::string name, Types type, Type* base, int size = 0) : type(type), base(base), loaded(false), size(size), name(name) {}
@@ -65,17 +73,22 @@ namespace Jet
 		//}
 	};
 
+	class Function;
 	struct Trait
 	{
-		
+		bool valid;
+		std::string name;
+		std::multimap<std::string, Function*> funcs;
+
+		std::multimap<std::string, Function*> extension_methods;
 	};
 
 	class StructExpression;
-	class Function;
 	struct Struct
 	{
 		std::string name;
 		llvm::Type* type;
+		Type* parent;//when inheritance
 
 		struct StructMember
 		{
@@ -83,7 +96,7 @@ namespace Jet
 			std::string type_name;
 			Type* type;
 		};
-		std::vector<StructMember/*std::pair<std::string, Type*>*/> members;//member variables
+		std::vector<StructMember> members;//member variables
 
 		std::multimap<std::string, Function*> functions;//member functions
 
@@ -91,7 +104,7 @@ namespace Jet
 
 		//template stuff
 		Struct* template_base;
-		std::vector<std::pair<std::string, std::string>> templates;
+		std::vector<std::pair<Trait*, std::string>> templates;
 		StructExpression* expression;
 
 		Struct()
@@ -99,6 +112,7 @@ namespace Jet
 			template_base = 0;
 			type = 0;
 			expression = 0;
+			parent = 0;
 			loaded = false;
 		}
 
@@ -124,8 +138,24 @@ namespace Jet
 
 		Function()
 		{
+			f = 0;
 			expression = 0;
 			loaded = false;
+		}
+
+		bool IsCompatible(Function* f)
+		{
+			if (f->return_type != this->return_type)
+				return false;
+
+			if (f->argst.size() != this->argst.size())
+				return false;
+
+			for (int i = 0; i < f->argst.size(); i++)
+				if (f->argst[i].first != this->argst[i].first)
+					return false;
+
+			return true;
 		}
 
 		void Load(Compiler* compiler);
@@ -134,8 +164,8 @@ namespace Jet
 	llvm::Type* GetType(Type* t);
 
 	extern Type VoidType;
-	extern Type BoolType;
-	extern Type DoubleType;
-	extern Type IntType;
+	//extern Type BoolType;
+	//extern Type DoubleType;
+	//extern Type IntType;
 }
 #endif

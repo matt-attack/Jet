@@ -6,9 +6,9 @@
 using namespace Jet;
 
 Type Jet::VoidType("void", Types::Void);
-Type Jet::BoolType("bool", Types::Bool);
-Type Jet::DoubleType("double", Types::Double);
-Type Jet::IntType("int", Types::Int);
+//Type Jet::BoolType("bool", Types::Bool);
+//Type Jet::DoubleType("double", Types::Double);
+//Type Jet::IntType("int", Types::Int);
 
 llvm::Type* Jet::GetType(Type* t)
 {
@@ -123,12 +123,84 @@ void Type::Load(Compiler* compiler)
 	this->loaded = true;
 }
 
+
+//is is function, b is trait fruncton
+bool IsMatch(Function* a, Function* b)
+{
+	if (a->return_type != b->return_type)
+		return false;
+
+	if (a->argst.size() != b->argst.size()-1)
+		return false;
+
+	for (int i = 1; i < a->argst.size(); i++)
+		if (a->argst[i].first != b->argst[i-1].first)
+			return false;
+
+	return true;
+}
+
+std::vector<Trait*> Type::GetTraits(Compiler* compiler)
+{
+	if (this->traits.size())
+		return this->traits;
+
+	//load traits yo
+	for (auto ii : compiler->traits)
+	{
+		if (this->type == Types::Struct)
+		{
+			bool match = true;
+			for (auto fun : ii.second->funcs)
+			{
+				auto range = this->data->functions.equal_range(fun.first);
+				if (range.first == range.second)
+				{
+					match = false;
+					break;//couldnt find it, doesnt match
+				}
+				for (auto f = range.first; f != range.second; f++)
+				{
+					if (IsMatch(fun.second, f->second) == false)
+					{
+						match = false;
+						break;
+					}
+				}
+			}
+			if (match == false)
+				continue;
+		}
+		else
+		{
+			if (ii.second->funcs.size())
+				continue;//only add if no functions
+		}
+		this->traits.push_back(ii.second);
+	}
+	return this->traits;
+}
+
 Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 {
 	//register the types
 	int i = 0;
 	for (auto ii : this->data->templates)
 	{
+		//check if traits match
+		auto ttraits = types[i]->GetTraits(compiler);
+		bool found = false;
+		for (auto tr : ttraits)
+		{
+			if (tr == ii.first)
+			{
+				found = true;
+				break;
+			}
+		}
+		if (found == false)
+			Error("Type '"+types[i]->name+"' doesn't match Trait '"+ii.first->name+"'", *compiler->current_function->current_token);
+
 		//lets be stupid and just register the type
 		//CHANGE ME LATER, THIS OVERRIDES TYPES, OR JUST RESTORE AFTER THIS
 		compiler->types[ii.second] = types[i++];
@@ -136,8 +208,6 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 
 	//duplicate and load
 	Struct* str = new Struct;
-	//str->functions = this->data->functions;
-	//str->members = this->data->members;
 	//build members
 	for (auto ii : this->data->expression->members)
 	{
@@ -200,6 +270,29 @@ void Struct::Load(Compiler* compiler)
 	if (this->loaded)
 		return;
 
+	//add on items from parent
+	if (this->parent)
+	{
+		this->parent->Load(compiler);
+
+		if (this->parent->type != Types::Struct)
+			Error("Struct's parent must be another Struct!", *compiler->current_function->current_token);
+
+		//add its members to me
+		auto oldmem = std::move(this->members);
+		this->members.clear();
+		for (auto ii : this->parent->data->members)
+			this->members.push_back(ii);
+		for (auto ii : oldmem)
+			this->members.push_back(ii);
+
+		//add the functions too :D
+		auto oldfuncs = std::move(this->functions);
+		this->functions.clear();
+		for (auto ii : this->parent->data->functions)
+			this->functions.insert(ii);
+	}
+
 	//recursively load
 	std::vector<llvm::Type*> elementss;
 	for (auto ii : this->members)
@@ -209,6 +302,9 @@ void Struct::Load(Compiler* compiler)
 
 		elementss.push_back(GetType(type));
 	}
+	if (elementss.size() == 0)
+		Error("Struct contains no elements!! Fix this not being ok!", *compiler->current_function->current_token);
+
 	this->type = llvm::StructType::create(elementss, this->name);
 
 	this->loaded = true;

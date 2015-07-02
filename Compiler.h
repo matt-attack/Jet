@@ -85,19 +85,27 @@ namespace Jet
 
 		CompilerContext* current_function;
 
+		//these are some of the basic types
+		Type* DoubleType;
+		Type* IntType;
+		Type* BoolType;
+
 		Compiler() : builder(llvm::getGlobalContext()), context(llvm::getGlobalContext())
 		{
 			this->target = 0;
 
 			//insert basic types
 			types["float"] = new Type("float", Types::Float);
-			types["double"] = &DoubleType;// new Type(Types::Float);
+			this->DoubleType = new Type("double", Types::Double);
+			types["double"] = this->DoubleType;// new Type("double", Types::Double);// &DoubleType;// new Type(Types::Float);
 			types["long"] = new Type("long", Types::Long);
-			types["int"] = &IntType;// new Type(Types::Int);
+			this->IntType = new Type("int", Types::Int);
+			types["int"] = this->IntType;// new Type("int", Types::Int);// &IntType;// new Type(Types::Int);
 			types["short"] = new Type("short", Types::Short);
 			types["char"] = new Type("char", Types::Char);
-			types["bool"] = &BoolType;// new Type(Types::Bool);
-			types["void"] = &VoidType;// new Type(Types::Void);
+			this->BoolType = new Type("bool", Types::Bool);// &BoolType;// new Type(Types::Bool);
+			types["bool"] = this->BoolType;
+			types["void"] = new Type("void", Types::Void);// &VoidType;// new Type(Types::Void);
 		}
 
 		~Compiler();
@@ -120,6 +128,8 @@ namespace Jet
 
 		//get array types inside of structs working
 		Type* AdvanceTypeLookup(const std::string& name);
+
+		Trait* AdvanceTraitLookup(const std::string& trait);
 
 		std::map<std::string, Type*> types;
 		Type* LookupType(const std::string& name);
