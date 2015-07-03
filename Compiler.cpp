@@ -38,6 +38,26 @@ void Jet::Error(const std::string& msg, Token token)
 	throw 7;
 }
 
+//finish me later
+void Error(const std::string& msg, Token start, Token end)
+{
+	int startrow = start.column;// -token.text.length();
+	int endrow = end.column + end.text.length();
+	std::string code = current_source->GetLine(start.line);
+	std::string underline = "";
+	for (int i = 0; i < code.length(); i++)
+	{
+		if (code[i] == '\t')
+			underline += '\t';
+		else if (i >= startrow && i < endrow)
+			underline += '~';
+		else
+			underline += ' ';
+	}
+	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", current_source->filename.c_str(), start.line, startrow, end.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
+	throw 7;
+}
+
 void Jet::ParserError(const std::string& msg, Token token)
 {
 	int startrow = token.column;// -token.text.length();
@@ -1092,7 +1112,7 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 
 				for (auto ii : res->data->expression->members)//functions)
 					if (ii.type == StructMember::FunctionMember)
-						ii.function->Compile(this->current_function);//the context used may not be proper, but it works
+						ii.function->DoCompile(this->current_function);//the context used may not be proper, but it works
 
 				this->builder.SetInsertPoint(rp);
 				expr->name = oldname;

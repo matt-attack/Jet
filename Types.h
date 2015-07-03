@@ -56,6 +56,7 @@ namespace Jet
 
 
 		std::vector<Trait*> GetTraits(Compiler* compiler);
+		bool MatchesTrait(Compiler* compiler, Trait* trait);
 		
 		Type() { data = 0; type = Types::Void; loaded = false; size = 0; }
 		Type(std::string name, Types type, Struct *data = 0) : type(type), data(data), loaded(false), size(0), name(name) {}
@@ -131,7 +132,9 @@ namespace Jet
 
 		Type* return_type;
 
-		//for use with templates
+		//template stuff
+		FunctionExpression* template_base;
+		std::vector<std::pair<Trait*, std::string>> templates;
 		FunctionExpression* expression;
 
 		bool loaded;
@@ -141,6 +144,7 @@ namespace Jet
 			f = 0;
 			expression = 0;
 			loaded = false;
+			template_base = 0;
 		}
 
 		bool IsCompatible(Function* f)
@@ -159,6 +163,8 @@ namespace Jet
 		}
 
 		void Load(Compiler* compiler);
+
+		Function* Instantiate(Compiler* compiler, const std::vector<Type*>& types);
 	};
 
 	llvm::Type* GetType(Type* t);

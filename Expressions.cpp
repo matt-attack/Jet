@@ -166,7 +166,24 @@ Type* IndexExpression::GetType(CompilerContext* context)
 
 			return lhs.type->data->members[index].type;
 		}
-		else if (this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
+		else if (this->token.type == TokenType::Dot && this->member.text.length() && lhs.type->type == Types::Struct)
+		{
+			int index = 0;
+			for (; index < lhs.type->data->members.size(); index++)
+			{
+				if (lhs.type->data->members[index].name == this->member.text)
+					break;
+			}
+
+			if (index >= lhs.type->data->members.size())
+			{
+				Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
+				//not found;
+			}
+
+			return lhs.type->data->members[index].type;
+		}
+		else if (this->token.type == TokenType::Pointy && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
 		{
 			int index = 0;
 			for (; index < lhs.type->base->data->members.size(); index++)
@@ -534,6 +551,19 @@ std::string FunctionExpression::GetRealName()
 
 CValue FunctionExpression::Compile(CompilerContext* context)
 {
+	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
+
+	//need to not compile if template or trait
+	if (context->parent->traits.find(Struct) != context->parent->traits.end())
+	{
+		return CValue();
+	}
+
+	return this->DoCompile(context);
+}
+
+CValue FunctionExpression::DoCompile(CompilerContext* context)
+{
 	context->CurrentToken(&token);
 
 	std::string fname;
@@ -545,36 +575,43 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	//build list of types of vars
 	std::vector<std::pair<Type*, std::string>> argsv;
 	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
+
 	if (Struct.length() > 0)
-	{
-		//im a member function
+	{   //im a member function
 		//insert first arg, which is me
 		auto type = context->parent->LookupType(Struct + "*");
 
 		argsv.push_back({ type, "this" });
-		//this->args->insert(this->args->begin(), { Struct + "*", "this" });
-		//this->args->push_back({ Struct + "*", "this" });
 	}
 	for (auto ii : *this->args)
-	{
 		argsv.push_back({ context->parent->LookupType(ii.first), ii.second });
-	}
 
 	context->CurrentToken(&this->ret_type);
 	auto ret = context->parent->LookupType(this->ret_type.text);
 
-	//auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 	CompilerContext* function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? true : false);// , this->varargs);
 	if (Struct.length() > 0)
 	{
 		auto range = context->parent->types[Struct]->data->functions.equal_range(fname);
-		for (auto ii = range.first; ii != range.second; ii++)
+		if (range.first == range.second)
 		{
-			//printf("found function option for %s\n", name.c_str());
-
-			//pick one with the right number of args
-			if (ii->second->argst.size() == argsv.size())
-				ii->second->f = function->f;
+			//it wasnt found, search through traits
+			auto range = context->parent->traits[Struct]->extension_methods.equal_range(fname);
+			for (auto ii = range.first; ii != range.second; ii++)
+			{
+				//pick one with the right number of args
+				if (ii->second->argst.size() == argsv.size())
+					ii->second->f = function->f;
+			}
+		}
+		else
+		{
+			for (auto ii = range.first; ii != range.second; ii++)
+			{
+				//pick one with the right number of args
+				if (ii->second->argst.size() == argsv.size())
+					ii->second->f = function->f;
+			}
 		}
 	}
 	//else
@@ -635,8 +672,6 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		auto type = context->parent->AdvanceTypeLookup(str + "*");
 
 		fun->argst.push_back({ type, "this" });
-		//this->args->insert(this->args->begin(), { Struct + "*", "this" });
-		//this->args->push_back({ Struct + "*", "this" });
 	}
 
 	for (auto ii : *this->args)
@@ -650,7 +685,19 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	fun->name = this->GetRealName();
 	fun->f = 0;
 	if (str.length() > 0)
-		context->parent->types[str]->data->functions.insert({ fname, fun });
+	{
+		auto iter = context->parent->types.find(str);
+		if (iter == context->parent->types.end() || iter->second->type == Types::Invalid)
+		{
+			auto tr = context->parent->traits.find(str);
+			if (tr == context->parent->traits.end())
+				Error("Type '" + str + "' does not exist", token);
+
+			tr->second->extension_methods.insert({ fname, fun });
+		}
+		else
+			context->parent->types[str]->data->functions.insert({ fname, fun });
+	}
 	else
 		context->parent->functions.insert({ fname, fun });
 }
@@ -791,6 +838,13 @@ CValue StructExpression::Compile(CompilerContext* context)
 	if (this->templates)
 	{
 		//compile l8r
+		//verify that all traits are valid
+		for (auto ii : *this->templates)
+		{
+			auto iter = context->parent->traits.find(ii.first.text);
+			if (iter == context->parent->traits.end() || iter->second->valid == false)
+				Error("Trait '"+ii.first.text+"' is not defined", ii.first);
+		}
 		return CValue();
 	}
 

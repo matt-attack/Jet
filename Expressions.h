@@ -1461,6 +1461,7 @@ namespace Jet
 	class FunctionExpression : public Expression
 	{
 		friend class Compiler;
+		friend class CompilerContext;
 		friend class Type;
 		Token name;
 		std::vector<std::pair<std::string, std::string>>* args;
@@ -1471,9 +1472,11 @@ namespace Jet
 
 		Token ret_type;
 		NameExpression* varargs;
+
+		std::vector<std::pair<Token, Token>>* templates;
 	public:
 
-		FunctionExpression(Token token, Token name, Token ret_type, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct)
+		FunctionExpression(Token token, Token name, Token ret_type, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, std::vector<std::pair<Token, Token>>* templates)
 		{
 			this->ret_type = ret_type;
 			this->args = args;
@@ -1482,6 +1485,7 @@ namespace Jet
 			this->token = token;
 			this->varargs = 0;// varargs;
 			this->Struct = Struct;
+			this->templates = templates;
 		}
 
 		~FunctionExpression()
@@ -1500,7 +1504,6 @@ namespace Jet
 		}
 
 		CValue Compile(CompilerContext* context);
-
 		void CompileDeclarations(CompilerContext* context);
 
 		void Print(std::string& output, Source* source)
@@ -1534,6 +1537,8 @@ namespace Jet
 			visitor->Visit(this);
 			block->Visit(visitor);
 		}
+
+		CValue FunctionExpression::DoCompile(CompilerContext* context);//call this to do real compilation
 	};
 
 	class ExternExpression : public Expression
@@ -1637,7 +1642,7 @@ namespace Jet
 			else if (tr->second->valid == false)//make sure it is set as invalid
 				t = tr->second;
 			else
-				Error("Trait '"+name.text+"' already exists", token);
+				Error("Trait '" + name.text + "' already exists", token);
 			t->valid = true;
 			t->name = this->name.text;
 			for (auto ii : this->funcs)
@@ -1933,9 +1938,15 @@ namespace Jet
 			context->CurrentToken(&other_type);
 			auto type = context->parent->AdvanceTypeLookup(other_type.text);
 
+			//this can be fixed by adding a third pass over the typedefs
 			auto iter = context->parent->types.find(new_type.text);
 			if (iter != context->parent->types.end())
-				Error("Type '" + new_type.text + "'already defined!", new_type);
+			{
+				if (iter->second->type == Types::Invalid)
+					Error("Please place the typedef before it is used, after is not yet handled properly.", new_type);
+				else
+					Error("Type '" + new_type.text + "' already defined!", new_type);
+			}
 			context->parent->types[new_type.text] = type;
 		};
 

@@ -311,6 +311,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 	Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 }
 
+#include "Expressions.h"
 CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct)
 {
 	llvm::Function* f = 0;
@@ -410,6 +411,28 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 					//pick one with the right number of args
 					if (ii->second->argst.size() == args.size())
 						fun = ii->second;
+				}
+
+				if (fun)
+				{
+					//massive hack again, like in templates
+					this->parent->types[tr->name] = Struct;
+
+					auto rp = this->parent->builder.GetInsertBlock();
+
+					//compile function
+					auto oldn = fun->expression->Struct.text;
+					fun->expression->Struct.text = Struct->data->name;
+
+					fun->expression->CompileDeclarations(this);
+					fun->expression->DoCompile(this);
+
+					fun->expression->Struct.text = oldn;
+
+					this->parent->builder.SetInsertPoint(rp);
+
+					fun = Struct->data->functions.find(name)->second;
+					break;
 				}
 			}
 

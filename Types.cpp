@@ -3,12 +3,13 @@
 #include "CompilerContext.h"
 #include "Expressions.h"
 
+//#include <llvm/IR/Attributes.h>
+//#include <llvm/IR/Argument.h>
+//#include <llvm/ADT/ilist.h>
+
 using namespace Jet;
 
 Type Jet::VoidType("void", Types::Void);
-//Type Jet::BoolType("bool", Types::Bool);
-//Type Jet::DoubleType("double", Types::Double);
-//Type Jet::IntType("int", Types::Int);
 
 llvm::Type* Jet::GetType(Type* t)
 {
@@ -105,12 +106,11 @@ void Type::Load(Compiler* compiler)
 
 				for (auto ii : res->data->expression->members)//functions)
 					if (ii.type == StructMember::FunctionMember)
-						ii.function->Compile(compiler->current_function);//the context used may not be proper, but it works
+						ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
 
 				compiler->builder.SetInsertPoint(rp);
 				expr->name = oldname;
 			}
-			//Error("Not implemented", *compiler->current_function->current_token);
 		}
 		else
 			Error("Tried To Use Undefined Type '" + this->name + "'", *compiler->current_function->current_token);
@@ -181,6 +181,21 @@ std::vector<Trait*> Type::GetTraits(Compiler* compiler)
 	return this->traits;
 }
 
+bool Type::MatchesTrait(Compiler* compiler, Trait* t)
+{
+	auto ttraits = this->GetTraits(compiler);
+	bool found = false;
+	for (auto tr : ttraits)
+	{
+		if (tr == t)
+		{
+			found = true;
+			break;
+		}
+	}
+	return found;
+}
+
 Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 {
 	//register the types
@@ -188,17 +203,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	for (auto ii : this->data->templates)
 	{
 		//check if traits match
-		auto ttraits = types[i]->GetTraits(compiler);
-		bool found = false;
-		for (auto tr : ttraits)
-		{
-			if (tr == ii.first)
-			{
-				found = true;
-				break;
-			}
-		}
-		if (found == false)
+		if (types[i]->MatchesTrait(compiler, ii.first) == false)
 			Error("Type '"+types[i]->name+"' doesn't match Trait '"+ii.first->name+"'", *compiler->current_function->current_token);
 
 		//lets be stupid and just register the type
@@ -310,9 +315,6 @@ void Struct::Load(Compiler* compiler)
 	this->loaded = true;
 }
 
-//#include <llvm/IR/Attributes.h>
-//#include <llvm/IR/Argument.h>
-//#include <llvm/ADT/ilist.h>
 void Function::Load(Compiler* compiler)
 {
 	if (this->loaded)
@@ -371,4 +373,50 @@ void Function::Load(Compiler* compiler)
 	}
 
 	this->loaded = true;
+}
+
+Function* Function::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
+{
+	/*//register the types
+	int i = 0;
+	for (auto ii : this->templates)
+	{
+		//check if traits match
+		if (types[i]->MatchesTrait(compiler, ii.first) == false)
+			Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
+
+		//lets be stupid and just register the type
+		//CHANGE ME LATER, THIS OVERRIDES TYPES, OR JUST RESTORE AFTER THIS
+		compiler->types[ii.second] = types[i++];
+	}
+
+	//duplicate and load
+	Function* str = new Function;
+	//build members
+	for (auto ii : this->expression->members)
+	{
+		if (ii.type == StructMember::VariableMember)
+		{
+			auto type = compiler->AdvanceTypeLookup(ii.variable.first.text);
+
+			str->members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
+		}
+	}
+
+	str->template_base = this->data;
+	str->name = this->data->name + "<";
+	for (int i = 0; i < this->data->templates.size(); i++)
+	{
+		str->name += types[i]->ToString();
+		if (i < this->data->templates.size() - 1)
+			str->name += ',';
+	}
+	str->name += ">";
+	str->expression = this->data->expression;
+
+	Type* t = new Type(str->name, Types::Struct, str);
+	t->Load(compiler);
+
+	return t; */
+		return 0;
 }
