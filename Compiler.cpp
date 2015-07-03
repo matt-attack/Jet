@@ -585,7 +585,7 @@ error:
 		if (project.IsExecutable())
 		{
 			printf("Compiling Executable...\n");
-			std::string cmd = "clang -L. ";
+			std::string cmd = "gcc -L. ";
 
 			cmd += "build/" + project.project_name + ".o ";
 			cmd += "-o build/" + project.project_name + ".exe ";

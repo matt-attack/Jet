@@ -212,7 +212,6 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
 
-	//auto string = dynamic_cast<StringExpression*>(index);
 	if (index == 0 && this->token.type == TokenType::Pointy)
 	{
 		CValue lhs;
@@ -262,10 +261,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 					break;
 			}
 			if (index >= lhs.type->data->members.size())
-			{
 				Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
-				//not found;
-			}
 
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
@@ -282,7 +278,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		}
 		else if (lhs.type->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
 		{
-			std::vector<llvm::Value*> iindex = { /*context->parent->builder.getInt32(0),*/ context->DoCast(context->parent->IntType, index->Compile(context)).val };
+			std::vector<llvm::Value*> iindex = { context->DoCast(context->parent->IntType, index->Compile(context)).val };
 
 			//loadme!!!
 			lhs.val = context->parent->builder.CreateLoad(lhs.val);
@@ -427,7 +423,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 		stru = index->GetBaseType(context);
 
 		llvm::Value* self;
-		if (index->token.type == TokenType::Pointy)// && index->token.type != TokenType::Dot)//->member.length() > 0)
+		if (index->token.type == TokenType::Pointy)
 		{
 			stru = stru->base;
 			self = context->parent->builder.CreateLoad(index->GetBaseGEP(context).val);
@@ -554,6 +550,17 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 
 	//need to not compile if template or trait
+	if (this->templates)
+	{
+		for (auto ii : *this->templates)//make sure traits are valid
+		{
+			auto iter = context->parent->traits.find(ii.first.text);
+			if (iter == context->parent->traits.end() || iter->second->valid == false)
+				Error("Trait '" + ii.first.text + "' is not defined", ii.first);
+		}
+		return CValue();
+	}
+
 	if (context->parent->traits.find(Struct) != context->parent->traits.end())
 	{
 		return CValue();
@@ -872,9 +879,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	{
 		str = ii->second;
 		if (str->type != Types::Invalid)
-		{
 			Error("Struct '" + this->name.text + "' Already Defined", this->token);
-		}
 	}
 
 	str->type = Types::Struct;
@@ -882,15 +887,11 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	str->data->name = this->name.text;
 	str->data->expression = this;
 	if (this->base_type.text.length())
-	{
 		str->data->parent = context->parent->AdvanceTypeLookup(this->base_type.text);
-	}
 	if (this->templates)
 	{
 		for (auto ii : *this->templates)
-		{
 			str->data->templates.push_back({ context->parent->AdvanceTraitLookup(ii.first.text), ii.second.text });
-		}
 	}
 
 	for (auto ii : this->members)
@@ -983,9 +984,8 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	{
 		auto Case = dynamic_cast<CaseExpression*>(expr);
 		if (Case)
-		{
 			cases.push_back(Case);
-		}
+		
 		//add default parser and expression
 		else if (auto def = dynamic_cast<DefaultExpression*>(expr))
 		{
