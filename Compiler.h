@@ -110,8 +110,8 @@ namespace Jet
 
 		~Compiler();
 
-		//returns paths to dependencies
-		std::vector<std::string> Compile(const char* projectfile, CompilerOptions* options = 0);
+		//returns if was successful
+		bool Compile(const char* projectfile, CompilerOptions* options = 0);
 
 		void Optimize();
 
@@ -129,7 +129,7 @@ namespace Jet
 		//get array types inside of structs working
 		Type* AdvanceTypeLookup(const std::string& name);
 
-		Trait* AdvanceTraitLookup(const std::string& trait);
+		//Trait* AdvanceTraitLookup(const std::string& trait);
 
 		std::map<std::string, Type*> types;
 		Type* LookupType(const std::string& name);

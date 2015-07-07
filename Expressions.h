@@ -57,9 +57,12 @@ namespace Jet
 
 	public:
 		Token token;
-		NameExpression(Token name)
+		std::vector<Token>* templates;
+
+		NameExpression(Token name, std::vector<Token>* templates = 0)
 		{
 			this->token = name;
+			this->templates = templates;
 		}
 
 		std::string GetName()
@@ -1616,12 +1619,14 @@ namespace Jet
 		Token token;
 		Token name;
 		std::vector<TraitFunction> funcs;
+		std::vector<std::pair<Token, Token>>* templates;
 	public:
-		TraitExpression(Token token, Token name, std::vector<TraitFunction>&& funcs)
+		TraitExpression(Token token, Token name, std::vector<TraitFunction>&& funcs, std::vector<std::pair<Token, Token>>* templates)
 		{
 			this->token = token;
 			this->name = name;
 			this->funcs = funcs;
+			this->templates = templates;
 		}
 
 		CValue Compile(CompilerContext* context)
@@ -1633,16 +1638,19 @@ namespace Jet
 		{
 			//check if trait already exists, if its in the table and set as invalid, then we can just fill in the blanks
 			Trait* t;
-			auto tr = context->parent->traits.find(name.text);
-			if (tr == context->parent->traits.end())
+			auto tr = context->parent->types.find(name.text);
+			if (tr == context->parent->types.end())
 			{
 				t = new Trait;
+				Type* ty = new Type(name.text, Types::Trait);
+				ty->trait = t;
+				context->parent->types[name.text] = ty;
 				context->parent->traits[name.text] = t;
 			}
-			else if (tr->second->valid == false)//make sure it is set as invalid
-				t = tr->second;
+			//else if (tr->second->valid == false)//make sure it is set as invalid
+				//t = tr->second;
 			else
-				Error("Trait '" + name.text + "' already exists", token);
+				Error("Type '" + name.text + "' already exists", token);
 			t->valid = true;
 			t->name = this->name.text;
 			for (auto ii : this->funcs)
@@ -1655,6 +1663,14 @@ namespace Jet
 				}
 
 				t->funcs.insert({ ii.name.text, func });
+			}
+			if (this->templates)
+			{
+				for (auto ii : *this->templates)
+				{
+					auto trait = ii.first.text.length() ? context->parent->AdvanceTypeLookup(ii.first.text) : 0;
+					t->templates.push_back({ trait, ii.second.text });
+				}
 			}
 		}
 

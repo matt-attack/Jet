@@ -79,15 +79,16 @@ void Jet::ParserError(const std::string& msg, Token token)
 
 Compiler::~Compiler()
 {
-	for (auto ii : this->types)
-		if (ii.second && ii.second->type == Types::Struct)//Types::Void)//add more later
-			delete ii.second;
+	//ok, instantiated template types end up being duplicates, that causes the crash when trying to delete them
+	//for (auto ii : this->types)
+		//if (ii.second && ii.second->type == Types::Struct)//Types::Void)//add more later
+			//delete ii.second;
 
 	for (auto ii : this->functions)
 		delete ii.second;
 
-	for (auto ii : this->traits)
-		delete ii.second;
+	//for (auto ii : this->traits)
+		//delete ii.second;
 }
 
 #include <llvm/ADT/Triple.h>
@@ -185,8 +186,17 @@ public:
 		while (pf.peek() != EOF)
 		{
 			std::string file;//read in a filename
-			while (pf.peek() != ' ' && pf.peek() != EOF && pf.peek() != '\r' && pf.peek() != '\n' && pf.peek() != '\t')
-				file += pf.get();
+			bool is_escaped = false;
+			while ((is_escaped || pf.peek() != ' ') && pf.peek() != EOF && pf.peek() != '\r' && pf.peek() != '\n' && pf.peek() != '\t')
+			{
+				if (pf.peek() == '"')
+				{
+					is_escaped = !is_escaped;
+					pf.get();
+				}
+				else
+					file += pf.get();//handle escaping
+			}
 
 			pf.get();
 
@@ -313,11 +323,14 @@ public:
 	}
 };
 
-std::vector<std::string> Compiler::Compile(const char* projectdir, CompilerOptions* options)
+//#define USE_GCC
+//#define USE_CLANG
+#define USE_MSVC
+bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 {
 	JetProject project;
 	if (project.Load(projectdir) == false)
-		return std::vector<std::string>();
+		return false;
 
 	char olddir[500];
 	getcwd(olddir, 500);
@@ -334,19 +347,26 @@ std::vector<std::string> Compiler::Compile(const char* projectdir, CompilerOptio
 		auto ii = project.dependencies[i];
 		//spin up new compiler instance and build it
 		Compiler compiler;
-		auto subdeps = compiler.Compile(ii.c_str());
+		auto success = compiler.Compile(ii.c_str());
+		if (success == false)
+		{
+			for (auto ii : lib_symbols)
+				delete[] ii;
 
-		//add the subdependencies to the list
-		//for (auto d : subdeps)
-		//dependencies.push_back(d);
+			printf("Dependency compilation failed, stopping compilation");
+			return false;
+		}
 
 		//read in declarations for each dependency
 		std::string symbol_filepath = ii + "/build/symbols.jlib";
 		std::ifstream symbols(symbol_filepath, std::ios_base::binary);
 		if (symbols.is_open() == false)
 		{
+			for (auto ii : lib_symbols)
+				delete[] ii;
+
 			printf("Dependency compilation failed: could not find symbol file!\n");
-			return std::vector<std::string>();
+			return false;
 		}
 
 		//parse symbols
@@ -443,7 +463,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir, CompilerOptio
 
 					//restore working directory
 					chdir(olddir);
-					return project.dependencies;
+					return true;
 				}
 			}
 			else
@@ -454,6 +474,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir, CompilerOptio
 	}
 	if (jlib) fclose(jlib);
 	if (output) fclose(output);
+
 
 	//JITHelper = new MCJITHelper(this->context);
 
@@ -518,10 +539,13 @@ std::vector<std::string> Compiler::Compile(const char* projectdir, CompilerOptio
 		}
 		asts[file.first] = result;
 
+		this->current_function = global;
+
 		//do this for each file
 		for (auto ii : result->statements)
 			ii->CompileDeclarations(global);//guaranteed not to throw?
 	}
+
 
 	//load all types
 	//for (auto ii : this->types)
@@ -531,6 +555,7 @@ std::vector<std::string> Compiler::Compile(const char* projectdir, CompilerOptio
 	for (auto result : asts)
 	{
 		current_source = sources[result.first];
+		this->current_function = global;
 
 		//then do this for each file
 		for (auto ii : result.second->statements)
@@ -538,7 +563,6 @@ std::vector<std::string> Compiler::Compile(const char* projectdir, CompilerOptio
 			//catch any exceptions
 			try
 			{
-				this->current_function = global;
 				ii->Compile(global);
 			}
 			catch (...)
@@ -548,13 +572,14 @@ std::vector<std::string> Compiler::Compile(const char* projectdir, CompilerOptio
 		}
 	}
 
+
 	//figure out how to get me working with multiple definitions
 	//auto init = global->AddFunction("global", &IntType, {});
 	//init->Return(global->Number(6));
 	//todo: put intializers here and have this call main()
 
 error:
-
+	
 	if (errors > 0)
 	{
 		printf("Compiling Failed: %d Errors Found\n", errors);
@@ -582,9 +607,14 @@ error:
 		this->OutputPackage(project.project_name);
 
 		//then, if and only if I am an executable, make the .exe
+		//add this yo
+	//C:\Users\Matthew\Desktop\VM\AsmVM2\AsmVM\TTest\build>C:\"Program Files (x86)"\"M
+		//icrosoft Visual Studio 12.0"\VC\bin\link.exe ttest.o /OUT:ttest3.exe msvcrt.lib
+		//rant.lib
 		if (project.IsExecutable())
 		{
 			printf("Compiling Executable...\n");
+#ifdef USE_GCC
 			std::string cmd = "gcc -L. ";
 
 			cmd += "build/" + project.project_name + ".o ";
@@ -601,6 +631,19 @@ error:
 			cmd += " -L.";
 			for (auto ii : project.libs)
 				cmd += " -l" + ii;
+#else
+			std::string cmd = "link.exe ";
+
+			cmd += "build/" + project.project_name + ".o ";
+			cmd += "/OUT:build/" + project.project_name + ".exe ";
+
+			//need to link each dependency
+			for (auto ii : project.dependencies)
+				cmd += ii + "/build/lib" + GetNameFromPath(ii) + ".a ";
+
+			for (auto ii : project.libs)
+				cmd += " \"" + ii + "\"";
+#endif
 
 			auto res = exec(cmd.c_str());
 			printf(res.c_str());
@@ -617,7 +660,8 @@ error:
 			for (auto ii : project.dependencies)
 			{
 				//need to extract then merge
-				std::string cm = "ar x " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
+				//can use llvm-ar or just ar
+				std::string cm = "llvm-ar x " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
 				auto res = exec(cm.c_str());
 				printf(res.c_str());
 
@@ -666,13 +710,13 @@ error:
 	//delete stuff
 	for (auto ii : asts)
 	{
-		std::string out;
+		//std::string out;
 
 		if (errors == 0)
 		{
-			MemberRenamer renamer("string", "length", "apples", this);
-			ii.second->Visit(&renamer);
-			ii.second->Print(out, sources[ii.first]);
+			//MemberRenamer renamer("string", "length", "apples", this);
+			//ii.second->Visit(&renamer);
+			//ii.second->Print(out, sources[ii.first]);
 		}
 		//printf("%s",out.c_str());
 
@@ -690,7 +734,7 @@ error:
 
 	//restore working directory
 	chdir(olddir);
-	return project.dependencies;
+	return true;
 }
 
 void Compiler::Optimize()
@@ -910,10 +954,30 @@ void Compiler::OutputPackage(const std::string& project_name)
 				function += ");";
 			}
 		}
+		if (ii.second->type == Types::Trait)
+		{
+			types += "trait " + ii.first + "{";
+			for (auto fun : ii.second->trait->funcs)
+			{
+				types += " fun " + fun.second->return_type->ToString() + " " + fun.first + "(";
+				bool first = false;
+				for (auto arg : fun.second->argst)
+				{
+					if (first)
+						function += ",";
+					else
+						first = true;
+
+					types += arg.first->ToString() + " " + arg.second;
+				}
+				types += ");";
+			}
+			types += "}";
+		}
 	}
 
 	//output traits
-	for (auto ii : this->traits)
+	/*for (auto ii : this->traits)
 	{
 		types += "trait " + ii.first + "{";
 		for (auto fun : ii.second->funcs)
@@ -932,7 +996,7 @@ void Compiler::OutputPackage(const std::string& project_name)
 			types += ");";
 		}
 		types += "}";
-	}
+	}*/
 
 	//todo: only do this if im a library
 	std::ofstream stable("build/symbols.jlib", std::ios_base::binary);
@@ -951,7 +1015,7 @@ void Compiler::OutputIR(const char* filename)
 }
 
 
-Trait* Compiler::AdvanceTraitLookup(const std::string& name)
+/*Trait* Compiler::AdvanceTraitLookup(const std::string& name)
 {
 	auto trait = traits.find(name);
 	if (trait == traits.end())
@@ -962,11 +1026,12 @@ Trait* Compiler::AdvanceTraitLookup(const std::string& name)
 		t->name = name;
 		this->traits[name] = t;
 
+		//process templated traits
 		return t;
 	}
 
 	return trait->second;
-}
+}*/
 
 Jet::Type* Compiler::AdvanceTypeLookup(const std::string& name)
 {
@@ -1008,7 +1073,7 @@ Jet::Type* Compiler::AdvanceTypeLookup(const std::string& name)
 			types[name] = type;
 			return type;
 		}
-
+		//help im getting type duplication with templates7
 		//who knows what type it is, create a dummy one
 		Type* type = new Type;
 		type->name = name;
@@ -1093,6 +1158,8 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 				Error("Reference To Undefined Type '" + base + "'", *this->current_function->current_token);
 
 			Type* res = t->second->Instantiate(this, types);
+			//resolve the type name down to basics
+			auto realname = res->ToString();
 			this->types[name] = res;
 
 
@@ -1109,6 +1176,8 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 				for (auto ii : res->data->expression->members)//functions)
 					if (ii.type == StructMember::FunctionMember)
 						ii.function->CompileDeclarations(this->current_function);
+
+				expr->name.text = res->data->name;
 
 				for (auto ii : res->data->expression->members)//functions)
 					if (ii.type == StructMember::FunctionMember)

@@ -403,7 +403,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			auto ttraits = Struct->GetTraits(this->parent);
 			for (auto tr : ttraits)
 			{
-				auto frange = tr->extension_methods.equal_range(name);
+				auto frange = tr.second->extension_methods.equal_range(name);
 				for (auto ii = frange.first; ii != frange.second; ii++)
 				{
 					//printf("found function option for %s\n", name.c_str());
@@ -416,13 +416,16 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				if (fun)
 				{
 					//massive hack again, like in templates
-					this->parent->types[tr->name] = Struct;
+					this->parent->types[tr.second->name] = Struct;
 
 					auto rp = this->parent->builder.GetInsertBlock();
 
 					//compile function
 					auto oldn = fun->expression->Struct.text;
 					fun->expression->Struct.text = Struct->data->name;
+					int i = 0;
+					for (auto ii : tr.second->templates)
+						this->parent->types[ii.second] = tr.first[i++];
 
 					fun->expression->CompileDeclarations(this);
 					fun->expression->DoCompile(this);

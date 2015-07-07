@@ -62,7 +62,37 @@ void Type::Load(Compiler* compiler)
 				if (name[p] == '<')
 					break;
 
+			//look up the base, and lets instantiate it
 			std::string base = name.substr(0, p);
+			auto t = compiler->types.find(base);
+			if (t == compiler->types.end())
+				Error("Reference To Undefined Type '" + base + "'", *compiler->current_function->current_token);
+			else if (t->second->type == Types::Trait)
+			{
+				printf("was a trait");
+				std::vector<Type*> types;
+				p++;
+				do
+				{
+					//lets cheat for the moment ok
+					std::string subtype;
+					do
+					{
+						subtype += name[p];
+						p++;
+					} while (name[p] != ',' && name[p] != '>');
+
+					Type* t = compiler->AdvanceTypeLookup(subtype);
+					types.push_back(t);
+				} while (name[p++] != '>');
+
+				this->type = Types::Trait;
+				this->trait = new Trait;
+				*this->trait = *t->second->trait;
+				this->trait->template_args = types;
+
+				return;
+			}
 
 			//parse types
 			std::vector<Type*> types;
@@ -80,15 +110,27 @@ void Type::Load(Compiler* compiler)
 				Type* t = compiler->LookupType(subtype);
 				types.push_back(t);
 			} while (name[p++] != '>');
-
-			//look up the base, and lets instantiate it
-			auto t = compiler->types.find(base);
-			if (t == compiler->types.end())
-				Error("Reference To Undefined Type '" + base + "'", *compiler->current_function->current_token);
-
+			
 			Type* res = t->second->Instantiate(compiler, types);
-			*this = *res;
-			//compiler->types[name] = res;
+			//check to see if it was already instantiated
+			auto realname = res->ToString();
+			auto iter = compiler->types.find(realname);
+			if (iter == compiler->types.end())
+			{
+				*this = *res;
+
+				//make sure the real thing is stored as this
+				auto realname = res->ToString();
+
+				compiler->types[realname] = res;
+			}
+			else
+			{
+				if (this != iter->second)
+					*this = *iter->second;
+				else
+					*this = *res;
+			}	
 
 			//compile its functions
 			if (res->data->expression->members.size() > 0)
@@ -130,17 +172,58 @@ bool IsMatch(Function* a, Function* b)
 	if (a->return_type != b->return_type)
 		return false;
 
-	if (a->argst.size() != b->argst.size()-1)
+	if (a->argst.size() != b->argst.size() - 1)
 		return false;
 
 	for (int i = 1; i < a->argst.size(); i++)
-		if (a->argst[i].first != b->argst[i-1].first)
+		if (a->argst[i].first != b->argst[i - 1].first)
 			return false;
 
 	return true;
 }
 
-std::vector<Trait*> Type::GetTraits(Compiler* compiler)
+void FindTemplates(Compiler* compiler, Type** types, Type* type, Type* match_type, Trait* trait)
+{
+	int i = 0;
+	bool was_template = false;
+	for (auto temp : trait->templates)
+	{
+		if (match_type->name == temp.second)
+		{
+			if (types[i] && types[i] != type)
+				Error("Does not match trait", *compiler->current_function->current_token);
+			types[i] = type;
+			was_template = true;
+			printf("found the template type!");
+		}
+		i++;
+	}
+	if (was_template == false && match_type->name.back() == '>')
+	{
+		auto traits = type->GetTraits(compiler);
+		//see if it is templated, if it is, look through its templates
+		std::string basename = match_type->name.substr(0, match_type->name.length() - 3);
+		for (auto ii : traits)
+		{
+			if (ii.second->name == basename)
+			{
+				printf("it matches the trait!");
+				match_type->Load(compiler);
+				for (int i = 0; i < type->data->template_args.size(); i++)
+				{
+					FindTemplates(compiler, types, type->data->template_args[i], match_type->trait->template_args[i], ii.second);
+				}			
+
+				//check if template values match any
+				//ok, now see what the template values are
+				break;
+			}
+		}
+		printf("loaded yo");
+	}
+}
+
+std::vector<std::pair<Type**,Trait*>> Type::GetTraits(Compiler* compiler)
 {
 	if (this->traits.size())
 		return this->traits;
@@ -150,6 +233,76 @@ std::vector<Trait*> Type::GetTraits(Compiler* compiler)
 	{
 		if (this->type == Types::Struct)
 		{
+			if (ii.second->templates.size())
+			{
+				//first get a list 
+				//this is gonna be fun
+				//need to look for matching type sets
+				//infer templates
+				Type** types = new Type*[ii.second->templates.size()];
+				for (int i = 0; i < ii.second->templates.size(); i++)
+					types[i] = 0;// compiler->LookupType("int");//cheat for now
+
+				bool match = true;
+				for (auto fun : ii.second->funcs)
+				{
+					auto range = this->data->functions.equal_range(fun.first);
+					if (range.first == range.second)
+					{
+						match = false;
+						break;//couldnt find it, doesnt match
+					}
+
+					//try and infer types
+					//lets just go with first option for the moment
+					//printf("inferring types...");
+
+					if (range.first->second->return_type)
+						FindTemplates(compiler, types, range.first->second->return_type, fun.second->return_type, ii.second);
+
+					//do it for args
+					for (int i = 1; i < range.first->second->argst.size(); i++)
+						FindTemplates(compiler, types, range.first->second->argst[i].first, fun.second->argst[i - 1].first, ii.second);
+					/*if (range.first->second->return_type)
+					{
+						//check if return type is the template
+						int i = 0;
+						bool was_template = false;
+						for (auto temp : ii.second->templates)
+						{
+							if (fun.second->return_type->name == temp.second)
+							{
+								types[i] = range.first->second->return_type;
+								//range.first->second->return_type->name
+								was_template = true;
+								printf("found the template type!");
+							}
+							i++;
+						}
+						if (was_template == false && fun.second->return_type->name.back() == '>')
+						{
+							auto traits = range.first->second->return_type->GetTraits(compiler);
+							//see if it is templated, if it is, look through its templates
+							std::string basename = fun.second->return_type->name.substr(0, fun.second->return_type->name.length() - 3);
+							for (auto ii : traits)
+							{
+								if (ii.second->name == basename)
+								{
+									printf("it matches the trait!");
+
+									//check if template values match any
+									//ok, now see what the template values are
+									break;
+								}
+							}
+							printf("loaded yo");
+						}
+					}*/
+				}
+				if (match)
+					this->traits.push_back({ types, ii.second });
+				continue;
+			}
 			bool match = true;
 			for (auto fun : ii.second->funcs)
 			{
@@ -176,7 +329,7 @@ std::vector<Trait*> Type::GetTraits(Compiler* compiler)
 			if (ii.second->funcs.size())
 				continue;//only add if no functions
 		}
-		this->traits.push_back(ii.second);
+		this->traits.push_back({ 0, ii.second });
 	}
 	return this->traits;
 }
@@ -187,7 +340,7 @@ bool Type::MatchesTrait(Compiler* compiler, Trait* t)
 	bool found = false;
 	for (auto tr : ttraits)
 	{
-		if (tr == t)
+		if (tr.second == t)
 		{
 			found = true;
 			break;
@@ -203,8 +356,8 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	for (auto ii : this->data->templates)
 	{
 		//check if traits match
-		if (types[i]->MatchesTrait(compiler, ii.first) == false)
-			Error("Type '"+types[i]->name+"' doesn't match Trait '"+ii.first->name+"'", *compiler->current_function->current_token);
+		if (types[i]->MatchesTrait(compiler, ii.first->trait) == false)
+			Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
 
 		//lets be stupid and just register the type
 		//CHANGE ME LATER, THIS OVERRIDES TYPES, OR JUST RESTORE AFTER THIS
@@ -224,6 +377,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 		}
 	}
 
+	str->template_args = types;
 	str->template_base = this->data;
 	str->name = this->data->name + "<";
 	for (int i = 0; i < this->data->templates.size(); i++)
@@ -381,13 +535,13 @@ Function* Function::Instantiate(Compiler* compiler, const std::vector<Type*>& ty
 	int i = 0;
 	for (auto ii : this->templates)
 	{
-		//check if traits match
-		if (types[i]->MatchesTrait(compiler, ii.first) == false)
-			Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
+	//check if traits match
+	if (types[i]->MatchesTrait(compiler, ii.first) == false)
+	Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
 
-		//lets be stupid and just register the type
-		//CHANGE ME LATER, THIS OVERRIDES TYPES, OR JUST RESTORE AFTER THIS
-		compiler->types[ii.second] = types[i++];
+	//lets be stupid and just register the type
+	//CHANGE ME LATER, THIS OVERRIDES TYPES, OR JUST RESTORE AFTER THIS
+	compiler->types[ii.second] = types[i++];
 	}
 
 	//duplicate and load
@@ -395,21 +549,21 @@ Function* Function::Instantiate(Compiler* compiler, const std::vector<Type*>& ty
 	//build members
 	for (auto ii : this->expression->members)
 	{
-		if (ii.type == StructMember::VariableMember)
-		{
-			auto type = compiler->AdvanceTypeLookup(ii.variable.first.text);
+	if (ii.type == StructMember::VariableMember)
+	{
+	auto type = compiler->AdvanceTypeLookup(ii.variable.first.text);
 
-			str->members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
-		}
+	str->members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
+	}
 	}
 
 	str->template_base = this->data;
 	str->name = this->data->name + "<";
 	for (int i = 0; i < this->data->templates.size(); i++)
 	{
-		str->name += types[i]->ToString();
-		if (i < this->data->templates.size() - 1)
-			str->name += ',';
+	str->name += types[i]->ToString();
+	if (i < this->data->templates.size() - 1)
+	str->name += ',';
 	}
 	str->name += ">";
 	str->expression = this->data->expression;
@@ -418,5 +572,5 @@ Function* Function::Instantiate(Compiler* compiler, const std::vector<Type*>& ty
 	t->Load(compiler);
 
 	return t; */
-		return 0;
+	return 0;
 }

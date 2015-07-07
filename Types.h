@@ -26,6 +26,8 @@ namespace Jet
 		Struct,//value type
 		Function,
 
+		Trait,//cant instantiate this!!
+
 		Pointer,
 		Array,//acts just like a pointer
 
@@ -39,7 +41,7 @@ namespace Jet
 	struct Trait;
 	class Type
 	{
-		std::vector<Trait*> traits;//all the traits that apply to this type
+		std::vector<std::pair<Type**,Trait*>> traits;//all the traits that apply to this type
 
 	public:
 
@@ -49,13 +51,14 @@ namespace Jet
 		{
 			Struct* data;//for classes
 			Type* base;//for pointers and arrays
+			Trait* trait;
 		};
 		unsigned int size;//for arrays
 
 		std::string name;
 
 
-		std::vector<Trait*> GetTraits(Compiler* compiler);
+		std::vector<std::pair<Type**,Trait*>> GetTraits(Compiler* compiler);
 		bool MatchesTrait(Compiler* compiler, Trait* trait);
 		
 		Type() { data = 0; type = Types::Void; loaded = false; size = 0; }
@@ -82,6 +85,10 @@ namespace Jet
 		std::multimap<std::string, Function*> funcs;
 
 		std::multimap<std::string, Function*> extension_methods;
+
+		//template stuff
+		std::vector<std::pair<Type*,std::string>> templates;
+		std::vector<Type*> template_args;
 	};
 
 	class StructExpression;
@@ -105,8 +112,11 @@ namespace Jet
 
 		//template stuff
 		Struct* template_base;
-		std::vector<std::pair<Trait*, std::string>> templates;
+		std::vector<std::pair<Type*, std::string>> templates;
+		std::vector<Type*> template_args;
 		StructExpression* expression;
+
+		//std::vector<std::pair<std::vector<Type*>, Type*>> instantiations;
 
 		Struct()
 		{

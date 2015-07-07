@@ -6,8 +6,107 @@
 
 using namespace Jet;
 
+
+Token ParseType(Parser* parser)
+{
+	Token name = parser->Consume(TokenType::Name);
+	std::string out = name.text;
+	while (parser->MatchAndConsume(TokenType::Asterisk))//parse pointers
+		out += '*';
+
+	//parse templates
+	if (parser->MatchAndConsume(TokenType::LessThan))
+	{
+		out += "<";
+		//recursively parse the rest
+		bool first = true;
+		do
+		{
+			if (first == false)
+				out += ",";
+			first = false;
+			out += ParseType(parser).text;
+		} while (parser->MatchAndConsume(TokenType::Comma));
+
+		parser->Consume(TokenType::GreaterThan);
+		out += ">";
+	}
+
+	Token ret;
+	ret.column = name.column;
+	ret.line = name.line;
+	ret.trivia_length = name.trivia_length;
+	ret.text_ptr = name.text_ptr;
+	ret.text = out;
+	return ret;
+}
+
+Token ParseTrait(Parser* parser)
+{
+	Token name = parser->Consume(TokenType::Name);
+	std::string out = name.text;
+
+	//parse templates
+	if (parser->MatchAndConsume(TokenType::LessThan))
+	{
+		out += "<";
+		//recursively parse the rest
+		bool first = true;
+		do
+		{
+			if (first == false)
+				out += ",";
+			first = false;
+			out += ParseType(parser).text;
+		} while (parser->MatchAndConsume(TokenType::Comma));
+
+		parser->Consume(TokenType::GreaterThan);
+		out += ">";
+	}
+
+	Token ret;
+	ret.column = name.column;
+	ret.line = name.line;
+	ret.trivia_length = name.trivia_length;
+	ret.text_ptr = name.text_ptr;
+	ret.text = out;
+	return ret;
+}
+
 Expression* NameParselet::parse(Parser* parser, Token token)
 {
+	if (parser->Match(TokenType::LessThan))
+	{
+		//check if the token after the next this is a , or a > if it is, then im a template
+		Token ahead = parser->LookAhead(2);
+		if (ahead.type != TokenType::Comma && ahead.type != TokenType::GreaterThan)
+			return new NameExpression(token);
+
+		parser->Consume(TokenType::LessThan);
+
+		token.text += "<";
+		//parse it as if it is a template
+		std::vector<Token>* templates = new std::vector < Token >();
+		bool first = true;
+		do
+		{
+			if (first)
+				first = false;
+			else
+				token.text += ",";
+			Token tname = ParseType(parser);
+			token.text += tname.text;
+			templates->push_back(tname);
+		} while (parser->MatchAndConsume(TokenType::Comma));
+		parser->Consume(TokenType::GreaterThan);
+
+		token.text += ">";
+
+		//actually, just treat me as a nameexpression, that should work
+		//idk, but what to do with the template stuff
+		//ok need to use these templates
+		return new NameExpression(token, templates);
+	}
 	return new NameExpression(token);
 }
 
@@ -53,40 +152,6 @@ Expression* PrefixOperatorParselet::parse(Parser* parser, Token token)
 		ParserError("PrefixOperatorParselet: Right hand side missing!", token);
 
 	return new PrefixExpression(token, right);
-}
-
-Token ParseType(Parser* parser)
-{
-	Token name = parser->Consume(TokenType::Name);
-	std::string out = name.text;
-	while (parser->MatchAndConsume(TokenType::Asterisk))//parse pointers
-		out += '*';
-	
-	//parse templates
-	if (parser->MatchAndConsume(TokenType::LessThan))
-	{
-		out += "<";
-		//recursively parse the rest
-		bool first = true;
-		do
-		{
-			if (first == false)
-				out += ",";
-			first = false;
-			out += ParseType(parser).text;
-		} while (parser->MatchAndConsume(TokenType::Comma));
-
-		parser->Consume(TokenType::GreaterThan);
-		out += ">";
-	}
-
-	Token ret;
-	ret.column = name.column;
-	ret.line = name.line;
-	ret.trivia_length = name.trivia_length;
-	ret.text_ptr = name.text_ptr;
-	ret.text = out;
-	return ret;
 }
 
 Expression* SizeofParselet::parse(Parser* parser, Token token)
@@ -248,8 +313,31 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 {
 	Token name = parser->Consume(TokenType::Name);
 
+	//parse templates
+	std::vector<std::pair<Token,Token>>* templated = 0;
+	if (parser->MatchAndConsume(TokenType::LessThan))
+	{
+		templated = new std::vector<std::pair<Token,Token>>;
+		//parse types and stuff
+		do
+		{
+			Token ttname = parser->Consume(TokenType::Name);
+			Token tname = parser->LookAhead();
+			if (tname.type == TokenType::Name)
+				parser->Consume(TokenType::Name);
+			else
+			{
+				tname = ttname;
+				ttname = Token();
+			}
+			
+			templated->push_back({ ttname, tname });
+		} while (parser->MatchAndConsume(TokenType::Comma));
+		parser->Consume(TokenType::GreaterThan);
+	}
+
 	parser->Consume(TokenType::LeftBrace);
-	
+
 	std::vector<TraitFunction> functions;
 	while (parser->MatchAndConsume(TokenType::RightBrace) == false)
 	{
@@ -259,7 +347,7 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 		func.name = parser->Consume(TokenType::Name);
 
 		parser->Consume(TokenType::LeftParen);
-		
+
 		bool first = true;
 		while (parser->MatchAndConsume(TokenType::RightParen) == false)
 		{
@@ -271,14 +359,14 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 			//parse args
 			func.args.push_back(ParseType(parser));
 			Token arg = parser->Consume(TokenType::Name);
-		} 
+		}
 
 		functions.push_back(func);
 
 		parser->Consume(TokenType::Semicolon);
 	}
 
-	return new TraitExpression(token, name, std::move(functions));
+	return new TraitExpression(token, name, std::move(functions), templated);
 }
 
 Expression* StructParselet::parse(Parser* parser, Token token)
@@ -293,7 +381,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		//parse types and stuff
 		do
 		{
-			Token ttname = parser->Consume(TokenType::Name);
+			Token ttname = ParseTrait(parser);// parser->Consume(TokenType::Name);
 			Token tname = parser->Consume(TokenType::Name);
 
 			templated->push_back({ ttname, tname });
@@ -408,11 +496,11 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	std::vector<std::pair<Token, Token>>* templated = 0;
 	if (parser->MatchAndConsume(TokenType::LessThan))
 	{
-		templated = new std::vector < std::pair<Token, Token> >;
+		templated = new std::vector < std::pair<Token, Token> > ;
 		//parse types and stuff
 		do
 		{
-			Token ttname = parser->Consume(TokenType::Name);
+			Token ttname = ParseTrait(parser);// parser->Consume(TokenType::Name);
 			Token tname = parser->Consume(TokenType::Name);
 
 			templated->push_back({ ttname, tname });

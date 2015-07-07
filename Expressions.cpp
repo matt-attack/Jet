@@ -159,10 +159,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 			}
 
 			if (index >= lhs.type->data->members.size())
-			{
 				Error("Struct Member '" + string->GetValue() + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
-				//not found;
-			}
 
 			return lhs.type->data->members[index].type;
 		}
@@ -176,10 +173,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 			}
 
 			if (index >= lhs.type->data->members.size())
-			{
 				Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
-				//not found;
-			}
 
 			return lhs.type->data->members[index].type;
 		}
@@ -193,10 +187,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 			}
 
 			if (index >= lhs.type->base->data->members.size())
-			{
 				Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->data->name + "' Not Found", this->token);
-				//not found;
-			}
 
 			return lhs.type->base->data->members[index].type;
 		}
@@ -232,9 +223,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 					break;
 			}
 			if (index >= type->data->members.size())
-			{
 				Error("Struct Member '" + this->member.text + "' of Struct '" + type->data->name + "' Not Found", this->token);
-			}
 
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
@@ -411,6 +400,8 @@ CValue CallExpression::Compile(CompilerContext* context)
 	{
 		//ok handle what to do if im an index expression
 		fname = name->GetName();
+
+		//need to use the template stuff how to get it working with index expressions tho???
 	}
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
 	{
@@ -552,18 +543,21 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	//need to not compile if template or trait
 	if (this->templates)
 	{
-		for (auto ii : *this->templates)//make sure traits are valid
+		Error("Not implemented!", token);
+		/*for (auto ii : *this->templates)//make sure traits are valid
 		{
 			auto iter = context->parent->traits.find(ii.first.text);
 			if (iter == context->parent->traits.end() || iter->second->valid == false)
 				Error("Trait '" + ii.first.text + "' is not defined", ii.first);
-		}
+		}*/
 		return CValue();
 	}
 
-	if (context->parent->traits.find(Struct) != context->parent->traits.end())
+	if (Struct.length())
 	{
-		return CValue();
+		auto iter = context->parent->types.find(Struct);
+		if (iter->second->type == Types::Trait)
+			return CValue();
 	}
 
 	return this->DoCompile(context);
@@ -603,13 +597,14 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		if (range.first == range.second)
 		{
 			//it wasnt found, search through traits
-			auto range = context->parent->traits[Struct]->extension_methods.equal_range(fname);
+			printf("fixme?");
+			/*auto range = context->parent->traits[Struct]->extension_methods.equal_range(fname);
 			for (auto ii = range.first; ii != range.second; ii++)
 			{
 				//pick one with the right number of args
 				if (ii->second->argst.size() == argsv.size())
 					ii->second->f = function->f;
-			}
+			}*/
 		}
 		else
 		{
@@ -661,6 +656,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 void FunctionExpression::CompileDeclarations(CompilerContext* context)
 {
+	context->CurrentToken(&this->token);
 	std::string fname;
 	if (name.text.length() > 0)
 		fname = name.text;
@@ -672,11 +668,44 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	fun->expression = this;
 
 	auto str = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
+
+
+	//todo: modulate actual name of function
+	fun->name = this->GetRealName();
+	fun->f = 0;
+	bool is_trait = false;
+	if (str.length() > 0)
+	{
+		auto type = context->parent->LookupType(str);
+		if (type->type == Types::Trait)
+		{
+			//if its invalid, try to load it
+			//if (iter != context->parent->types.end())
+			//	iter->second->Load(context->parent);
+
+			//auto tr = context->parent->traits.find(str);
+			//if (tr == context->parent->traits.end())
+				//Error("Type '" + str + "' does not exist", token);
+
+			type->trait->extension_methods.insert({ fname, fun });
+			is_trait = true;
+		}
+		else
+		{
+			auto tr = context->parent->LookupType(str);
+			tr->data->functions.insert({ fname, fun });
+		}
+	}
+	else
+		context->parent->functions.insert({ fname, fun });
+
 	if (str.length() > 0)
 	{
 		//im a member function
 		//insert first arg, which is me
-		auto type = context->parent->AdvanceTypeLookup(str + "*");
+		Type* type = 0;
+		if (is_trait == false)
+			type = context->parent->AdvanceTypeLookup(str + "*");
 
 		fun->argst.push_back({ type, "this" });
 	}
@@ -687,26 +716,6 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 
 		fun->argst.push_back({ type, ii.second });
 	}
-
-	//todo: modulate actual name of function
-	fun->name = this->GetRealName();
-	fun->f = 0;
-	if (str.length() > 0)
-	{
-		auto iter = context->parent->types.find(str);
-		if (iter == context->parent->types.end() || iter->second->type == Types::Invalid)
-		{
-			auto tr = context->parent->traits.find(str);
-			if (tr == context->parent->traits.end())
-				Error("Type '" + str + "' does not exist", token);
-
-			tr->second->extension_methods.insert({ fname, fun });
-		}
-		else
-			context->parent->types[str]->data->functions.insert({ fname, fun });
-	}
-	else
-		context->parent->functions.insert({ fname, fun });
 }
 
 CValue ExternExpression::Compile(CompilerContext* context)
@@ -848,8 +857,8 @@ CValue StructExpression::Compile(CompilerContext* context)
 		//verify that all traits are valid
 		for (auto ii : *this->templates)
 		{
-			auto iter = context->parent->traits.find(ii.first.text);
-			if (iter == context->parent->traits.end() || iter->second->valid == false)
+			auto iter = context->parent->types.find(ii.first.text);
+			if (iter == context->parent->types.end() || iter->second->type != Types::Trait)
 				Error("Trait '"+ii.first.text+"' is not defined", ii.first);
 		}
 		return CValue();
@@ -891,7 +900,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	if (this->templates)
 	{
 		for (auto ii : *this->templates)
-			str->data->templates.push_back({ context->parent->AdvanceTraitLookup(ii.first.text), ii.second.text });
+			str->data->templates.push_back({ context->parent->AdvanceTypeLookup(ii.first.text), ii.second.text });
 	}
 
 	for (auto ii : this->members)
@@ -906,7 +915,8 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		}
 		else
 		{
-			ii.function->CompileDeclarations(context);
+			if (this->templates == 0)
+				ii.function->CompileDeclarations(context);
 		}
 	}
 

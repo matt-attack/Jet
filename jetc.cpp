@@ -94,6 +94,7 @@ public:
 
 	void Parse(const std::string& args)
 	{
+		//just parse it into an array of space separated things to process below
 		int pos = 0;
 		while (pos < args.length())
 		{
@@ -115,12 +116,41 @@ public:
 			}
 		}
 	}
+
+	void Parse(int argc, char ** args)
+	{
+		for (int i = 2; i < argc; i++)
+		{
+			if (args[i][0] == '-')
+			{
+				//its an arg
+				char o = args[i][1];
+				std::string option;
+				option += o;
+
+				//read in value
+				std::string value;
+				int pos = 2;
+				while (args[i][pos])
+					value += args[i][pos++];
+
+				auto find = vars.find(option);
+				if (find != vars.end())
+					vars[option].SetValue(value);
+			}
+		}
+	}
 };
 
 int main(int argc, char* argv[])
 {
 	if (argc > 1)//if we get a command, just try and build the project at that path
 	{
+		OptionParser parser;
+		parser.AddOption("o", "0");
+		parser.AddOption("f", "0");
+		parser.Parse(argc, argv);
+
 		Jet::Compiler c;
 		if (strcmp(argv[1], "build") == 0)
 			c.Compile("");
@@ -139,13 +169,13 @@ int main(int argc, char* argv[])
 
 		Jet::Compiler c2;
 
-		if (strncmp(command, "run ", 4) == 0)
+		/*if (strncmp(command, "run ", 4) == 0)
 		{
 			printf("got run command");
 			int len = strlen(command) - 4;
 			memmove(command, command + 4, len);
 			command[len] = 0;
-		}
+		}*/
 		
 		int i = 0;
 		while (command[i] != ' ' && command[i] != 0)

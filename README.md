@@ -6,7 +6,7 @@ A work in progress compiled language that uses a LLVM backend. Currently the lan
 
 Currently the build only works on Windows, but it shouldn't take much more than changing a few function calls to port to Linux/Mac.
 
-In order to build the compiler you need to have LLVM and in order to use the compiler you need Clang.
+In order to build the compiler you need to have LLVM and in order to use the compiler you need GCC.
 
 #### Notable Features So Far:
 - Structs
