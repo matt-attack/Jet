@@ -113,10 +113,10 @@ namespace Jet
 		//returns if was successful
 		bool Compile(const char* projectfile, CompilerOptions* options = 0);
 
-		void Optimize();
+		void Optimize(int level);
 
 		void OutputIR(const char* filename);
-		void OutputPackage(const std::string& project_name);
+		void OutputPackage(const std::string& project_name, int o_level);
 
 		void Dump()
 		{

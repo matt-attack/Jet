@@ -167,12 +167,6 @@ void Type::Load(Compiler* compiler)
 			{
 				//lets cheat for the moment ok
 				std::string subtype = ParseType(name.c_str(), p);
-				/*std::string subtype;
-				do
-				{
-					subtype += name[p];
-					p++;
-				} while (name[p] != ',' && name[p] != '>');*/
 
 				Type* t = compiler->LookupType(subtype);
 				types.push_back(t);
@@ -198,28 +192,6 @@ void Type::Load(Compiler* compiler)
 				else
 					*this = *res;
 			}
-
-			//compile its functions
-			/*if (res->data->expression->members.size() > 0)
-			{
-				StructExpression* expr = dynamic_cast<StructExpression*>(res->data->expression);// ->functions->back()->Parent);
-				auto oldname = expr->name;
-				expr->name.text = res->data->name;
-
-				//store then restore insertion point
-				auto rp = compiler->builder.GetInsertBlock();
-
-				for (auto ii : res->data->expression->members)//functions)
-					if (ii.type == StructMember::FunctionMember)
-						ii.function->CompileDeclarations(compiler->current_function);
-
-				for (auto ii : res->data->expression->members)//functions)
-					if (ii.type == StructMember::FunctionMember)
-						ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
-
-				compiler->builder.SetInsertPoint(rp);
-				expr->name = oldname;
-			}*/
 		}
 		else if (this->name.back() == ')')
 		{
@@ -237,11 +209,7 @@ void Type::Load(Compiler* compiler)
 			while (name[p] != ')')
 			{
 				//lets cheat for the moment ok
-				std::string subtype;
-				do
-				{
-					subtype += name[p++];
-				} while (name[p] != ',' && name[p] != ')');
+				std::string subtype = ParseType(name.c_str(), p);
 
 				Type* t = compiler->LookupType(subtype);
 				args.push_back(t);
@@ -432,8 +400,6 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 		if (types[i]->MatchesTrait(compiler, ii.first->trait) == false)
 			Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
 
-		//lets be stupid and just register the type
-		//CHANGE ME LATER, THIS OVERRIDES TYPES, OR JUST RESTORE AFTER THIS
 		old.push_back({ ii.second, compiler->types[ii.second] });
 		compiler->types[ii.second] = types[i++];
 	}
@@ -483,18 +449,18 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	//compile its functions
 	if (t->data->expression->members.size() > 0)
 	{
-		StructExpression* expr = dynamic_cast<StructExpression*>(t->data->expression);// ->functions->back()->Parent);
+		StructExpression* expr = dynamic_cast<StructExpression*>(t->data->expression);
 		auto oldname = expr->name;
 		expr->name.text = t->data->name;
 
 		//store then restore insertion point
 		auto rp = compiler->builder.GetInsertBlock();
 
-		for (auto ii : t->data->expression->members)//functions)
+		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->CompileDeclarations(compiler->current_function);
 
-		for (auto ii : t->data->expression->members)//functions)
+		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
 
@@ -502,7 +468,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 		expr->name = oldname;
 	}
 
-	exit:
+exit:
 	//restore template types
 	for (auto ii : old)
 	{
@@ -511,11 +477,14 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 			compiler->types[ii.first] = ii.second;
 		else
 			compiler->types.erase(compiler->types.find(ii.first));
-			//compiler->types[ii.first]->type = Types::Invalid;
-		compiler->types.erase(compiler->types.find(ii.first + "*"));
+
+		//need to get rid of all references to it, or blam
+		auto iter = compiler->types.find(ii.first + "*");
+		if (iter != compiler->types.end())
+			compiler->types.erase(iter);
 	}
 	//need to restore pointers and such as well
-		//one solution is to not cache pointers at all
+	//one solution is to not cache pointers at all
 
 	return t;
 }
@@ -688,8 +657,6 @@ Function* Function::Instantiate(Compiler* compiler, const std::vector<Type*>& ty
 
 Type* Function::GetType(Compiler* compiler)
 {
-	//	todo :D
-	//build the type name from the args and return type
 	std::string type;
 	type += return_type->ToString();
 	type += "(";

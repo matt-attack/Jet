@@ -102,6 +102,7 @@ Compiler::~Compiler()
 #include <llvm\Support\TargetRegistry.h>
 #include <llvm\Target\TargetMachine.h>
 #include <llvm\Target\TargetSubtargetInfo.h>
+#include <llvm/Transforms/IPO.h>
 
 #include <Windows.h>
 
@@ -595,14 +596,14 @@ error:
 		if (options)
 		{
 			if (options->optimization > 0)
-				this->Optimize();
+				this->Optimize(options->optimization);
 		}
+
+		//output the .o file for this package
+		this->OutputPackage(project.project_name, options ? options->optimization : 0);
 
 		//output the IR for debugging
 		this->OutputIR("build/output.ir");
-
-		//output the .o file for this package
-		this->OutputPackage(project.project_name);
 
 		//then, if and only if I am an executable, make the .exe
 		if (project.IsExecutable())
@@ -731,7 +732,7 @@ error:
 	return true;
 }
 
-void Compiler::Optimize()
+void Compiler::Optimize(int level)
 {
 	llvm::legacy::FunctionPassManager OurFPM(module);
 	// Set up the optimizer pipeline.  Start with registering info about how the
@@ -752,6 +753,12 @@ void Compiler::Optimize()
 	// Simplify the control flow graph (deleting unreachable blocks, etc).
 	OurFPM.add(llvm::createCFGSimplificationPass());
 
+	
+	if (level > 1)
+	{
+		OurFPM.add(llvm::createDeadCodeEliminationPass());
+	}
+
 	OurFPM.doInitialization();
 
 	for (auto ii : this->functions)
@@ -763,7 +770,7 @@ void Compiler::Optimize()
 	//run it on member functions
 	for (auto ii : this->types)
 	{
-		if (ii.second->type == Types::Struct)
+		if (ii.second && ii.second->type == Types::Struct)
 		{
 			for (auto fun : ii.second->data->functions)
 			{
@@ -806,7 +813,7 @@ void Compiler::SetTarget()
 	module->setDataLayout(this->target->getSubtargetImpl()->getDataLayout());
 }
 
-void Compiler::OutputPackage(const std::string& project_name)
+void Compiler::OutputPackage(const std::string& project_name, int o_level)
 {
 	llvm::legacy::PassManager MPM;
 
@@ -820,10 +827,13 @@ void Compiler::OutputPackage(const std::string& project_name)
 	if (true)
 		TLI->disableAllFunctions();
 	MPM.add(TLI);
-
+	if (o_level > 0)
+	{
+		MPM.add(llvm::createFunctionInliningPass(o_level,3));
+	}
 	MPM.add(new llvm::DataLayoutPass());
 	target->addPassesToEmitFile(MPM, oo, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
-
+	
 	//std::error_code ecc;
 	//llvm::raw_fd_ostream strrr("build/" + project_name + ".s", ecc, llvm::sys::fs::OpenFlags::F_None);
 	//llvm::formatted_raw_ostream oo2(strrr);
@@ -1138,11 +1148,6 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 			{
 				//lets cheat for the moment ok
 				std::string subtype = ParseType(name.c_str(), p);
-				/*std::string subtype;
-				do
-				{
-					subtype += name[p++];
-				} while (name[p] != ',' && name[p] != '>');*/
 
 				Type* t = this->LookupType(subtype);
 				types.push_back(t);
@@ -1163,31 +1168,6 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 			//else
 				//this->types[realname] = res;
 
-
-			//compile its functions
-			/*if (res->data->expression->members.size() > 0)
-			{
-				StructExpression* expr = dynamic_cast<StructExpression*>(res->data->expression);// ->functions->back()->Parent);
-				auto oldname = expr->name;
-				expr->name.text = res->data->name;
-
-				//store then restore insertion point
-				auto rp = this->builder.GetInsertBlock();
-
-				for (auto ii : res->data->expression->members)//functions)
-					if (ii.type == StructMember::FunctionMember)
-						ii.function->CompileDeclarations(this->current_function);
-
-				//expr->name.text = res->data->name;
-
-				for (auto ii : res->data->expression->members)//functions)
-					if (ii.type == StructMember::FunctionMember)
-						ii.function->DoCompile(this->current_function);//the context used may not be proper, but it works
-
-				this->builder.SetInsertPoint(rp);
-				expr->name = oldname;
-			}*/
-
 			type = res;
 		}
 		else if (name[name.length() - 1] == ')')
@@ -1206,23 +1186,13 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 			while (name[p] != ')')
 			{
 				//lets cheat for the moment ok
-				std::string subtype;
-				do
-				{
-					subtype += name[p];
-					p++;
-				} while (name[p] != ',' && name[p] != ')');
+				std::string subtype = ParseType(name.c_str(), p);
 
 				Type* t = this->LookupType(subtype);
 				args.push_back(t);
 				if (name[p] == ',')
 					p++;
 			} 
-			/*while (name[p+1] != ')')
-			{
-				fix this
-				Error("function pointer arguments not implemented", *this->current_function->current_token);
-			}*/
 			
 			auto t = new FunctionType;
 			t->args = args;
