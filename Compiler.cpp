@@ -546,7 +546,6 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 			ii->CompileDeclarations(global);//guaranteed not to throw?
 	}
 
-
 	//load all types
 	//for (auto ii : this->types)
 		//if (!(ii.second->type == Types::Struct && ii.second->data->templates.size()))
@@ -571,7 +570,6 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 			}
 		}
 	}
-
 
 	//figure out how to get me working with multiple definitions
 	//auto init = global->AddFunction("global", &IntType, {});
@@ -607,10 +605,6 @@ error:
 		this->OutputPackage(project.project_name);
 
 		//then, if and only if I am an executable, make the .exe
-		//add this yo
-	//C:\Users\Matthew\Desktop\VM\AsmVM2\AsmVM\TTest\build>C:\"Program Files (x86)"\"M
-		//icrosoft Visual Studio 12.0"\VC\bin\link.exe ttest.o /OUT:ttest3.exe msvcrt.lib
-		//rant.lib
 		if (project.IsExecutable())
 		{
 			printf("Compiling Executable...\n");
@@ -868,6 +862,8 @@ void Compiler::OutputPackage(const std::string& project_name)
 	std::string types;
 	for (auto ii : this->types)
 	{
+		if (ii.second == 0)
+			continue;
 		if (ii.second->type == Types::Struct)
 		{
 			if (ii.second->data->template_base)
@@ -1141,12 +1137,12 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 			do
 			{
 				//lets cheat for the moment ok
-				std::string subtype;
+				std::string subtype = ParseType(name.c_str(), p);
+				/*std::string subtype;
 				do
 				{
-					subtype += name[p];
-					p++;
-				} while (name[p] != ',' && name[p] != '>');
+					subtype += name[p++];
+				} while (name[p] != ',' && name[p] != '>');*/
 
 				Type* t = this->LookupType(subtype);
 				types.push_back(t);
@@ -1159,12 +1155,17 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 
 			Type* res = t->second->Instantiate(this, types);
 			//resolve the type name down to basics
-			auto realname = res->ToString();
-			this->types[name] = res;
+			//see if the actual thing already exists
+			//auto realname = res->ToString();
+			//auto f = this->types.find(realname);
+			//if (f != this->types.end())
+			//	res = f->second;// printf("already exists");
+			//else
+				//this->types[realname] = res;
 
 
 			//compile its functions
-			if (res->data->expression->members.size() > 0)
+			/*if (res->data->expression->members.size() > 0)
 			{
 				StructExpression* expr = dynamic_cast<StructExpression*>(res->data->expression);// ->functions->back()->Parent);
 				auto oldname = expr->name;
@@ -1177,7 +1178,7 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 					if (ii.type == StructMember::FunctionMember)
 						ii.function->CompileDeclarations(this->current_function);
 
-				expr->name.text = res->data->name;
+				//expr->name.text = res->data->name;
 
 				for (auto ii : res->data->expression->members)//functions)
 					if (ii.type == StructMember::FunctionMember)
@@ -1185,9 +1186,54 @@ Jet::Type* Compiler::LookupType(const std::string& name)
 
 				this->builder.SetInsertPoint(rp);
 				expr->name = oldname;
-			}
+			}*/
 
 			type = res;
+		}
+		else if (name[name.length() - 1] == ')')
+		{
+			int p = 0;
+			for (p = 0; p < name.length(); p++)
+				if (name[p] == '(')
+					break;
+
+			std::string ret_type = name.substr(0, p);
+			auto rtype = this->LookupType(ret_type);
+
+			std::vector<Type*> args;
+			//parse types
+			p++;
+			while (name[p] != ')')
+			{
+				//lets cheat for the moment ok
+				std::string subtype;
+				do
+				{
+					subtype += name[p];
+					p++;
+				} while (name[p] != ',' && name[p] != ')');
+
+				Type* t = this->LookupType(subtype);
+				args.push_back(t);
+				if (name[p] == ',')
+					p++;
+			} 
+			/*while (name[p+1] != ')')
+			{
+				fix this
+				Error("function pointer arguments not implemented", *this->current_function->current_token);
+			}*/
+			
+			auto t = new FunctionType;
+			t->args = args;
+			t->return_type = rtype;
+
+			type = new Type;
+			type->name = name;
+			type->function = t;
+			type->type = Types::Function;
+			
+			types[name] = type;
 		}
 		else
 		{

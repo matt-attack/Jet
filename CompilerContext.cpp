@@ -40,18 +40,16 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		func->return_type = ret;
 		func->argst = args;
 		func->name = fname;
+		std::vector<llvm::Type*> oargs;
 		for (int i = 0; i < args.size(); i++)
-		{
-			func->args.push_back(GetType(args[i].first));
-		}
+			oargs.push_back(GetType(args[i].first));
 
 		auto n = new CompilerContext(this->parent);
 
-		auto ft = llvm::FunctionType::get(GetType(ret), func->args, false);
-		//this->parent->module->getOrInsertFunction()
+		auto ft = llvm::FunctionType::get(GetType(ret), oargs, false);
 		
 		n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
-		//n->f->dump();
+
 		n->function = func;
 		func->f = n->f;
 		if (member == false)
@@ -71,6 +69,9 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 			if (ii->second->argst.size() == args.size())
 				func = ii->second;
 		}
+
+		if (func == 0)
+			Error("Function '"+fname+"' not found", *this->parent->current_function->current_token);
 	}
 
 	func->Load(this->parent);
@@ -324,11 +325,11 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		if (iter == this->parent->functions.end())
 		{
 			//check if its a type, if so try and find a constructor
-			auto type = this->parent->LookupType(name);
-			if (type->type == Types::Struct)
+			auto type = this->parent->types.find(name);// LookupType(name);
+			if (type != this->parent->types.end() && type->second->type == Types::Struct)
 			{
 				//look for a constructor
-				auto range = type->data->functions.equal_range(name);
+				auto range = type->second->data->functions.equal_range(name);
 				for (auto ii = range.first; ii != range.second; ii++)
 				{
 					if (ii->second->argst.size() == args.size() + 1)
@@ -337,10 +338,8 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				if (fun)//constructor != type->data->functions.end() && constructor->second->argst.size() == args.size() + 1)
 				{
 					//ok, we allocate, call then 
-					//printf("calling constructor\n");
-
 					//allocate thing
-					auto Alloca = this->parent->builder.CreateAlloca(GetType(type), 0, "constructortemp");
+					auto Alloca = this->parent->builder.CreateAlloca(GetType(type->second), 0, "constructortemp");
 
 					std::vector<llvm::Value*> argsv;
 					int i = 1;
@@ -362,8 +361,33 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 					this->parent->builder.CreateCall(fun->f, argsv);
 
-					return CValue(type, this->parent->builder.CreateLoad(Alloca));
+					return CValue(type->second, this->parent->builder.CreateLoad(Alloca));
 				}
+			}
+			//else if (type == this->parent->types.end() || type->second->type == Types::Invalid)
+			//{
+				//Error("wrong something", *current_token);
+			//}
+			else
+			{
+				//try to find it in variables
+				auto var = this->GetVariable(name);
+
+				if (var.type->type != Types::Function)
+					Error("Cannot call non-function type", *this->current_token);
+				
+				std::vector<llvm::Value*> argsv;
+				int i = 0;
+				for (auto ii : args)
+				{
+					//try and cast to the correct type if we can
+					argsv.push_back(this->DoCast(var.type->function->args[i++], ii).val);
+					//argsv.back()->dump();
+				}
+				
+				//var.val->dump();
+				var.val = this->parent->builder.CreateLoad(var.val);
+				return CValue(var.type->function->return_type, this->parent->builder.CreateCall(var.val, argsv));
 			}
 			Error("Function '" + name + "' is not defined", *this->current_token);
 		}
@@ -416,6 +440,8 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				if (fun)
 				{
 					//massive hack again, like in templates
+					std::vector<std::pair<std::string, Type*>> old;
+					old.push_back({ tr.second->name, this->parent->types[tr.second->name] });
 					this->parent->types[tr.second->name] = Struct;
 
 					auto rp = this->parent->builder.GetInsertBlock();
@@ -425,10 +451,18 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 					fun->expression->Struct.text = Struct->data->name;
 					int i = 0;
 					for (auto ii : tr.second->templates)
+					{
+						old.push_back({ ii.second, this->parent->types[ii.second] });
 						this->parent->types[ii.second] = tr.first[i++];
-
+					}
+					//fix these templates, store temp result then restore after
 					fun->expression->CompileDeclarations(this);
 					fun->expression->DoCompile(this);
+
+					for (auto ii : old)
+					{
+						this->parent->types[ii.first] = ii.second;
+					}
 
 					fun->expression->Struct.text = oldn;
 

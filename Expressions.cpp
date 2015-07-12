@@ -290,7 +290,6 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 {
 	context->CurrentToken(&token);
-
 	auto loc = this->GetGEP(context);
 	right = context->DoCast(loc.type, right);
 	context->parent->builder.CreateStore(right.val, loc.val);
@@ -663,8 +662,10 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	else
 		fname = "_lambda_id_";
 
+	bool advlookup = true;
 	Function* fun = new Function;
-	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type.text);
+	
+
 	fun->expression = this;
 
 	auto str = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
@@ -679,14 +680,6 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		auto type = context->parent->LookupType(str);
 		if (type->type == Types::Trait)
 		{
-			//if its invalid, try to load it
-			//if (iter != context->parent->types.end())
-			//	iter->second->Load(context->parent);
-
-			//auto tr = context->parent->traits.find(str);
-			//if (tr == context->parent->traits.end())
-				//Error("Type '" + str + "' does not exist", token);
-
 			type->trait->extension_methods.insert({ fname, fun });
 			is_trait = true;
 		}
@@ -694,10 +687,16 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		{
 			auto tr = context->parent->LookupType(str);
 			tr->data->functions.insert({ fname, fun });
+			advlookup = !tr->data->template_args.size();
 		}
 	}
 	else
 		context->parent->functions.insert({ fname, fun });
+
+	if (advlookup)
+		fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type.text);
+	else
+		fun->return_type = context->parent->LookupType(this->ret_type.text);
 
 	if (str.length() > 0)
 	{
@@ -712,7 +711,11 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 
 	for (auto ii : *this->args)
 	{
-		auto type = context->parent->AdvanceTypeLookup(ii.first);
+		Type* type = 0;
+		if (advlookup)
+			type = context->parent->AdvanceTypeLookup(ii.first);
+		else
+			type = context->parent->LookupType(ii.first);
 
 		fun->argst.push_back({ type, ii.second });
 	}
@@ -743,7 +746,6 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	if (Struct.length() > 0)
 	{
 		fun->name = "__" + Struct + "_" + fname;//mangled name
-
 
 		//add to struct
 		auto ii = context->parent->types.find(Struct);
@@ -821,6 +823,10 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			else
 				Alloca = TmpB.CreateAlloca(GetType(val.type), 0, aname);
 
+			//Alloca->dump();
+			//Alloca->getType()->dump();
+			//val.val->dump();
+			//val.val->getType()->dump();
 			context->parent->builder.CreateStore(val.val, Alloca);
 		}
 		else
@@ -902,6 +908,8 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		for (auto ii : *this->templates)
 			str->data->templates.push_back({ context->parent->AdvanceTypeLookup(ii.first.text), ii.second.text });
 	}
+
+	//register the templates as a type, so all the members end up with the same type
 
 	for (auto ii : this->members)
 	{

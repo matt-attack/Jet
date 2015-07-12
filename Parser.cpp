@@ -234,7 +234,7 @@ Token Parser::Consume(TokenType expected)
 		//fabricate a fake token
 		ParserError(str, temp);
 		//lets give up on this, it doesnt work well
-		throw 7;
+		//throw 7;
 
 		mRead.pop_front();
 		return Token(0, 0, temp.line, temp.column, expected, "uh");

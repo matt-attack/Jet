@@ -12,6 +12,8 @@ namespace llvm
 }
 namespace Jet
 {
+	std::string ParseType(const char* tname, int& p);
+
 	enum class Types
 	{
 		Void,
@@ -39,6 +41,7 @@ namespace Jet
 	class Compiler;
 	struct Struct;
 	struct Trait;
+	struct FunctionType;
 	class Type
 	{
 		std::vector<std::pair<Type**,Trait*>> traits;//all the traits that apply to this type
@@ -52,6 +55,7 @@ namespace Jet
 			Struct* data;//for classes
 			Type* base;//for pointers and arrays
 			Trait* trait;
+			FunctionType* function;
 		};
 		unsigned int size;//for arrays
 
@@ -129,13 +133,33 @@ namespace Jet
 
 		void Load(Compiler* compiler);
 	};
+
+	struct FunctionType
+	{
+		bool loaded;
+		Type* return_type;
+		std::vector<Type*> args;
+
+		//llvm::FunctionType* type;
+
+		FunctionType()
+		{
+			loaded = false;
+		}
+
+		void Load(Compiler* compiler)
+		{
+
+		}
+	};
 	
 	class FunctionExpression;
 	struct Function
 	{
+		FunctionType* type;
 		std::string name;
 
-		std::vector<llvm::Type*> args;
+		//std::vector<llvm::Type*> args;
 		std::vector<std::pair<Type*, std::string>> argst;
 
 		llvm::Function* f;//not always used
@@ -174,14 +198,13 @@ namespace Jet
 
 		void Load(Compiler* compiler);
 
+		Type* GetType(Compiler* compiler);
+
 		Function* Instantiate(Compiler* compiler, const std::vector<Type*>& types);
 	};
 
 	llvm::Type* GetType(Type* t);
 
 	extern Type VoidType;
-	//extern Type BoolType;
-	//extern Type DoubleType;
-	//extern Type IntType;
 }
 #endif

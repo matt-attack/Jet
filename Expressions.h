@@ -1703,7 +1703,7 @@ namespace Jet
 	class StructExpression : public Expression
 	{
 		friend class Compiler;
-		friend struct Type;
+		friend class Type;
 
 		Token token;
 		Token name;

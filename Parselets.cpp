@@ -11,8 +11,6 @@ Token ParseType(Parser* parser)
 {
 	Token name = parser->Consume(TokenType::Name);
 	std::string out = name.text;
-	while (parser->MatchAndConsume(TokenType::Asterisk))//parse pointers
-		out += '*';
 
 	//parse templates
 	if (parser->MatchAndConsume(TokenType::LessThan))
@@ -31,6 +29,25 @@ Token ParseType(Parser* parser)
 		parser->Consume(TokenType::GreaterThan);
 		out += ">";
 	}
+	else if (parser->MatchAndConsume(TokenType::LeftParen))
+	{
+		out += "(";
+		//recursively parse the rest
+		bool first = true;
+		do
+		{
+			if (first == false)
+				out += ",";
+			first = false;
+			out += ParseType(parser).text;
+		} while (parser->MatchAndConsume(TokenType::Comma));
+
+		parser->Consume(TokenType::RightParen);
+		out += ")";
+	}
+
+	while (parser->MatchAndConsume(TokenType::Asterisk))//parse pointers
+		out += '*';
 
 	Token ret;
 	ret.column = name.column;
@@ -94,7 +111,7 @@ Expression* NameParselet::parse(Parser* parser, Token token)
 				first = false;
 			else
 				token.text += ",";
-			Token tname = ParseType(parser);
+			Token tname = ::ParseType(parser);
 			token.text += tname.text;
 			templates->push_back(tname);
 		} while (parser->MatchAndConsume(TokenType::Comma));
@@ -157,14 +174,14 @@ Expression* PrefixOperatorParselet::parse(Parser* parser, Token token)
 Expression* SizeofParselet::parse(Parser* parser, Token token)
 {
 	Token left = parser->Consume(TokenType::LeftParen);
-	Token type = ParseType(parser);
+	Token type = ::ParseType(parser);
 	Token right = parser->Consume(TokenType::RightParen);
 	return new SizeofExpression(token, left, type, right);
 }
 
 Expression* CastParselet::parse(Parser* parser, Token token)
 {
-	Token type = ParseType(parser);
+	Token type = ::ParseType(parser);
 	Token end = parser->Consume(TokenType::GreaterThan);
 
 	auto right = parser->parseExpression(Precedence::PREFIX);
@@ -343,7 +360,7 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 	{
 		TraitFunction func;
 		Token tfunc = parser->Consume(TokenType::Function);
-		func.ret_type = ParseType(parser);
+		func.ret_type = ::ParseType(parser);
 		func.name = parser->Consume(TokenType::Name);
 
 		parser->Consume(TokenType::LeftParen);
@@ -357,7 +374,7 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 				parser->Consume(TokenType::Comma);
 
 			//parse args
-			func.args.push_back(ParseType(parser));
+			func.args.push_back(::ParseType(parser));
 			Token arg = parser->Consume(TokenType::Name);
 		}
 
@@ -428,7 +445,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 			ParserError("Not implemented!", token);
 		}
 
-		Token type = ParseType(parser);
+		Token type = ::ParseType(parser);
 
 		Token name = parser->Consume(TokenType::Name);//then read name
 
@@ -445,14 +462,14 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 				if (s->GetValue() <= 0)
 				{
 					ParserError("Cannot size array with a zero or negative size", token);
-					throw 7;
+					//throw 7;
 				}
 				type.text += "[" + std::to_string((int)s->GetValue()) + "]";
 			}
 			else
 			{
 				ParserError("Cannot size array with a non constant size", token);
-				throw 7;
+				//throw 7;
 			}
 		}
 
@@ -474,7 +491,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 Expression* FunctionParselet::parse(Parser* parser, Token token)
 {
 	//read in type
-	Token ret_type = ParseType(parser);
+	Token ret_type = ::ParseType(parser);
 
 	bool destructor = parser->MatchAndConsume(TokenType::BNot);
 	Token name = parser->Consume(TokenType::Name);
@@ -515,7 +532,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	{
 		do
 		{
-			Token type = ParseType(parser);
+			Token type = ::ParseType(parser);
 
 			Token name = parser->Consume();
 			if (name.type == TokenType::Name)
@@ -546,7 +563,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 {
 	parser->Consume(TokenType::Function);
 
-	Token ret_type = ParseType(parser);
+	Token ret_type = ::ParseType(parser);
 
 	Token name = parser->Consume(TokenType::Name);
 	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
@@ -571,7 +588,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	{
 		do
 		{
-			Token type = ParseType(parser);
+			Token type = ::ParseType(parser);
 			Token name = parser->Consume(TokenType::Name);
 			if (name.type == TokenType::Name)
 			{
@@ -667,7 +684,7 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 		auto next = parser->LookAhead(1);
 		Token type;// = next.type == TokenType::Assign ? "" : ParseType(parser).text;
 		if (next.type != TokenType::Assign)
-			type = ParseType(parser);
+			type = ::ParseType(parser);
 		Token name = parser->Consume(TokenType::Name);
 
 		if (parser->MatchAndConsume(TokenType::LeftBracket))
@@ -683,14 +700,14 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 				if (s->GetValue() <= 0)
 				{
 					ParserError("Cannot size array with a zero or negative size", token);
-					throw 7;
+					//throw 7;
 				}
 				type.text += "[" + std::to_string((int)s->GetValue()) + "]";
 			}
 			else
 			{
 				ParserError("Cannot size array with a non constant size", token);
-				throw 7;
+				//throw 7;
 			}
 		}
 		names->push_back({ type, name });
@@ -861,6 +878,6 @@ Expression* TypedefParselet::parse(Parser* parser, Token token)
 {
 	Token new_type = parser->Consume(TokenType::Name);
 	Token equals = parser->Consume(TokenType::Assign);
-	Token other_type = ParseType(parser);
+	Token other_type = ::ParseType(parser);
 	return new TypedefExpression(token, new_type, equals, other_type);
 }

@@ -15,28 +15,13 @@ namespace Jet
 	extern std::map<TokenType,std::string> TokenToString; 
 	class Lexer
 	{
-		//unsigned int index;
-		//std::istream* stream;
-
-		//std::string text;
 		Source* src;
 		int last_index;//location where last token ended, used for tracking whitespace
 
-		//std::vector<std::pair<const char*, unsigned int>> lines;
 	public:
-		Lexer(Source* source);// std::istream* input, std::string filename);
-		//Lexer(std::string text, std::string filename);
+		Lexer(Source* source);
 
 		Token Next();
-
-		//std::string GetLine(unsigned int line);
-
-		//std::string filename;
-
-	//private:
-		//char ConsumeChar();
-		//char MatchAndConsumeChar(char c);
-		//char PeekChar();
 	};
 }
 #endif

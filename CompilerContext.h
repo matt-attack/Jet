@@ -119,6 +119,14 @@ namespace Jet
 				if (global != this->parent->globals.end())
 					return global->second;
 
+				auto function = this->parent->functions.find(name);
+				//function->second->f->getType()->dump();
+				if (function != this->parent->functions.end())
+				{
+					function->second->Load(this->parent);
+					return CValue(function->second->GetType(this->parent), function->second->f);
+				}
+
 				Error("Undeclared identifier '" + name + "'", *current_token);
 			}
 			return value;
@@ -140,7 +148,8 @@ namespace Jet
 		CValue Load(const std::string& name)
 		{
 			CValue value = GetVariable(name);
-
+			if (value.type->type == Types::Function)
+				return value;
 			return CValue(value.type, parent->builder.CreateLoad(value.val, name.c_str()));
 		}
 
@@ -331,6 +340,11 @@ namespace Jet
 						return CValue(t, value.val);*/
 					}
 				}
+			}
+			if (value.type->type == Types::Function)
+			{
+				if (t->type == Types::Function && t->function == value.type->function)
+					return value;
 			}
 
 			Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);

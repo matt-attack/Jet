@@ -37,8 +37,74 @@ llvm::Type* Jet::GetType(Type* t)
 		return llvm::ArrayType::get(GetType(t->base), t->size);
 	case Types::Pointer:
 		return llvm::PointerType::get(GetType(t->base), 0);//address space, wat?
+	case Types::Function:
+	{
+		std::vector<llvm::Type*> args;
+		for (auto ii : t->function->args)
+			args.push_back(GetType(ii));
+		return llvm::FunctionType::get(GetType(t->function->return_type), args, false)->getPointerTo();
 	}
+	}
+	Error("Unhandled Type in GetType", Token());
 	throw 7;
+}
+
+#include "Lexer.h"
+std::string Jet::ParseType(const char* tname, int& p)
+{
+	//int p = 0;
+	//Token name = parser->Consume(TokenType::Name);
+	std::string out;// = name.text;
+	while (IsLetter(tname[p]))
+	{
+		out += tname[p];
+		p++;
+	}
+
+	//parse templates
+	if (tname[p] == '<')//parser->MatchAndConsume(TokenType::LessThan))
+	{
+		p++;
+		out += "<";
+		//recursively parse the rest
+		bool first = true;
+		do
+		{
+			if (first == false)
+				out += ",";
+			first = false;
+			out += ParseType(tname, p);
+		} while (tname[p] == ',' && p++);
+
+		p++;
+		//parser->Consume(TokenType::GreaterThan);
+		out += ">";
+	}
+	else if (tname[p] == '(')//parser->MatchAndConsume(TokenType::LeftParen))
+	{
+		p++;
+		out += "(";
+		//recursively parse the rest
+		bool first = true;
+		do
+		{
+			if (first == false)
+				out += ",";
+			first = false;
+			out += ParseType(tname, p);
+		} while (tname[p] == ',' && p++);//parser->MatchAndConsume(TokenType::Comma));
+
+		p++;
+		//parser->Consume(TokenType::RightParen);
+		out += ")";
+	}
+
+	while (tname[p] == '*')//parser->MatchAndConsume(TokenType::Asterisk))//parse pointers
+	{
+		out += '*';
+		p++;
+	}
+	return out;
 }
 
 void Type::Load(Compiler* compiler)
@@ -69,7 +135,7 @@ void Type::Load(Compiler* compiler)
 				Error("Reference To Undefined Type '" + base + "'", *compiler->current_function->current_token);
 			else if (t->second->type == Types::Trait)
 			{
-				printf("was a trait");
+				//printf("was a trait");
 				std::vector<Type*> types;
 				p++;
 				do
@@ -100,17 +166,18 @@ void Type::Load(Compiler* compiler)
 			do
 			{
 				//lets cheat for the moment ok
-				std::string subtype;
+				std::string subtype = ParseType(name.c_str(), p);
+				/*std::string subtype;
 				do
 				{
 					subtype += name[p];
 					p++;
-				} while (name[p] != ',' && name[p] != '>');
+				} while (name[p] != ',' && name[p] != '>');*/
 
 				Type* t = compiler->LookupType(subtype);
 				types.push_back(t);
 			} while (name[p++] != '>');
-			
+
 			Type* res = t->second->Instantiate(compiler, types);
 			//check to see if it was already instantiated
 			auto realname = res->ToString();
@@ -130,10 +197,10 @@ void Type::Load(Compiler* compiler)
 					*this = *iter->second;
 				else
 					*this = *res;
-			}	
+			}
 
 			//compile its functions
-			if (res->data->expression->members.size() > 0)
+			/*if (res->data->expression->members.size() > 0)
 			{
 				StructExpression* expr = dynamic_cast<StructExpression*>(res->data->expression);// ->functions->back()->Parent);
 				auto oldname = expr->name;
@@ -152,7 +219,59 @@ void Type::Load(Compiler* compiler)
 
 				compiler->builder.SetInsertPoint(rp);
 				expr->name = oldname;
+			}*/
+		}
+		else if (this->name.back() == ')')
+		{
+			int p = 0;
+			for (p = 0; p < name.length(); p++)
+				if (name[p] == '(')
+					break;
+
+			std::string ret_type = name.substr(0, p);
+			auto rtype = compiler->LookupType(ret_type);
+
+			std::vector<Type*> args;
+			//parse types
+			p++;
+			while (name[p] != ')')
+			{
+				//lets cheat for the moment ok
+				std::string subtype;
+				do
+				{
+					subtype += name[p++];
+				} while (name[p] != ',' && name[p] != ')');
+
+				Type* t = compiler->LookupType(subtype);
+				args.push_back(t);
+				if (name[p] == ',')
+					p++;
 			}
+
+			auto t = new FunctionType;
+			t->args = args;
+			t->return_type = rtype;
+
+			//this = new Type;
+			this->name = name;
+			this->function = t;
+			this->type = Types::Function;
+
+			auto realname = this->ToString();
+			auto iter = compiler->types.find(realname);
+			if (iter == compiler->types.end())
+			{
+				compiler->types[name] = this;
+			}
+			else
+			{
+				if (iter->second == this)
+					Error("Whoops", Token());
+				else
+					*this = *iter->second;
+			}
+			//types[name] = type;
 		}
 		else
 			Error("Tried To Use Undefined Type '" + this->name + "'", *compiler->current_function->current_token);
@@ -194,10 +313,10 @@ void FindTemplates(Compiler* compiler, Type** types, Type* type, Type* match_typ
 				Error("Does not match trait", *compiler->current_function->current_token);
 			types[i] = type;
 			was_template = true;
-			printf("found the template type!");
 		}
 		i++;
 	}
+
 	if (was_template == false && match_type->name.back() == '>')
 	{
 		auto traits = type->GetTraits(compiler);
@@ -207,23 +326,17 @@ void FindTemplates(Compiler* compiler, Type** types, Type* type, Type* match_typ
 		{
 			if (ii.second->name == basename)
 			{
-				printf("it matches the trait!");
 				match_type->Load(compiler);
 				for (int i = 0; i < type->data->template_args.size(); i++)
-				{
 					FindTemplates(compiler, types, type->data->template_args[i], match_type->trait->template_args[i], ii.second);
-				}			
 
-				//check if template values match any
-				//ok, now see what the template values are
 				break;
 			}
 		}
-		printf("loaded yo");
 	}
 }
 
-std::vector<std::pair<Type**,Trait*>> Type::GetTraits(Compiler* compiler)
+std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compiler* compiler)
 {
 	if (this->traits.size())
 		return this->traits;
@@ -235,13 +348,11 @@ std::vector<std::pair<Type**,Trait*>> Type::GetTraits(Compiler* compiler)
 		{
 			if (ii.second->templates.size())
 			{
-				//first get a list 
-				//this is gonna be fun
 				//need to look for matching type sets
 				//infer templates
 				Type** types = new Type*[ii.second->templates.size()];
 				for (int i = 0; i < ii.second->templates.size(); i++)
-					types[i] = 0;// compiler->LookupType("int");//cheat for now
+					types[i] = 0;//cheat for now
 
 				bool match = true;
 				for (auto fun : ii.second->funcs)
@@ -253,51 +364,12 @@ std::vector<std::pair<Type**,Trait*>> Type::GetTraits(Compiler* compiler)
 						break;//couldnt find it, doesnt match
 					}
 
-					//try and infer types
-					//lets just go with first option for the moment
-					//printf("inferring types...");
-
 					if (range.first->second->return_type)
 						FindTemplates(compiler, types, range.first->second->return_type, fun.second->return_type, ii.second);
 
 					//do it for args
 					for (int i = 1; i < range.first->second->argst.size(); i++)
 						FindTemplates(compiler, types, range.first->second->argst[i].first, fun.second->argst[i - 1].first, ii.second);
-					/*if (range.first->second->return_type)
-					{
-						//check if return type is the template
-						int i = 0;
-						bool was_template = false;
-						for (auto temp : ii.second->templates)
-						{
-							if (fun.second->return_type->name == temp.second)
-							{
-								types[i] = range.first->second->return_type;
-								//range.first->second->return_type->name
-								was_template = true;
-								printf("found the template type!");
-							}
-							i++;
-						}
-						if (was_template == false && fun.second->return_type->name.back() == '>')
-						{
-							auto traits = range.first->second->return_type->GetTraits(compiler);
-							//see if it is templated, if it is, look through its templates
-							std::string basename = fun.second->return_type->name.substr(0, fun.second->return_type->name.length() - 3);
-							for (auto ii : traits)
-							{
-								if (ii.second->name == basename)
-								{
-									printf("it matches the trait!");
-
-									//check if template values match any
-									//ok, now see what the template values are
-									break;
-								}
-							}
-							printf("loaded yo");
-						}
-					}*/
 				}
 				if (match)
 					this->traits.push_back({ types, ii.second });
@@ -353,6 +425,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 {
 	//register the types
 	int i = 0;
+	std::vector<std::pair<std::string, Type*>> old;
 	for (auto ii : this->data->templates)
 	{
 		//check if traits match
@@ -361,6 +434,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 
 		//lets be stupid and just register the type
 		//CHANGE ME LATER, THIS OVERRIDES TYPES, OR JUST RESTORE AFTER THIS
+		old.push_back({ ii.second, compiler->types[ii.second] });
 		compiler->types[ii.second] = types[i++];
 	}
 
@@ -371,7 +445,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	{
 		if (ii.type == StructMember::VariableMember)
 		{
-			auto type = compiler->AdvanceTypeLookup(ii.variable.first.text);
+			auto type = compiler->LookupType(ii.variable.first.text);
 
 			str->members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
 		}
@@ -391,6 +465,57 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 
 	Type* t = new Type(str->name, Types::Struct, str);
 	t->Load(compiler);
+
+	//make sure the real thing is stored as this
+	auto realname = t->ToString();
+
+	//uh oh, this duplicates
+	auto res = compiler->types.find(realname);
+	if (res != compiler->types.end() && res->second)
+	{
+		t = res->second;
+		goto exit;
+	}
+	else
+		compiler->types[realname] = t;
+
+	//need to store it
+	//compile its functions
+	if (t->data->expression->members.size() > 0)
+	{
+		StructExpression* expr = dynamic_cast<StructExpression*>(t->data->expression);// ->functions->back()->Parent);
+		auto oldname = expr->name;
+		expr->name.text = t->data->name;
+
+		//store then restore insertion point
+		auto rp = compiler->builder.GetInsertBlock();
+
+		for (auto ii : t->data->expression->members)//functions)
+			if (ii.type == StructMember::FunctionMember)
+				ii.function->CompileDeclarations(compiler->current_function);
+
+		for (auto ii : t->data->expression->members)//functions)
+			if (ii.type == StructMember::FunctionMember)
+				ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
+
+		compiler->builder.SetInsertPoint(rp);
+		expr->name = oldname;
+	}
+
+	exit:
+	//restore template types
+	for (auto ii : old)
+	{
+		//need to remove everything that is using me
+		if (ii.second)
+			compiler->types[ii.first] = ii.second;
+		else
+			compiler->types.erase(compiler->types.find(ii.first));
+			//compiler->types[ii.first]->type = Types::Invalid;
+		compiler->types.erase(compiler->types.find(ii.first + "*"));
+	}
+	//need to restore pointers and such as well
+		//one solution is to not cache pointers at all
 
 	return t;
 }
@@ -421,7 +546,23 @@ std::string Type::ToString()
 		return "void";
 	case Types::Invalid:
 		return "Undefined Type";
+	case Types::Trait:
+		return this->trait->name;
+	case Types::Function:
+		std::string out = this->function->return_type->ToString() + "(";
+		bool first = true;
+		int i = 0;
+		for (auto ii : this->function->args)
+		{
+			out += ii->ToString();
+			if (++i != this->function->args.size())
+				out += ",";
+		}
+
+		//Error("function tostring not finished", Token());
+		return out + ")";
 	}
+	Error("Unhandled Type::ToString()", Token());
 }
 
 void Struct::Load(Compiler* compiler)
@@ -476,47 +617,17 @@ void Function::Load(Compiler* compiler)
 
 	this->return_type->Load(compiler);
 
+	std::vector<llvm::Type*> args;
 	for (auto type : this->argst)
 	{
 		type.first->Load(compiler);
-		this->args.push_back(GetType(type.first));
+		/*this->*/args.push_back(::GetType(type.first));
 	}
 
-	llvm::FunctionType *ft = llvm::FunctionType::get(GetType(this->return_type), this->args, false);
+	llvm::FunctionType *ft = llvm::FunctionType::get(::GetType(this->return_type), /*this->*/args, false);
 
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
 
-	/*if (this->name[0] == 'R')
-	{
-	//f->setDLLStorageClass(llvm::Function::DLLImportStorageClass);
-	//f->setCallingConv(llvm::CallingConv::X86_StdCall);
-
-	int i = 0;
-	for (auto ii : this->argst)
-	{
-	if (ii.first->type == Types::Struct)
-	{
-
-	auto list = f->args();
-
-	//for (auto arg = list.begin(); arg != list.end(); ++arg)
-	//{
-	//	arg->dump();
-	//	llvm::AttributeSet set;
-	//	//set.
-	//	llvm::AttrBuilder builder;
-
-	//	builder.addAttribute(llvm::Attribute::AttrKind::ByVal);
-	//	set = set.addAttribute(compiler->context, 0, llvm::Attribute::AttrKind::ByVal);
-	//	//set.addAttribute()
-	//	arg->addAttr(set);
-	//	printf("hi");
-	//}
-
-	}
-	i++;
-	}
-	}*/
 	//alloc args
 	auto AI = f->arg_begin();
 	for (unsigned Idx = 0, e = argst.size(); Idx != e; ++Idx, ++AI)
@@ -573,4 +684,21 @@ Function* Function::Instantiate(Compiler* compiler, const std::vector<Type*>& ty
 
 	return t; */
 	return 0;
+}
+
+Type* Function::GetType(Compiler* compiler)
+{
+	//	todo :D
+	//build the type name from the args and return type
+	std::string type;
+	type += return_type->ToString();
+	type += "(";
+	for (int i = 0; i < this->argst.size(); i++)
+	{
+		if (i != this->argst.size() - 1)
+			type += ",";
+		type += this->argst[i].first->ToString();
+	}
+	type += ")";
+	return compiler->LookupType(type);
 }
