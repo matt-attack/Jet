@@ -41,8 +41,12 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		func->argst = args;
 		func->name = fname;
 		std::vector<llvm::Type*> oargs;
+		std::vector<llvm::Metadata*> ftypes;
 		for (int i = 0; i < args.size(); i++)
+		{
 			oargs.push_back(GetType(args[i].first));
+			ftypes.push_back(args[i].first->GetDebugType(this->parent));
+		}
 
 		auto n = new CompilerContext(this->parent);
 
@@ -54,6 +58,15 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		func->f = n->f;
 		if (member == false)
 			this->parent->functions.insert({ fname, func });// [fname] = func;
+
+		llvm::DIFile unit = parent->debug_info.file;
+
+		auto functiontype = parent->debug->createSubroutineType(unit, parent->debug->getOrCreateTypeArray(ftypes));
+		llvm::DISubprogram sp = parent->debug->createFunction(unit, fname, fname, unit, 0, functiontype, false, true, 0, 0, false, n->f);
+
+		assert(sp.describes(n->f));
+		func->scope = sp;
+		parent->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
 
 		llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "entry", n->f);
 		parent->builder.SetInsertPoint(bb);
@@ -76,7 +89,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 
 	func->Load(this->parent);
 
-
+	//func->scope->dump();
 	auto n = new CompilerContext(this->parent);
 	n->f = func->f;
 	n->function = func;
@@ -445,6 +458,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 					this->parent->types[tr.second->name] = Struct;
 
 					auto rp = this->parent->builder.GetInsertBlock();
+					auto dp = this->parent->builder.getCurrentDebugLocation();
 
 					//compile function
 					auto oldn = fun->expression->Struct.text;
@@ -466,6 +480,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 					fun->expression->Struct.text = oldn;
 
+					this->parent->builder.SetCurrentDebugLocation(dp);
 					this->parent->builder.SetInsertPoint(rp);
 
 					fun = Struct->data->functions.find(name)->second;

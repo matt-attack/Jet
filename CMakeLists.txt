@@ -25,6 +25,7 @@ add_executable(Jet
 	Types.cpp
 	Lexer.cpp
 	Token.cpp
+	Project.cpp
 )
 
 llvm_map_components_to_libnames(llvm_libs support core mcjit native ipo)

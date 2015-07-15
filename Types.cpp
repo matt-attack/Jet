@@ -11,6 +11,49 @@ using namespace Jet;
 
 Type Jet::VoidType("void", Types::Void);
 
+llvm::DIType Type::GetDebugType(Compiler* compiler)
+{
+	if (this->type == Types::Int)
+		return compiler->debug->createBasicType("int", 32, 32, llvm::dwarf::DW_ATE_signed);
+	if (this->type == Types::Short)
+		return compiler->debug->createBasicType("short", 16, 16, llvm::dwarf::DW_ATE_signed);
+	if (this->type == Types::Char)
+		return compiler->debug->createBasicType("char", 8, 8, llvm::dwarf::DW_ATE_signed);
+	if (this->type == Types::Double)
+		return compiler->debug->createBasicType("double", 64, 64, llvm::dwarf::DW_ATE_float);
+	if (this->type == Types::Pointer)
+		return compiler->debug->createPointerType(this->base->GetDebugType(compiler), 32, 32, "pointer");
+	if (this->type == Types::Function)
+		return compiler->debug->createBasicType("fun_pointer", 32, 32, llvm::dwarf::DW_ATE_address);
+	if (this->type == Types::Struct)
+	{
+		std::vector<llvm::Metadata*> ftypes;
+		for (auto type : this->data->members)
+			ftypes.push_back(type.type->GetDebugType(compiler));
+		llvm::DIFile unit = compiler->debug_info.file;
+
+		llvm::DIType typ;
+		return compiler->debug->createStructType(compiler->debug_info.file/*compiler->current_function->function->scope*/, this->data->name, unit, 0, 1024, 1024, 0, typ, compiler->debug->getOrCreateArray(ftypes));
+	}
+	if (this->type == Types::Function)
+	{
+		std::vector<llvm::Metadata*> ftypes;
+		for (auto type : this->function->args)
+		{
+			//add debug stuff
+			//auto type = compiler->debug->createBasicType("double", 64, 64, llvm::dwarf::DW_ATE_float);
+			ftypes.push_back(type->GetDebugType(compiler));
+		}
+
+		llvm::DIFile unit = compiler->debug_info.file;
+
+
+		return compiler->debug->createSubroutineType(unit, compiler->debug->getOrCreateTypeArray(ftypes));
+	}
+	//	return compiler->debug->createStructType()
+	printf("oops");
+}
+
 llvm::Type* Jet::GetType(Type* t)
 {
 	switch (t->type)
@@ -437,10 +480,14 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 
 	//uh oh, this duplicates
 	auto res = compiler->types.find(realname);
-	if (res != compiler->types.end() && res->second)
+	if (res != compiler->types.end() && res->second && res->second->type != Types::Invalid)
 	{
 		t = res->second;
 		goto exit;
+	}
+	else if (res != compiler->types.end() && res->second)
+	{
+		*res->second = *t;
 	}
 	else
 		compiler->types[realname] = t;
@@ -455,15 +502,21 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 
 		//store then restore insertion point
 		auto rp = compiler->builder.GetInsertBlock();
+		auto dp = compiler->builder.getCurrentDebugLocation();
 
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->CompileDeclarations(compiler->current_function);
-
+		
+		//this doesnt work right for some reason
+		//set the correct file back?
+		//compiler->debug_info.file.dump();
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
-
+		//compiler->debug->finalize();
+		//compiler->module->dump();
+		compiler->builder.SetCurrentDebugLocation(dp);
 		compiler->builder.SetInsertPoint(rp);
 		expr->name = oldname;
 	}
@@ -587,15 +640,35 @@ void Function::Load(Compiler* compiler)
 	this->return_type->Load(compiler);
 
 	std::vector<llvm::Type*> args;
+	std::vector<llvm::Metadata*> ftypes;
 	for (auto type : this->argst)
 	{
 		type.first->Load(compiler);
-		/*this->*/args.push_back(::GetType(type.first));
+		args.push_back(::GetType(type.first));
+
+		//add debug stuff
+		ftypes.push_back(type.first->GetDebugType(compiler));
 	}
 
 	llvm::FunctionType *ft = llvm::FunctionType::get(::GetType(this->return_type), /*this->*/args, false);
 
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
+
+	llvm::DIFile unit = compiler->debug_info.file;
+	
+	auto functiontype = compiler->debug->createSubroutineType(unit, compiler->debug->getOrCreateTypeArray(ftypes));
+	int line = this->expression ? this->expression->token.line : 0;
+	llvm::DISubprogram sp = compiler->debug->createFunction(unit, this->name, this->name, unit, line, functiontype, false, true, line, 0, false, f);
+	
+	//FContext, Name, StringRef(), Unit, LineNo, 0, false, f);
+	//for some reason struct member functions derp
+		//CreateFunctionType(Args.size(), Unit), false /* internal linkage */,
+		//true /* definition */, ScopeLine, DINode::FlagPrototyped, false, F);
+	assert(sp.describes(f));
+	this->scope = sp;
+	compiler->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
+	//compiler->debug->finalize();
+	//compiler->module->dump();
 
 	//alloc args
 	auto AI = f->arg_begin();

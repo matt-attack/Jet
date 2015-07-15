@@ -7,6 +7,8 @@ using namespace Jet;
 #include <llvm\IR\IRBuilder.h>
 #include <llvm\IR\Module.h>
 #include <llvm\IR\LLVMContext.h>
+#include <llvm\IR\DIBuilder.h>
+#include <llvm/IR/DerivedTypes.h>
 
 CValue PrefixExpression::Compile(CompilerContext* context)
 {
@@ -53,7 +55,6 @@ CValue SizeofExpression::Compile(CompilerContext* context)
 CValue PostfixExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->_operator);
-
 	auto lhs = left->Compile(context);
 
 	auto res = context->UnaryOperation(this->_operator.type, lhs);
@@ -69,7 +70,7 @@ CValue PostfixExpression::Compile(CompilerContext* context)
 CValue IndexExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&token);
-
+	context->SetDebugLocation(this->token);
 	auto loc = this->GetGEP(context);
 	return CValue(loc.type, context->parent->builder.CreateLoad(loc.val));
 }
@@ -290,6 +291,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 {
 	context->CurrentToken(&token);
+	context->SetDebugLocation(this->token);
 	auto loc = this->GetGEP(context);
 	right = context->DoCast(loc.type, right);
 	context->parent->builder.CreateStore(right.val, loc.val);
@@ -381,6 +383,8 @@ lstorable->CompileStore(context);
 
 CValue AssignExpression::Compile(CompilerContext* context)
 {
+	context->SetDebugLocation(this->token);
+
 	if (auto storable = dynamic_cast<IStorableExpression*>(this->left))
 		storable->CompileStore(context, right->Compile(context));
 
@@ -390,6 +394,7 @@ CValue AssignExpression::Compile(CompilerContext* context)
 CValue CallExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->token);
+	context->SetDebugLocation(this->token);
 
 	std::vector<CValue> argsv;
 
@@ -449,7 +454,7 @@ CValue OperatorAssignExpression::Compile(CompilerContext* context)
 	rhs = context->DoCast(lhs.type, rhs);
 
 	context->CurrentToken(&token);
-
+	context->SetDebugLocation(token);
 	auto res = context->BinaryOperation(token.type, lhs, rhs);
 
 	//insert store here
@@ -462,7 +467,7 @@ CValue OperatorAssignExpression::Compile(CompilerContext* context)
 CValue OperatorExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->_operator);
-
+	context->SetDebugLocation(this->_operator);
 	if (this->_operator.type == TokenType::And)
 	{
 		auto else_block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "land.shortcircuitelse");
@@ -620,6 +625,8 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	context->parent->current_function = function;
 
+	function->SetDebugLocation(this->token);
+
 	//alloc args
 	auto AI = function->f->arg_begin();
 	for (unsigned Idx = 0, e = argsv.size(); Idx != e; ++Idx, ++AI) {
@@ -632,6 +639,15 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		function->parent->builder.CreateStore(AI, Alloca);
 
 		AI->setName(aname);
+
+		llvm::DIFile unit = context->parent->debug_info.file;
+
+		llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, unit, this->token.line,
+			argsv[Idx].first->GetDebugType(context->parent));
+
+		llvm::Instruction *Call = context->parent->debug->insertDeclare(
+			Alloca, D, context->parent->debug->createExpression(), context->parent->builder.GetInsertBlock());
+		Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
 
 		// Add arguments to variable symbol table.
 		function->RegisterLocal(aname, CValue(argsv[Idx].first, Alloca));
@@ -804,6 +820,15 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			else
 				Alloca = TmpB.CreateAlloca(GetType(type), 0, aname);
 
+			llvm::DIFile unit = context->parent->debug_info.file;
+
+			llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, unit, ii.second.line,
+				type->GetDebugType(context->parent));
+
+			llvm::Instruction *Call = context->parent->debug->insertDeclare(
+				Alloca, D, context->parent->debug->createExpression(), context->parent->builder.GetInsertBlock());
+			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
+
 			// Store the initial value into the alloca.
 			if (this->_right)
 			{
@@ -823,6 +848,14 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			else
 				Alloca = TmpB.CreateAlloca(GetType(val.type), 0, aname);
 
+			llvm::DIFile unit = context->parent->debug_info.file;
+
+			llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, context->function->scope, aname, unit, ii.second.line,
+				type->GetDebugType(context->parent));
+
+			llvm::Instruction *Call = context->parent->debug->insertDeclare(
+				Alloca, D, context->parent->debug->createExpression(), context->parent->builder.GetInsertBlock());
+			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
 			//Alloca->dump();
 			//Alloca->getType()->dump();
 			//val.val->dump();
@@ -831,6 +864,8 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		}
 		else
 			Error("Cannot infer type from nothing!", ii.second);
+
+		
 
 		// Add arguments to variable symbol table.
 		context->RegisterLocal(aname, CValue(type, Alloca));

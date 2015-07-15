@@ -5,19 +5,83 @@
 #include "Parser.h"
 #include "Lexer.h"
 #include "Expressions.h"
+#include "UniquePtr.h"
+#include "Project.h"
 
 #include <direct.h>
 
 #include <fstream>
 #include <filesystem>
 
+#include <llvm/ADT/Triple.h>
+#include <llvm/Support/Host.h>
+#include <llvm\Target\TargetLibraryInfo.h>
+#include <llvm\IR\AssemblyAnnotationWriter.h>
+#include <llvm\Support\FormattedStream.h>
+#include <llvm\Support\raw_os_ostream.h>
+#include <llvm/CodeGen/CommandFlags.h>
+#include <llvm\Target\TargetRegisterInfo.h>
+#include <llvm\Support\TargetRegistry.h>
+#include <llvm\Target\TargetMachine.h>
+#include <llvm\Target\TargetSubtargetInfo.h>
+#include <llvm/Transforms/IPO.h>
+
 using namespace Jet;
+
+//options for the linker
+//#ifdef _WIN32
+//#define USE_MSVC
+//#else
+#define USE_GCC
+//#endif
 
 //this is VERY TERRIBLE remove later
 Source* current_source = 0;
 
 //#include "JIT.h"
 //MCJITHelper* JITHelper;
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
+class StackTime
+{
+public:
+	long long start;
+	long long rate;
+	char* name;
+
+	StackTime(char* name);
+
+	~StackTime();
+};
+
+StackTime::StackTime(char* name)
+{
+	this->name = name;
+
+#ifndef _WIN32
+	start = gettime2();
+	rate = 1000000;
+#else
+	QueryPerformanceCounter((LARGE_INTEGER *)&start);
+	QueryPerformanceFrequency((LARGE_INTEGER *)&rate);
+#endif
+}
+
+StackTime::~StackTime()
+{
+	long long  end;
+#ifdef _WIN32
+	QueryPerformanceCounter((LARGE_INTEGER *)&end);
+#else
+	end = gettime2();
+#endif
+
+	long long diff = end - start;
+	float dt = ((double)diff) / ((double)rate);
+	printf("%s Time: %f seconds\n", this->name, dt);
+}
 
 void Jet::Error(const std::string& msg, Token token)
 {
@@ -91,22 +155,6 @@ Compiler::~Compiler()
 		//delete ii.second;
 }
 
-#include <llvm/ADT/Triple.h>
-#include <llvm/Support/Host.h>
-#include <llvm\Target\TargetLibraryInfo.h>
-#include <llvm\IR\AssemblyAnnotationWriter.h>
-#include <llvm\Support\FormattedStream.h>
-#include <llvm\Support\raw_os_ostream.h>
-#include <llvm/CodeGen/CommandFlags.h>
-#include <llvm\Target\TargetRegisterInfo.h>
-#include <llvm\Support\TargetRegistry.h>
-#include <llvm\Target\TargetMachine.h>
-#include <llvm\Target\TargetSubtargetInfo.h>
-#include <llvm/Transforms/IPO.h>
-
-#include <Windows.h>
-
-#include "UniquePtr.h"
 
 std::string exec(const char* cmd) {
 	FILE* pipe = _popen(cmd, "r");
@@ -120,168 +168,6 @@ std::string exec(const char* cmd) {
 	_pclose(pipe);
 	return result;
 }
-
-std::string GetNameFromPath(const std::string& path)
-{
-	std::string name;
-	bool first = false;
-	int i = path.length() - 1;
-	for (; i >= 0; i--)
-	{
-		if (path[i] == '/' || path[i] == '\\')
-		{
-			if (first)
-				break;
-			first = true;
-		}
-		else if (first == false)
-		{
-			first = true;
-		}
-	}
-	if (i < 0)
-		i = 0;
-
-	for (; i < path.length(); i++)
-	{
-		if (path[i] != '/' && path[i] != '\\')
-			name.push_back(path[i]);
-	}
-
-	return name;
-}
-
-class JetProject
-{
-	bool opened, is_executable;
-public:
-
-	std::string project_name;
-	std::vector<std::string> files;
-	std::vector<std::string> dependencies;
-	std::vector<std::string> libs;//libraries to link to
-
-	JetProject()
-	{
-		opened = false;
-	}
-
-	bool IsExecutable()
-	{
-		return this->is_executable;
-	}
-
-	bool Load(const std::string& projectdir)
-	{
-		//ok, lets parse the jp file
-		std::ifstream pf(std::string(projectdir) + "/project.jp", std::ios::in | std::ios::binary);
-		if (pf.is_open() == false)
-		{
-			printf("Error: Could not find project file %s/project.jp\n", projectdir.c_str());
-			return false;
-		}
-
-		is_executable = true;
-		int current_block = 0;
-		project_name = GetNameFromPath(projectdir);
-		while (pf.peek() != EOF)
-		{
-			std::string file;//read in a filename
-			bool is_escaped = false;
-			while ((is_escaped || pf.peek() != ' ') && pf.peek() != EOF && pf.peek() != '\r' && pf.peek() != '\n' && pf.peek() != '\t')
-			{
-				if (pf.peek() == '"')
-				{
-					is_escaped = !is_escaped;
-					pf.get();
-				}
-				else
-					file += pf.get();//handle escaping
-			}
-
-			pf.get();
-
-			if (file == "files:")
-			{
-				current_block = 1;
-				continue;
-			}
-			else if (file == "requires:")
-			{
-				current_block = 2;
-				continue;
-			}
-			else if (file == "lib:")
-			{
-				current_block = 3;
-				is_executable = false;
-				continue;
-			}
-			else if (file == "libs:")
-			{
-				current_block = 4;
-				continue;
-			}
-			else if (file == "\n" || file == "")
-			{
-				continue;
-			}
-
-			switch (current_block)
-			{
-			case 1:
-				if (file.length() > 0)
-					files.push_back(file);
-				break;
-			case 2:
-				if (file.length() > 0)
-					dependencies.push_back(file);
-				break;//do me later
-			case 3:
-				break;
-			case 4:
-				if (file.length() > 0)
-					libs.push_back(file);
-				break;
-			default:
-				printf("Malformatted Project File!\n");
-			}
-		}
-
-		if (files.size() == 0)
-		{
-			//if no files, then just add all.jet files in the directory
-		}
-		this->opened = true;
-		return true;
-	}
-
-	std::map<std::string, Source*> GetSources()
-	{
-		std::map<std::string, Source*> sources;
-		for (auto file : files)
-		{
-			std::ifstream t(file, std::ios::in | std::ios::binary);
-			if (t)
-			{
-				t.seekg(0, std::ios::end);    // go to the end
-				std::streamoff length = t.tellg();           // report location (this is the length)
-				t.seekg(0, std::ios::beg);    // go back to the beginning
-				char* buffer = new char[length + 1];    // allocate memory for a buffer of appropriate dimension
-				t.read(buffer, length);       // read the whole file into the buffer
-				buffer[length] = 0;
-				t.close();
-
-				sources[file] = new Source(buffer, file);
-			}
-			else
-			{
-				sources[file] = 0;
-			}
-		}
-		return sources;
-	}
-};
 
 
 //get traits working
@@ -324,9 +210,6 @@ public:
 	}
 };
 
-//#define USE_GCC
-//#define USE_CLANG
-#define USE_MSVC
 bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 {
 	JetProject project;
@@ -476,13 +359,14 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 	if (jlib) fclose(jlib);
 	if (output) fclose(output);
 
-
 	//JITHelper = new MCJITHelper(this->context);
 
 	//spin off children and lets compile this!
 	//module = JITHelper->getModuleForNewFunction();
 	module = new llvm::Module("hi.im.jet", context);
-
+	debug = new llvm::DIBuilder(*module);
+	debug_info.cu = debug->createCompileUnit(dwarf::DW_LANG_C, "../aaaa.jet", ".", "Jet Compiler", false, "", 0, "");
+	
 	//compile it
 	//first lets create the global context!!
 	//ok this will be the main entry point it initializes everything, then calls the program's entry point
@@ -495,56 +379,63 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 	//read in symbols from lib
 	std::vector<Expression*> symbol_asts;
 	std::vector<Source*> symbol_sources;
-	for (auto buffer : lib_symbols)
 	{
-		Source* src = new Source(buffer, "symbols");
+		StackTime timer("Reading Symbols");
+		for (auto buffer : lib_symbols)
+		{
+			Source* src = new Source(buffer, "symbols");
 
-		BlockExpression* result = 0;
-		try
-		{
-			result = src->GetAST();
-			result->CompileDeclarations(global);
-			symbol_asts.push_back(result);
-			symbol_sources.push_back(src);
-		}
-		catch (...)
-		{
-			delete result;
-			printf("Compilation Stopped, Error Parsing Symbols\n");
-			errors = 1;
-			goto error;
+			BlockExpression* result = 0;
+			try
+			{
+				result = src->GetAST();
+				result->CompileDeclarations(global);
+				symbol_asts.push_back(result);
+				symbol_sources.push_back(src);
+			}
+			catch (...)
+			{
+				delete result;
+				printf("Compilation Stopped, Error Parsing Symbols\n");
+				errors = 1;
+				goto error;
+			}
 		}
 	}
 
 	//read in each file
 	//these two blocks could be multithreaded! theoretically
-	for (auto file : sources)
 	{
-		if (file.second == 0)
-		{
-			printf("Could not find file '%s'!\n", file.first.c_str());
-			errors = 1;
-			goto error;
-		}
+		StackTime timer("Parsing Files and Compiling Declarations");
 
-		BlockExpression* result = 0;
-		try
+		for (auto file : sources)
 		{
-			result = file.second->GetAST();
-		}
-		catch (...)
-		{
-			printf("Compilation Stopped, Parser Error\n");
-			errors = 1;
-			goto error;
-		}
-		asts[file.first] = result;
+			if (file.second == 0)
+			{
+				printf("Could not find file '%s'!\n", file.first.c_str());
+				errors = 1;
+				goto error;
+			}
 
-		this->current_function = global;
+			BlockExpression* result = 0;
+			try
+			{
+				result = file.second->GetAST();
+			}
+			catch (...)
+			{
+				printf("Compilation Stopped, Parser Error\n");
+				errors = 1;
+				goto error;
+			}
+			asts[file.first] = result;
 
-		//do this for each file
-		for (auto ii : result->statements)
-			ii->CompileDeclarations(global);//guaranteed not to throw?
+			this->current_function = global;
+
+			//do this for each file
+			for (auto ii : result->statements)
+				ii->CompileDeclarations(global);//guaranteed not to throw?
+		}
 	}
 
 	//load all types
@@ -552,30 +443,48 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 		//if (!(ii.second->type == Types::Struct && ii.second->data->templates.size()))
 		//	ii.second->Load(this);
 
-	for (auto result : asts)
 	{
-		current_source = sources[result.first];
-		this->current_function = global;
+		StackTime timer("Final Compiler Pass");
 
-		//then do this for each file
-		for (auto ii : result.second->statements)
+		for (auto result : asts)
 		{
-			//catch any exceptions
-			try
+			current_source = sources[result.first];
+			this->current_function = global;
+
+			//ok, I only need one of these, fixme
+			//debug_info.cu = debug->createCompileUnit(dwarf::DW_LANG_C, result.first, "../", "Jet Compiler", false, "", 0, "");
+			debug_info.file = debug->createFile(result.first,
+				debug_info.cu.getDirectory());
+			this->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, debug_info.file));
+
+			//make sure to set the file name differently for different files
+			//then do this for each file
+			for (auto ii : result.second->statements)
 			{
-				ii->Compile(global);
-			}
-			catch (...)
-			{
-				errors++;
+				//catch any exceptions
+				try
+				{
+					ii->Compile(global);
+				}
+				catch (...)
+				{
+					errors++;
+				}
 			}
 		}
 	}
 
 	//figure out how to get me working with multiple definitions
-	//auto init = global->AddFunction("global", &IntType, {});
-	//init->Return(global->Number(6));
-	//todo: put intializers here and have this call main()
+	auto init = global->AddFunction("_jet_initializer", this->types["int"], {});
+	if (project.IsExecutable())
+	{
+		//this->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, init->function->scope.get()));
+		//init->Call("puts", { init->String("hello from initializer") });
+
+		//todo: put intializers here
+		init->Call("main", {});
+	}
+	init->Return(global->Integer(0));
 
 error:
 	
@@ -587,6 +496,8 @@ error:
 	}
 	else
 	{
+		StackTime timer("Building Output");
+
 		//make the output folder
 		mkdir("build/");
 
@@ -598,7 +509,9 @@ error:
 			if (options->optimization > 0)
 				this->Optimize(options->optimization);
 		}
-
+		//figure out why the debug fails on larger files 
+			//add more debug location emits
+		debug->finalize();
 		//output the .o file for this package
 		this->OutputPackage(project.project_name, options ? options->optimization : 0);
 
@@ -610,7 +523,7 @@ error:
 		{
 			printf("Compiling Executable...\n");
 #ifdef USE_GCC
-			std::string cmd = "gcc -L. ";
+			std::string cmd = "gcc -L. -g ";//-e_jet_initializer
 
 			cmd += "build/" + project.project_name + ".o ";
 			cmd += "-o build/" + project.project_name + ".exe ";
@@ -625,9 +538,9 @@ error:
 
 			cmd += " -L.";
 			for (auto ii : project.libs)
-				cmd += " -l" + ii;
+				cmd += " -l:\"" + ii+"\" ";
 #else
-			std::string cmd = "link.exe ";
+			std::string cmd = "link.exe /ENTRY:_jet_initializer /DEBUG ";
 
 			cmd += "build/" + project.project_name + ".o ";
 			cmd += "/OUT:build/" + project.project_name + ".exe ";
@@ -1019,25 +932,6 @@ void Compiler::OutputIR(const char* filename)
 	llvm::AssemblyAnnotationWriter writer;
 	module->print(str, &writer);
 }
-
-
-/*Trait* Compiler::AdvanceTraitLookup(const std::string& name)
-{
-	auto trait = traits.find(name);
-	if (trait == traits.end())
-	{
-		//make a new one
-		Trait* t = new Trait;
-		t->valid = false;
-		t->name = name;
-		this->traits[name] = t;
-
-		//process templated traits
-		return t;
-	}
-
-	return trait->second;
-}*/
 
 Jet::Type* Compiler::AdvanceTypeLookup(const std::string& name)
 {

@@ -1466,6 +1466,7 @@ namespace Jet
 		friend class Compiler;
 		friend class CompilerContext;
 		friend class Type;
+		friend class Function;
 		Token name;
 		std::vector<std::pair<std::string, std::string>>* args;
 		ScopeExpression* block;

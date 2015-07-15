@@ -153,6 +153,12 @@ namespace Jet
 			return CValue(value.type, parent->builder.CreateLoad(value.val, name.c_str()));
 		}
 
+		void SetDebugLocation(const Token& t)
+		{
+			assert(this->function->loaded);
+			this->parent->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope.get()));
+		}
+
 
 		CValue UnaryOperation(TokenType operation, CValue value);
 
@@ -350,7 +356,7 @@ namespace Jet
 			Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 		}
 
-		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member);
+		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member = false);
 
 		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0);
 	};

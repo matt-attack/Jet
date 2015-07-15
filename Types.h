@@ -5,6 +5,9 @@
 #include <string>
 #include <map>
 
+#include <llvm/IR/DebugInfo.h>
+#include <llvm/IR/DIBuilder.h>
+
 namespace llvm
 {
 	class Type;
@@ -44,7 +47,7 @@ namespace Jet
 	struct FunctionType;
 	class Type
 	{
-		std::vector<std::pair<Type**,Trait*>> traits;//all the traits that apply to this type
+		std::vector<std::pair<Type**, Trait*>> traits;//all the traits that apply to this type
 
 	public:
 
@@ -62,9 +65,9 @@ namespace Jet
 		std::string name;
 
 
-		std::vector<std::pair<Type**,Trait*>> GetTraits(Compiler* compiler);
+		std::vector<std::pair<Type**, Trait*>> GetTraits(Compiler* compiler);
 		bool MatchesTrait(Compiler* compiler, Trait* trait);
-		
+
 		Type() { data = 0; type = Types::Void; loaded = false; size = 0; }
 		Type(std::string name, Types type, Struct *data = 0) : type(type), data(data), loaded(false), size(0), name(name) {}
 		Type(std::string name, Types type, Type* base, int size = 0) : type(type), base(base), loaded(false), size(size), name(name) {}
@@ -74,6 +77,8 @@ namespace Jet
 		Type* Instantiate(Compiler* compiler, const std::vector<Type*>& types);
 
 		std::string ToString();
+
+		llvm::DIType GetDebugType(Compiler* compiler);
 
 		//Type* GetPointerType()
 		//{
@@ -163,6 +168,7 @@ namespace Jet
 		std::vector<std::pair<Type*, std::string>> argst;
 
 		llvm::Function* f;//not always used
+		llvm::DISubprogram scope;
 
 		Type* return_type;
 

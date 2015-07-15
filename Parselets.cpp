@@ -331,10 +331,10 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 	Token name = parser->Consume(TokenType::Name);
 
 	//parse templates
-	std::vector<std::pair<Token,Token>>* templated = 0;
+	std::vector<std::pair<Token, Token>>* templated = 0;
 	if (parser->MatchAndConsume(TokenType::LessThan))
 	{
-		templated = new std::vector<std::pair<Token,Token>>;
+		templated = new std::vector < std::pair<Token, Token> > ;
 		//parse types and stuff
 		do
 		{
@@ -347,7 +347,7 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 				tname = ttname;
 				ttname = Token();
 			}
-			
+
 			templated->push_back({ ttname, tname });
 		} while (parser->MatchAndConsume(TokenType::Comma));
 		parser->Consume(TokenType::GreaterThan);
@@ -614,41 +614,40 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 }
 
 
-/*Expression* LambdaParselet::parse(Parser* parser, Token token)
+Expression* LambdaParselet::parse(Parser* parser, Token token)
 {
-parser->Consume(TokenType::LeftParen);
+	parser->Consume(TokenType::LeftParen);
 
-NameExpression* varargs = 0;
-auto arguments = new std::vector<Expression*>;
-if (parser->LookAhead().type != TokenType::RightParen)
-{
-do
-{
-Token name = parser->Consume();
-if (name.type == TokenType::Name)
-{
-arguments->push_back(new NameExpression(name.getText()));
-}
-else if (name.type == TokenType::Ellipses)
-{
-varargs = new NameExpression(parser->Consume(TokenType::Name).getText());
+	//NameExpression* varargs = 0;
+	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
+	if (parser->LookAhead().type != TokenType::RightParen)
+	{
+		do
+		{
+			Token name = parser->Consume();
+			if (name.type == TokenType::Name)
+			{
+				arguments->push_back({"", name.text});
+			}
+			//else if (name.type == TokenType::Ellipses)
+			//{
+				//varargs = new NameExpression(parser->Consume(TokenType::Name).text);
 
-break;//this is end of parsing arguments
-}
-else
-{
-std::string str = "Consume: TokenType not as expected! Expected Name or Ellises Got: " + name.text;
-throw CompilerException(parser->filename, name.line, str);
-}
-}
-while(parser->MatchAndConsume(TokenType::Comma));
-}
+			//	break;//this is end of parsing arguments
+			//}
+			else
+			{
+				std::string str = "Consume: TokenType not as expected! Expected Name or Ellises Got: " + name.text;
+				ParserError(str, token);
+			}
+		} while (parser->MatchAndConsume(TokenType::Comma));
+	}
 
-parser->Consume(TokenType::RightParen);
+	parser->Consume(TokenType::RightParen);
 
-auto block = new ScopeExpression(parser->parseBlock());
-return new FunctionExpression(token, 0, arguments, block, varargs);
-}*/
+	auto block = new ScopeExpression(parser->parseBlock());
+	return new FunctionExpression(token, Token(), Token(), arguments, block, Token(), 0);
+}
 
 Expression* CallParselet::parse(Parser* parser, Expression* left, Token token)
 {

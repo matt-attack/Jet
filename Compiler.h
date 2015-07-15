@@ -79,6 +79,14 @@ namespace Jet
 		llvm::IRBuilder<> builder;
 		llvm::LLVMContext& context;
 		llvm::Module* module;
+		llvm::DIBuilder* debug;
+		struct DebugInfo {
+			llvm::DICompileUnit cu;
+			llvm::DIFile file;
+			//DIType *DblTy;
+
+			//DIType *getDoubleTy();
+		} debug_info;
 
 		std::multimap<std::string, Function*> functions;
 		std::map<std::string, Trait*> traits;
