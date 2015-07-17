@@ -264,6 +264,12 @@ extern "C"
 			Scope* scope = f->expression->GetBlock()->scope;
 			for (auto ii : scope->named_values)
 				out += ii.first + "L/"+ii.second.type->ToString() + " " + ii.first+"/";
+
+			if (scope->prev)
+			{
+				for (auto ii : scope->prev->named_values)
+					out += ii.first + "L/" + ii.second.type->ToString() + " " + ii.first + "/";
+			}
 		}
 
 		strcpy(data, out.c_str());

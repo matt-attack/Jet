@@ -269,7 +269,7 @@ namespace Jet
 
 	void Compile(CompilerContext* context);
 	};*/
-	
+
 	class StringExpression : public Expression
 	{
 		Token token;
@@ -699,7 +699,7 @@ namespace Jet
 	{
 		friend class ScopeExpression;
 		bool no_brackets;
-		
+
 	public:
 		Token start, end;
 
@@ -733,14 +733,16 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
-			try
+			for (auto ii : statements)
 			{
-				for (auto ii : statements)
+				try
+				{
 					ii->Compile(context);
-			}
-			catch (...)
-			{
+				}
+				catch (...)
+				{
 
+				}
 			}
 
 			return CValue();
@@ -748,14 +750,16 @@ namespace Jet
 
 		void CompileDeclarations(CompilerContext* context)
 		{
-			try
+			for (auto ii : statements)
 			{
-				for (auto ii : statements)
+				try
+				{
 					ii->CompileDeclarations(context);
-			}
-			catch (...)
-			{
+				}
+				catch (...)
+				{
 
+				}
 			}
 		};
 
@@ -1671,7 +1675,7 @@ namespace Jet
 				context->parent->traits[name.text] = t;
 			}
 			//else if (tr->second->valid == false)//make sure it is set as invalid
-				//t = tr->second;
+			//t = tr->second;
 			else
 				context->parent->Error("Type '" + name.text + "' already exists", token);
 			t->valid = true;
