@@ -38,8 +38,8 @@
 //then add templates/generics
 namespace Jet
 {
-	void Error(const std::string& msg, Token token);
-	void ParserError(const std::string& msg, Token token);
+	//void Error(const std::string& msg, Token token);
+	void ParserError(const std::string& msg, Token token);//todo
 
 	class BlockExpression;
 
@@ -71,55 +71,92 @@ namespace Jet
 
 	//add global variables
 	//global compiler context
-	class CompilerContext;
-	class Compiler
+
+	struct JetError
 	{
+		std::string message;
+		std::string file;
+
+		std::string line;//the line of code that the function was on
+		Token token;
+		Token end;//optional
+
+		void Print();
+	};
+
+	class CompilerContext;
+	class JetProject;
+	class Compilation
+	{
+		friend class Type;
+		friend class Struct;
+		friend class Function;
+		friend class Compiler;
+		friend class Expression;
+		friend class CompilerContext;
+		friend class FunctionExpression;
+		friend class ExternExpression;
+		friend class TraitExpression;
+		friend class LocalExpression;
+
 		llvm::TargetMachine* target;
-	public:
-		llvm::IRBuilder<> builder;
 		llvm::LLVMContext& context;
-		llvm::Module* module;
-		llvm::DIBuilder* debug;
+		
 		struct DebugInfo {
 			llvm::DICompileUnit cu;
 			llvm::DIFile file;
-			//DIType *DblTy;
-
-			//DIType *getDoubleTy();
 		} debug_info;
 
-		std::multimap<std::string, Function*> functions;
 		std::map<std::string, Trait*> traits;
 
 		CompilerContext* current_function;
+
+		//int errors;
+
+		Compilation(JetProject* proj);
+	public:
+		//dont use these k
+		llvm::Module* module;
+		llvm::DIBuilder* debug;
+		llvm::IRBuilder<> builder;
 
 		//these are some of the basic types
 		Type* DoubleType;
 		Type* IntType;
 		Type* BoolType;
 
-		Compiler() : builder(llvm::getGlobalContext()), context(llvm::getGlobalContext())
-		{
-			this->target = 0;
+		JetProject* project;
 
-			//insert basic types
-			types["float"] = new Type("float", Types::Float);
-			this->DoubleType = new Type("double", Types::Double);
-			types["double"] = this->DoubleType;// new Type("double", Types::Double);// &DoubleType;// new Type(Types::Float);
-			types["long"] = new Type("long", Types::Long);
-			this->IntType = new Type("int", Types::Int);
-			types["int"] = this->IntType;// new Type("int", Types::Int);// &IntType;// new Type(Types::Int);
-			types["short"] = new Type("short", Types::Short);
-			types["char"] = new Type("char", Types::Char);
-			this->BoolType = new Type("bool", Types::Bool);// &BoolType;// new Type(Types::Bool);
-			types["bool"] = this->BoolType;
-			types["void"] = new Type("void", Types::Void);// &VoidType;// new Type(Types::Void);
+		std::map<std::string, Source*> sources;
+		std::map<std::string, BlockExpression*> asts;
+
+		std::multimap<std::string, Function*> functions;
+
+		~Compilation();
+
+		//get array types inside of structs working
+		Type* AdvanceTypeLookup(const std::string& name);
+
+		std::map<std::string, Type*> types;
+		Type* LookupType(const std::string& name);
+
+		std::map<std::string, CValue> globals;
+		CValue AddGlobal(const std::string& name, Type* t);
+
+		static Compilation* Make(JetProject* proj);
+
+		std::vector<JetError> errors;
+		std::vector<JetError>& GetErrors()
+		{
+			return this->errors;
 		}
 
-		~Compiler();
+		void Error(const std::string& string, Token token);
 
-		//returns if was successful
-		bool Compile(const char* projectfile, CompilerOptions* options = 0);
+		//generates and outputs an exe or lib file
+		void Assemble(int olevel);
+
+	private:
 
 		void Optimize(int level);
 
@@ -128,22 +165,21 @@ namespace Jet
 
 		void Dump()
 		{
-			if (module)
-				module->dump();
+			//if (module)
+			//module->dump();
 		}
 
 		void SetTarget();//make this customizable later
+	};
 
-		//get array types inside of structs working
-		Type* AdvanceTypeLookup(const std::string& name);
+	class Compiler
+	{
+	public:
 
-		//Trait* AdvanceTraitLookup(const std::string& trait);
+		//returns if was successful
+		bool Compile(const char* projectfile, CompilerOptions* options = 0);
 
-		std::map<std::string, Type*> types;
-		Type* LookupType(const std::string& name);
 		
-		std::map<std::string, CValue> globals;
-		CValue AddGlobal(const std::string& name, Type* t);
 	};
 };
 #endif

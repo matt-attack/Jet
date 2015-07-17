@@ -42,6 +42,7 @@ namespace Jet
 
 	//todo: add void* like type
 	class Compiler;
+	class Compilation;
 	struct Struct;
 	struct Trait;
 	struct FunctionType;
@@ -65,20 +66,20 @@ namespace Jet
 		std::string name;
 
 
-		std::vector<std::pair<Type**, Trait*>> GetTraits(Compiler* compiler);
-		bool MatchesTrait(Compiler* compiler, Trait* trait);
+		std::vector<std::pair<Type**, Trait*>> GetTraits(Compilation* compiler);
+		bool MatchesTrait(Compilation* compiler, Trait* trait);
 
 		Type() { data = 0; type = Types::Void; loaded = false; size = 0; }
 		Type(std::string name, Types type, Struct *data = 0) : type(type), data(data), loaded(false), size(0), name(name) {}
 		Type(std::string name, Types type, Type* base, int size = 0) : type(type), base(base), loaded(false), size(size), name(name) {}
 
-		void Load(Compiler* compiler);
+		void Load(Compilation* compiler);
 
-		Type* Instantiate(Compiler* compiler, const std::vector<Type*>& types);
+		Type* Instantiate(Compilation* compiler, const std::vector<Type*>& types);
 
 		std::string ToString();
 
-		llvm::DIType GetDebugType(Compiler* compiler);
+		llvm::DIType GetDebugType(Compilation* compiler);
 
 		//Type* GetPointerType()
 		//{
@@ -136,7 +137,7 @@ namespace Jet
 			loaded = false;
 		}
 
-		void Load(Compiler* compiler);
+		void Load(Compilation* compiler);
 	};
 
 	struct FunctionType
@@ -202,11 +203,11 @@ namespace Jet
 			return true;
 		}
 
-		void Load(Compiler* compiler);
+		void Load(Compilation* compiler);
 
-		Type* GetType(Compiler* compiler);
+		Type* GetType(Compilation* compiler);
 
-		Function* Instantiate(Compiler* compiler, const std::vector<Type*>& types);
+		Function* Instantiate(Compilation* compiler, const std::vector<Type*>& types);
 	};
 
 	llvm::Type* GetType(Type* t);

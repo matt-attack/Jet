@@ -84,7 +84,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		}
 
 		if (func == 0)
-			Error("Function '"+fname+"' not found", *this->parent->current_function->current_token);
+			this->parent->Error("Function '"+fname+"' not found", *this->parent->current_function->current_token);
 	}
 
 	func->Load(this->parent);
@@ -128,7 +128,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 			res = parent->builder.CreateFNeg(value.val);// parent->builder.CreateFMul(left.val, right.val);
 			break;
 		default:
-			Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
+			this->parent->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 			break;
 		}
 
@@ -152,7 +152,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 			res = parent->builder.CreateNot(value.val);
 			break;
 		default:
-			Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
+			this->parent->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 			break;
 		}
 
@@ -169,11 +169,11 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		case TokenType::Decrement:
 			return CValue(value.type->base, this->parent->builder.CreateGEP(value.val, parent->builder.getInt32(-1)));
 		default:
-			Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
+			this->parent->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 		}
 
 	}
-	Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
+	this->parent->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 }
 
 CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue right)
@@ -234,7 +234,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			return CValue(parent->BoolType, res);
 			break;
 		default:
-			Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
+			this->parent->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 
 			break;
 		}
@@ -314,7 +314,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 		case TokenType::RightShift:
 			//todo
 		default:
-			Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
+			this->parent->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 
 			break;
 		}
@@ -322,7 +322,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 		return CValue(left.type, res);
 	}
 
-	Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
+	this->parent->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 }
 
 #include "Expressions.h"
@@ -387,7 +387,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				auto var = this->GetVariable(name);
 
 				if (var.type->type != Types::Function)
-					Error("Cannot call non-function type", *this->current_token);
+					this->parent->Error("Cannot call non-function type", *this->current_token);
 				
 				std::vector<llvm::Value*> argsv;
 				int i = 0;
@@ -402,7 +402,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				var.val = this->parent->builder.CreateLoad(var.val);
 				return CValue(var.type->function->return_type, this->parent->builder.CreateCall(var.val, argsv));
 			}
-			Error("Function '" + name + "' is not defined", *this->current_token);
+			this->parent->Error("Function '" + name + "' is not defined", *this->current_token);
 		}
 
 		//look for the best one
@@ -417,7 +417,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		}
 
 		if (fun == 0)
-			Error("Mismatched function parameters in call", *this->current_token);
+			this->parent->Error("Mismatched function parameters in call", *this->current_token);
 		//fun = iter->second;
 	}
 	else
@@ -489,7 +489,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			}
 
 			if (fun == 0)
-				Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+				this->parent->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
 		}
 	}
 
@@ -501,7 +501,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 	{
 		//f->dump();
 		//todo: add better checks later
-		Error("Mismatched function parameters in call", *this->current_token);
+		this->parent->Error("Mismatched function parameters in call", *this->current_token);
 	}
 
 	std::vector<llvm::Value*> argsv;

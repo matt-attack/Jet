@@ -11,7 +11,7 @@ using namespace Jet;
 
 Type Jet::VoidType("void", Types::Void);
 
-llvm::DIType Type::GetDebugType(Compiler* compiler)
+llvm::DIType Type::GetDebugType(Compilation* compiler)
 {
 	if (this->type == Types::Int)
 		return compiler->debug->createBasicType("int", 32, 32, llvm::dwarf::DW_ATE_signed);
@@ -88,8 +88,6 @@ llvm::Type* Jet::GetType(Type* t)
 		return llvm::FunctionType::get(GetType(t->function->return_type), args, false)->getPointerTo();
 	}
 	}
-	Error("Unhandled Type in GetType", Token());
-	throw 7;
 }
 
 #include "Lexer.h"
@@ -150,7 +148,7 @@ std::string Jet::ParseType(const char* tname, int& p)
 	return out;
 }
 
-void Type::Load(Compiler* compiler)
+void Type::Load(Compilation* compiler)
 {
 	//recursively load
 	if (loaded == true)
@@ -175,7 +173,7 @@ void Type::Load(Compiler* compiler)
 			std::string base = name.substr(0, p);
 			auto t = compiler->types.find(base);
 			if (t == compiler->types.end())
-				Error("Reference To Undefined Type '" + base + "'", *compiler->current_function->current_token);
+				compiler->Error("Reference To Undefined Type '" + base + "'", *compiler->current_function->current_token);
 			else if (t->second->type == Types::Trait)
 			{
 				//printf("was a trait");
@@ -278,14 +276,14 @@ void Type::Load(Compiler* compiler)
 			else
 			{
 				if (iter->second == this)
-					Error("Whoops", Token());
+					compiler->Error("Whoops", Token());
 				else
 					*this = *iter->second;
 			}
 			//types[name] = type;
 		}
 		else
-			Error("Tried To Use Undefined Type '" + this->name + "'", *compiler->current_function->current_token);
+			compiler->Error("Tried To Use Undefined Type '" + this->name + "'", *compiler->current_function->current_token);
 	}
 	else if (type == Types::Pointer)
 	{
@@ -312,7 +310,7 @@ bool IsMatch(Function* a, Function* b)
 	return true;
 }
 
-void FindTemplates(Compiler* compiler, Type** types, Type* type, Type* match_type, Trait* trait)
+bool FindTemplates(Compilation* compiler, Type** types, Type* type, Type* match_type, Trait* trait)
 {
 	int i = 0;
 	bool was_template = false;
@@ -321,7 +319,7 @@ void FindTemplates(Compiler* compiler, Type** types, Type* type, Type* match_typ
 		if (match_type->name == temp.second)
 		{
 			if (types[i] && types[i] != type)
-				Error("Does not match trait", *compiler->current_function->current_token);
+				return false;// Error("Does not match trait", *compiler->current_function->current_token);
 			types[i] = type;
 			was_template = true;
 		}
@@ -339,15 +337,20 @@ void FindTemplates(Compiler* compiler, Type** types, Type* type, Type* match_typ
 			{
 				match_type->Load(compiler);
 				for (int i = 0; i < type->data->template_args.size(); i++)
-					FindTemplates(compiler, types, type->data->template_args[i], match_type->trait->template_args[i], ii.second);
+				{
+					bool res = FindTemplates(compiler, types, type->data->template_args[i], match_type->trait->template_args[i], ii.second);
+					if (res == false)
+						return false;
+				}
 
 				break;
 			}
 		}
 	}
+	return true;
 }
 
-std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compiler* compiler)
+std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 {
 	if (this->traits.size())
 		return this->traits;
@@ -376,11 +379,25 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compiler* compiler)
 					}
 
 					if (range.first->second->return_type)
-						FindTemplates(compiler, types, range.first->second->return_type, fun.second->return_type, ii.second);
+					{
+						bool res = FindTemplates(compiler, types, range.first->second->return_type, fun.second->return_type, ii.second);
+						if (res == false)
+						{
+							match = false;
+							break;
+						}
+					}
 
 					//do it for args
 					for (int i = 1; i < range.first->second->argst.size(); i++)
-						FindTemplates(compiler, types, range.first->second->argst[i].first, fun.second->argst[i - 1].first, ii.second);
+					{
+						bool res = FindTemplates(compiler, types, range.first->second->argst[i].first, fun.second->argst[i - 1].first, ii.second);
+						if (res == false)
+						{
+							match = false;
+							break;
+						}
+					}
 				}
 				if (match)
 					this->traits.push_back({ types, ii.second });
@@ -417,7 +434,7 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compiler* compiler)
 	return this->traits;
 }
 
-bool Type::MatchesTrait(Compiler* compiler, Trait* t)
+bool Type::MatchesTrait(Compilation* compiler, Trait* t)
 {
 	auto ttraits = this->GetTraits(compiler);
 	bool found = false;
@@ -432,7 +449,7 @@ bool Type::MatchesTrait(Compiler* compiler, Trait* t)
 	return found;
 }
 
-Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
+Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 {
 	//register the types
 	int i = 0;
@@ -441,7 +458,7 @@ Type* Type::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
 	{
 		//check if traits match
 		if (types[i]->MatchesTrait(compiler, ii.first->trait) == false)
-			Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
+			compiler->Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
 
 		old.push_back({ ii.second, compiler->types[ii.second] });
 		compiler->types[ii.second] = types[i++];
@@ -584,10 +601,10 @@ std::string Type::ToString()
 		//Error("function tostring not finished", Token());
 		return out + ")";
 	}
-	Error("Unhandled Type::ToString()", Token());
+	//Error("Unhandled Type::ToString()", Token());
 }
 
-void Struct::Load(Compiler* compiler)
+void Struct::Load(Compilation* compiler)
 {
 	if (this->loaded)
 		return;
@@ -598,7 +615,7 @@ void Struct::Load(Compiler* compiler)
 		this->parent->Load(compiler);
 
 		if (this->parent->type != Types::Struct)
-			Error("Struct's parent must be another Struct!", *compiler->current_function->current_token);
+			compiler->Error("Struct's parent must be another Struct!", *compiler->current_function->current_token);
 
 		//add its members to me
 		auto oldmem = std::move(this->members);
@@ -625,14 +642,14 @@ void Struct::Load(Compiler* compiler)
 		elementss.push_back(GetType(type));
 	}
 	if (elementss.size() == 0)
-		Error("Struct contains no elements!! Fix this not being ok!", *compiler->current_function->current_token);
+		compiler->Error("Struct contains no elements!! Fix this not being ok!", *compiler->current_function->current_token);
 
 	this->type = llvm::StructType::create(elementss, this->name);
 
 	this->loaded = true;
 }
 
-void Function::Load(Compiler* compiler)
+void Function::Load(Compilation* compiler)
 {
 	if (this->loaded)
 		return;
@@ -682,7 +699,7 @@ void Function::Load(Compiler* compiler)
 	this->loaded = true;
 }
 
-Function* Function::Instantiate(Compiler* compiler, const std::vector<Type*>& types)
+Function* Function::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 {
 	/*//register the types
 	int i = 0;
@@ -728,7 +745,7 @@ Function* Function::Instantiate(Compiler* compiler, const std::vector<Type*>& ty
 	return 0;
 }
 
-Type* Function::GetType(Compiler* compiler)
+Type* Function::GetType(Compilation* compiler)
 {
 	std::string type;
 	type += return_type->ToString();

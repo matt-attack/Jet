@@ -16,7 +16,9 @@
 
 #define CODE(code) #code
 
+#include "Project.h"
 #include "Compiler.h"
+#include "Expressions.h"
 
 #include <iostream>
 #include <string>

@@ -28,7 +28,7 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 			auto var = p->GetGEP(context);
 			return CValue(context->parent->LookupType(var.type->ToString() + "*"), var.val);
 		}
-		Error("Not Implemented", this->_operator);
+		context->parent->Error("Not Implemented", this->_operator);
 	}
 
 	auto rhs = right->Compile(context);
@@ -85,10 +85,10 @@ Type* IndexExpression::GetBaseType(CompilerContext* context)
 	else if (i)
 		return i->GetType(context);
 
-	Error("wat", token);
+	context->parent->Error("wat", token);
 }
 
-Type* IndexExpression::GetBaseType(Compiler* compiler)
+Type* IndexExpression::GetBaseType(Compilation* compiler)
 {
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
@@ -117,10 +117,10 @@ Type* IndexExpression::GetBaseType(Compiler* compiler)
 	//return context->GetVariable(p->GetName()).type;
 	else if (i)
 	{
-		Error("todo", token);// throw 7;// return i->GetType(context);
+		compiler->Error("todo", token);// throw 7;// return i->GetType(context);
 	}
 
-	Error("wat", token);
+	compiler->Error("wat", token);
 }
 
 CValue IndexExpression::GetBaseGEP(CompilerContext* context)
@@ -133,7 +133,7 @@ CValue IndexExpression::GetBaseGEP(CompilerContext* context)
 	else if (i)
 		return i->GetGEP(context);
 
-	Error("wat", token);
+	context->parent->Error("wat", token);
 }
 
 Type* IndexExpression::GetType(CompilerContext* context)
@@ -160,7 +160,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 			}
 
 			if (index >= lhs.type->data->members.size())
-				Error("Struct Member '" + string->GetValue() + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
+				context->parent->Error("Struct Member '" + string->GetValue() + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
 
 			return lhs.type->data->members[index].type;
 		}
@@ -174,7 +174,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 			}
 
 			if (index >= lhs.type->data->members.size())
-				Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
+				context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
 
 			return lhs.type->data->members[index].type;
 		}
@@ -188,7 +188,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 			}
 
 			if (index >= lhs.type->base->data->members.size())
-				Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->data->name + "' Not Found", this->token);
+				context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->data->name + "' Not Found", this->token);
 
 			return lhs.type->base->data->members[index].type;
 		}
@@ -224,7 +224,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 					break;
 			}
 			if (index >= type->data->members.size())
-				Error("Struct Member '" + this->member.text + "' of Struct '" + type->data->name + "' Not Found", this->token);
+				context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + type->data->name + "' Not Found", this->token);
 
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
@@ -232,7 +232,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 			return CValue(type->data->members[index].type, loc);
 		}
 
-		Error("unimplemented!", this->token);
+		context->parent->Error("unimplemented!", this->token);
 	}
 	else if (p || i)
 	{
@@ -251,7 +251,7 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 					break;
 			}
 			if (index >= lhs.type->data->members.size())
-				Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
+				context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
 
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
@@ -279,12 +279,12 @@ CValue IndexExpression::GetGEP(CompilerContext* context)
 		}
 		else if (lhs.type->type == Types::Struct && this->member.text.length() == 0)
 		{
-			Error("Indexing Structs Not Implemented", this->token);
+			context->parent->Error("Indexing Structs Not Implemented", this->token);
 		}
-		Error("Cannot index type '" + lhs.type->ToString() + "'", this->token);
+		context->parent->Error("Cannot index type '" + lhs.type->ToString() + "'", this->token);
 	}
 
-	Error("Unimplemented", this->token);
+	context->parent->Error("Unimplemented", this->token);
 }
 
 
@@ -547,7 +547,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	//need to not compile if template or trait
 	if (this->templates)
 	{
-		Error("Not implemented!", token);
+		context->parent->Error("Not implemented!", token);
 		/*for (auto ii : *this->templates)//make sure traits are valid
 		{
 			auto iter = context->parent->traits.find(ii.first.text);
@@ -662,7 +662,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		else
 		{
 			//function->f->dump();
-			Error("Function must return a value!", token);
+			context->parent->Error("Function must return a value!", token);
 		}
 
 	context->parent->current_function = context;
@@ -767,14 +767,14 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		auto ii = context->parent->types.find(Struct);
 		if (ii == context->parent->types.end())//its new
 		{
-			Error("Not implemented!", token);
+			context->parent->Error("Not implemented!", token);
 			//str = new Type;
 			//context->parent->types[this->name] = str;
 		}
 		else
 		{
 			if (ii->second->type != Types::Struct)
-				Error("Cannot define a function for a type that is not a struct", token);
+				context->parent->Error("Cannot define a function for a type that is not a struct", token);
 
 			ii->second->data->functions.insert({ fname, fun });
 		}
@@ -798,7 +798,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		//should I add a constructor?
 		if (this->_right && this->_right->size() > 0)
 		{
-			Error("Initializing global variables not yet implemented", token);
+			context->parent->Error("Initializing global variables not yet implemented", token);
 		}
 
 		return CValue();
@@ -863,7 +863,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			context->parent->builder.CreateStore(val.val, Alloca);
 		}
 		else
-			Error("Cannot infer type from nothing!", ii.second);
+			context->parent->Error("Cannot infer type from nothing!", ii.second);
 
 		
 
@@ -900,7 +900,7 @@ CValue StructExpression::Compile(CompilerContext* context)
 		{
 			auto iter = context->parent->types.find(ii.first.text);
 			if (iter == context->parent->types.end() || iter->second->type != Types::Trait)
-				Error("Trait '"+ii.first.text+"' is not defined", ii.first);
+				context->parent->Error("Trait '"+ii.first.text+"' is not defined", ii.first);
 		}
 		return CValue();
 	}
@@ -929,7 +929,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	{
 		str = ii->second;
 		if (str->type != Types::Invalid)
-			Error("Struct '" + this->name.text + "' Already Defined", this->token);
+			context->parent->Error("Struct '" + this->name.text + "' Already Defined", this->token);
 	}
 
 	str->type = Types::Struct;
@@ -978,7 +978,7 @@ CValue DefaultExpression::Compile(CompilerContext* context)
 
 	SwitchExpression* sw = dynamic_cast<SwitchExpression*>(this->Parent->Parent);
 	if (sw == 0)
-		Error("Cannot use default expression outside of a switch!", token);
+		context->parent->Error("Cannot use default expression outside of a switch!", token);
 
 	//create a new block for this case
 	llvm::BasicBlock* block = sw->def;// lvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefault");
@@ -1003,7 +1003,7 @@ CValue CaseExpression::Compile(CompilerContext* context)
 
 	SwitchExpression* sw = dynamic_cast<SwitchExpression*>(this->Parent->Parent);
 	if (sw == 0)
-		Error("Cannot use case expression outside of a switch!", token);
+		context->parent->Error("Cannot use case expression outside of a switch!", token);
 
 	//create a new block for this case
 	llvm::BasicBlock* block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "case" + std::to_string(value));
@@ -1027,7 +1027,7 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 
 	CValue value = this->var->Compile(context);
 	if (value.type->type != Types::Int)
-		Error("Argument to Case Statement Must Be an Integer", token);
+		context->parent->Error("Argument to Case Statement Must Be an Integer", token);
 
 	this->switch_end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchend");
 
@@ -1044,7 +1044,7 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 		{
 			//do default
 			if (this->def)
-				Error("Multiple defaults defined for the same switch!", token);
+				context->parent->Error("Multiple defaults defined for the same switch!", token);
 			this->def = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefault");
 		}
 	}

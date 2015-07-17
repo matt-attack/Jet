@@ -33,6 +33,19 @@ std::string Source::GetLine(unsigned int line)
 	return std::string(l.first, l.second);
 }
 
+const char* Source::GetLinePointer(unsigned int line)
+{
+	auto l = this->lines[line - 1];
+	//if (l.second == 0)
+	//{
+		//search for the end
+		//while (l.first[l.second] != 0 && l.first[l.second] != '\n')
+			//l.second++;
+		//printf("oops");
+	//}
+	return l.first;//, l.second);
+}
+
 char Source::ConsumeChar()
 {
 	if (index >= length)

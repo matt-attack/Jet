@@ -8,6 +8,7 @@
 #include "Compiler.h"
 #include "CompilerContext.h"
 #include "ExpressionVisitor.h"
+#include "Source.h"
 
 namespace Jet
 {
@@ -268,7 +269,7 @@ namespace Jet
 
 	void Compile(CompilerContext* context);
 	};*/
-
+	
 	class StringExpression : public Expression
 	{
 		Token token;
@@ -294,7 +295,7 @@ namespace Jet
 
 			output += "\"";
 			//fixme!
-			auto cur = token.text_ptr + 1;
+			auto cur = &source->GetLinePointer(token.line)[token.column]/* token.text_ptr*/ + 1;
 			do
 			{
 				if (*cur == '\"' && *(cur - 1) != '\\')
@@ -347,7 +348,7 @@ namespace Jet
 
 		Type* GetType(CompilerContext* context);
 		Type* GetBaseType(CompilerContext* context);
-		Type* GetBaseType(Compiler* compiler);
+		Type* GetBaseType(Compilation* compiler);
 
 		void CompileStore(CompilerContext* context, CValue right);
 
@@ -571,7 +572,7 @@ namespace Jet
 		void CompileStore(CompilerContext* context, CValue right)
 		{
 			if (_operator.type != TokenType::Asterisk)
-				Error("Cannot store into this expression!", _operator);
+				context->parent->Error("Cannot store into this expression!", _operator);
 
 			if (this->_operator.type == TokenType::Asterisk)
 			{
@@ -583,7 +584,7 @@ namespace Jet
 				context->parent->builder.CreateStore(right.val, loc.val);
 				return;
 			}
-			Error("Unimplemented!", _operator);
+			context->parent->Error("Unimplemented!", _operator);
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -698,8 +699,10 @@ namespace Jet
 	{
 		friend class ScopeExpression;
 		bool no_brackets;
-		Token start, end;
+		
 	public:
+		Token start, end;
+
 		std::vector<Expression*> statements;
 		BlockExpression(Token start_bracket, Token end_bracket, std::vector<Expression*>&& statements) : statements(statements)
 		{
@@ -730,16 +733,30 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
-			for (auto ii : statements)
-				ii->Compile(context);
+			try
+			{
+				for (auto ii : statements)
+					ii->Compile(context);
+			}
+			catch (...)
+			{
+
+			}
 
 			return CValue();
 		}
 
 		void CompileDeclarations(CompilerContext* context)
 		{
-			for (auto ii : statements)
-				ii->CompileDeclarations(context);
+			try
+			{
+				for (auto ii : statements)
+					ii->CompileDeclarations(context);
+			}
+			catch (...)
+			{
+
+			}
 		};
 
 		void Print(std::string& output, Source* source)
@@ -1480,6 +1497,11 @@ namespace Jet
 		std::vector<std::pair<Token, Token>>* templates;
 	public:
 
+		ScopeExpression* GetBlock()
+		{
+			return block;
+		}
+
 		FunctionExpression(Token token, Token name, Token ret_type, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, std::vector<std::pair<Token, Token>>* templates)
 		{
 			this->ret_type = ret_type;
@@ -1651,7 +1673,7 @@ namespace Jet
 			//else if (tr->second->valid == false)//make sure it is set as invalid
 				//t = tr->second;
 			else
-				Error("Type '" + name.text + "' already exists", token);
+				context->parent->Error("Type '" + name.text + "' already exists", token);
 			t->valid = true;
 			t->name = this->name.text;
 			for (auto ii : this->funcs)
@@ -1942,7 +1964,7 @@ namespace Jet
 		CValue Compile(CompilerContext* context)
 		{
 			if (this->Parent->Parent != 0)
-				Error("Cannot use typedef outside of global scope", token);
+				context->parent->Error("Cannot use typedef outside of global scope", token);
 
 			return CValue();
 		}
@@ -1950,7 +1972,7 @@ namespace Jet
 		void CompileDeclarations(CompilerContext* context)
 		{
 			if (this->Parent->Parent != 0)
-				Error("Cannot use typedef outside of global scope", token);
+				context->parent->Error("Cannot use typedef outside of global scope", token);
 
 			context->CurrentToken(&other_type);
 			auto type = context->parent->AdvanceTypeLookup(other_type.text);
@@ -1960,9 +1982,9 @@ namespace Jet
 			if (iter != context->parent->types.end())
 			{
 				if (iter->second->type == Types::Invalid)
-					Error("Please place the typedef before it is used, after is not yet handled properly.", new_type);
+					context->parent->Error("Please place the typedef before it is used, after is not yet handled properly.", new_type);
 				else
-					Error("Type '" + new_type.text + "' already defined!", new_type);
+					context->parent->Error("Type '" + new_type.text + "' already defined!", new_type);
 			}
 			context->parent->types[new_type.text] = type;
 		};

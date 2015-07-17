@@ -35,13 +35,14 @@ namespace Jet
 		~Source();
 
 		std::string GetLine(unsigned int line);
+		const char* GetLinePointer(unsigned int line);
 
 		char ConsumeChar();
 		char MatchAndConsumeChar(char c);
 		char PeekChar();
 
 		bool IsAtEnd();
-		
+
 		unsigned int Remaining()
 		{
 			return length + 1 - index;
@@ -55,6 +56,11 @@ namespace Jet
 		int GetIndex()
 		{
 			return this->index;
+		}
+
+		int GetLength()
+		{
+			return this->length;
 		}
 
 		const char* GetSubstring(int start, int end)

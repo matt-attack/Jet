@@ -26,9 +26,30 @@ add_executable(Jet
 	Lexer.cpp
 	Token.cpp
 	Project.cpp
+	Compilation.cpp
 )
+
+add_library(Racer
+	SHARED
+	
+	racer.cpp
+
+	Compiler.cpp
+	CompilerContext.cpp
+	Expressions.cpp
+	Parser.cpp
+	Parselets.cpp
+	Source.cpp
+	Types.cpp
+	Lexer.cpp
+	Token.cpp
+	Project.cpp
+	Compilation.cpp
+	)
 
 llvm_map_components_to_libnames(llvm_libs support core mcjit native ipo)
 
 # Link against LLVM libraries
 target_link_libraries(Jet ${llvm_libs})
+
+target_link_libraries(Racer ${llvm_libs})

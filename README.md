@@ -6,14 +6,16 @@ A work in progress compiled language that uses a LLVM backend. Currently the lan
 
 Currently the build only works on Windows, but it shouldn't take much more than changing a few function calls to port to Linux/Mac.
 
-In order to build the compiler you need to have LLVM and in order to use the compiler you need GCC.
+In order to build the compiler you need to have LLVM and in order to use the compiler you need GCC or the MSVC linker (link.exe) installed and in your PATH.
 
 #### Notable Features So Far:
 - Structs
 	- Constructors/Destructors
 	- Member Functions
 	- Extension Methods
+	- Templates
 - Type Inference
+- Traits That Automatically Apply Themselves to All Applicable Types
 
 
 # Using Jet and The Compiler
@@ -28,6 +30,7 @@ An example project.jp file should look as follows:
 [lib:] (only if you are making a library, not an executable)
 files: (space delimited list of all source files in your program)
 requires: (space delimited list of paths to all required libraries)
+[libs:] (space delimited list of libraries to link to)
 ```
 Each section of the project file can span any number of lines.
 

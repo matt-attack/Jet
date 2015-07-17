@@ -1,5 +1,6 @@
 #include "Token.h"
 #include "Source.h"
+#include "Compiler.h"
 
 using namespace Jet;
 
@@ -13,4 +14,17 @@ void Token::Print(std::string& str, Source* source)
 		str += trivia[i];
 	}
 	str += text;//do more later lel
+}
+
+
+Source* Token::GetSource(Compilation* compilation)
+{
+	for (auto ii : compilation->sources)
+	{
+		if (ii.second->GetLinePointer(1) <= this->text_ptr && this->text_ptr <= &ii.second->GetLinePointer(1)[ii.second->GetLength()])
+		{
+			return ii.second;
+		}
+	}
+	return 0;
 }

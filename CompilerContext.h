@@ -46,13 +46,13 @@ namespace Jet
 		Scope* scope;
 
 	public:
-		Compiler* parent;
+		Compilation* parent;
 
 		llvm::Function* f;
 
 		Function* function;
 
-		CompilerContext(Compiler* parent)
+		CompilerContext(Compilation* parent)
 		{
 			this->parent = parent;
 			this->scope = new Scope;
@@ -79,7 +79,7 @@ namespace Jet
 		void RegisterLocal(const std::string& name, CValue val)
 		{
 			if (this->scope->named_values.find(name) != this->scope->named_values.end())
-				Error("Variable '" + name + "' already defined", *this->current_token);
+				this->parent->Error("Variable '" + name + "' already defined", *this->current_token);
 			this->scope->named_values[name] = val;
 		}
 
@@ -127,7 +127,7 @@ namespace Jet
 					return CValue(function->second->GetType(this->parent), function->second->f);
 				}
 
-				Error("Undeclared identifier '" + name + "'", *current_token);
+				this->parent->Error("Undeclared identifier '" + name + "'", *current_token);
 			}
 			return value;
 		}
@@ -178,7 +178,7 @@ namespace Jet
 		void Continue()
 		{
 			if (loops.empty())
-				Error("Cannot continue from outside loop!", *current_token);
+				this->parent->Error("Cannot continue from outside loop!", *current_token);
 
 			this->parent->builder.CreateBr(loops.top().second);
 
@@ -189,7 +189,7 @@ namespace Jet
 		void Break()
 		{
 			if (loops.empty())
-				Error("Cannot break from outside loop!", *current_token);
+				this->parent->Error("Cannot break from outside loop!", *current_token);
 
 			this->parent->builder.CreateBr(loops.top().first);
 
@@ -201,7 +201,7 @@ namespace Jet
 		{
 			//try and cast if we can
 			if (this->function == 0)
-				Error("Cannot return from outside function!", *current_token);
+				this->parent->Error("Cannot return from outside function!", *current_token);
 
 			//call destructors
 			auto cur = this->scope;
@@ -353,7 +353,7 @@ namespace Jet
 					return value;
 			}
 
-			Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
+			this->parent->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 		}
 
 		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member = false);

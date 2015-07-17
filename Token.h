@@ -116,6 +116,7 @@ namespace Jet
 	};
 
 	class Source;
+	class Compilation;
 	struct Token
 	{
 		TokenType type;
@@ -130,12 +131,12 @@ namespace Jet
 
 		Token()
 		{
-
 		}
 
-		Token(const char* txtptr, unsigned int trivia_length, unsigned int line, unsigned int column, TokenType type, std::string txt)
+		Token(const char* source, unsigned int trivia_length, unsigned int line, unsigned int column, TokenType type, std::string txt)
 		{
-			this->text_ptr = txtptr;
+			this->text_ptr = source;
+			//this->text_ptr = txtptr;
 			this->trivia_length = trivia_length;
 			this->type = type;
 			this->text = txt;
@@ -144,6 +145,8 @@ namespace Jet
 		}
 
 		void Print(std::string& str, Source* source);
+
+		Source* GetSource(Compilation* compilation);
 	};
 }
 
