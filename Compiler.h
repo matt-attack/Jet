@@ -43,21 +43,6 @@ namespace Jet
 
 	class BlockExpression;
 
-	struct CValue
-	{
-		//my type info
-		Type* type;
-		llvm::Value* val;
-
-		CValue()
-		{
-			type = &VoidType;
-			val = 0;
-		}
-
-		CValue(Type* type, llvm::Value* val) : type(type), val(val) {}
-	};
-
 	struct CompilerOptions
 	{
 		int optimization;//from 0-3

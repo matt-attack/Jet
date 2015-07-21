@@ -17,6 +17,23 @@ namespace Jet
 {
 	std::string ParseType(const char* tname, int& p);
 
+	class Type;
+	extern Type VoidType;
+	struct CValue
+	{
+		//my type info
+		Type* type;
+		llvm::Value* val;
+
+		CValue()
+		{
+			type = &VoidType;
+			val = 0;
+		}
+
+		CValue(Type* type, llvm::Value* val) : type(type), val(val) {}
+	};
+
 	enum class Types
 	{
 		Void,
@@ -43,9 +60,11 @@ namespace Jet
 	//todo: add void* like type
 	class Compiler;
 	class Compilation;
+	class CompilerContext;
 	struct Struct;
 	struct Trait;
 	struct FunctionType;
+	struct Function;
 	class Type
 	{
 		std::vector<std::pair<Type**, Trait*>> traits;//all the traits that apply to this type
@@ -80,6 +99,8 @@ namespace Jet
 		std::string ToString();
 
 		llvm::DIType GetDebugType(Compilation* compiler);
+
+		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, CompilerContext* context, bool def = false);
 
 		//Type* GetPointerType()
 		//{
@@ -211,7 +232,5 @@ namespace Jet
 	};
 
 	llvm::Type* GetType(Type* t);
-
-	extern Type VoidType;
 }
 #endif

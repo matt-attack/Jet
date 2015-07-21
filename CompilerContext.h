@@ -358,6 +358,7 @@ namespace Jet
 
 		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member = false);
 
+		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0);
 		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0);
 	};
 };

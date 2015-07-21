@@ -604,6 +604,79 @@ std::string Type::ToString()
 	//Error("Unhandled Type::ToString()", Token());
 }
 
+Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& args, CompilerContext* context, bool def)
+{
+	if (this->type != Types::Struct)
+		return 0;
+
+	//im a struct yo
+	Function* fun = 0;
+	auto range = this->data->functions.equal_range(name);
+	for (auto ii = range.first; ii != range.second; ii++)
+	{
+		//pick one with the right number of args
+		if (def)
+			fun = ii->second;
+		else if (ii->second->argst.size() == args.size())
+			fun = ii->second;
+	}
+
+	//auto iter = Struct->data->functions.find(name);
+	if (fun == 0)
+	{
+		//	check for trait extension methods
+		auto ttraits = this->GetTraits(context->parent);
+		for (auto tr : ttraits)
+		{
+			auto frange = tr.second->extension_methods.equal_range(name);
+			for (auto ii = frange.first; ii != frange.second; ii++)
+			{
+				//pick one with the right number of args
+				if (def)
+					fun = ii->second;
+				else if (ii->second->argst.size() == args.size())
+					fun = ii->second;
+			}
+
+			if (fun)
+			{
+				//massive hack again, like in templates
+				std::vector<std::pair<std::string, Type*>> old;
+				old.push_back({ tr.second->name, context->parent->types[tr.second->name] });
+				context->parent->types[tr.second->name] = this;
+
+				auto rp = context->parent->builder.GetInsertBlock();
+				auto dp = context->parent->builder.getCurrentDebugLocation();
+
+				//compile function
+				auto oldn = fun->expression->Struct.text;
+				fun->expression->Struct.text = this->name;
+				int i = 0;
+				for (auto ii : tr.second->templates)
+				{
+					old.push_back({ ii.second, context->parent->types[ii.second] });
+					context->parent->types[ii.second] = tr.first[i++];
+				}
+				//fix these templates, store temp result then restore after
+				fun->expression->CompileDeclarations(context);
+				fun->expression->DoCompile(context);
+
+				for (auto ii : old)
+					context->parent->types[ii.first] = ii.second;
+
+				fun->expression->Struct.text = oldn;
+
+				context->parent->builder.SetCurrentDebugLocation(dp);
+				context->parent->builder.SetInsertPoint(rp);
+
+				fun = this->data->functions.find(name)->second;
+				break;
+			}
+		}
+	}
+	return fun;
+}
+
 void Struct::Load(Compilation* compiler)
 {
 	if (this->loaded)
@@ -752,9 +825,9 @@ Type* Function::GetType(Compilation* compiler)
 	type += "(";
 	for (int i = 0; i < this->argst.size(); i++)
 	{
+		type += this->argst[i].first->ToString();
 		if (i != this->argst.size() - 1)
 			type += ",";
-		type += this->argst[i].first->ToString();
 	}
 	type += ")";
 	return compiler->LookupType(type);

@@ -343,8 +343,8 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context);
 
-		CValue GetGEP(CompilerContext* context);
-		CValue GetBaseGEP(CompilerContext* context);
+		CValue GetElementPointer(CompilerContext* context);
+		CValue GetBaseElementPointer(CompilerContext* context);
 
 		Type* GetType(CompilerContext* context);
 		Type* GetBaseType(CompilerContext* context);
@@ -1417,9 +1417,11 @@ namespace Jet
 	class CallExpression : public Expression
 	{
 		Token token;
+		
+		
+	public:
 		Expression* left;
 		std::vector<Expression*>* args;
-	public:
 		friend class FunctionParselet;
 		CallExpression(Token token, Expression* left, std::vector<Expression*>* args)
 		{
@@ -1488,6 +1490,7 @@ namespace Jet
 		friend class CompilerContext;
 		friend class Type;
 		friend class Function;
+		friend class Struct;
 		Token name;
 		std::vector<std::pair<std::string, std::string>>* args;
 		ScopeExpression* block;
@@ -1685,9 +1688,7 @@ namespace Jet
 				Function* func = new Function;
 				func->return_type = context->parent->AdvanceTypeLookup(ii.ret_type.text);
 				for (auto arg : ii.args)
-				{
 					func->argst.push_back({ context->parent->AdvanceTypeLookup(arg.text), "dummy" });
-				}
 
 				t->funcs.insert({ ii.name.text, func });
 			}

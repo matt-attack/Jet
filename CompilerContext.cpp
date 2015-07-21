@@ -51,7 +51,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		auto n = new CompilerContext(this->parent);
 
 		auto ft = llvm::FunctionType::get(GetType(ret), oargs, false);
-		
+
 		n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
 
 		n->function = func;
@@ -84,7 +84,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		}
 
 		if (func == 0)
-			this->parent->Error("Function '"+fname+"' not found", *this->parent->current_function->current_token);
+			this->parent->Error("Function '" + fname + "' not found", *this->parent->current_function->current_token);
 	}
 
 	func->Load(this->parent);
@@ -326,9 +326,9 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 }
 
 #include "Expressions.h"
-CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct)
+
+Function* CompilerContext::GetMethod(const std::string& name, const std::vector<CValue>& args, Type* Struct)
 {
-	llvm::Function* f = 0;
 	Function* fun = 0;
 
 	if (Struct == 0)
@@ -372,37 +372,37 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 					//parent->module->dump();
 					//auto fun = this->parent->module->getFunction(constructor->second->name);
 
-					this->parent->builder.CreateCall(fun->f, argsv);
+					//this->parent->builder.CreateCall(fun->f, argsv);
 
-					return CValue(type->second, this->parent->builder.CreateLoad(Alloca));
+					return fun;// CValue(type->second, this->parent->builder.CreateLoad(Alloca));
 				}
 			}
 			//else if (type == this->parent->types.end() || type->second->type == Types::Invalid)
 			//{
-				//Error("wrong something", *current_token);
+			//Error("wrong something", *current_token);
 			//}
-			else
+			/*else
 			{
-				//try to find it in variables
-				auto var = this->GetVariable(name);
+			//try to find it in variables
+			auto var = this->GetVariable(name);
 
-				if (var.type->type != Types::Function)
-					this->parent->Error("Cannot call non-function type", *this->current_token);
-				
-				std::vector<llvm::Value*> argsv;
-				int i = 0;
-				for (auto ii : args)
-				{
-					//try and cast to the correct type if we can
-					argsv.push_back(this->DoCast(var.type->function->args[i++], ii).val);
-					//argsv.back()->dump();
-				}
-				
-				//var.val->dump();
-				var.val = this->parent->builder.CreateLoad(var.val);
-				return CValue(var.type->function->return_type, this->parent->builder.CreateCall(var.val, argsv));
+			if (var.type->type != Types::Function)
+			this->parent->Error("Cannot call non-function type", *this->current_token);
+
+			std::vector<llvm::Value*> argsv;
+			int i = 0;
+			for (auto ii : args)
+			{
+			//try and cast to the correct type if we can
+			argsv.push_back(this->DoCast(var.type->function->args[i++], ii).val);
+			//argsv.back()->dump();
 			}
-			this->parent->Error("Function '" + name + "' is not defined", *this->current_token);
+
+			//var.val->dump();
+			var.val = this->parent->builder.CreateLoad(var.val);
+			return CValue(var.type->function->return_type, this->parent->builder.CreateCall(var.val, argsv));
+			}*/
+			//this->parent->Error("Function '" + name + "' is not defined", *this->current_token);
 		}
 
 		//look for the best one
@@ -416,81 +416,97 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				fun = ii->second;
 		}
 
-		if (fun == 0)
-			this->parent->Error("Mismatched function parameters in call", *this->current_token);
+		//if (fun == 0)
+		//this->parent->Error("Mismatched function parameters in call", *this->current_token);
 		//fun = iter->second;
 	}
 	else
 	{
+		fun = Struct->GetMethod(name, args, this);
+
 		//im a struct yo
-		auto range = Struct->data->functions.equal_range(name);
-		for (auto ii = range.first; ii != range.second; ii++)
-		{
-			//printf("found function option for %s\n", name.c_str());
+		//if (fun == 0)
+		//this->parent->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+	}
+	return fun;
+}
 
-			//pick one with the right number of args
-			if (ii->second->argst.size() == args.size())
-				fun = ii->second;
-		}
+CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct)
+{
+	llvm::Function* f = 0;
+	Function* fun = this->GetMethod(name, args, Struct);
 
-		//auto iter = Struct->data->functions.find(name);
-		if (fun == 0)//iter == Struct->data->functions.end())
+	if (fun == 0 && Struct == 0)
+	{
+		//global function?
+		//check if its a type, if so try and find a constructor
+		auto type = this->parent->types.find(name);// LookupType(name);
+		if (type != this->parent->types.end() && type->second->type == Types::Struct)
 		{
-			//	check for trait extension methods
-			auto ttraits = Struct->GetTraits(this->parent);
-			for (auto tr : ttraits)
+			//look for a constructor
+			auto range = type->second->data->functions.equal_range(name);
+			for (auto ii = range.first; ii != range.second; ii++)
 			{
-				auto frange = tr.second->extension_methods.equal_range(name);
-				for (auto ii = frange.first; ii != frange.second; ii++)
-				{
-					//printf("found function option for %s\n", name.c_str());
+				if (ii->second->argst.size() == args.size() + 1)
+					fun = ii->second;
+			}
+			if (fun)//constructor != type->data->functions.end() && constructor->second->argst.size() == args.size() + 1)
+			{
+				//ok, we allocate, call then 
+				//allocate thing
+				auto Alloca = this->parent->builder.CreateAlloca(GetType(type->second), 0, "constructortemp");
 
-					//pick one with the right number of args
-					if (ii->second->argst.size() == args.size())
-						fun = ii->second;
+				std::vector<llvm::Value*> argsv;
+				int i = 1;
+
+				//add struct
+				argsv.push_back(Alloca);
+				for (auto ii : args)
+				{
+					//try and cast to the correct type if we can
+					argsv.push_back(this->DoCast(fun->argst[i++].first, ii).val);
+					//argsv.back()->dump();
 				}
 
-				if (fun)
-				{
-					//massive hack again, like in templates
-					std::vector<std::pair<std::string, Type*>> old;
-					old.push_back({ tr.second->name, this->parent->types[tr.second->name] });
-					this->parent->types[tr.second->name] = Struct;
+				fun->Load(this->parent);
 
-					auto rp = this->parent->builder.GetInsertBlock();
-					auto dp = this->parent->builder.getCurrentDebugLocation();
+				//constructor->second->f->dump();
+				//parent->module->dump();
+				//auto fun = this->parent->module->getFunction(constructor->second->name);
 
-					//compile function
-					auto oldn = fun->expression->Struct.text;
-					fun->expression->Struct.text = Struct->data->name;
-					int i = 0;
-					for (auto ii : tr.second->templates)
-					{
-						old.push_back({ ii.second, this->parent->types[ii.second] });
-						this->parent->types[ii.second] = tr.first[i++];
-					}
-					//fix these templates, store temp result then restore after
-					fun->expression->CompileDeclarations(this);
-					fun->expression->DoCompile(this);
+				this->parent->builder.CreateCall(fun->f, argsv);
 
-					for (auto ii : old)
-					{
-						this->parent->types[ii.first] = ii.second;
-					}
+				return CValue(type->second, this->parent->builder.CreateLoad(Alloca));
+			}
+		}
+		else
+		{
+			//try to find it in variables
+			auto var = this->GetVariable(name);
 
-					fun->expression->Struct.text = oldn;
+			if (var.type->type != Types::Function)
+				this->parent->Error("Cannot call non-function type", *this->current_token);
 
-					this->parent->builder.SetCurrentDebugLocation(dp);
-					this->parent->builder.SetInsertPoint(rp);
-
-					fun = Struct->data->functions.find(name)->second;
-					break;
-				}
+			std::vector<llvm::Value*> argsv;
+			int i = 0;
+			for (auto ii : args)
+			{
+				//try and cast to the correct type if we can
+				argsv.push_back(this->DoCast(var.type->function->args[i++], ii).val);
+				//argsv.back()->dump();
 			}
 
-			if (fun == 0)
-				this->parent->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+			//var.val->dump();
+			var.val = this->parent->builder.CreateLoad(var.val);
+			return CValue(var.type->function->return_type, this->parent->builder.CreateCall(var.val, argsv));
 		}
+		this->parent->Error("Function '" + name + "' is not defined", *this->current_token);
+	}
+	else
+	{
+		//im a struct yo
+		if (fun == 0)
+			this->parent->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
 	}
 
 	fun->Load(this->parent);

@@ -82,7 +82,7 @@ Parser::Parser(Lexer* l)
 
 	//lambda
 	//this->Register(TokenType::Function, new LambdaParselet());
-	//this->Register(TokenType::LeftParen, new LambdaParselet());
+	this->Register(TokenType::LeftBracket, new LambdaParselet());
 
 	//statements
 	this->Register(TokenType::While, new WhileParselet());
