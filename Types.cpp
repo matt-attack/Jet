@@ -13,12 +13,16 @@ Type Jet::VoidType("void", Types::Void);
 
 llvm::DIType Type::GetDebugType(Compilation* compiler)
 {
+	if (this->type == Types::Bool)
+		return compiler->debug->createBasicType("bool", 1, 8, llvm::dwarf::DW_ATE_boolean);
 	if (this->type == Types::Int)
 		return compiler->debug->createBasicType("int", 32, 32, llvm::dwarf::DW_ATE_signed);
 	if (this->type == Types::Short)
 		return compiler->debug->createBasicType("short", 16, 16, llvm::dwarf::DW_ATE_signed);
 	if (this->type == Types::Char)
-		return compiler->debug->createBasicType("char", 8, 8, llvm::dwarf::DW_ATE_signed);
+		return compiler->debug->createBasicType("char", 8, 8, llvm::dwarf::DW_ATE_signed_char);
+	if (this->type == Types::Float)
+		return compiler->debug->createBasicType("float", 32, 32, llvm::dwarf::DW_ATE_float);
 	if (this->type == Types::Double)
 		return compiler->debug->createBasicType("double", 64, 64, llvm::dwarf::DW_ATE_float);
 	if (this->type == Types::Pointer)
@@ -33,24 +37,17 @@ llvm::DIType Type::GetDebugType(Compilation* compiler)
 		llvm::DIFile unit = compiler->debug_info.file;
 
 		llvm::DIType typ;
-		return compiler->debug->createStructType(compiler->debug_info.file/*compiler->current_function->function->scope*/, this->data->name, unit, 0, 1024, 1024, 0, typ, compiler->debug->getOrCreateArray(ftypes));
+		return compiler->debug->createStructType(compiler->debug_info.file, this->data->name, unit, 0, 1024, 1024, 0, typ, compiler->debug->getOrCreateArray(ftypes));
 	}
 	if (this->type == Types::Function)
 	{
 		std::vector<llvm::Metadata*> ftypes;
 		for (auto type : this->function->args)
-		{
-			//add debug stuff
-			//auto type = compiler->debug->createBasicType("double", 64, 64, llvm::dwarf::DW_ATE_float);
 			ftypes.push_back(type->GetDebugType(compiler));
-		}
 
 		llvm::DIFile unit = compiler->debug_info.file;
-
-
 		return compiler->debug->createSubroutineType(unit, compiler->debug->getOrCreateTypeArray(ftypes));
 	}
-	//	return compiler->debug->createStructType()
 	printf("oops");
 }
 
@@ -664,12 +661,14 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 				for (auto ii : old)
 					context->parent->types[ii.first] = ii.second;
 
+				//fun->f->dump();
 				fun->expression->Struct.text = oldn;
 
 				context->parent->builder.SetCurrentDebugLocation(dp);
 				context->parent->builder.SetInsertPoint(rp);
 
 				fun = this->data->functions.find(name)->second;
+			
 				break;
 			}
 		}

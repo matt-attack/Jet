@@ -1319,7 +1319,8 @@ namespace Jet
 				//statement body
 				context->parent->builder.SetInsertPoint(ThenBB);
 				ii->block->Compile(context);
-				context->parent->builder.CreateBr(EndBB);//branch to end
+				if (context->parent->builder.GetInsertBlock()->getTerminator() == 0)
+					context->parent->builder.CreateBr(EndBB);//branch to end
 
 				pos++;
 			}
@@ -1417,8 +1418,8 @@ namespace Jet
 	class CallExpression : public Expression
 	{
 		Token token;
-		
-		
+
+
 	public:
 		Expression* left;
 		std::vector<Expression*>* args;
