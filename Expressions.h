@@ -1491,7 +1491,7 @@ namespace Jet
 		friend class CompilerContext;
 		friend class Type;
 		friend class Function;
-		friend class Struct;
+		friend struct Struct;
 		Token name;
 		std::vector<std::pair<std::string, std::string>>* args;
 		ScopeExpression* block;
@@ -1546,7 +1546,6 @@ namespace Jet
 			token.Print(output, source);
 
 			ret_type.Print(output, source);
-			//output += " " + ret_type;
 
 			name.Print(output, source);
 
@@ -1614,7 +1613,6 @@ namespace Jet
 
 			output += " fun";
 			ret_type.Print(output, source);
-			//output += " " + ret_type;
 
 			name.Print(output, source);
 
@@ -1689,7 +1687,7 @@ namespace Jet
 				Function* func = new Function;
 				func->return_type = context->parent->AdvanceTypeLookup(ii.ret_type.text);
 				for (auto arg : ii.args)
-					func->argst.push_back({ context->parent->AdvanceTypeLookup(arg.text), "dummy" });
+					func->arguments.push_back({ context->parent->AdvanceTypeLookup(arg.text), "dummy" });
 
 				t->funcs.insert({ ii.name.text, func });
 			}
@@ -1708,7 +1706,29 @@ namespace Jet
 			token.Print(output, source);
 			name.Print(output, source);
 
-			output += "{}";
+			output += "{";
+
+			for (auto fun : this->funcs)
+			{
+				output += " fun ";
+				fun.ret_type.Print(output, source);
+				output += " ";
+				fun.name.Print(output, source);
+				output += "(";
+				bool first = false;
+				for (auto arg : fun.args)
+				{
+					if (first)
+						output += ", ";
+					else
+						first = true;
+
+					arg.Print(output, source);
+					//output += arg.first->ToString() + " " + arg.second;
+				}
+				output += ");";
+			}
+			output += "}";
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)

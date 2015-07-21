@@ -679,7 +679,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			for (auto ii = range.first; ii != range.second; ii++)
 			{
 				//pick one with the right number of args
-				if (ii->second->argst.size() == argsv.size())
+				if (ii->second->arguments.size() == argsv.size())
 					ii->second->f = function->f;
 			}
 		}
@@ -762,17 +762,23 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	bool is_trait = false;
 	if (str.length() > 0)
 	{
+		//auto type = context->parent->AdvanceTypeLookup(str);
 		auto type = context->parent->LookupType(str);
 		if (type->type == Types::Trait)
 		{
+			type->Load(context->parent);
 			type->trait->extension_methods.insert({ fname, fun });
 			is_trait = true;
 		}
+		else if (type->type == Types::Invalid)
+		{
+			context->parent->Error("Type '"+str+"' not defined", *context->current_token);
+		}
 		else
 		{
-			auto tr = context->parent->LookupType(str);
-			tr->data->functions.insert({ fname, fun });
-			advlookup = !tr->data->template_args.size();
+			//auto tr = context->parent->LookupType(str);
+			type->data->functions.insert({ fname, fun });
+			advlookup = !type->data->template_args.size();
 		}
 	}
 	else
@@ -791,7 +797,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		if (is_trait == false)
 			type = context->parent->AdvanceTypeLookup(str + "*");
 
-		fun->argst.push_back({ type, "this" });
+		fun->arguments.push_back({ type, "this" });
 	}
 
 	for (auto ii : *this->args)
@@ -802,7 +808,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		else
 			type = context->parent->LookupType(ii.first);
 
-		fun->argst.push_back({ type, ii.second });
+		fun->arguments.push_back({ type, ii.second });
 	}
 }
 
@@ -822,7 +828,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	{
 		auto type = context->parent->AdvanceTypeLookup(ii.first);
 
-		fun->argst.push_back({ type, ii.second });
+		fun->arguments.push_back({ type, ii.second });
 	}
 
 	fun->name = fname;

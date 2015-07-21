@@ -13,6 +13,7 @@ Type Jet::VoidType("void", Types::Void);
 
 llvm::DIType Type::GetDebugType(Compilation* compiler)
 {
+	assert(this->loaded);
 	if (this->type == Types::Bool)
 		return compiler->debug->createBasicType("bool", 1, 8, llvm::dwarf::DW_ATE_boolean);
 	if (this->type == Types::Int)
@@ -31,16 +32,26 @@ llvm::DIType Type::GetDebugType(Compilation* compiler)
 		return compiler->debug->createBasicType("fun_pointer", 32, 32, llvm::dwarf::DW_ATE_address);
 	if (this->type == Types::Struct)
 	{
+		this->Load(compiler);
+
 		std::vector<llvm::Metadata*> ftypes;
 		for (auto type : this->data->members)
-			ftypes.push_back(type.type->GetDebugType(compiler));
-		llvm::DIFile unit = compiler->debug_info.file;
+		{
+			assert(type.type->loaded);
+			//fixme later?
 
+			//ftypes.push_back(type.type->GetDebugType(compiler));
+		}
+		//for (auto ii : ftypes)
+			//ii->dump();
+		llvm::DIFile unit = compiler->debug_info.file;
 		llvm::DIType typ;
 		return compiler->debug->createStructType(compiler->debug_info.file, this->data->name, unit, 0, 1024, 1024, 0, typ, compiler->debug->getOrCreateArray(ftypes));
 	}
 	if (this->type == Types::Function)
 	{
+		this->Load(compiler);
+
 		std::vector<llvm::Metadata*> ftypes;
 		for (auto type : this->function->args)
 			ftypes.push_back(type->GetDebugType(compiler));
@@ -72,6 +83,7 @@ llvm::Type* Jet::GetType(Type* t)
 	case Types::Bool:
 		return llvm::Type::getInt1Ty(llvm::getGlobalContext());
 	case Types::Struct:
+		assert(t->loaded);
 		return t->data->type;
 	case Types::Array:
 		return llvm::ArrayType::get(GetType(t->base), t->size);
@@ -169,7 +181,7 @@ void Type::Load(Compilation* compiler)
 			//look up the base, and lets instantiate it
 			std::string base = name.substr(0, p);
 			auto t = compiler->types.find(base);
-			if (t == compiler->types.end())
+			if (t == compiler->types.end())//fix this
 				compiler->Error("Reference To Undefined Type '" + base + "'", *compiler->current_function->current_token);
 			else if (t->second->type == Types::Trait)
 			{
@@ -272,9 +284,10 @@ void Type::Load(Compilation* compiler)
 			}
 			else
 			{
-				if (iter->second == this)
-					compiler->Error("Whoops", Token());
-				else
+				//if (iter->second == this)
+
+				//compiler->Error("Whoops", Token());
+				if (iter->second != this)
 					*this = *iter->second;
 			}
 			//types[name] = type;
@@ -297,11 +310,11 @@ bool IsMatch(Function* a, Function* b)
 	if (a->return_type != b->return_type)
 		return false;
 
-	if (a->argst.size() != b->argst.size() - 1)
+	if (a->arguments.size() != b->arguments.size() - 1)
 		return false;
 
-	for (int i = 1; i < a->argst.size(); i++)
-		if (a->argst[i].first != b->argst[i - 1].first)
+	for (int i = 1; i < a->arguments.size(); i++)
+		if (a->arguments[i].first != b->arguments[i - 1].first)
 			return false;
 
 	return true;
@@ -386,9 +399,9 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 					}
 
 					//do it for args
-					for (int i = 1; i < range.first->second->argst.size(); i++)
+					for (int i = 1; i < range.first->second->arguments.size(); i++)
 					{
-						bool res = FindTemplates(compiler, types, range.first->second->argst[i].first, fun.second->argst[i - 1].first, ii.second);
+						bool res = FindTemplates(compiler, types, range.first->second->arguments[i].first, fun.second->arguments[i - 1].first, ii.second);
 						if (res == false)
 						{
 							match = false;
@@ -496,17 +509,15 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	auto res = compiler->types.find(realname);
 	if (res != compiler->types.end() && res->second && res->second->type != Types::Invalid)
 	{
+		delete t;
 		t = res->second;
 		goto exit;
 	}
 	else if (res != compiler->types.end() && res->second)
-	{
 		*res->second = *t;
-	}
 	else
 		compiler->types[realname] = t;
 
-	//need to store it
 	//compile its functions
 	if (t->data->expression->members.size() > 0)
 	{
@@ -521,17 +532,14 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->CompileDeclarations(compiler->current_function);
-		
-		//this doesnt work right for some reason
-		//set the correct file back?
-		//compiler->debug_info.file.dump();
+
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
-		//compiler->debug->finalize();
-		//compiler->module->dump();
+
 		compiler->builder.SetCurrentDebugLocation(dp);
-		compiler->builder.SetInsertPoint(rp);
+		if (rp)
+			compiler->builder.SetInsertPoint(rp);
 		expr->name = oldname;
 	}
 
@@ -548,7 +556,13 @@ exit:
 		//need to get rid of all references to it, or blam
 		auto iter = compiler->types.find(ii.first + "*");
 		if (iter != compiler->types.end())
+		{
 			compiler->types.erase(iter);
+
+			iter = compiler->types.find(ii.first + "**");
+			if (iter != compiler->types.end())
+				compiler->types.erase(iter);
+		}
 	}
 	//need to restore pointers and such as well
 	//one solution is to not cache pointers at all
@@ -595,7 +609,6 @@ std::string Type::ToString()
 				out += ",";
 		}
 
-		//Error("function tostring not finished", Token());
 		return out + ")";
 	}
 	//Error("Unhandled Type::ToString()", Token());
@@ -614,7 +627,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 		//pick one with the right number of args
 		if (def)
 			fun = ii->second;
-		else if (ii->second->argst.size() == args.size())
+		else if (ii->second->arguments.size() == args.size())
 			fun = ii->second;
 	}
 
@@ -631,7 +644,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 				//pick one with the right number of args
 				if (def)
 					fun = ii->second;
-				else if (ii->second->argst.size() == args.size())
+				else if (ii->second->arguments.size() == args.size())
 					fun = ii->second;
 			}
 
@@ -661,14 +674,13 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 				for (auto ii : old)
 					context->parent->types[ii.first] = ii.second;
 
-				//fun->f->dump();
 				fun->expression->Struct.text = oldn;
 
 				context->parent->builder.SetCurrentDebugLocation(dp);
 				context->parent->builder.SetInsertPoint(rp);
 
 				fun = this->data->functions.find(name)->second;
-			
+
 				break;
 			}
 		}
@@ -730,7 +742,7 @@ void Function::Load(Compilation* compiler)
 
 	std::vector<llvm::Type*> args;
 	std::vector<llvm::Metadata*> ftypes;
-	for (auto type : this->argst)
+	for (auto type : this->arguments)
 	{
 		type.first->Load(compiler);
 		args.push_back(::GetType(type.first));
@@ -744,15 +756,15 @@ void Function::Load(Compilation* compiler)
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
 
 	llvm::DIFile unit = compiler->debug_info.file;
-	
+
 	auto functiontype = compiler->debug->createSubroutineType(unit, compiler->debug->getOrCreateTypeArray(ftypes));
 	int line = this->expression ? this->expression->token.line : 0;
 	llvm::DISubprogram sp = compiler->debug->createFunction(unit, this->name, this->name, unit, line, functiontype, false, true, line, 0, false, f);
-	
+
 	//FContext, Name, StringRef(), Unit, LineNo, 0, false, f);
 	//for some reason struct member functions derp
-		//CreateFunctionType(Args.size(), Unit), false /* internal linkage */,
-		//true /* definition */, ScopeLine, DINode::FlagPrototyped, false, F);
+	//CreateFunctionType(Args.size(), Unit), false /* internal linkage */,
+	//true /* definition */, ScopeLine, DINode::FlagPrototyped, false, F);
 	assert(sp.describes(f));
 	this->scope = sp;
 	compiler->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
@@ -761,9 +773,9 @@ void Function::Load(Compilation* compiler)
 
 	//alloc args
 	auto AI = f->arg_begin();
-	for (unsigned Idx = 0, e = argst.size(); Idx != e; ++Idx, ++AI)
+	for (unsigned Idx = 0, e = arguments.size(); Idx != e; ++Idx, ++AI)
 	{
-		auto aname = this->argst[Idx].second;
+		auto aname = this->arguments[Idx].second;
 
 		AI->setName(aname);
 	}
@@ -822,10 +834,10 @@ Type* Function::GetType(Compilation* compiler)
 	std::string type;
 	type += return_type->ToString();
 	type += "(";
-	for (int i = 0; i < this->argst.size(); i++)
+	for (int i = 0; i < this->arguments.size(); i++)
 	{
-		type += this->argst[i].first->ToString();
-		if (i != this->argst.size() - 1)
+		type += this->arguments[i].first->ToString();
+		if (i != this->arguments.size() - 1)
 			type += ",";
 	}
 	type += ")";

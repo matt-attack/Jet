@@ -1,8 +1,8 @@
 #include "Compiler.h"
 #include "CompilerContext.h"
 
-
 #include "Lexer.h"
+#include "Expressions.h"
 
 using namespace Jet;
 
@@ -29,7 +29,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		for (auto ii = range.first; ii != range.second; ii++)
 		{
 			//printf("found option for %s with %i args\n", fname.c_str(), ii->second->argst.size());
-			if (ii->second->argst.size() == args.size())
+			if (ii->second->arguments.size() == args.size())
 				func = ii->second;
 		}
 	}
@@ -38,7 +38,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		//no function exists
 		func = new Function;
 		func->return_type = ret;
-		func->argst = args;
+		func->arguments = args;
 		func->name = fname;
 		std::vector<llvm::Type*> oargs;
 		std::vector<llvm::Metadata*> ftypes;
@@ -79,7 +79,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		for (auto ii = range.first; ii != range.second; ii++)
 		{
 			//printf("found option for %s with %i args\n", fname.c_str(), ii->second->argst.size());
-			if (ii->second->argst.size() == args.size())
+			if (ii->second->arguments.size() == args.size())
 				func = ii->second;
 		}
 
@@ -184,7 +184,6 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 	if (left.type->type != right.type->type)
 	{
 		//conversion time!!
-
 		throw 7;
 	}
 
@@ -311,8 +310,12 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			break;
 		case TokenType::LeftShift:
 			//todo
+			res = parent->builder.CreateShl(left.val, right.val);
+			break;
 		case TokenType::RightShift:
 			//todo
+			res = parent->builder.CreateLShr(left.val, right.val);
+			break;
 		default:
 			this->parent->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 
@@ -324,8 +327,6 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 
 	this->parent->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 }
-
-#include "Expressions.h"
 
 Function* CompilerContext::GetMethod(const std::string& name, const std::vector<CValue>& args, Type* Struct)
 {
@@ -345,10 +346,10 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 				auto range = type->second->data->functions.equal_range(name);
 				for (auto ii = range.first; ii != range.second; ii++)
 				{
-					if (ii->second->argst.size() == args.size() + 1)
+					if (ii->second->arguments.size() == args.size() + 1)
 						fun = ii->second;
 				}
-				if (fun)//constructor != type->data->functions.end() && constructor->second->argst.size() == args.size() + 1)
+				if (fun)
 				{
 					//ok, we allocate, call then 
 					//allocate thing
@@ -360,11 +361,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 					//add struct
 					argsv.push_back(Alloca);
 					for (auto ii : args)
-					{
-						//try and cast to the correct type if we can
-						argsv.push_back(this->DoCast(fun->argst[i++].first, ii).val);
-						//argsv.back()->dump();
-					}
+						argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
 
 					fun->Load(this->parent);
 
@@ -412,23 +409,15 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 			//printf("found function option for %s\n", name.c_str());
 
 			//pick one with the right number of args
-			if (ii->second->argst.size() == args.size())
+			if (ii->second->arguments.size() == args.size())
 				fun = ii->second;
 		}
-
-		//if (fun == 0)
-		//this->parent->Error("Mismatched function parameters in call", *this->current_token);
-		//fun = iter->second;
+		return fun;
 	}
 	else
 	{
-		fun = Struct->GetMethod(name, args, this);
-
-		//im a struct yo
-		//if (fun == 0)
-		//this->parent->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+		return Struct->GetMethod(name, args, this);
 	}
-	return fun;
 }
 
 CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct)
@@ -447,10 +436,10 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			auto range = type->second->data->functions.equal_range(name);
 			for (auto ii = range.first; ii != range.second; ii++)
 			{
-				if (ii->second->argst.size() == args.size() + 1)
+				if (ii->second->arguments.size() == args.size() + 1)
 					fun = ii->second;
 			}
-			if (fun)//constructor != type->data->functions.end() && constructor->second->argst.size() == args.size() + 1)
+			if (fun)
 			{
 				//ok, we allocate, call then 
 				//allocate thing
@@ -462,17 +451,9 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				//add struct
 				argsv.push_back(Alloca);
 				for (auto ii : args)
-				{
-					//try and cast to the correct type if we can
-					argsv.push_back(this->DoCast(fun->argst[i++].first, ii).val);
-					//argsv.back()->dump();
-				}
+					argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
 
 				fun->Load(this->parent);
-
-				//constructor->second->f->dump();
-				//parent->module->dump();
-				//auto fun = this->parent->module->getFunction(constructor->second->name);
 
 				this->parent->builder.CreateCall(fun->f, argsv);
 
@@ -511,24 +492,18 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 	fun->Load(this->parent);
 
-	f = fun->f;// this->parent->module->getFunction(fun->name);
+	f = fun->f;
 
 	if (args.size() != f->arg_size())
-	{
-		//f->dump();
-		//todo: add better checks later
-		this->parent->Error("Mismatched function parameters in call", *this->current_token);
-	}
+		this->parent->Error("Mismatched function parameters in call", *this->current_token);//todo: add better checks later
 
 	std::vector<llvm::Value*> argsv;
 	int i = 0;
 	for (auto ii : args)
 	{
 		//try and cast to the correct type if we can
-		argsv.push_back(this->DoCast(fun->argst[i++].first, ii).val);
-		//argsv.back()->dump();
+		argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);
 	}
-	//fun->f->dump();
-	//parent->module->dump();
+
 	return CValue(fun->return_type, this->parent->builder.CreateCall(f, argsv));
 }

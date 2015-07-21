@@ -186,8 +186,7 @@ namespace Jet
 		FunctionType* type;
 		std::string name;
 
-		//std::vector<llvm::Type*> args;
-		std::vector<std::pair<Type*, std::string>> argst;
+		std::vector<std::pair<Type*, std::string>> arguments;
 
 		llvm::Function* f;//not always used
 		llvm::DISubprogram scope;
@@ -214,11 +213,11 @@ namespace Jet
 			if (f->return_type != this->return_type)
 				return false;
 
-			if (f->argst.size() != this->argst.size())
+			if (f->arguments.size() != this->arguments.size())
 				return false;
 
-			for (int i = 0; i < f->argst.size(); i++)
-				if (f->argst[i].first != this->argst[i].first)
+			for (int i = 0; i < f->arguments.size(); i++)
+				if (f->arguments[i].first != this->arguments[i].first)
 					return false;
 
 			return true;

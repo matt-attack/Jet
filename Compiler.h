@@ -74,7 +74,7 @@ namespace Jet
 	class Compilation
 	{
 		friend class Type;
-		friend class Struct;
+		friend struct Struct;
 		friend class Function;
 		friend class Compiler;
 		friend class Expression;
