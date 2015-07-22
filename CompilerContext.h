@@ -140,7 +140,7 @@ namespace Jet
 			//iter->second.val->dump();
 			//val.val->dump();
 			//val.val->getType()->dump();
-			val = this->DoCast(value.type, val);
+			val = this->DoCast(value.type->base, val);
 
 			return parent->builder.CreateStore(val.val, value.val);
 		}
@@ -149,8 +149,11 @@ namespace Jet
 		{
 			CValue value = GetVariable(name);
 			if (value.type->type == Types::Function)
+			//{
+				//value.val->dump();
 				return value;
-			return CValue(value.type, parent->builder.CreateLoad(value.val, name.c_str()));
+			//}
+			return CValue(value.type->base, parent->builder.CreateLoad(value.val, name.c_str()));
 		}
 
 		void SetDebugLocation(const Token& t)
@@ -224,7 +227,12 @@ namespace Jet
 				cur = cur->prev;
 			} while (cur);
 
-			ret = this->DoCast(this->function->return_type, ret);
+			if (ret.val)
+			{
+				//ret.val->dump();
+				//ret.val->getType()->dump();
+				ret = this->DoCast(this->function->return_type, ret);
+			}
 			return parent->builder.CreateRet(ret.val);
 		}
 

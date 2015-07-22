@@ -21,12 +21,12 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 		if (i)
 		{
 			auto var = context->GetVariable(i->GetName());
-			return CValue(context->parent->LookupType(var.type->ToString() + "*"), var.val);
+			return CValue(var.type, var.val);
 		}
 		else if (p)
 		{
 			auto var = p->GetElementPointer(context);
-			return CValue(context->parent->LookupType(var.type->ToString() + "*"), var.val);
+			return CValue(var.type, var.val);
 		}
 		context->parent->Error("Not Implemented", this->_operator);
 	}
@@ -74,7 +74,7 @@ CValue IndexExpression::Compile(CompilerContext* context)
 	auto loc = this->GetElementPointer(context);
 	if (loc.type->type == Types::Function)
 		return loc;
-	return CValue(loc.type, context->parent->builder.CreateLoad(loc.val));
+	return CValue(loc.type->base, context->parent->builder.CreateLoad(loc.val));
 }
 
 Type* IndexExpression::GetBaseType(CompilerContext* context)
@@ -83,7 +83,7 @@ Type* IndexExpression::GetBaseType(CompilerContext* context)
 	auto i = dynamic_cast<IndexExpression*>(left);
 
 	if (p)
-		return context->GetVariable(p->GetName()).type;
+		return context->GetVariable(p->GetName()).type->base;
 	else if (i)
 		return i->GetType(context);
 
@@ -166,21 +166,7 @@ Type* IndexExpression::GetType(CompilerContext* context)
 
 			return lhs.type->data->members[index].type;
 		}
-		else if (this->token.type == TokenType::Dot && this->member.text.length() && lhs.type->type == Types::Struct)
-		{
-			int index = 0;
-			for (; index < lhs.type->data->members.size(); index++)
-			{
-				if (lhs.type->data->members[index].name == this->member.text)
-					break;
-			}
-
-			if (index >= lhs.type->data->members.size())
-				context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->data->name + "' Not Found", this->member);
-
-			return lhs.type->data->members[index].type;
-		}
-		else if (this->token.type == TokenType::Pointy && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
+		else if (this->token.type == TokenType::Dot && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
 		{
 			int index = 0;
 			for (; index < lhs.type->base->data->members.size(); index++)
@@ -194,9 +180,23 @@ Type* IndexExpression::GetType(CompilerContext* context)
 
 			return lhs.type->base->data->members[index].type;
 		}
+		else if (this->token.type == TokenType::Pointy && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && lhs.type->base->base->type == Types::Struct)
+		{
+			int index = 0;
+			for (; index < lhs.type->base->base->data->members.size(); index++)
+			{
+				if (lhs.type->base->base->data->members[index].name == this->member.text)
+					break;
+			}
+
+			if (index >= lhs.type->base->base->data->members.size())
+				context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->base->data->name + "' Not Found", this->member);
+
+			return lhs.type->base->base->data->members[index].type;
+		}
 		else if ((lhs.type->type == Types::Array || lhs.type->type == Types::Pointer) && string == 0)//or pointer!!(later)
 		{
-			return lhs.type->base;
+			return lhs.type->base->base;
 		}
 	}
 }
@@ -214,11 +214,11 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		else if (i)
 			lhs = i->GetElementPointer(context);
 
-		if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
+		if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && lhs.type->base->base->type == Types::Struct)
 		{
 			lhs.val = context->parent->builder.CreateLoad(lhs.val);
 
-			auto type = lhs.type->base;
+			auto type = lhs.type->base->base;
 			int index = 0;
 			for (; index < type->data->members.size(); index++)
 			{
@@ -233,11 +233,11 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 					context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + type->data->name + "' Not Found", this->member);
 				return CValue(method->GetType(context->parent), method->f);
 			}
-			
+
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-			return CValue(type->data->members[index].type, loc);
+			return CValue(type->data->members[index].type->GetPointerType(context), loc);
 		}
 
 		context->parent->Error("unimplemented!", this->token);
@@ -250,36 +250,36 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		else if (i)
 			lhs = i->GetElementPointer(context);
 
-		if (this->member.text.length() && lhs.type->type == Types::Struct)
+		if (this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
 		{
 			int index = 0;
-			for (; index < lhs.type->data->members.size(); index++)
+			for (; index < lhs.type->base->data->members.size(); index++)
 			{
-				if (lhs.type->data->members[index].name == this->member.text)
+				if (lhs.type->base->data->members[index].name == this->member.text)
 					break;
 			}
-			if (index >= lhs.type->data->members.size())
+			if (index >= lhs.type->base->data->members.size())
 			{
 				//check methods
-				auto method = lhs.type->GetMethod(this->member.text, {}, context, true);
+				auto method = lhs.type->base->GetMethod(this->member.text, {}, context, true);
 				if (method == 0)
-					context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->data->name + "' Not Found", this->member);
+					context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->data->name + "' Not Found", this->member);
 				return CValue(method->GetType(context->parent), method->f);
 			}
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-			return CValue(lhs.type->data->members[index].type, loc);
+			return CValue(lhs.type->base->data->members[index].type->GetPointerType(context), loc);
 		}
-		else if (lhs.type->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
+		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
 		{
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->DoCast(context->parent->IntType, index->Compile(context)).val };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
 
-			return CValue(lhs.type->base, loc);
+			return CValue(lhs.type/*->base*/, loc);
 		}
-		else if (lhs.type->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
+		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
 		{
 			std::vector<llvm::Value*> iindex = { context->DoCast(context->parent->IntType, index->Compile(context)).val };
 
@@ -306,7 +306,13 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	context->CurrentToken(&token);
 	context->SetDebugLocation(this->token);
 	auto loc = this->GetElementPointer(context);
-	right = context->DoCast(loc.type, right);
+	//if (right.type->type == Types::Function)
+		//right.val = context->parent->builder.CreateLoad(right.val);
+	//right.val->dump();
+	//right.val->getType()->dump();
+	//loc.val->dump();
+	//loc.val->getType()->dump();
+	right = context->DoCast(loc.type->base, right);
 	context->parent->builder.CreateStore(right.val, loc.val);
 }
 
@@ -399,7 +405,11 @@ CValue AssignExpression::Compile(CompilerContext* context)
 	context->SetDebugLocation(this->token);
 
 	if (auto storable = dynamic_cast<IStorableExpression*>(this->left))
-		storable->CompileStore(context, right->Compile(context));
+	{
+		auto r = right->Compile(context);
+		//r.val->dump();
+		storable->CompileStore(context, r);
+	}
 
 	return CValue();
 }
@@ -443,6 +453,20 @@ CValue CallExpression::Compile(CompilerContext* context)
 
 		//push in the this pointer argument kay
 		argsv.push_back(CValue(context->parent->LookupType(stru->ToString() + "*"), self));
+	}
+	else
+	{
+		auto lhs = this->left->Compile(context);
+		if (lhs.type->type != Types::Function)
+			context->parent->Error("Cannot call non-function", *context->current_token);
+
+		std::vector<llvm::Value*> argts;
+		for (auto ii : *this->args)
+		{
+			auto val = ii->Compile(context);
+			argts.push_back(val.val);
+		}
+		return CValue(lhs.type->function->return_type, context->parent->builder.CreateCall(lhs.val, argts));
 	}
 
 	//build arg list
@@ -539,13 +563,14 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 	return context->BinaryOperation(this->_operator.type, lhs, rhs);
 }
 
+unsigned int uuid = 5;
 std::string FunctionExpression::GetRealName()
 {
 	std::string fname;
 	if (name.text.length() > 0)
 		fname = name.text;
 	else
-		fname = "_lambda_id_";
+		fname = "_lambda_id_" + std::to_string(uuid++);
 	auto Struct = dynamic_cast<StructExpression*>(this->Parent);
 	if (this->Struct.text.length() > 0)
 		return "__" + this->Struct.text + "_" + fname;
@@ -585,14 +610,14 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	context->CurrentToken(&token);
 
 	bool is_lambda = name.text.length() == 0;
-	std::string fname;
-	if (name.text.length() > 0)
+	//std::string fname;
+	/*if (name.text.length() > 0)
 		fname = name.text;
-	else
-		fname = "_lambda_id_"; //need to randomly generate id based on project name
+		else
+		fname = "_lambda_id_"; *///need to randomly generate id based on project name
 
-		//build list of types of vars
-		std::vector<std::pair<Type*, std::string>> argsv;
+	//build list of types of vars
+	std::vector<std::pair<Type*, std::string>> argsv;
 	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 
 	if (Struct.length() > 0)
@@ -613,11 +638,9 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		//find my type
 		if (call)
 		{
-			//call->l
 			//look for me in the args
 			if (call->left == this)
 				context->parent->Error("Cannot imply type of lambda with the args of its call", *context->current_token);
-
 
 			int i = dynamic_cast<NameExpression*>(call->left) ? 0 : 1;
 			for (; i < call->args->size(); i++)
@@ -625,21 +648,23 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 				if ((*call->args)[i] == this)
 					break;
 			}
-			//call->left->
 			CValue fun = call->left->Compile(context);
 			Type* type = fun.type->function->args[i];
 
-			//do type inference
-			int i2 = 0;
-			for (auto& ii : *this->args)
+			if (type->type == Types::Function)
 			{
-				if (ii.first.length() == 0)//do type inference
-					ii.first = type->function->args[i2]->ToString();
-				i2++;
-			}
+				//do type inference
+				int i2 = 0;
+				for (auto& ii : *this->args)
+				{
+					if (ii.first.length() == 0)//do type inference
+						ii.first = type->function->args[i2]->ToString();
+					i2++;
+				}
 
-			if (this->ret_type.text.length() == 0)//infer return type
-				this->ret_type.text = type->function->return_type->ToString();
+				if (this->ret_type.text.length() == 0)//infer return type
+					this->ret_type.text = type->function->return_type->ToString();
+			}
 		}
 		else
 		{
@@ -651,7 +676,6 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		}
 	}
 
-
 	for (auto ii : *this->args)
 		argsv.push_back({ context->parent->LookupType(ii.first), ii.second });
 
@@ -661,7 +685,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	CompilerContext* function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? true : false);// , this->varargs);
 	if (Struct.length() > 0)
 	{
-		auto range = context->parent->types[Struct]->data->functions.equal_range(fname);
+		auto range = context->parent->types[Struct]->data->functions.equal_range(name.text);
 		if (range.first == range.second)
 		{
 			//it wasnt found, search through traits
@@ -715,7 +739,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
 
 		// Add arguments to variable symbol table.
-		function->RegisterLocal(aname, CValue(argsv[Idx].first, Alloca));
+		function->RegisterLocal(aname, CValue(argsv[Idx].first->GetPointerType(context), Alloca));
 	}
 
 	block->Compile(function);
@@ -772,7 +796,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		}
 		else if (type->type == Types::Invalid)
 		{
-			context->parent->Error("Type '"+str+"' not defined", *context->current_token);
+			context->parent->Error("Type '" + str + "' not defined", *context->current_token);
 		}
 		else
 		{
@@ -943,7 +967,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 
 		// Add arguments to variable symbol table.
-		context->RegisterLocal(aname, CValue(type, Alloca));
+		context->RegisterLocal(aname, CValue(type->GetPointerType(context), Alloca));
 
 		//construct it!
 		if (this->_right == 0 && type->type == Types::Struct)
@@ -954,7 +978,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			if (iter != type->data->functions.end())
 			{
 				//this is the constructor, call it
-
+				//add default constructor and construct members
 				//todo: move implicit casts for operators and assignment into functions in compilercontext
 				//	will make it easier to implement operator overloads
 				context->Call(constructor_name, { CValue(context->parent->LookupType(type->ToString() + "*"), Alloca) }, type);

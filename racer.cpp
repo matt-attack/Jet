@@ -246,14 +246,14 @@ extern "C"
 				out += "fun " + ii.second->return_type->ToString() + " " + ii.second->name;
 				out += "(";
 				bool first = false;
-				for (int i = 1; i < ii.second->argst.size(); i++)
+				for (int i = 1; i < ii.second->arguments.size(); i++)
 				{
 					if (first)
 						out += ",";
 					else
 						first = true;
 
-					out += ii.second->argst[i].first->ToString() + " " + ii.second->argst[i].second;
+					out += ii.second->arguments[i].first->ToString() + " " + ii.second->arguments[i].second;
 				}
 				out += ")/";
 			}

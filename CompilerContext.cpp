@@ -169,7 +169,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		case TokenType::Decrement:
 			return CValue(value.type->base, this->parent->builder.CreateGEP(value.val, parent->builder.getInt32(-1)));
 		default:
-			this->parent->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
+			this->parent->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->base->ToString() + "'", *current_token);
 		}
 
 	}
@@ -463,11 +463,13 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		else
 		{
 			//try to find it in variables
-			auto var = this->GetVariable(name);
+			auto var = this->Load(name);
 
+			//if (!(var.type->type == Types::Pointer && var.type->base->type == Types::Function))
 			if (var.type->type != Types::Function)
 				this->parent->Error("Cannot call non-function type", *this->current_token);
-
+			//if ()
+			//nneed to load it
 			std::vector<llvm::Value*> argsv;
 			int i = 0;
 			for (auto ii : args)
@@ -478,7 +480,8 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			}
 
 			//var.val->dump();
-			var.val = this->parent->builder.CreateLoad(var.val);
+			//if (var.type->type == Types::Pointer)
+			//`var.val = this->parent->builder.CreateLoad(var.val);
 			return CValue(var.type->function->return_type, this->parent->builder.CreateCall(var.val, argsv));
 		}
 		this->parent->Error("Function '" + name + "' is not defined", *this->current_token);

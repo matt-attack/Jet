@@ -102,7 +102,7 @@ namespace Jet
 
 		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, CompilerContext* context, bool def = false);
 
-		//Type* GetPointerType()
+		Type* GetPointerType(CompilerContext* context);
 		//{
 		//todo, idk how im gonna do this lel
 		//}

@@ -11,6 +11,11 @@ using namespace Jet;
 
 Type Jet::VoidType("void", Types::Void);
 
+Type* Type::GetPointerType(CompilerContext* context)
+{
+	return context->parent->LookupType(this->ToString() + "*");
+}
+
 llvm::DIType Type::GetDebugType(Compilation* compiler)
 {
 	assert(this->loaded);

@@ -96,8 +96,6 @@ namespace Jet
 
 		CompilerContext* current_function;
 
-		//int errors;
-
 		Compilation(JetProject* proj);
 	public:
 		//dont use these k
