@@ -119,7 +119,7 @@ Type* IndexExpression::GetBaseType(Compilation* compiler)
 	//return context->GetVariable(p->GetName()).type;
 	else if (i)
 	{
-		compiler->Error("todo", token);// throw 7;// return i->GetType(context);
+		compiler->Error("todo", token);//return i->GetType(context);
 	}
 
 	compiler->Error("wat", token);
@@ -306,12 +306,7 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	context->CurrentToken(&token);
 	context->SetDebugLocation(this->token);
 	auto loc = this->GetElementPointer(context);
-	//if (right.type->type == Types::Function)
-	//right.val = context->parent->builder.CreateLoad(right.val);
-	//right.val->dump();
-	//right.val->getType()->dump();
-	//loc.val->dump();
-	//loc.val->getType()->dump();
+
 	right = context->DoCast(loc.type->base, right);
 	context->parent->builder.CreateStore(right.val, loc.val);
 }
@@ -407,7 +402,7 @@ CValue AssignExpression::Compile(CompilerContext* context)
 	if (auto storable = dynamic_cast<IStorableExpression*>(this->left))
 	{
 		auto r = right->Compile(context);
-		//r.val->dump();
+
 		storable->CompileStore(context, r);
 	}
 
@@ -434,10 +429,6 @@ CValue CallExpression::Compile(CompilerContext* context)
 	{
 		//im a struct yo
 		fname = index->member.text;
-		//if (index->member.length() > 0)
-		//	fname = index->member;
-		//else
-		//	fname = dynamic_cast<StringExpression*>(index->index)->GetValue();
 		stru = index->GetBaseType(context);
 
 		llvm::Value* self;
@@ -610,11 +601,6 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	context->CurrentToken(&token);
 
 	bool is_lambda = name.text.length() == 0;
-	//std::string fname;
-	/*if (name.text.length() > 0)
-		fname = name.text;
-		else
-		fname = "_lambda_id_"; *///need to randomly generate id based on project name
 
 	//build list of types of vars
 	std::vector<std::pair<Type*, std::string>> argsv;
@@ -683,33 +669,6 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	auto ret = context->parent->LookupType(this->ret_type.text);
 
 	CompilerContext* function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? true : false);// , this->varargs);
-	if (Struct.length() > 0)
-	{
-		auto range = context->parent->types[Struct]->data->functions.equal_range(name.text);
-		if (range.first == range.second)
-		{
-			//it wasnt found, search through traits
-			printf("fixme?");
-			/*auto range = context->parent->traits[Struct]->extension_methods.equal_range(fname);
-			for (auto ii = range.first; ii != range.second; ii++)
-			{
-			//pick one with the right number of args
-			if (ii->second->argst.size() == argsv.size())
-			ii->second->f = function->f;
-			}*/
-		}
-		else
-		{
-			for (auto ii = range.first; ii != range.second; ii++)
-			{
-				//pick one with the right number of args
-				if (ii->second->arguments.size() == argsv.size())
-					ii->second->f = function->f;
-			}
-		}
-	}
-	//else
-	//context->parent->functions[fname] = function->f;
 
 	context->parent->current_function = function;
 	function->function->context = function;
@@ -729,9 +688,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		AI->setName(aname);
 
-		llvm::DIFile unit = context->parent->debug_info.file;
-
-		llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, unit, this->token.line,
+		llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, context->parent->debug_info.file, this->token.line,
 			argsv[Idx].first->GetDebugType(context->parent));
 
 		llvm::Instruction *Call = context->parent->debug->insertDeclare(
@@ -749,10 +706,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		if (this->ret_type.text == "void")
 			function->Return(CValue());
 		else
-		{
-			//function->f->dump();
 			context->parent->Error("Function must return a value!", token);
-		}
 
 	context->parent->builder.SetCurrentDebugLocation(dp);
 	if (rp)
@@ -771,19 +725,17 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		return;//dont compile expression for lambdas fname = "_lambda_id_";
 
 	bool advlookup = true;
-	Function* fun = new Function;
+	Function* fun = new Function(this->GetRealName());
 	fun->expression = this;
 
 	auto str = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 
-	//todo: modulate actual name of function
-	fun->name = this->GetRealName();
 	fun->f = 0;
 	bool is_trait = false;
 	if (str.length() > 0)
 	{
-		//auto type = context->parent->AdvanceTypeLookup(str);
-		auto type = context->parent->LookupType(str);
+		auto type = context->parent->AdvanceTypeLookup(str);
+		//auto type = context->parent->LookupType(str);
 		if (type->type == Types::Trait)
 		{
 			type->Load(context->parent);
@@ -840,7 +792,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 {
 	std::string fname = name.text;
 
-	Function* fun = new Function;
+	Function* fun = new Function(fname);
 	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type.text);
 
 	for (auto ii : *this->args)
@@ -849,8 +801,6 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 
 		fun->arguments.push_back({ type, ii.second });
 	}
-
-	fun->name = fname;
 
 	fun->f = 0;
 	if (Struct.length() > 0)
@@ -875,7 +825,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	}
 	else
 	{
-		context->parent->functions.insert({ fname, fun });// [fname] = fun;
+		context->parent->functions.insert({ fname, fun });
 	}
 }
 
@@ -914,9 +864,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			else
 				Alloca = TmpB.CreateAlloca(GetType(type), 0, aname);
 
-			llvm::DIFile unit = context->parent->debug_info.file;
-
-			llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, unit, ii.second.line,
+			llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, context->parent->debug_info.file, ii.second.line,
 				type->GetDebugType(context->parent));
 
 			llvm::Instruction *Call = context->parent->debug->insertDeclare(
@@ -950,16 +898,11 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			llvm::Instruction *Call = context->parent->debug->insertDeclare(
 				Alloca, D, context->parent->debug->createExpression(), context->parent->builder.GetInsertBlock());
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
-			//Alloca->dump();
-			//Alloca->getType()->dump();
-			//val.val->dump();
-			//val.val->getType()->dump();
+
 			context->parent->builder.CreateStore(val.val, Alloca);
 		}
 		else
 			context->parent->Error("Cannot infer type from nothing!", ii.second);
-
-
 
 		// Add arguments to variable symbol table.
 		context->RegisterLocal(aname, CValue(type->GetPointerType(context), Alloca));
@@ -1020,41 +963,32 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 		if (ii.type == StructMember::FunctionMember)
 		{
 			if (ii.function->GetName() == strname)
-			{
 				has_constructor = true;
-				//printf("was constructor");
-			}
 			else if (ii.function->GetName() == "~" + strname)
-			{
 				has_destructor = true;
-				//printf("was destructor");
-			}
 		}
 	}
 	if (has_constructor == false)
 	{
-		auto fun = new Function;
-		fun->name = "__" + str->data->name + "_" + strname;//
+		auto fun = new Function("__" + str->data->name + "_" + strname);//
 		fun->return_type = &VoidType;
 		fun->arguments = { { context->parent->AdvanceTypeLookup(str->data->name + "*"), "this" } };
 		fun->f = 0;
 		fun->expression = 0;
 		fun->type = (FunctionType*)-1;
-		str->data->functions.insert({ strname, fun });
-		//register function in _Struct
+		str->data->functions.insert({ strname, fun });//register function in _Struct
 		//printf("has no constructor, making default");
 	}
 	if (has_destructor == false)
 	{
-		auto fun = new Function;
-		fun->name = "__" + str->data->name + "_~" + strname;//
+		auto fun = new Function("__" + str->data->name + "_~" + strname);//
 		fun->return_type = &VoidType;
 		fun->arguments = { { context->parent->AdvanceTypeLookup(str->data->name + "*"), "this" } };
 		fun->f = 0;
 		fun->expression = 0;
 		fun->type = (FunctionType*)-1;
-		
-		str->data->functions.insert({ "~"+strname, fun });
+
+		str->data->functions.insert({ "~" + strname, fun });
 		//printf("has no destructor, making default");
 	}
 }
@@ -1127,9 +1061,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 
 					AI->setName(aname);
 
-					llvm::DIFile unit = context->parent->debug_info.file;
-
-					llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, unit, this->token.line,
+					llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, context->parent->debug_info.file, this->token.line,
 						argsv[Idx].first->GetDebugType(context->parent));
 
 					llvm::Instruction *Call = context->parent->debug->insertDeclare(
@@ -1149,7 +1081,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 					{
 						//call the constructor
 						auto iiname = ii.type->data->template_base ? ii.type->data->template_base->name : ii.type->data->name;
-						auto range = ii.type->data->functions.equal_range("~"+iiname);
+						auto range = ii.type->data->functions.equal_range("~" + iiname);
 						for (auto iii = range.first; iii != range.second; iii++)
 						{
 							if (iii->second->arguments.size() == 1)
@@ -1287,10 +1219,10 @@ void StructExpression::AddConstructors(CompilerContext* context)
 						{
 							auto myself = ii.second->context->Load("this");
 							std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(i) };
-							
+
 							auto gep = context->parent->builder.CreateGEP(myself.val, iindex, "getmember");
 							iii->second->Load(context->parent);
-							
+
 							context->parent->builder.CreateCall(iii->second->f, gep);
 						}
 					}
@@ -1318,7 +1250,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				if (iip.type->type == Types::Struct)
 				{
 					//call the destructor
-					auto range = iip.type->data->functions.equal_range("~"+iip.type->data->name);
+					auto range = iip.type->data->functions.equal_range("~" + iip.type->data->name);
 					for (auto iii = range.first; iii != range.second; iii++)
 					{
 						if (iii->second->arguments.size() == 1)

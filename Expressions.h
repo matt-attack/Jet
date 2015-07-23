@@ -1689,7 +1689,7 @@ namespace Jet
 			t->name = this->name.text;
 			for (auto ii : this->funcs)
 			{
-				Function* func = new Function;
+				Function* func = new Function("");
 				func->return_type = context->parent->AdvanceTypeLookup(ii.ret_type.text);
 				for (auto arg : ii.args)
 					func->arguments.push_back({ context->parent->AdvanceTypeLookup(arg.text), "dummy" });

@@ -103,9 +103,6 @@ namespace Jet
 		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, CompilerContext* context, bool def = false);
 
 		Type* GetPointerType(CompilerContext* context);
-		//{
-		//todo, idk how im gonna do this lel
-		//}
 	};
 
 	class Function;
@@ -113,8 +110,8 @@ namespace Jet
 	{
 		bool valid;
 		std::string name;
-		std::multimap<std::string, Function*> funcs;
 
+		std::multimap<std::string, Function*> funcs;
 		std::multimap<std::string, Function*> extension_methods;
 
 		//template stuff
@@ -187,13 +184,14 @@ namespace Jet
 		std::string name;
 
 		std::vector<std::pair<Type*, std::string>> arguments;
+		Type* return_type;
 
 		CompilerContext* context;
 		llvm::Function* f;//not always used
+
 		llvm::DISubprogram scope;
 
-		Type* return_type;
-
+		
 		//template stuff
 		FunctionExpression* template_base;
 		std::vector<std::pair<Trait*, std::string>> templates;
@@ -201,8 +199,9 @@ namespace Jet
 
 		bool loaded;
 
-		Function()
+		Function(const std::string& name)
 		{
+			this->name = name;
 			context = 0;
 			f = 0;
 			expression = 0;

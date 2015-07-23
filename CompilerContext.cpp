@@ -36,10 +36,9 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 	if (iter == parent->functions.end() && member == false)
 	{
 		//no function exists
-		func = new Function;
+		func = new Function(fname);
 		func->return_type = ret;
 		func->arguments = args;
-		func->name = fname;
 		std::vector<llvm::Type*> oargs;
 		std::vector<llvm::Metadata*> ftypes;
 		for (int i = 0; i < args.size(); i++)
@@ -89,7 +88,6 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 
 	func->Load(this->parent);
 
-	//func->scope->dump();
 	auto n = new CompilerContext(this->parent);
 	n->f = func->f;
 	n->function = func;

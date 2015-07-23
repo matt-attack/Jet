@@ -49,7 +49,6 @@ namespace Jet
 		Compilation* parent;
 
 		llvm::Function* f;
-
 		Function* function;
 
 		CompilerContext(Compilation* parent)
@@ -137,9 +136,6 @@ namespace Jet
 			//for each scope
 			CValue value = GetVariable(name);
 
-			//iter->second.val->dump();
-			//val.val->dump();
-			//val.val->getType()->dump();
 			val = this->DoCast(value.type->base, val);
 
 			return parent->builder.CreateStore(val.val, value.val);
@@ -149,10 +145,8 @@ namespace Jet
 		{
 			CValue value = GetVariable(name);
 			if (value.type->type == Types::Function)
-			//{
-				//value.val->dump();
 				return value;
-			//}
+			
 			return CValue(value.type->base, parent->builder.CreateLoad(value.val, name.c_str()));
 		}
 
@@ -228,11 +222,7 @@ namespace Jet
 			} while (cur);
 
 			if (ret.val)
-			{
-				//ret.val->dump();
-				//ret.val->getType()->dump();
 				ret = this->DoCast(this->function->return_type, ret);
-			}
 			return parent->builder.CreateRet(ret.val);
 		}
 
@@ -275,7 +265,6 @@ namespace Jet
 
 			auto temp = this->scope;
 			this->scope = this->scope->prev;
-			//delete temp;
 		}
 
 		CValue DoCast(Type* t, CValue value, bool Explicit = false)
