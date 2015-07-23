@@ -1531,6 +1531,11 @@ namespace Jet
 
 		std::string GetRealName();
 
+		std::string GetName()
+		{
+			return this->name.text;
+		}
+
 		void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
@@ -1763,6 +1768,9 @@ namespace Jet
 		Token end;
 
 		Token base_type;
+
+		void AddConstructorDeclarations(Type* str, CompilerContext* context);
+		void AddConstructors(CompilerContext* context);
 	public:
 
 		std::vector<StructMember> members;

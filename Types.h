@@ -188,6 +188,7 @@ namespace Jet
 
 		std::vector<std::pair<Type*, std::string>> arguments;
 
+		CompilerContext* context;
 		llvm::Function* f;//not always used
 		llvm::DISubprogram scope;
 
@@ -202,6 +203,7 @@ namespace Jet
 
 		Function()
 		{
+			context = 0;
 			f = 0;
 			expression = 0;
 			loaded = false;

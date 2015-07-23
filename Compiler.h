@@ -83,6 +83,7 @@ namespace Jet
 		friend class ExternExpression;
 		friend class TraitExpression;
 		friend class LocalExpression;
+		friend class StructExpression;
 
 		llvm::TargetMachine* target;
 		llvm::LLVMContext& context;

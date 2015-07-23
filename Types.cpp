@@ -538,9 +538,13 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->CompileDeclarations(compiler->current_function);
 
+		expr->AddConstructorDeclarations(t, compiler->current_function);
+
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
+
+		expr->AddConstructors(compiler->current_function);
 
 		compiler->builder.SetCurrentDebugLocation(dp);
 		if (rp)
