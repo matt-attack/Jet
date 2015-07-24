@@ -119,7 +119,6 @@ namespace Jet
 					return global->second;
 
 				auto function = this->parent->functions.find(name);
-				//function->second->f->getType()->dump();
 				if (function != this->parent->functions.end())
 				{
 					function->second->Load(this->parent);

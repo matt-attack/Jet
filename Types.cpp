@@ -48,7 +48,7 @@ llvm::DIType Type::GetDebugType(Compilation* compiler)
 			//ftypes.push_back(type.type->GetDebugType(compiler));
 		}
 		//for (auto ii : ftypes)
-			//ii->dump();
+		//ii->dump();
 		llvm::DIFile unit = compiler->debug_info.file;
 		llvm::DIType typ;
 		return compiler->debug->createStructType(compiler->debug_info.file, this->data->name, unit, 0, 1024, 1024, 0, typ, compiler->debug->getOrCreateArray(ftypes));
@@ -393,6 +393,7 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 						break;//couldnt find it, doesnt match
 					}
 
+
 					if (range.first->second->return_type)
 					{
 						bool res = FindTemplates(compiler, types, range.first->second->return_type, fun.second->return_type, ii.second);
@@ -401,9 +402,20 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 							match = false;
 							break;
 						}
+
+						if (fun.second->return_type->type != Types::Trait  && fun.second->return_type->type != Types::Invalid && fun.second->return_type != range.first->second->return_type)
+						{
+							match = false;
+							break;
+						}
 					}
 
 					//do it for args
+					if (range.first->second->arguments.size() != fun.second->arguments.size()+1)
+					{
+						match = false;
+						break;
+					}
 					for (int i = 1; i < range.first->second->arguments.size(); i++)
 					{
 						bool res = FindTemplates(compiler, types, range.first->second->arguments[i].first, fun.second->arguments[i - 1].first, ii.second);
@@ -414,7 +426,12 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 						}
 					}
 				}
-				if (match)
+
+				bool not_found = false;
+				for (int i = 0; i < ii.second->templates.size(); i++)
+					if (types[i] == 0)
+						not_found = true;
+				if (match && not_found == false)
 					this->traits.push_back({ types, ii.second });
 				continue;
 			}
