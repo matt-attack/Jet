@@ -576,13 +576,13 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	//need to not compile if template or trait
 	if (this->templates)
 	{
-		context->parent->Error("Not implemented!", token);
-		/*for (auto ii : *this->templates)//make sure traits are valid
+		//context->parent->Error("Not implemented!", token);
+		for (auto ii : *this->templates)//make sure traits are valid
 		{
-		auto iter = context->parent->traits.find(ii.first.text);
-		if (iter == context->parent->traits.end() || iter->second->valid == false)
-		Error("Trait '" + ii.first.text + "' is not defined", ii.first);
-		}*/
+			auto iter = context->parent->traits.find(ii.first.text);
+			if (iter == context->parent->traits.end() || iter->second->valid == false)
+				context->parent->Error("Trait '" + ii.first.text + "' is not defined", ii.first);
+		}
 		return CValue();
 	}
 
@@ -735,7 +735,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	if (str.length() > 0)
 	{
 		auto type = context->parent->AdvanceTypeLookup(str);
-		//auto type = context->parent->LookupType(str);
+		//auto type = context->parent->LookupType(str);jet
 		if (type->type == Types::Trait)
 		{
 			type->Load(context->parent);
@@ -769,6 +769,12 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			type = context->parent->AdvanceTypeLookup(str + "*");
 
 		fun->arguments.push_back({ type, "this" });
+	}
+
+	if (this->templates)
+	{
+		for (auto ii : *this->templates)
+			fun->templates.push_back({ context->parent->LookupType(ii.first.text), ii.second.text });
 	}
 
 	for (auto ii : *this->args)
@@ -862,7 +868,14 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			if (type->type == Types::Array)
 				Alloca = TmpB.CreateAlloca(GetType(type), context->parent->builder.getInt32(type->size), aname);
 			else
+			{
+				if (type->GetBaseType()->type == Types::Trait)
+					context->parent->Error("Cannot instantiate trait", ii.second);
+
+				auto ty = GetType(type);
+
 				Alloca = TmpB.CreateAlloca(GetType(type), 0, aname);
+			}
 
 			llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, context->parent->debug_info.file, ii.second.line,
 				type->GetDebugType(context->parent));
@@ -977,7 +990,6 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 		fun->expression = 0;
 		fun->type = (FunctionType*)-1;
 		str->data->functions.insert({ strname, fun });//register function in _Struct
-		//printf("has no constructor, making default");
 	}
 	if (has_destructor == false)
 	{
@@ -989,34 +1001,13 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 		fun->type = (FunctionType*)-1;
 
 		str->data->functions.insert({ "~" + strname, fun });
-		//printf("has no destructor, making default");
 	}
 }
 
 void StructExpression::AddConstructors(CompilerContext* context)
 {
-	bool has_destructor = false;
-	bool has_constructor = false;
-	for (auto ii : this->members)
-	{
-		if (ii.type == StructMember::FunctionMember)
-		{
-			if (ii.function->GetName() == this->name.text)
-			{
-				has_constructor = true;
-				//printf("was constructor todo fill me in with stuff");
-			}
-			else if (ii.function->GetName() == "~" + this->name.text)
-			{
-				has_destructor = true;
-				//printf("was destructor todo fill me in with stuff");
-			}
-		}
-	}
-
 	auto Struct = this->GetName();
 
-	//todo
 	Type* str = context->parent->LookupType(Struct);//todo get me
 	std::string strname = str->data->template_base ? str->data->template_base->name : str->data->name;
 
@@ -1073,7 +1064,6 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				}
 
 				//compile stuff here
-				//block->Compile(function);
 				int i = 0;
 				for (auto ii : str->data->members)
 				{
@@ -1156,7 +1146,6 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				}
 
 				//compile stuff here
-				//block->Compile(function);
 				int i = 0;
 				for (auto ii : str->data->members)
 				{
@@ -1273,8 +1262,6 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				context->parent->builder.SetInsertPoint(rp);
 		}
 	}
-
-	//compile function for in struct
 }
 
 void StructExpression::CompileDeclarations(CompilerContext* context)

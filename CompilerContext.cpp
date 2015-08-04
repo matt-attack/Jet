@@ -340,6 +340,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 			auto type = this->parent->types.find(name);// LookupType(name);
 			if (type != this->parent->types.end() && type->second->type == Types::Struct)
 			{
+				type->second->Load(this->parent);
 				//look for a constructor
 				auto range = type->second->data->functions.equal_range(name);
 				for (auto ii = range.first; ii != range.second; ii++)
@@ -353,62 +354,133 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 					//allocate thing
 					auto Alloca = this->parent->builder.CreateAlloca(GetType(type->second), 0, "constructortemp");
 
-					std::vector<llvm::Value*> argsv;
-					int i = 1;
-
-					//add struct
-					argsv.push_back(Alloca);
-					for (auto ii : args)
-						argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
-
 					fun->Load(this->parent);
 
-					//constructor->second->f->dump();
-					//parent->module->dump();
-					//auto fun = this->parent->module->getFunction(constructor->second->name);
-
-					//this->parent->builder.CreateCall(fun->f, argsv);
-
-					return fun;// CValue(type->second, this->parent->builder.CreateLoad(Alloca));
+					return 0;// fun;// CValue(type->second, this->parent->builder.CreateLoad(Alloca));
 				}
 			}
-			//else if (type == this->parent->types.end() || type->second->type == Types::Invalid)
-			//{
-			//Error("wrong something", *current_token);
-			//}
-			/*else
-			{
-			//try to find it in variables
-			auto var = this->GetVariable(name);
+		}
 
-			if (var.type->type != Types::Function)
-			this->parent->Error("Cannot call non-function type", *this->current_token);
+		if (name[name.length() - 1] == '>')//its a template
+		{
+			int i = name.find_first_of('<');
+			auto base_name = name.substr(0, i);
 
-			std::vector<llvm::Value*> argsv;
-			int i = 0;
-			for (auto ii : args)
-			{
-			//try and cast to the correct type if we can
-			argsv.push_back(this->DoCast(var.type->function->args[i++], ii).val);
-			//argsv.back()->dump();
-			}
+			auto range = this->parent->functions.equal_range(name);
 
-			//var.val->dump();
-			var.val = this->parent->builder.CreateLoad(var.val);
-			return CValue(var.type->function->return_type, this->parent->builder.CreateCall(var.val, argsv));
-			}*/
-			//this->parent->Error("Function '" + name + "' is not defined", *this->current_token);
+			//instantiate here
+			this->parent->Error("Not implemented", *this->current_token);
+
+			return range.first->second;
 		}
 
 		//look for the best one
 		auto range = this->parent->functions.equal_range(name);
 		for (auto ii = range.first; ii != range.second; ii++)
 		{
-			//printf("found function option for %s\n", name.c_str());
-
 			//pick one with the right number of args
 			if (ii->second->arguments.size() == args.size())
 				fun = ii->second;
+		}
+
+		if (fun && fun->templates.size() > 0)
+		{
+			auto templates = new Type*[fun->templates.size()];
+			for (int i = 0; i < fun->templates.size(); i++)
+				templates[i] = 0;
+
+			//need to infer
+			if (fun->arguments.size() > 0)
+			{
+				int i = 0;
+				for (auto ii : fun->templates)
+				{
+					//look for stuff in args
+					int i2 = 0;
+					for (auto iii : fun->arguments)
+					{
+						if (iii.first->name == ii.second)
+						{
+							//found it
+							if (templates[i] != 0 && templates[i] != args[i2].type)
+								this->parent->Error("Could not infer template type", *this->current_token);
+
+							templates[i] = args[i2].type;
+						}
+						i2++;
+					}
+					i++;
+				}
+			}
+			
+			for (int i = 0; i < fun->templates.size(); i++)
+			{
+				if (templates[i] == 0)
+					this->parent->Error("Could not infer template type", *this->current_token);
+			}
+			
+			auto oldname = fun->expression->name.text;
+			fun->expression->name.text += '<';
+			for (int i = 0; i < fun->templates.size(); i++)
+			{
+				fun->expression->name.text += templates[i]->ToString();
+				if (i + 1 < fun->templates.size())
+					fun->expression->name.text += ',';
+			}
+			fun->expression->name.text += '>';
+			auto rname = fun->expression->name.text;
+			
+			//register the types
+			int i = 0;
+			std::vector<std::pair<std::string, Type*>> old;
+			for (auto ii : fun->templates)
+			{
+				//check if traits match
+				if (templates[i]->MatchesTrait(this->parent, ii.first->trait) == false)
+					parent->Error("Type '" + templates[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *parent->current_function->current_token);
+
+				old.push_back({ ii.second, parent->types[ii.second] });
+				parent->types[ii.second] = templates[i++];
+			}
+
+			//store then restore insertion point
+			auto rp = parent->builder.GetInsertBlock();
+			auto dp = parent->builder.getCurrentDebugLocation();
+
+
+			fun->expression->CompileDeclarations(this);
+			fun->expression->DoCompile(this);
+
+			//restore types
+
+			for (auto ii : old)
+			{
+				//need to remove everything that is using me
+				if (ii.second)
+					parent->types[ii.first] = ii.second;
+				else
+					parent->types.erase(parent->types.find(ii.first));
+
+				//need to get rid of all references to it, or blam
+				auto iter = parent->types.find(ii.first + "*");
+				if (iter != parent->types.end())
+				{
+					parent->types.erase(iter);
+
+					iter = parent->types.find(ii.first + "**");
+					if (iter != parent->types.end())
+						parent->types.erase(iter);
+				}
+			}
+
+			parent->builder.SetCurrentDebugLocation(dp);
+			if (rp)
+				parent->builder.SetInsertPoint(rp);
+
+			fun->expression->name.text = oldname;
+
+			//time to recompile and stuff
+			return parent->functions.find(rname)->second;
 		}
 		return fun;
 	}
@@ -441,6 +513,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			{
 				//ok, we allocate, call then 
 				//allocate thing
+				type->second->Load(this->parent);
 				auto Alloca = this->parent->builder.CreateAlloca(GetType(type->second), 0, "constructortemp");
 
 				std::vector<llvm::Value*> argsv;
@@ -463,23 +536,14 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			//try to find it in variables
 			auto var = this->Load(name);
 
-			//if (!(var.type->type == Types::Pointer && var.type->base->type == Types::Function))
 			if (var.type->type != Types::Function)
 				this->parent->Error("Cannot call non-function type", *this->current_token);
-			//if ()
-			//nneed to load it
+
 			std::vector<llvm::Value*> argsv;
 			int i = 0;
 			for (auto ii : args)
-			{
-				//try and cast to the correct type if we can
-				argsv.push_back(this->DoCast(var.type->function->args[i++], ii).val);
-				//argsv.back()->dump();
-			}
+				argsv.push_back(this->DoCast(var.type->function->args[i++], ii).val);//try and cast to the correct type if we can
 
-			//var.val->dump();
-			//if (var.type->type == Types::Pointer)
-			//`var.val = this->parent->builder.CreateLoad(var.val);
 			return CValue(var.type->function->return_type, this->parent->builder.CreateCall(var.val, argsv));
 		}
 		this->parent->Error("Function '" + name + "' is not defined", *this->current_token);
@@ -501,10 +565,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 	std::vector<llvm::Value*> argsv;
 	int i = 0;
 	for (auto ii : args)
-	{
-		//try and cast to the correct type if we can
-		argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);
-	}
+		argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
 
 	return CValue(fun->return_type, this->parent->builder.CreateCall(f, argsv));
 }

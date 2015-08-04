@@ -101,6 +101,8 @@ llvm::Type* Jet::GetType(Type* t)
 			args.push_back(GetType(ii));
 		return llvm::FunctionType::get(GetType(t->function->return_type), args, false)->getPointerTo();
 	}
+	case Types::Trait:
+		return 0;
 	}
 }
 

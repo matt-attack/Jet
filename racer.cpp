@@ -218,9 +218,48 @@ extern "C"
 			{
 				if (ii.first == symbol)
 				{
-					strcpy(data, ii.second.type->ToString().c_str());
-					return data;
+					if (ii.second.type->type == Types::Pointer)
+					{
+						strcpy(data, ii.second.type->base->ToString().c_str());
+						return data;
+					}
+					else
+					{
+						strcpy(data, ii.second.type->ToString().c_str());
+						return data;
+					}
 				}
+			}
+
+			if (scope->prev)
+			{
+				for (auto ii : scope->prev->named_values)
+				{
+					if (ii.first == symbol)
+					{
+						if (ii.second.type->type == Types::Pointer)
+						{
+							strcpy(data, ii.second.type->base->ToString().c_str());
+							return data;
+						}
+						else
+						{
+							strcpy(data, ii.second.type->ToString().c_str());
+							return data;
+						}
+					}
+				}
+			}
+		}
+
+		//look for global functions
+		auto fun = compilation->functions.find(symbol);
+		if (fun != compilation->functions.end())
+		{
+			if (fun->first == symbol)
+			{
+				strcpy(data, fun->second->GetType(compilation)->ToString().c_str());
+				return data;
 			}
 		}
 		return "";
@@ -236,7 +275,7 @@ extern "C"
 			return "";//project didnt load, just return 0
 
 		auto compilation = Compilation::Make(project);
-		//compilation->Assemble(0);
+
 		std::string out;
 		for (auto ii : compilation->functions)
 		{

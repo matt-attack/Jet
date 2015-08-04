@@ -103,6 +103,22 @@ namespace Jet
 		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, CompilerContext* context, bool def = false);
 
 		Type* GetPointerType(CompilerContext* context);
+
+		Type* GetBaseType()//returns bottom level type
+		{
+			if (this->type == Types::Pointer)
+			{
+				this->base->GetBaseType();
+			}
+			else if (this->type == Types::Array)
+			{
+				return this->base->GetBaseType();
+			}
+			else
+			{
+				return this;
+			}
+		}
 	};
 
 	class Function;
@@ -194,7 +210,7 @@ namespace Jet
 		
 		//template stuff
 		FunctionExpression* template_base;
-		std::vector<std::pair<Trait*, std::string>> templates;
+		std::vector<std::pair<Type*, std::string>> templates;
 		FunctionExpression* expression;
 
 		bool loaded;

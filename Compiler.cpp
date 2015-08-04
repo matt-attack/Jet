@@ -191,6 +191,9 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 			//	delete[] ii;
 
 			printf("Dependency compilation failed, stopping compilation");
+
+			//restore working directory
+			chdir(olddir);
 			return false;
 		}
 
