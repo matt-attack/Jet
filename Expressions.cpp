@@ -722,7 +722,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	std::string fname = name.text;
 
 	if (name.text.length() == 0)
-		return;//dont compile expression for lambdas fname = "_lambda_id_";
+		return;//dont compile expression for lambdas
 
 	bool advlookup = true;
 	Function* fun = new Function(this->GetRealName());
@@ -735,7 +735,6 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	if (str.length() > 0)
 	{
 		auto type = context->parent->AdvanceTypeLookup(str);
-		//auto type = context->parent->LookupType(str);jet
 		if (type->type == Types::Trait)
 		{
 			type->Load(context->parent);
@@ -760,9 +759,8 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	else
 		fun->return_type = context->parent->LookupType(this->ret_type.text);
 
-	if (str.length() > 0)
+	if (str.length() > 0)//im a member function
 	{
-		//im a member function
 		//insert first arg, which is me
 		Type* type = 0;
 		if (is_trait == false)
@@ -804,7 +802,6 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	for (auto ii : *this->args)
 	{
 		auto type = context->parent->AdvanceTypeLookup(ii.first);
-
 		fun->arguments.push_back({ type, ii.second });
 	}
 
@@ -927,12 +924,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			const std::string& constructor_name = type->data->template_base ? type->data->template_base->name : type->data->name;
 			auto iter = type->data->functions.find(constructor_name);
 			if (iter != type->data->functions.end())
-			{
-				//this is the constructor, call it
-				//todo: move implicit casts for operators and assignment into functions in compilercontext
-				//	will make it easier to implement operator overloads
 				context->Call(constructor_name, { CValue(context->parent->LookupType(type->ToString() + "*"), Alloca) }, type);
-			}
 		}
 	}
 
@@ -943,8 +935,7 @@ CValue StructExpression::Compile(CompilerContext* context)
 {
 	if (this->templates)
 	{
-		//compile l8r
-		//verify that all traits are valid
+		//dont compile, just verify that all traits are valid
 		for (auto ii : *this->templates)
 		{
 			auto iter = context->parent->types.find(ii.first.text);
@@ -1246,7 +1237,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 						{
 							auto myself = ii.second->context->Load("this");
 							std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(i) };
-							//iii f is missing oops
+							
 							auto gep = context->parent->builder.CreateGEP(myself.val, iindex, "getmember");
 							iii->second->Load(context->parent);
 
@@ -1325,10 +1316,10 @@ CValue DefaultExpression::Compile(CompilerContext* context)
 		context->parent->Error("Cannot use default expression outside of a switch!", token);
 
 	//create a new block for this case
-	llvm::BasicBlock* block = sw->def;// lvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefault");
+	llvm::BasicBlock* block = sw->def;
 
 	//add the case to the switch
-	bool is_first = sw->first_case;// AddCase(context->parent->builder.getInt32(this->value), block);
+	bool is_first = sw->first_case;
 	sw->first_case = false;
 
 	//jump to end block

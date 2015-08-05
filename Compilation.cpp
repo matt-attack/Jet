@@ -126,7 +126,7 @@ Compilation* Compilation::Make(JetProject* project)
 				delete[] ii;
 
 			printf("Dependency compilation failed: could not find symbol file!\n");
-			return false;
+			return 0;
 		}
 
 		//parse symbols
@@ -179,6 +179,8 @@ Compilation* Compilation::Make(JetProject* project)
 			{
 				delete result;
 				printf("Compilation Stopped, Error Parsing Symbols\n");
+				delete compilation;
+				compilation = 0;
 				errors = 1;
 				goto error;
 			}
@@ -208,6 +210,8 @@ Compilation* Compilation::Make(JetProject* project)
 			{
 				printf("Compilation Stopped, Parser Error\n");
 				errors = 1;
+				delete compilation;
+				compilation = 0;
 				goto error;
 			}
 			compilation->asts[file.first] = result;

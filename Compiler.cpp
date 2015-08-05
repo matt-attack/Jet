@@ -121,21 +121,17 @@ void Jet::ParserError(const std::string& msg, Token token)
 
 
 
-
-
-//get traits working
-//generate trait from struct
 class MemberRenamer : public ExpressionVisitor
 {
 	std::string stru, member, newname;
 	Compilation* compiler;
 public:
 
-	MemberRenamer(std::string stru, std::string member, std::string newname, Compilation* compiler) :stru(stru), member(member), newname(newname), compiler(compiler)
+	MemberRenamer(std::string stru, std::string member, std::string newname, Compilation* compiler) : stru(stru), member(member), newname(newname), compiler(compiler)
 	{
 
 	}
-	//lets make a waywo demo for this :D
+
 	virtual void Visit(StructExpression* expr)
 	{
 		if (expr->GetName() == stru)
@@ -177,7 +173,6 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 	chdir(path.c_str());
 
 	//build each dependency
-	//std::vector<char*> lib_symbols;
 	int deps = project->dependencies.size();
 	for (int i = 0; i < deps; i++)
 	{
@@ -187,38 +182,12 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 		auto success = compiler.Compile(ii.c_str());
 		if (success == false)
 		{
-			//for (auto ii : lib_symbols)
-			//	delete[] ii;
-
 			printf("Dependency compilation failed, stopping compilation");
 
 			//restore working directory
 			chdir(olddir);
 			return false;
 		}
-
-		/*//read in declarations for each dependency
-		std::string symbol_filepath = ii + "/build/symbols.jlib";
-		std::ifstream symbols(symbol_filepath, std::ios_base::binary);
-		if (symbols.is_open() == false)
-		{
-			for (auto ii : lib_symbols)
-				delete[] ii;
-
-			printf("Dependency compilation failed: could not find symbol file!\n");
-			return false;
-		}
-
-		//parse symbols
-		symbols.seekg(0, std::ios::end);    // go to the end
-		std::streamoff length = symbols.tellg();           // report location (this is the length)
-		symbols.seekg(0, std::ios::beg);    // go back to the beginning
-		char* buffer = new char[length + 1];    // allocate memory for a buffer of appropriate dimension
-		symbols.read(buffer, length);       // read the whole file into the buffer
-		buffer[length] = 0;
-		symbols.close();
-
-		lib_symbols.push_back(buffer);*/
 	}
 
 	printf("\nCompiling Project: %s\n", projectdir);
@@ -267,8 +236,6 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 		FILETIME create, modified, access;
 		GetFileTime(file, &create, &access, &modified);
 
-		//SYSTEMTIME syst;
-		//FileTimeToSystemTime(&modified, &syst);
 		CloseHandle(file);
 		modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
 	}
@@ -316,14 +283,16 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 
 error:
 
-	if (compilation->GetErrors().size() > 0)
+	if (compilation == 0)
+	{
+		//compiling failed completely
+	}
+	else if (compilation->GetErrors().size() > 0)
 	{
 		for (auto ii : compilation->GetErrors())
 			ii.Print();
 
 		printf("Compiling Failed: %d Errors Found\n", compilation->GetErrors().size());
-		//delete module;
-		//module = 0;
 	}
 	else
 	{

@@ -51,10 +51,10 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 
 		auto ft = llvm::FunctionType::get(GetType(ret), oargs, false);
 
-		n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
+		func->f = n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
 
 		n->function = func;
-		func->f = n->f;
+
 		if (member == false)
 			this->parent->functions.insert({ fname, func });// [fname] = func;
 
@@ -106,7 +106,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 	if (operation == TokenType::BAnd)
 	{
 		//this should already have been done elsewhere, so error
-		throw 7;
+		assert(false);
 	}
 
 	if (value.type->type == Types::Float || value.type->type == Types::Double)
@@ -182,7 +182,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 	if (left.type->type != right.type->type)
 	{
 		//conversion time!!
-		throw 7;
+		parent->Error("Cannot perform a binary operation between two incompatible types", *this->current_token);
 	}
 
 	if (left.type->type == Types::Float || left.type->type == Types::Double)
@@ -352,9 +352,9 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 				{
 					//ok, we allocate, call then 
 					//allocate thing
-					auto Alloca = this->parent->builder.CreateAlloca(GetType(type->second), 0, "constructortemp");
+					//auto Alloca = this->parent->builder.CreateAlloca(GetType(type->second), 0, "constructortemp");
 
-					fun->Load(this->parent);
+					//fun->Load(this->parent);
 
 					return 0;// fun;// CValue(type->second, this->parent->builder.CreateLoad(Alloca));
 				}
@@ -492,7 +492,6 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 
 CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct)
 {
-	llvm::Function* f = 0;
 	Function* fun = this->GetMethod(name, args, Struct);
 
 	if (fun == 0 && Struct == 0)
@@ -540,9 +539,8 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				this->parent->Error("Cannot call non-function type", *this->current_token);
 
 			std::vector<llvm::Value*> argsv;
-			int i = 0;
-			for (auto ii : args)
-				argsv.push_back(this->DoCast(var.type->function->args[i++], ii).val);//try and cast to the correct type if we can
+			for (int i = 0; i < args.size(); i++)
+				argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
 
 			return CValue(var.type->function->return_type, this->parent->builder.CreateCall(var.val, argsv));
 		}
@@ -557,15 +555,12 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 	fun->Load(this->parent);
 
-	f = fun->f;
-
-	if (args.size() != f->arg_size())
+	if (args.size() != fun->f->arg_size())
 		this->parent->Error("Mismatched function parameters in call", *this->current_token);//todo: add better checks later
 
 	std::vector<llvm::Value*> argsv;
-	int i = 0;
-	for (auto ii : args)
-		argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
+	for (int i = 0; i < args.size(); i++)// auto ii : args)
+		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]).val);//try and cast to the correct type if we can
 
-	return CValue(fun->return_type, this->parent->builder.CreateCall(f, argsv));
+	return CValue(fun->return_type, this->parent->builder.CreateCall(fun->f, argsv));
 }

@@ -113,10 +113,7 @@ std::string Jet::ParseType(const char* tname, int& p)
 	//Token name = parser->Consume(TokenType::Name);
 	std::string out;// = name.text;
 	while (IsLetter(tname[p]))
-	{
-		out += tname[p];
-		p++;
-	}
+		out += tname[p++];
 
 	//parse templates
 	if (tname[p] == '<')//parser->MatchAndConsume(TokenType::LessThan))
@@ -176,14 +173,10 @@ void Type::Load(Compilation* compiler)
 	}
 	else if (type == Types::Invalid)
 	{
-		if (this->name.back() == '>')
+		if (this->name.back() == '>')//im a template!
 		{
-			//im a template!
 			//get first bit, then we can instatiate it
-			int p = 0;
-			for (p = 0; p < name.length(); p++)
-				if (name[p] == '<')
-					break;
+			int p = name.find_first_of('<');
 
 			//look up the base, and lets instantiate it
 			std::string base = name.substr(0, p);
@@ -192,7 +185,6 @@ void Type::Load(Compilation* compiler)
 				compiler->Error("Reference To Undefined Type '" + base + "'", *compiler->current_function->current_token);
 			else if (t->second->type == Types::Trait)
 			{
-				//printf("was a trait");
 				std::vector<Type*> types;
 				p++;
 				do
@@ -252,10 +244,7 @@ void Type::Load(Compilation* compiler)
 		}
 		else if (this->name.back() == ')')
 		{
-			int p = 0;
-			for (p = 0; p < name.length(); p++)
-				if (name[p] == '(')
-					break;
+			int p = name.find_first_of('(');
 
 			std::string ret_type = name.substr(0, p);
 			auto rtype = compiler->LookupType(ret_type);
