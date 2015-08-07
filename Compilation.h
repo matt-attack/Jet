@@ -44,8 +44,8 @@ namespace Jet
 		llvm::LLVMContext& context;
 
 		struct DebugInfo {
-			llvm::DICompileUnit cu;
-			llvm::DIFile file;
+			llvm::DICompileUnit* cu;
+			llvm::DIFile* file;
 		} debug_info;
 
 		std::map<std::string, Trait*> traits;

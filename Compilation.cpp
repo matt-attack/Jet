@@ -6,10 +6,9 @@
 #include <direct.h>
 
 
-
 #include <llvm/ADT/Triple.h>
 #include <llvm/Support/Host.h>
-#include <llvm\Target\TargetLibraryInfo.h>
+#include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm\IR\AssemblyAnnotationWriter.h>
 #include <llvm\Support\FormattedStream.h>
 #include <llvm\Support\raw_os_ostream.h>
@@ -19,6 +18,7 @@
 #include <llvm\Target\TargetMachine.h>
 #include <llvm\Target\TargetSubtargetInfo.h>
 #include <llvm/Transforms/IPO.h>
+#include <llvm\IR\DataLayout.h>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -30,11 +30,11 @@ using namespace Jet;
 Source* current_source = 0;
 
 //options for the linker
-//#ifdef _WIN32
-//#define USE_MSVC
-//#else
+#ifdef _WIN32
+#define USE_MSVC
+#else
 #define USE_GCC
-//#endif
+#endif
 
 std::string exec(const char* cmd) {
 	FILE* pipe = _popen(cmd, "r");
@@ -100,6 +100,8 @@ Compilation::~Compilation()
 	//delete ii.second;
 }
 
+#include <llvm\DebugInfo\PDB\PDBContext.h>
+#include <llvm\DebugInfo\PDB\PDBSymDumper.h>
 Compilation* Compilation::Make(JetProject* project)
 {
 	Compilation* compilation = new Compilation(project);
@@ -146,6 +148,8 @@ Compilation* Compilation::Make(JetProject* project)
 
 	//module = JITHelper->getModuleForNewFunction();
 	compilation->module = new llvm::Module("hi.im.jet", compilation->context);
+	//compilation->module->
+
 	compilation->debug = new llvm::DIBuilder(*compilation->module);
 	compilation->debug_info.cu = compilation->debug->createCompileUnit(dwarf::DW_LANG_C, "../aaaa.jet", ".", "Jet Compiler", false, "", 0, "");
 
@@ -156,8 +160,7 @@ Compilation* Compilation::Make(JetProject* project)
 	auto global = new CompilerContext(compilation);
 
 	compilation->sources = project->GetSources();
-	//std::map<std::string, BlockExpression*> asts;
-
+	
 	//read in symbols from lib
 	std::vector<Expression*> symbol_asts;
 	std::vector<Source*> symbol_sources;
@@ -240,7 +243,7 @@ Compilation* Compilation::Make(JetProject* project)
 			//ok, I only need one of these, fixme
 			//debug_info.cu = debug->createCompileUnit(dwarf::DW_LANG_C, result.first, "../", "Jet Compiler", false, "", 0, "");
 			compilation->debug_info.file = compilation->debug->createFile(result.first,
-				compilation->debug_info.cu.getDirectory());
+				compilation->debug_info.cu->getDirectory());
 			compilation->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, compilation->debug_info.file));
 
 			//make sure to set the file name differently for different files
@@ -311,6 +314,7 @@ void Compilation::Assemble(int olevel)
 	//figure out why the debug fails on larger files 
 	//add more debug location emits
 	debug->finalize();
+
 	//output the .o file for this package
 	this->OutputPackage(project->project_name, olevel);
 
@@ -343,14 +347,14 @@ void Compilation::Assemble(int olevel)
 #else
 		std::string cmd = "link.exe /ENTRY:_jet_initializer /DEBUG ";
 
-		cmd += "build/" + project.project_name + ".o ";
-		cmd += "/OUT:build/" + project.project_name + ".exe ";
+		cmd += "build/" + project->project_name + ".o ";
+		cmd += "/OUT:build/" + project->project_name + ".exe ";
 
 		//need to link each dependency
-		for (auto ii : project.dependencies)
+		for (auto ii : project->dependencies)
 			cmd += ii + "/build/lib" + GetNameFromPath(ii) + ".a ";
 
-		for (auto ii : project.libs)
+		for (auto ii : project->libs)
 			cmd += " \"" + ii + "\"";
 #endif
 
@@ -363,7 +367,7 @@ void Compilation::Assemble(int olevel)
 
 		//need to put this stuff in the .jlib file later
 		printf("Compiling Lib...\n");
-		std::string cmd = "ar rcs build/lib" + project->project_name + ".a ";
+		std::string cmd = "llvm-ar rcs build/lib" + project->project_name + ".a ";
 		cmd += "build/" + project->project_name + ".o ";
 
 		for (auto ii : project->dependencies)
@@ -412,7 +416,7 @@ void Compilation::Optimize(int level)
 	// target lays out data structures.
 	//TheModule->setDataLayout(*TheExecutionEngine->getDataLayout());
 	// Do the main datalayout
-	OurFPM.add(new DataLayoutPass());
+	//OurFPM.add(new llvm::DataLayoutPass());
 	// Provide basic AliasAnalysis support for GVN.
 	OurFPM.add(llvm::createBasicAliasAnalysisPass());
 	// Do simple "peephole" optimizations and bit-twiddling optzns.
@@ -483,7 +487,7 @@ void Compilation::SetTarget()
 	auto CodeModel = llvm::CodeModel::Default;
 	this->target = TheTarget->createTargetMachine(TheTriple.getTriple(), MCPU, FeaturesStr, Options, RelocModel, CodeModel, OLvl);
 
-	module->setDataLayout(this->target->getSubtargetImpl()->getDataLayout());
+	module->setDataLayout(*this->target->getDataLayout());// getSubtargetImpl(*module->getFunctionList().begin())->getDataLayout());
 }
 
 void Compilation::OutputPackage(const std::string& project_name, int o_level)
@@ -496,16 +500,16 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	llvm::AssemblyAnnotationWriter writer;
 
 	//no idea what this does LOL
-	llvm::TargetLibraryInfo *TLI = new llvm::TargetLibraryInfo();
-	if (true)
-		TLI->disableAllFunctions();
-	MPM.add(TLI);
+	//llvm::TargetLibraryInfo *TLI = new llvm::TargetLibraryInfo::;
+	//if (true)
+		//TLI->disableAllFunctions();
+	//MPM.add(TLI);
 	if (o_level > 0)
 	{
 		MPM.add(llvm::createFunctionInliningPass(o_level, 3));
 	}
-	MPM.add(new llvm::DataLayoutPass());
-	target->addPassesToEmitFile(MPM, oo, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
+	//MPM.add(new llvm::DataLayoutPass());
+	target->addPassesToEmitFile(MPM, strr, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
 
 	//std::error_code ecc;
 	//llvm::raw_fd_ostream strrr("build/" + project_name + ".s", ecc, llvm::sys::fs::OpenFlags::F_None);

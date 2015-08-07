@@ -688,11 +688,11 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		AI->setName(aname);
 
-		llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, context->parent->debug_info.file, this->token.line,
+		auto D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, context->parent->debug_info.file, this->token.line,
 			argsv[Idx].first->GetDebugType(context->parent));
 
 		llvm::Instruction *Call = context->parent->debug->insertDeclare(
-			Alloca, D, context->parent->debug->createExpression(), context->parent->builder.GetInsertBlock());
+			Alloca, D, context->parent->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope), Alloca);
 		Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
 
 		// Add arguments to variable symbol table.
@@ -874,11 +874,11 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				Alloca = TmpB.CreateAlloca(GetType(type), 0, aname);
 			}
 
-			llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, context->parent->debug_info.file, ii.second.line,
+			auto D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, context->parent->debug_info.file, ii.second.line,
 				type->GetDebugType(context->parent));
 
 			llvm::Instruction *Call = context->parent->debug->insertDeclare(
-				Alloca, D, context->parent->debug->createExpression(), context->parent->builder.GetInsertBlock());
+				Alloca, D, context->parent->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), Alloca);
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
 
 			// Store the initial value into the alloca.
@@ -900,15 +900,15 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			else
 				Alloca = TmpB.CreateAlloca(GetType(val.type), 0, aname);
 
-			llvm::DIFile unit = context->parent->debug_info.file;
+			llvm::DIFile* unit = context->parent->debug_info.file;
 
-			llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, context->function->scope, aname, unit, ii.second.line,
+			llvm::DILocalVariable* D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, context->function->scope, aname, unit, ii.second.line,
 				type->GetDebugType(context->parent));
 
 			llvm::Instruction *Call = context->parent->debug->insertDeclare(
-				Alloca, D, context->parent->debug->createExpression(), context->parent->builder.GetInsertBlock());
+				Alloca, D, context->parent->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), Alloca);
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
-
+			
 			context->parent->builder.CreateStore(val.val, Alloca);
 		}
 		else
@@ -1043,11 +1043,11 @@ void StructExpression::AddConstructors(CompilerContext* context)
 
 					AI->setName(aname);
 
-					llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, context->parent->debug_info.file, this->token.line,
+					auto D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, context->parent->debug_info.file, this->token.line,
 						argsv[Idx].first->GetDebugType(context->parent));
 
 					llvm::Instruction *Call = context->parent->debug->insertDeclare(
-						Alloca, D, context->parent->debug->createExpression(), context->parent->builder.GetInsertBlock());
+						Alloca, D, context->parent->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope), Alloca);
 					Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
 
 					// Add arguments to variable symbol table.
@@ -1123,13 +1123,13 @@ void StructExpression::AddConstructors(CompilerContext* context)
 
 					AI->setName(aname);
 
-					llvm::DIFile unit = context->parent->debug_info.file;
+					llvm::DIFile* unit = context->parent->debug_info.file;
 
-					llvm::DIVariable D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, unit, this->token.line,
+					auto D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, unit, this->token.line,
 						argsv[Idx].first->GetDebugType(context->parent));
 
 					llvm::Instruction *Call = context->parent->debug->insertDeclare(
-						Alloca, D, context->parent->debug->createExpression(), context->parent->builder.GetInsertBlock());
+						Alloca, D, context->parent->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope), Alloca);
 					Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
 
 					// Add arguments to variable symbol table.
@@ -1180,7 +1180,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			auto dp = context->parent->builder.getCurrentDebugLocation();
 
 			auto iter = ii.second->f->getBasicBlockList().begin()->begin();
-			for (int i = 0; i < str->data->members.size(); i++)
+			for (int i = 0; i < ii.second->arguments.size()*3; i++)
 				iter++;
 			context->parent->builder.SetInsertPoint(iter);
 
@@ -1220,7 +1220,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			auto dp = context->parent->builder.getCurrentDebugLocation();
 
 			auto iter = ii.second->f->getBasicBlockList().begin()->begin();
-			for (int i = 0; i < str->data->members.size(); i++)
+			for (int i = 0; i < ii.second->arguments.size() * 3; i++)
 				iter++;
 			context->parent->builder.SetInsertPoint(iter);
 

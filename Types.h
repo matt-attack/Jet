@@ -98,7 +98,7 @@ namespace Jet
 
 		std::string ToString();
 
-		llvm::DIType GetDebugType(Compilation* compiler);
+		llvm::DIType* GetDebugType(Compilation* compiler);
 
 		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, CompilerContext* context, bool def = false);
 
@@ -205,7 +205,7 @@ namespace Jet
 		CompilerContext* context;
 		llvm::Function* f;//not always used
 
-		llvm::DISubprogram scope;
+		llvm::DISubprogram* scope;
 
 		
 		//template stuff

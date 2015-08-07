@@ -16,7 +16,7 @@ Type* Type::GetPointerType(CompilerContext* context)
 	return context->parent->LookupType(this->ToString() + "*");
 }
 
-llvm::DIType Type::GetDebugType(Compilation* compiler)
+llvm::DIType* Type::GetDebugType(Compilation* compiler)
 {
 	assert(this->loaded);
 	if (this->type == Types::Bool)
@@ -49,9 +49,8 @@ llvm::DIType Type::GetDebugType(Compilation* compiler)
 		}
 		//for (auto ii : ftypes)
 		//ii->dump();
-		llvm::DIFile unit = compiler->debug_info.file;
-		llvm::DIType typ;
-		return compiler->debug->createStructType(compiler->debug_info.file, this->data->name, unit, 0, 1024, 1024, 0, typ, compiler->debug->getOrCreateArray(ftypes));
+		llvm::DIType* typ = 0;
+		return compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, 0, 1024, 1024, 0, typ, compiler->debug->getOrCreateArray(ftypes));
 	}
 	if (this->type == Types::Function)
 	{
@@ -61,8 +60,7 @@ llvm::DIType Type::GetDebugType(Compilation* compiler)
 		for (auto type : this->function->args)
 			ftypes.push_back(type->GetDebugType(compiler));
 
-		llvm::DIFile unit = compiler->debug_info.file;
-		return compiler->debug->createSubroutineType(unit, compiler->debug->getOrCreateTypeArray(ftypes));
+		return compiler->debug->createSubroutineType(compiler->debug_info.file, compiler->debug->getOrCreateTypeArray(ftypes));
 	}
 	printf("oops");
 }
@@ -772,17 +770,17 @@ void Function::Load(Compilation* compiler)
 
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
 
-	llvm::DIFile unit = compiler->debug_info.file;
+	llvm::DIFile* unit = compiler->debug_info.file;
 
 	auto functiontype = compiler->debug->createSubroutineType(unit, compiler->debug->getOrCreateTypeArray(ftypes));
 	int line = this->expression ? this->expression->token.line : 0;
-	llvm::DISubprogram sp = compiler->debug->createFunction(unit, this->name, this->name, unit, line, functiontype, false, true, line, 0, false, f);
+	llvm::DISubprogram* sp = compiler->debug->createFunction(unit, this->name, this->name, unit, line, functiontype, false, true, line, 0, false, f);
 
 	//FContext, Name, StringRef(), Unit, LineNo, 0, false, f);
 	//for some reason struct member functions derp
 	//CreateFunctionType(Args.size(), Unit), false /* internal linkage */,
 	//true /* definition */, ScopeLine, DINode::FlagPrototyped, false, F);
-	assert(sp.describes(f));
+	assert(sp->describes(f));
 	this->scope = sp;
 	compiler->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
 	//compiler->debug->finalize();

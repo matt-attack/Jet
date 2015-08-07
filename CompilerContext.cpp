@@ -58,12 +58,12 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		if (member == false)
 			this->parent->functions.insert({ fname, func });// [fname] = func;
 
-		llvm::DIFile unit = parent->debug_info.file;
+		llvm::DIFile* unit = parent->debug_info.file;
 
 		auto functiontype = parent->debug->createSubroutineType(unit, parent->debug->getOrCreateTypeArray(ftypes));
-		llvm::DISubprogram sp = parent->debug->createFunction(unit, fname, fname, unit, 0, functiontype, false, true, 0, 0, false, n->f);
+		llvm::DISubprogram* sp = parent->debug->createFunction(unit, fname, fname, unit, 0, functiontype, false, true, 0, 0, false, n->f);
 
-		assert(sp.describes(n->f));
+		assert(sp->describes(n->f));
 		func->scope = sp;
 		parent->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
 
