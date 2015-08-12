@@ -887,3 +887,14 @@ Expression* TypedefParselet::parse(Parser* parser, Token token)
 	Token other_type = ::ParseType(parser);
 	return new TypedefExpression(token, new_type, equals, other_type);
 }
+
+Expression* NamespaceParselet::parse(Parser* parser, Token token)
+{
+	Token name = parser->Consume(TokenType::Name);
+	Token start = parser->Consume(TokenType::LeftBracket);
+
+	auto block = parser->parseBlock();
+
+	Token end = parser->Consume(TokenType::RightBracket);
+	return new NamespaceExpression(token, name, start, block, end);
+}

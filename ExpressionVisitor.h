@@ -32,6 +32,7 @@ namespace Jet
 	class CastExpression;
 	class SizeofExpression;
 	class TypedefExpression;
+	class NamespaceExpression;
 	class ExpressionVisitor
 	{
 	public:
@@ -83,6 +84,8 @@ namespace Jet
 
 		virtual void Visit(SizeofExpression* exp) {};
 		virtual void Visit(TypedefExpression* exp) {};
+
+		virtual void Visit(NamespaceExpression* exp) {};
 	};
 }
 

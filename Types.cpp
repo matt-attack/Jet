@@ -40,7 +40,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		this->Load(compiler);
 
 		std::vector<llvm::Metadata*> ftypes;
-		for (auto type : this->data->members)
+		for (auto type : this->data->struct_members)
 		{
 			assert(type.type->loaded);
 			//fixme later?
@@ -178,10 +178,10 @@ void Type::Load(Compilation* compiler)
 
 			//look up the base, and lets instantiate it
 			std::string base = name.substr(0, p);
-			auto t = compiler->types.find(base);
-			if (t == compiler->types.end())//fix this
+			auto t = compiler->LookupType(base);
+			if (t == 0)//fix this
 				compiler->Error("Reference To Undefined Type '" + base + "'", *compiler->current_function->current_token);
-			else if (t->second->type == Types::Trait)
+			else if (t->type == Types::Trait)
 			{
 				std::vector<Type*> types;
 				p++;
@@ -201,7 +201,7 @@ void Type::Load(Compilation* compiler)
 
 				this->type = Types::Trait;
 				this->trait = new Trait;
-				*this->trait = *t->second->trait;
+				*this->trait = *t->trait;
 				this->trait->template_args = types;
 
 				return;
@@ -219,9 +219,10 @@ void Type::Load(Compilation* compiler)
 				types.push_back(t);
 			} while (name[p++] != '>');
 
-			Type* res = t->second->Instantiate(compiler, types);
+			Type* res = t->Instantiate(compiler, types);
 			//check to see if it was already instantiated
-			auto realname = res->ToString();
+			throw 7;
+			/*auto realname = res->ToString();
 			auto iter = compiler->types.find(realname);
 			if (iter == compiler->types.end())
 			{
@@ -238,7 +239,7 @@ void Type::Load(Compilation* compiler)
 					*this = *iter->second;
 				else
 					*this = *res;
-			}
+			}*/
 		}
 		else if (this->name.back() == ')')
 		{
@@ -271,7 +272,8 @@ void Type::Load(Compilation* compiler)
 			this->type = Types::Function;
 
 			auto realname = this->ToString();
-			auto iter = compiler->types.find(realname);
+			throw 7;
+			/*auto iter = compiler->types.find(realname);
 			if (iter == compiler->types.end())
 			{
 				compiler->types[name] = this;
@@ -283,7 +285,7 @@ void Type::Load(Compilation* compiler)
 				//compiler->Error("Whoops", Token());
 				if (iter->second != this)
 					*this = *iter->second;
-			}
+			}*/
 			//types[name] = type;
 		}
 		else
@@ -472,21 +474,26 @@ bool Type::MatchesTrait(Compilation* compiler, Trait* t)
 
 Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 {
+	//duplicate and load
+	Struct* str = new Struct;
+
+	//create a new namespace here for the struct
+	str->parent = compiler->ns;
+	compiler->ns = str;
+	
 	//register the types
 	int i = 0;
-	std::vector<std::pair<std::string, Type*>> old;
+	//std::vector<std::pair<std::string, Type*>> old;
 	for (auto ii : this->data->templates)
 	{
 		//check if traits match
 		if (types[i]->MatchesTrait(compiler, ii.first->trait) == false)
 			compiler->Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
 
-		old.push_back({ ii.second, compiler->types[ii.second] });
-		compiler->types[ii.second] = types[i++];
+		//old.push_back({ ii.second, compiler->types[ii.second] });
+		compiler->ns->members.insert({ ii.second, types[i++] });// types[ii.second] = types[i++];
 	}
 
-	//duplicate and load
-	Struct* str = new Struct;
 	//build members
 	for (auto ii : this->data->expression->members)
 	{
@@ -494,7 +501,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		{
 			auto type = compiler->LookupType(ii.variable.first.text);
 
-			str->members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
+			str->struct_members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
 		}
 	}
 
@@ -517,17 +524,17 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	auto realname = t->ToString();
 
 	//uh oh, this duplicates
-	auto res = compiler->types.find(realname);
-	if (res != compiler->types.end() && res->second && res->second->type != Types::Invalid)
+	auto res = compiler->ns->members.find(realname);// types.find(realname);
+	if (res != compiler->ns->members.end() && res->second.type == SymbolType::Type && res->second.ty->type != Types::Invalid)
 	{
 		delete t;
-		t = res->second;
-		goto exit;
+		t = res->second.ty;
+		return t;// goto exit;
 	}
-	else if (res != compiler->types.end() && res->second)
-		*res->second = *t;
+	else if (res != compiler->ns->members.end() && res->second.type == SymbolType::Type)
+		*res->second.ty = *t;
 	else
-		compiler->types[realname] = t;
+		compiler->ns->members.insert({ realname, t });// compiler->types[realname] = t;
 
 	//compile its functions
 	if (t->data->expression->members.size() > 0)
@@ -558,29 +565,8 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		expr->name = oldname;
 	}
 
-exit:
-	//restore template types
-	for (auto ii : old)
-	{
-		//need to remove everything that is using me
-		if (ii.second)
-			compiler->types[ii.first] = ii.second;
-		else
-			compiler->types.erase(compiler->types.find(ii.first));
-
-		//need to get rid of all references to it, or blam
-		auto iter = compiler->types.find(ii.first + "*");
-		if (iter != compiler->types.end())
-		{
-			compiler->types.erase(iter);
-
-			iter = compiler->types.find(ii.first + "**");
-			if (iter != compiler->types.end())
-				compiler->types.erase(iter);
-		}
-	}
-	//need to restore pointers and such as well
-	//one solution is to not cache pointers at all
+	//restore namespace
+	compiler->ns = compiler->ns->parent;
 
 	return t;
 }
@@ -665,8 +651,9 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 
 			if (fun)
 			{
+				throw 7;
 				//massive hack again, like in templates
-				std::vector<std::pair<std::string, Type*>> old;
+				/*std::vector<std::pair<std::string, Type*>> old;
 				old.push_back({ tr.second->name, context->parent->types[tr.second->name] });
 				context->parent->types[tr.second->name] = this;
 
@@ -694,7 +681,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 				context->parent->builder.SetCurrentDebugLocation(dp);
 				context->parent->builder.SetInsertPoint(rp);
 
-				fun = this->data->functions.find(name)->second;
+				fun = this->data->functions.find(name)->second;*/
 
 				break;
 			}
@@ -711,29 +698,29 @@ void Struct::Load(Compilation* compiler)
 	//add on items from parent
 	if (this->parent)
 	{
-		this->parent->Load(compiler);
+		this->parent_struct->Load(compiler);
 
-		if (this->parent->type != Types::Struct)
+		if (this->parent_struct->type != Types::Struct)
 			compiler->Error("Struct's parent must be another Struct!", *compiler->current_function->current_token);
 
 		//add its members to me
-		auto oldmem = std::move(this->members);
-		this->members.clear();
-		for (auto ii : this->parent->data->members)
-			this->members.push_back(ii);
+		auto oldmem = std::move(this->struct_members);
+		this->struct_members.clear();
+		for (auto ii : this->parent_struct->data->struct_members)
+			this->struct_members.push_back(ii);
 		for (auto ii : oldmem)
-			this->members.push_back(ii);
+			this->struct_members.push_back(ii);
 
 		//add the functions too :D
 		auto oldfuncs = std::move(this->functions);
 		this->functions.clear();
-		for (auto ii : this->parent->data->functions)
+		for (auto ii : this->parent_struct->data->functions)
 			this->functions.insert(ii);
 	}
 
 	//recursively load
 	std::vector<llvm::Type*> elementss;
-	for (auto ii : this->members)
+	for (auto ii : this->struct_members)
 	{
 		auto type = ii.type;
 		ii.type->Load(compiler);

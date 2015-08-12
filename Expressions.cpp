@@ -155,44 +155,44 @@ Type* IndexExpression::GetType(CompilerContext* context)
 		if (string && lhs.type->type == Types::Struct)
 		{
 			int index = 0;
-			for (; index < lhs.type->data->members.size(); index++)
+			for (; index < lhs.type->data->struct_members.size(); index++)
 			{
-				if (lhs.type->data->members[index].name == string->GetValue())
+				if (lhs.type->data->struct_members[index].name == string->GetValue())
 					break;
 			}
 
-			if (index >= lhs.type->data->members.size())
+			if (index >= lhs.type->data->struct_members.size())
 				context->parent->Error("Struct Member '" + string->GetValue() + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
 
-			return lhs.type->data->members[index].type;
+			return lhs.type->data->struct_members[index].type;
 		}
 		else if (this->token.type == TokenType::Dot && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
 		{
 			int index = 0;
-			for (; index < lhs.type->base->data->members.size(); index++)
+			for (; index < lhs.type->base->data->struct_members.size(); index++)
 			{
-				if (lhs.type->base->data->members[index].name == this->member.text)
+				if (lhs.type->base->data->struct_members[index].name == this->member.text)
 					break;
 			}
 
-			if (index >= lhs.type->base->data->members.size())
+			if (index >= lhs.type->base->data->struct_members.size())
 				context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->data->name + "' Not Found", this->member);
 
-			return lhs.type->base->data->members[index].type;
+			return lhs.type->base->data->struct_members[index].type;
 		}
 		else if (this->token.type == TokenType::Pointy && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && lhs.type->base->base->type == Types::Struct)
 		{
 			int index = 0;
-			for (; index < lhs.type->base->base->data->members.size(); index++)
+			for (; index < lhs.type->base->base->data->struct_members.size(); index++)
 			{
-				if (lhs.type->base->base->data->members[index].name == this->member.text)
+				if (lhs.type->base->base->data->struct_members[index].name == this->member.text)
 					break;
 			}
 
-			if (index >= lhs.type->base->base->data->members.size())
+			if (index >= lhs.type->base->base->data->struct_members.size())
 				context->parent->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->base->data->name + "' Not Found", this->member);
 
-			return lhs.type->base->base->data->members[index].type;
+			return lhs.type->base->base->data->struct_members[index].type;
 		}
 		else if ((lhs.type->type == Types::Array || lhs.type->type == Types::Pointer) && string == 0)//or pointer!!(later)
 		{
@@ -220,12 +220,12 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 
 			auto type = lhs.type->base->base;
 			int index = 0;
-			for (; index < type->data->members.size(); index++)
+			for (; index < type->data->struct_members.size(); index++)
 			{
-				if (type->data->members[index].name == this->member.text)
+				if (type->data->struct_members[index].name == this->member.text)
 					break;
 			}
-			if (index >= type->data->members.size())
+			if (index >= type->data->struct_members.size())
 			{
 				//check methods
 				auto method = type->GetMethod(this->member.text, {}, context, true);
@@ -237,7 +237,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-			return CValue(type->data->members[index].type->GetPointerType(context), loc);
+			return CValue(type->data->struct_members[index].type->GetPointerType(context), loc);
 		}
 
 		context->parent->Error("unimplemented!", this->token);
@@ -253,12 +253,12 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		if (this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
 		{
 			int index = 0;
-			for (; index < lhs.type->base->data->members.size(); index++)
+			for (; index < lhs.type->base->data->struct_members.size(); index++)
 			{
-				if (lhs.type->base->data->members[index].name == this->member.text)
+				if (lhs.type->base->data->struct_members[index].name == this->member.text)
 					break;
 			}
-			if (index >= lhs.type->base->data->members.size())
+			if (index >= lhs.type->base->data->struct_members.size())
 			{
 				//check methods
 				auto method = lhs.type->base->GetMethod(this->member.text, {}, context, true);
@@ -269,7 +269,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-			return CValue(lhs.type->base->data->members[index].type->GetPointerType(context), loc);
+			return CValue(lhs.type->base->data->struct_members[index].type->GetPointerType(context), loc);
 		}
 		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
 		{
@@ -588,8 +588,8 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 
 	if (Struct.length())
 	{
-		auto iter = context->parent->types.find(Struct);
-		if (iter->second->type == Types::Trait)
+		auto iter = context->parent->LookupType(Struct);
+		if (iter->type == Types::Trait)
 			return CValue();
 	}
 
@@ -752,7 +752,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		}
 	}
 	else
-		context->parent->functions.insert({ fname, fun });
+		context->parent->ns->members.insert({ fname, fun });
 
 	if (advlookup)
 		fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type.text);
@@ -811,8 +811,8 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		fun->name = "__" + Struct + "_" + fname;//mangled name
 
 		//add to struct
-		auto ii = context->parent->types.find(Struct);
-		if (ii == context->parent->types.end())//its new
+		auto ii = context->parent->TryLookupType(Struct);// context->parent->ns->members.find(Struct);
+		if (ii == 0)//its new
 		{
 			context->parent->Error("Not implemented!", token);
 			//str = new Type;
@@ -820,15 +820,15 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		}
 		else
 		{
-			if (ii->second->type != Types::Struct)
+			if (ii->type != Types::Struct)
 				context->parent->Error("Cannot define a function for a type that is not a struct", token);
 
-			ii->second->data->functions.insert({ fname, fun });
+			ii->data->functions.insert({ fname, fun });
 		}
 	}
 	else
 	{
-		context->parent->functions.insert({ fname, fun });
+		context->parent->ns->members.insert({ fname, fun });
 	}
 }
 
@@ -938,8 +938,8 @@ CValue StructExpression::Compile(CompilerContext* context)
 		//dont compile, just verify that all traits are valid
 		for (auto ii : *this->templates)
 		{
-			auto iter = context->parent->types.find(ii.first.text);
-			if (iter == context->parent->types.end() || iter->second->type != Types::Trait)
+			auto iter = context->parent->TryLookupType(ii.first.text);
+			if (iter == 0 || iter->type != Types::Trait)
 				context->parent->Error("Trait '" + ii.first.text + "' is not defined", ii.first);
 		}
 		return CValue();
@@ -1056,7 +1056,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 
 				//compile stuff here
 				int i = 0;
-				for (auto ii : str->data->members)
+				for (auto ii : str->data->struct_members)
 				{
 					if (ii.type->type == Types::Struct)
 					{
@@ -1138,7 +1138,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 
 				//compile stuff here
 				int i = 0;
-				for (auto ii : str->data->members)
+				for (auto ii : str->data->struct_members)
 				{
 					if (ii.type->type == Types::Struct)
 					{
@@ -1185,7 +1185,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			context->parent->builder.SetInsertPoint(iter);
 
 			int i = 0;
-			for (auto iip : str->data->members)
+			for (auto iip : str->data->struct_members)
 			{
 				if (iip.type->type == Types::Struct)
 				{
@@ -1225,7 +1225,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			context->parent->builder.SetInsertPoint(iter);
 
 			int i = 0;
-			for (auto iip : str->data->members)
+			for (auto iip : str->data->struct_members)
 			{
 				if (iip.type->type == Types::Struct)
 				{
@@ -1260,17 +1260,18 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	//build data about the struct
 	//get or add the struct type from the type table
 	Type* str = 0;
-	auto ii = context->parent->types.find(this->name.text);
-	if (ii == context->parent->types.end())//its new
+	//auto ii = context->parent->types.find(this->name.text);
+	if (true)//ii == context->parent->types.end())//its new
 	{
 		str = new Type;
-		context->parent->types[this->name.text] = str;
+		context->parent->ns->members.insert({ this->name.text, str });
+		//context->parent->types[this->name.text] = str;
 	}
 	else
 	{
-		str = ii->second;
-		if (str->type != Types::Invalid)
-			context->parent->Error("Struct '" + this->name.text + "' Already Defined", this->token);
+		//str = ii->second;
+		//if (str->type != Types::Invalid)
+			//context->parent->Error("Struct '" + this->name.text + "' Already Defined", this->token);
 	}
 
 	str->type = Types::Struct;
@@ -1278,7 +1279,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	str->data->name = this->name.text;
 	str->data->expression = this;
 	if (this->base_type.text.length())
-		str->data->parent = context->parent->AdvanceTypeLookup(this->base_type.text);
+		str->data->parent_struct = context->parent->AdvanceTypeLookup(this->base_type.text);
 	if (this->templates)
 	{
 		for (auto ii : *this->templates)
@@ -1295,7 +1296,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 			if (this->templates == 0)
 				type = context->parent->AdvanceTypeLookup(ii.variable.first.text);
 
-			str->data->members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
+			str->data->struct_members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
 		}
 		else
 		{

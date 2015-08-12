@@ -68,18 +68,19 @@ namespace Jet
 
 		JetProject* project;
 
+		Namespace* ns;
+
 		std::map<std::string, Source*> sources;
 		std::map<std::string, BlockExpression*> asts;
 
-		std::multimap<std::string, Function*> functions;
-
 		~Compilation();
 
-		//get array types inside of structs working
+		std::vector<std::pair<Namespace*, Type*>> types;//a list of all referenced types and their locations
 		Type* AdvanceTypeLookup(const std::string& name);
 
-		std::map<std::string, Type*> types;
+		//std::map<std::string, Type*> types;
 		Type* LookupType(const std::string& name);
+		Type* TryLookupType(const std::string& name);
 
 		std::map<std::string, CValue> globals;
 		CValue AddGlobal(const std::string& name, Type* t);
@@ -97,6 +98,24 @@ namespace Jet
 		void Assemble(int olevel);
 
 	private:
+
+		void ResolveTypes()
+		{
+			auto oldns = this->ns;
+			for (auto ii : this->types)
+			{
+				if (ii.second->type == Types::Invalid)
+				{
+					//resolve me
+
+					this->ns = ii.first;
+
+					auto res = this->LookupType(ii.second->name);
+					*ii.second = *res;
+				}
+			}
+			this->ns = oldns;
+		}
 
 		void Optimize(int level);
 

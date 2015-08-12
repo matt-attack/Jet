@@ -1414,6 +1414,62 @@ namespace Jet
 			visitor->Visit(this);
 		}
 	};
+	
+	class NamespaceExpression : public Expression//, public IStorableExpression
+	{
+		Token begin, end;
+		Token name;
+		Token token;
+		BlockExpression* block;
+	public:
+		NamespaceExpression(Token token, Token name, Token start, BlockExpression* block, Token end)
+		{
+			this->name = name;
+			this->begin = start;
+			this->token = token;
+			this->end = end;
+			this->block = block;
+		}
+
+		void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+		}
+
+		CValue Compile(CompilerContext* context)
+		{
+			context->SetNamespace(this->name.text);
+
+			this->block->Compile(context);
+
+			context->PopNamespace();
+
+			return CValue();
+		}
+
+		void CompileDeclarations(CompilerContext* context) 
+		{
+			context->SetNamespace(this->name.text);
+
+			this->block->CompileDeclarations(context);
+
+			context->PopNamespace();
+		}
+
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+			name.Print(output, source);
+			begin.Print(output, source);
+			block->Print(output, source);
+			end.Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
+	};
 
 	class CallExpression : public Expression
 	{
@@ -1672,13 +1728,14 @@ namespace Jet
 		{
 			//check if trait already exists, if its in the table and set as invalid, then we can just fill in the blanks
 			Trait* t;
-			auto tr = context->parent->types.find(name.text);
-			if (tr == context->parent->types.end())
+			auto tr = context->parent->ns->members.find(name.text);
+			if (tr == context->parent->ns->members.end())
 			{
 				t = new Trait;
 				Type* ty = new Type(name.text, Types::Trait);
 				ty->trait = t;
-				context->parent->types[name.text] = ty;
+				context->parent->ns->members.insert({ name.text, Symbol(ty) });
+				//context->parent->types[name.text] = ty;
 				context->parent->traits[name.text] = t;
 			}
 			//else if (tr->second->valid == false)//make sure it is set as invalid
@@ -1890,6 +1947,7 @@ namespace Jet
 		CValue Compile(CompilerContext* context)
 		{
 			context->CurrentToken(&token);
+			context->SetDebugLocation(token);
 
 			if (right)
 				context->Return(right->Compile(context));
@@ -1930,6 +1988,7 @@ namespace Jet
 		CValue Compile(CompilerContext* context)
 		{
 			context->CurrentToken(&token);
+			context->SetDebugLocation(token);
 			context->Break();
 
 			return CValue();
@@ -1962,6 +2021,7 @@ namespace Jet
 		CValue Compile(CompilerContext* context)
 		{
 			context->CurrentToken(&token);
+			context->SetDebugLocation(token);
 			context->Continue();
 
 			return CValue();
@@ -2008,7 +2068,9 @@ namespace Jet
 			if (this->Parent->Parent != 0)
 				context->parent->Error("Cannot use typedef outside of global scope", token);
 
-			context->CurrentToken(&other_type);
+			context->parent->Error("Typedef not implemented atm", token);
+
+			/*context->CurrentToken(&other_type);
 			auto type = context->parent->AdvanceTypeLookup(other_type.text);
 
 			//this can be fixed by adding a third pass over the typedefs
@@ -2020,7 +2082,7 @@ namespace Jet
 				else
 					context->parent->Error("Type '" + new_type.text + "' already defined!", new_type);
 			}
-			context->parent->types[new_type.text] = type;
+			context->parent->types[new_type.text] = type;*/
 		};
 
 		void Print(std::string& output, Source* source)

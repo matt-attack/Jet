@@ -121,6 +121,56 @@ namespace Jet
 		}
 	};
 
+	struct Namespace;
+	struct Function;
+	enum class SymbolType
+	{
+		Namespace,
+		Type,
+		Function
+	};
+	struct Symbol
+	{
+		SymbolType type : 8;
+		union
+		{
+			Namespace* ns;
+			Type* ty;
+			Function* fn;
+		};
+
+		Symbol() {}
+		Symbol(Function* fn) : fn(fn) { this->type = SymbolType::Function; }
+		Symbol(Type* ty) : ty(ty) { this->type = SymbolType::Type; }
+		Symbol(Namespace* ns) : ns(ns) { this->type = SymbolType::Namespace; }
+	};
+
+	struct Namespace
+	{
+		std::string name;
+		Namespace* parent;
+
+		std::multimap<std::string, Symbol> members;
+		//std::map<std::string, Symbol> members;
+		//std::multimap<std::string, Function*> functions;
+
+		Function* GetFunction(const std::string& name)
+		{
+			auto r = members.find(name);
+			if (r->second.type == SymbolType::Function)
+				return r->second.fn;
+			return 0;
+		}
+
+		Function* GetFunction(const std::string& name, const std::vector<CValue>& args)
+		{
+			auto r = members.find(name);
+			if (r->second.type == SymbolType::Function)
+				return r->second.fn;
+			return 0;
+		}
+	};
+
 	class Function;
 	struct Trait
 	{
@@ -136,11 +186,11 @@ namespace Jet
 	};
 
 	class StructExpression;
-	struct Struct
+	struct Struct : public Namespace
 	{
 		std::string name;
 		llvm::Type* type;
-		Type* parent;//when inheritance
+		Type* parent_struct;//when inheritance
 
 		struct StructMember
 		{
@@ -148,7 +198,7 @@ namespace Jet
 			std::string type_name;
 			Type* type;
 		};
-		std::vector<StructMember> members;//member variables
+		std::vector<StructMember> struct_members;//member variables
 
 		std::multimap<std::string, Function*> functions;//member functions
 
@@ -167,7 +217,7 @@ namespace Jet
 			template_base = 0;
 			type = 0;
 			expression = 0;
-			parent = 0;
+			parent_struct = 0;
 			loaded = false;
 		}
 

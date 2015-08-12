@@ -24,12 +24,12 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/Scalar.h"
 
-
 //lets get functions with the same name but different args working for structs
 //then add templates/generics
 namespace Jet
 {
 	//global compiler context
+
 
 	struct Scope
 	{
@@ -75,13 +75,6 @@ namespace Jet
 			return CValue(parent->IntType, llvm::ConstantInt::get(parent->context, llvm::APInt(32, value, true)));
 		}
 
-		void RegisterLocal(const std::string& name, CValue val)
-		{
-			if (this->scope->named_values.find(name) != this->scope->named_values.end())
-				this->parent->Error("Variable '" + name + "' already defined", *this->current_token);
-			this->scope->named_values[name] = val;
-		}
-
 		CValue String(const std::string& str)
 		{
 			auto fname = llvm::ConstantDataArray::getString(parent->context, str, true);
@@ -98,6 +91,13 @@ namespace Jet
 			//auto res = llvm::ConstantExpr::getGetElementPtr(FBloc, const_ptr_7_indices, "x");
 			//fname->get
 			return CValue(this->parent->LookupType("char*"), res);
+		}
+
+		void RegisterLocal(const std::string& name, CValue val)
+		{
+			if (this->scope->named_values.find(name) != this->scope->named_values.end())
+				this->parent->Error("Variable '" + name + "' already defined", *this->current_token);
+			this->scope->named_values[name] = val;
 		}
 
 		CValue GetVariable(const std::string& name)
@@ -122,11 +122,11 @@ namespace Jet
 				if (global != this->parent->globals.end())
 					return global->second;
 
-				auto function = this->parent->functions.find(name);
-				if (function != this->parent->functions.end())
+				auto function = this->parent->ns->GetFunction(name);//this->parent->functions.find(name);
+				if (function != 0)//this->parent->functions.end())
 				{
-					function->second->Load(this->parent);
-					return CValue(function->second->GetType(this->parent), function->second->f);
+					function->Load(this->parent);
+					return CValue(function->GetType(this->parent), function->f);
 				}
 
 				this->parent->Error("Undeclared identifier '" + name + "'", *current_token);
@@ -157,6 +157,26 @@ namespace Jet
 		{
 			assert(this->function->loaded);
 			this->parent->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope));
+		}
+
+		void SetNamespace(const std::string& name)
+		{
+			auto res = this->parent->ns->members.find(name);
+			if (res != this->parent->ns->members.end())
+				this->parent->ns = res->second.ns;
+
+			//create new one
+			auto ns = new Namespace;
+			ns->name = name;
+			ns->parent = this->parent->ns;
+
+			this->parent->ns->members.insert({ name, Symbol(ns) });// [name] = s;
+			this->parent->ns = ns;
+		}
+
+		void PopNamespace()
+		{
+			this->parent->ns = this->parent->ns->parent;
 		}
 
 

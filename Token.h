@@ -83,6 +83,7 @@ namespace Jet
 		Extern,
 		Struct,
 		Trait,
+		Namespace,
 
 		Const,
 

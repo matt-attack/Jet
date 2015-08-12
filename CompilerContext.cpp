@@ -8,7 +8,7 @@ using namespace Jet;
 
 CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member)
 {
-	auto iter = parent->functions.find(fname);
+	auto iter = parent->ns->GetFunction(fname);// functions.find(fname);
 	Function* func = 0;
 	if (member)
 	{
@@ -33,7 +33,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 				func = ii->second;
 		}
 	}
-	if (iter == parent->functions.end() && member == false)
+	if (iter == 0 && member == false)
 	{
 		//no function exists
 		func = new Function(fname);
@@ -56,7 +56,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		n->function = func;
 
 		if (member == false)
-			this->parent->functions.insert({ fname, func });// [fname] = func;
+			this->parent->ns->members.insert({ fname, func });// [fname] = func;
 
 		llvm::DIFile* unit = parent->debug_info.file;
 
@@ -74,13 +74,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 	else if (func == 0)
 	{
 		//select the right one
-		auto range = parent->functions.equal_range(fname);
-		for (auto ii = range.first; ii != range.second; ii++)
-		{
-			//printf("found option for %s with %i args\n", fname.c_str(), ii->second->argst.size());
-			if (ii->second->arguments.size() == args.size())
-				func = ii->second;
-		}
+		func = parent->ns->GetFunction(fname/*, args*/);// functions.equal_range(fname);
 
 		if (func == 0)
 			this->parent->Error("Function '" + fname + "' not found", *this->parent->current_function->current_token);
@@ -333,16 +327,16 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 	if (Struct == 0)
 	{
 		//global function?
-		auto iter = this->parent->functions.find(name);
-		if (iter == this->parent->functions.end())
+		auto iter = this->parent->ns->GetFunction(name);// functions.find(name);
+		if (iter == 0)//this->parent->functions.end())
 		{
 			//check if its a type, if so try and find a constructor
-			auto type = this->parent->types.find(name);// LookupType(name);
-			if (type != this->parent->types.end() && type->second->type == Types::Struct)
+			auto type = this->parent->TryLookupType(name);// types.find(name);// LookupType(name);
+			if (type != 0 && type->type == Types::Struct)
 			{
-				type->second->Load(this->parent);
+				type->Load(this->parent);
 				//look for a constructor
-				auto range = type->second->data->functions.equal_range(name);
+				auto range = type->data->functions.equal_range(name);
 				for (auto ii = range.first; ii != range.second; ii++)
 				{
 					if (ii->second->arguments.size() == args.size() + 1)
@@ -366,22 +360,16 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 			int i = name.find_first_of('<');
 			auto base_name = name.substr(0, i);
 
-			auto range = this->parent->functions.equal_range(name);
+			//auto range = this->parent->functions.equal_range(name);
 
 			//instantiate here
 			this->parent->Error("Not implemented", *this->current_token);
 
-			return range.first->second;
+			//return range.first->second;
 		}
 
 		//look for the best one
-		auto range = this->parent->functions.equal_range(name);
-		for (auto ii = range.first; ii != range.second; ii++)
-		{
-			//pick one with the right number of args
-			if (ii->second->arguments.size() == args.size())
-				fun = ii->second;
-		}
+		fun = this->parent->ns->GetFunction(name, args);// functions.equal_range(name);
 
 		if (fun && fun->templates.size() > 0)
 		{
@@ -432,15 +420,13 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 			
 			//register the types
 			int i = 0;
-			std::vector<std::pair<std::string, Type*>> old;
 			for (auto ii : fun->templates)
 			{
 				//check if traits match
 				if (templates[i]->MatchesTrait(this->parent, ii.first->trait) == false)
 					parent->Error("Type '" + templates[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *parent->current_function->current_token);
 
-				old.push_back({ ii.second, parent->types[ii.second] });
-				parent->types[ii.second] = templates[i++];
+				parent->ns->members.insert({ ii.second, templates[i++] });
 			}
 
 			//store then restore insertion point
@@ -451,28 +437,6 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 			fun->expression->CompileDeclarations(this);
 			fun->expression->DoCompile(this);
 
-			//restore types
-
-			for (auto ii : old)
-			{
-				//need to remove everything that is using me
-				if (ii.second)
-					parent->types[ii.first] = ii.second;
-				else
-					parent->types.erase(parent->types.find(ii.first));
-
-				//need to get rid of all references to it, or blam
-				auto iter = parent->types.find(ii.first + "*");
-				if (iter != parent->types.end())
-				{
-					parent->types.erase(iter);
-
-					iter = parent->types.find(ii.first + "**");
-					if (iter != parent->types.end())
-						parent->types.erase(iter);
-				}
-			}
-
 			parent->builder.SetCurrentDebugLocation(dp);
 			if (rp)
 				parent->builder.SetInsertPoint(rp);
@@ -480,7 +444,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 			fun->expression->name.text = oldname;
 
 			//time to recompile and stuff
-			return parent->functions.find(rname)->second;
+			return parent->ns->members.find(rname)->second.fn;
 		}
 		return fun;
 	}
@@ -498,11 +462,11 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 	{
 		//global function?
 		//check if its a type, if so try and find a constructor
-		auto type = this->parent->types.find(name);// LookupType(name);
-		if (type != this->parent->types.end() && type->second->type == Types::Struct)
+		auto type = this->parent->TryLookupType(name);
+		if (type != 0 && type->type == Types::Struct)
 		{
 			//look for a constructor
-			auto range = type->second->data->functions.equal_range(name);
+			auto range = type->data->functions.equal_range(name);
 			for (auto ii = range.first; ii != range.second; ii++)
 			{
 				if (ii->second->arguments.size() == args.size() + 1)
@@ -512,8 +476,8 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			{
 				//ok, we allocate, call then 
 				//allocate thing
-				type->second->Load(this->parent);
-				auto Alloca = this->parent->builder.CreateAlloca(GetType(type->second), 0, "constructortemp");
+				type->Load(this->parent);
+				auto Alloca = this->parent->builder.CreateAlloca(GetType(type), 0, "constructortemp");
 
 				std::vector<llvm::Value*> argsv;
 				int i = 1;
@@ -527,7 +491,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 				this->parent->builder.CreateCall(fun->f, argsv);
 
-				return CValue(type->second, this->parent->builder.CreateLoad(Alloca));
+				return CValue(type, this->parent->builder.CreateLoad(Alloca));
 			}
 		}
 		else

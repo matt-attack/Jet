@@ -53,19 +53,21 @@ std::string exec(const char* cmd) {
 Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), context(llvm::getGlobalContext()), project(proj)
 {
 	this->target = 0;
+	this->ns = new Namespace;
+	this->ns->parent = 0;
 
 	//insert basic types
-	types["float"] = new Type("float", Types::Float);
+	ns->members.insert({ "float", new Type("float", Types::Float) });
 	this->DoubleType = new Type("double", Types::Double);
-	types["double"] = this->DoubleType;// new Type("double", Types::Double);// &DoubleType;// new Type(Types::Float);
-	types["long"] = new Type("long", Types::Long);
+	ns->members.insert({ "double", this->DoubleType }); //types["double"] = this->DoubleType;// new Type("double", Types::Double);// &DoubleType;// new Type(Types::Float);
+	ns->members.insert({ "long", new Type("long", Types::Long) }); //types["long"] = new Type("long", Types::Long);
 	this->IntType = new Type("int", Types::Int);
-	types["int"] = this->IntType;// new Type("int", Types::Int);// &IntType;// new Type(Types::Int);
-	types["short"] = new Type("short", Types::Short);
-	types["char"] = new Type("char", Types::Char);
+	ns->members.insert({ "int", this->IntType });//types["int"] = this->IntType;// new Type("int", Types::Int);// &IntType;// new Type(Types::Int);
+	ns->members.insert({ "short", new Type("short", Types::Short) });//types["short"] = new Type("short", Types::Short);
+	ns->members.insert({ "char", new Type("char", Types::Char) });//types["char"] = new Type("char", Types::Char);
 	this->BoolType = new Type("bool", Types::Bool);// &BoolType;// new Type(Types::Bool);
-	types["bool"] = this->BoolType;
-	types["void"] = new Type("void", Types::Void);// &VoidType;// new Type(Types::Void);
+	ns->members.insert({ "bool", this->BoolType });// types["bool"] = this->BoolType;
+	ns->members.insert({ "void", new Type("void", Types::Void) });// types["void"] = new Type("void", Types::Void);// &VoidType;// new Type(Types::Void);
 }
 
 Compilation::~Compilation()
@@ -75,8 +77,8 @@ Compilation::~Compilation()
 	//if (ii.second && ii.second->type == Types::Struct)//Types::Void)//add more later
 	//delete ii.second;
 
-	for (auto ii : this->functions)
-		delete ii.second;
+	//for (auto ii : this->functions)
+	//	delete ii.second;
 
 	for (auto ii : asts)
 	{
@@ -100,8 +102,6 @@ Compilation::~Compilation()
 	//delete ii.second;
 }
 
-#include <llvm\DebugInfo\PDB\PDBContext.h>
-#include <llvm\DebugInfo\PDB\PDBSymDumper.h>
 Compilation* Compilation::Make(JetProject* project)
 {
 	Compilation* compilation = new Compilation(project);
@@ -227,6 +227,8 @@ Compilation* Compilation::Make(JetProject* project)
 		}
 	}
 
+	compilation->ResolveTypes();
+
 	//load all types
 	//for (auto ii : this->types)
 	//if (!(ii.second->type == Types::Struct && ii.second->data->templates.size()))
@@ -264,7 +266,7 @@ Compilation* Compilation::Make(JetProject* project)
 	}
 
 	//figure out how to get me working with multiple definitions
-	auto init = global->AddFunction("_jet_initializer", compilation->types["int"], {});
+	auto init = global->AddFunction("_jet_initializer", compilation->ns->members.find("int")->second.ty, {});
 	if (project->IsExecutable())
 	{
 		//this->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, init->function->scope.get()));
@@ -367,19 +369,26 @@ void Compilation::Assemble(int olevel)
 
 		//need to put this stuff in the .jlib file later
 		printf("Compiling Lib...\n");
-		std::string cmd = "llvm-ar rcs build/lib" + project->project_name + ".a ";
+
+#ifndef USE_GCC
+		std::string ar = "llvm-ar";
+#else
+		std::string ar = "ar";
+#endif
+
+		std::string cmd = ar + " rcs build/lib" + project->project_name + ".a ";
 		cmd += "build/" + project->project_name + ".o ";
 
 		for (auto ii : project->dependencies)
 		{
 			//need to extract then merge
 			//can use llvm-ar or just ar
-			std::string cm = "llvm-ar x " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
+			std::string cm = ar + " x " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
 			auto res = exec(cm.c_str());
 			printf(res.c_str());
 
 			//get a list of the extracted files
-			cm = "ar t " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
+			cm = ar + " t " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
 			res = exec(cm.c_str());
 			int i = 0;
 			while (true)
@@ -438,11 +447,12 @@ void Compilation::Optimize(int level)
 
 	OurFPM.doInitialization();
 
-	for (auto ii : this->functions)
+	throw 7;
+	/*for (auto ii : this->functions)
 	{
 		if (ii.second->f)
 			OurFPM.run(*ii.second->f);
-	}
+	}*/
 
 	//run it on member functions
 	for (auto ii : this->types)
@@ -529,21 +539,24 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	//build symbol table for export
 	printf("Building Symbol Table...\n");
 	std::string function;
-	for (auto ii : this->functions)
+	for (auto ii : this->ns->members)/// functions)
 	{
-		function += "extern fun " + ii.second->return_type->ToString() + " ";
-		function += ii.first + "(";
-		bool first = false;
-		for (auto arg : ii.second->arguments)
+		if (ii.second.type == SymbolType::Function)
 		{
-			if (first)
-				function += ",";
-			else
-				first = true;
+			function += "extern fun " + ii.second.fn->return_type->ToString() + " ";
+			function += ii.first + "(";
+			bool first = false;
+			for (auto arg : ii.second.fn->arguments)
+			{
+				if (first)
+					function += ",";
+				else
+					first = true;
 
-			function += arg.first->ToString() + " " + arg.second;
+				function += arg.first->ToString() + " " + arg.second;
+			}
+			function += ");";
 		}
-		function += ");";
 	}
 
 	std::string types;
@@ -573,7 +586,7 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 			{
 				types += "struct " + ii.second->data->name + "{";
 			}
-			for (auto var : ii.second->data->members)
+			for (auto var : ii.second->data->struct_members)
 			{
 				if (var.type == 0 || var.type->type == Types::Invalid)//its a template probably?
 				{
@@ -641,7 +654,7 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 		}
 		if (ii.second->type == Types::Trait)
 		{
-			types += "trait " + ii.first + "{";
+			types += "trait " + ii.second->trait->name + "{";
 			for (auto fun : ii.second->trait->funcs)
 			{
 				types += " fun " + fun.second->return_type->ToString() + " " + fun.first + "(";
@@ -679,8 +692,8 @@ void Compilation::OutputIR(const char* filename)
 
 Jet::Type* Compilation::AdvanceTypeLookup(const std::string& name)
 {
-	auto type = types.find(name);
-	if (type == types.end())
+	//auto type = types.find(name);
+	if (true)//type == types.end())
 	{
 		//create it, its not a basic type, todo later
 		if (name[name.length() - 1] == '*')
@@ -693,7 +706,8 @@ Jet::Type* Compilation::AdvanceTypeLookup(const std::string& name)
 			type->base = t;
 			type->type = Types::Pointer;
 
-			types[name] = type;
+			types.push_back({ this->ns, type });
+			//types[name] = type;
 			return type;
 		}
 		else if (name[name.length() - 1] == ']')
@@ -714,7 +728,8 @@ Jet::Type* Compilation::AdvanceTypeLookup(const std::string& name)
 			type->name = name;
 			type->type = Types::Array;
 			type->size = std::stoi(len);//cheat for now
-			types[name] = type;
+			types.push_back({ this->ns, type });
+			//types[name] = type;
 			return type;
 		}
 		//help im getting type duplication with templates7
@@ -723,17 +738,42 @@ Jet::Type* Compilation::AdvanceTypeLookup(const std::string& name)
 		type->name = name;
 		type->type = Types::Invalid;
 		type->data = 0;
-		types[name] = type;
+		types.push_back({ this->ns, type });
+		//types[name] = type;
 
 		return type;
 	}
-	return type->second;
+	//return type->second;
+}
+
+Jet::Type* Compilation::TryLookupType(const std::string& name)
+{
+	try
+	{
+		return this->LookupType(name);
+	}
+	catch (...)
+	{
+		return 0;
+	}
 }
 
 Jet::Type* Compilation::LookupType(const std::string& name)
 {
-	auto iter = types.find(name);
-	auto type = iter != types.end() ? iter->second : 0;
+	//look through namespaces to find it
+	auto curns = this->ns;
+	auto res = this->ns->members.find(name);
+	while (res == curns->members.end())
+	{
+		curns = curns->parent;
+		if (curns == 0)
+			break;
+
+		res = curns->members.find(name);
+	}
+
+	//auto iter = types.find(name);
+	auto type = (curns != 0 && res != curns->members.end() && res->second.type == SymbolType::Type) ? res->second.ty : 0;
 
 	if (type == 0)
 	{
@@ -752,7 +792,8 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 			type->base = t;
 			type->type = Types::Pointer;
 
-			types[name] = type;
+			curns->members.insert({ name, type });
+			//types[name] = type;
 		}
 		else if (name[name.length() - 1] == ']')
 		{
@@ -772,7 +813,8 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 			type->base = t;
 			type->type = Types::Array;
 			type->size = std::stoi(len);//cheat for now
-			types[name] = type;
+			curns->members.insert({ name, type });
+			//types[name] = type;
 		}
 		else if (name[name.length() - 1] == '>')
 		{
@@ -798,21 +840,12 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 			} while (name[p++] != '>');
 
 			//look up the base, and lets instantiate it
-			auto t = this->types.find(base);
-			if (t == this->types.end())
-				Error("Reference To Undefined Type '" + base + "'", *this->current_function->current_token);
+			throw 7;
+			//auto t = this->types.find(base);
+			//if (t == this->types.end())
+				//Error("Reference To Undefined Type '" + base + "'", *this->current_function->current_token);
 
-			Type* res = t->second->Instantiate(this, types);
-			//resolve the type name down to basics
-			//see if the actual thing already exists
-			//auto realname = res->ToString();
-			//auto f = this->types.find(realname);
-			//if (f != this->types.end())
-			//	res = f->second;// printf("already exists");
-			//else
-			//this->types[realname] = res;
-
-			type = res;
+			//type = t->second->Instantiate(this, types);
 		}
 		else if (name[name.length() - 1] == ')')
 		{
@@ -866,8 +899,9 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 			type->name = name;
 			type->function = t;
 			type->type = Types::Function;
-
-			types[name] = type;
+			fix this
+			curns->members.insert({ name, type });
+			//types[name] = type;
 		}
 		else
 		{

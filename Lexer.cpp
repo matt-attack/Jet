@@ -122,6 +122,7 @@ public:
 
 		keywords["extern"] = TokenType::Extern;
 		keywords["struct"] = TokenType::Struct;
+		keywords["namespace"] = TokenType::Namespace;
 
 		//internal "functions"
 		keywords["sizeof"] = TokenType::SizeOf;
