@@ -48,6 +48,8 @@ public:
 		operators[":"] = TokenType::Colon;
 		operators[";"] = TokenType::Semicolon;
 		operators[","] = TokenType::Comma;
+		
+		operators["::"] = TokenType::Scope;
 
 		operators["++"] = TokenType::Increment;
 		operators["--"] = TokenType::Decrement;

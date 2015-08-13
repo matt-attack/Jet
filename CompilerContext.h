@@ -163,7 +163,10 @@ namespace Jet
 		{
 			auto res = this->parent->ns->members.find(name);
 			if (res != this->parent->ns->members.end())
+			{
 				this->parent->ns = res->second.ns;
+				return;
+			}
 
 			//create new one
 			auto ns = new Namespace;

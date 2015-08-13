@@ -54,6 +54,8 @@ namespace Jet
 
 		CompilerContext* current_function;
 
+		Namespace* global;
+
 		Compilation(JetProject* proj);
 	public:
 		//dont use these k
@@ -75,11 +77,11 @@ namespace Jet
 
 		~Compilation();
 
-		std::vector<std::pair<Namespace*, Type*>> types;//a list of all referenced types and their locations
-		Type* AdvanceTypeLookup(const std::string& name);
+		std::vector<std::pair<Namespace*, Type**>> types;//a list of all referenced types and their locations
+		void AdvanceTypeLookup(Type** dest, const std::string& name);
 
 		//std::map<std::string, Type*> types;
-		Type* LookupType(const std::string& name);
+		Type* LookupType(const std::string& name, bool load = true);
 		Type* TryLookupType(const std::string& name);
 
 		std::map<std::string, CValue> globals;
@@ -99,19 +101,42 @@ namespace Jet
 
 	private:
 
+		Function* GetFunction(const std::string& name, const std::vector<CValue>& args)
+		{
+			return this->GetFunction(name);
+		}
+
+		Function* GetFunction(const std::string& name)
+		{
+			auto r = this->ns->members.find(name);
+			if (r != this->ns->members.end() && r->second.type == SymbolType::Function)
+				return r->second.fn;
+			//try lower one
+			auto next = this->ns->parent;
+			while (next)
+			{
+				r = next->members.find(name);
+				if (r != next->members.end() && r->second.type == SymbolType::Function)
+					return r->second.fn;
+
+				next = next->parent;
+			}
+			return 0;
+		}
+
 		void ResolveTypes()
 		{
 			auto oldns = this->ns;
-			for (auto ii : this->types)
+			for (int i = 0; i < this->types.size(); i++)// auto ii : this->types)
 			{
-				if (ii.second->type == Types::Invalid)
+				if ((*types[i].second)->type == Types::Invalid)
 				{
 					//resolve me
 
-					this->ns = ii.first;
+					this->ns = types[i].first;
 
-					auto res = this->LookupType(ii.second->name);
-					*ii.second = *res;
+					auto res = this->LookupType((*types[i].second)->name, false);
+					*types[i].second = res;
 				}
 			}
 			this->ns = oldns;

@@ -85,6 +85,8 @@ namespace Jet
 		Trait,
 		Namespace,
 
+		Scope,//::
+
 		Const,
 
 		Swap,

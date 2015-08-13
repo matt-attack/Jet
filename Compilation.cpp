@@ -55,6 +55,7 @@ Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), 
 	this->target = 0;
 	this->ns = new Namespace;
 	this->ns->parent = 0;
+	this->global = this->ns;
 
 	//insert basic types
 	ns->members.insert({ "float", new Type("float", Types::Float) });
@@ -160,7 +161,7 @@ Compilation* Compilation::Make(JetProject* project)
 	auto global = new CompilerContext(compilation);
 
 	compilation->sources = project->GetSources();
-	
+
 	//read in symbols from lib
 	std::vector<Expression*> symbol_asts;
 	std::vector<Source*> symbol_sources;
@@ -323,7 +324,7 @@ void Compilation::Assemble(int olevel)
 	//output the IR for debugging
 	this->OutputIR("build/output.ir");
 
-	
+
 
 	//then, if and only if I am an executable, make the .exe
 	if (project->IsExecutable())
@@ -450,22 +451,22 @@ void Compilation::Optimize(int level)
 	throw 7;
 	/*for (auto ii : this->functions)
 	{
-		if (ii.second->f)
-			OurFPM.run(*ii.second->f);
+	if (ii.second->f)
+	OurFPM.run(*ii.second->f);
 	}*/
 
 	//run it on member functions
-	for (auto ii : this->types)
+	/*for (auto ii : this->types)
 	{
-		if (ii.second && ii.second->type == Types::Struct)
-		{
-			for (auto fun : ii.second->data->functions)
-			{
-				if (fun.second->f)
-					OurFPM.run(*fun.second->f);
-			}
-		}
+	if (ii.second && ii.second->type == Types::Struct)
+	{
+	for (auto fun : ii.second->data->functions)
+	{
+	if (fun.second->f)
+	OurFPM.run(*fun.second->f);
 	}
+	}
+	}*/
 }
 
 void Compilation::SetTarget()
@@ -512,7 +513,7 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	//no idea what this does LOL
 	//llvm::TargetLibraryInfo *TLI = new llvm::TargetLibraryInfo::;
 	//if (true)
-		//TLI->disableAllFunctions();
+	//TLI->disableAllFunctions();
 	//MPM.add(TLI);
 	if (o_level > 0)
 	{
@@ -560,119 +561,108 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	}
 
 	std::string types;
-	for (auto ii : this->types)
+	/*for (auto ii : this->types)
 	{
-		if (ii.second == 0)
-			continue;
-		if (ii.second->type == Types::Struct)
-		{
-			if (ii.second->data->template_base)
-				continue;//dont bother exporting instantiated templates for now
+	if (ii.second == 0)
+	continue;
+	if (ii.second->type == Types::Struct)
+	{
+	if (ii.second->data->template_base)
+	continue;//dont bother exporting instantiated templates for now
 
-			//export me
-			if (ii.second->data->templates.size() > 0)
-			{
-				types += "struct " + ii.second->data->name + "<";
-				for (int i = 0; i < ii.second->data->templates.size(); i++)
-				{
-					types += ii.second->data->templates[i].first->name + " ";
-					types += ii.second->data->templates[i].second;
-					if (i < ii.second->data->templates.size() - 1)
-						types += ',';
-				}
-				types += ">{";
-			}
-			else
-			{
-				types += "struct " + ii.second->data->name + "{";
-			}
-			for (auto var : ii.second->data->struct_members)
-			{
-				if (var.type == 0 || var.type->type == Types::Invalid)//its a template probably?
-				{
-					types += var.type_name + " ";
-					types += var.name + ";";
-				}
-				else if (var.type->type == Types::Array)
-				{
-					types += var.type->base->ToString() + " ";
-					types += var.name + "[" + std::to_string(var.type->size) + "];";
-				}
-				else
-				{
-					types += var.type->ToString() + " ";
-					types += var.name + ";";
-				}
-			}
-
-			if (ii.second->data->templates.size() > 0 && ii.second->data->template_base == 0)
-			{
-				//output member functions somehow?
-				for (auto fun : ii.second->data->functions)
-				{
-					if (fun.second->expression == 0)
-						continue;
-					/*types += "fun " + fun.second->return_type->name + " " + fun.first + "(";
-					bool first = false;
-					for (int i = 1; i < fun.second->argst.size(); i++)/// auto arg : fun.second->argst)
-					{
-					if (first)
-					function += ",";
-					else
-					first = true;
-
-					function += fun.second->argst[i].first->ToString() + " " + fun.second->argst[i].second;
-					}
-					types += ") {}";*/
-					std::string source;
-					fun.second->expression->Print(source, current_source);
-					types += source;
-					//printf("%s", source.c_str());
-				}
-				types += "}";
-				continue;
-			}
-			types += "}";
-
-			//output member functions
-			for (auto fun : ii.second->data->functions)
-			{
-				function += "extern fun " + fun.second->return_type->ToString() + " " + ii.second->data->name + "::";
-				function += fun.first + "(";
-				bool first = false;
-				for (int i = 1; i < fun.second->arguments.size(); i++)
-				{
-					if (first)
-						function += ",";
-					else
-						first = true;
-
-					function += fun.second->arguments[i].first->ToString() + " " + fun.second->arguments[i].second;
-				}
-				function += ");";
-			}
-		}
-		if (ii.second->type == Types::Trait)
-		{
-			types += "trait " + ii.second->trait->name + "{";
-			for (auto fun : ii.second->trait->funcs)
-			{
-				types += " fun " + fun.second->return_type->ToString() + " " + fun.first + "(";
-				bool first = false;
-				for (auto arg : fun.second->arguments)
-				{
-					if (first)
-						types += ",";
-					else
-						first = true;
-
-					types += arg.first->ToString() + " " + arg.second;
-				}
-				types += ");";
-			}
-			types += "}";
-		}
+	//export me
+	if (ii.second->data->templates.size() > 0)
+	{
+	types += "struct " + ii.second->data->name + "<";
+	for (int i = 0; i < ii.second->data->templates.size(); i++)
+	{
+	types += ii.second->data->templates[i].first->name + " ";
+	types += ii.second->data->templates[i].second;
+	if (i < ii.second->data->templates.size() - 1)
+	types += ',';
 	}
+	types += ">{";
+	}
+	else
+	{
+	types += "struct " + ii.second->data->name + "{";
+	}
+	for (auto var : ii.second->data->struct_members)
+	{
+	if (var.type == 0 || var.type->type == Types::Invalid)//its a template probably?
+	{
+	types += var.type_name + " ";
+	types += var.name + ";";
+	}
+	else if (var.type->type == Types::Array)
+	{
+	types += var.type->base->ToString() + " ";
+	types += var.name + "[" + std::to_string(var.type->size) + "];";
+	}
+	else
+	{
+	types += var.type->ToString() + " ";
+	types += var.name + ";";
+	}
+	}
+
+	if (ii.second->data->templates.size() > 0 && ii.second->data->template_base == 0)
+	{
+	//output member functions somehow?
+	for (auto fun : ii.second->data->functions)
+	{
+	if (fun.second->expression == 0)
+	continue;
+
+	std::string source;
+	fun.second->expression->Print(source, current_source);
+	types += source;
+	//printf("%s", source.c_str());
+	}
+	types += "}";
+	continue;
+	}
+	types += "}";
+
+	//output member functions
+	for (auto fun : ii.second->data->functions)
+	{
+	function += "extern fun " + fun.second->return_type->ToString() + " " + ii.second->data->name + "::";
+	function += fun.first + "(";
+	bool first = false;
+	for (int i = 1; i < fun.second->arguments.size(); i++)
+	{
+	if (first)
+	function += ",";
+	else
+	first = true;
+
+	function += fun.second->arguments[i].first->ToString() + " " + fun.second->arguments[i].second;
+	}
+	function += ");";
+	}
+	}
+	if (ii.second->type == Types::Trait)
+	{
+	types += "trait " + ii.second->trait->name + "{";
+	for (auto fun : ii.second->trait->funcs)
+	{
+	types += " fun " + fun.second->return_type->ToString() + " " + fun.first + "(";
+	bool first = false;
+	for (auto arg : fun.second->arguments)
+	{
+	if (first)
+	types += ",";
+	else
+	first = true;
+
+	types += arg.first->ToString() + " " + arg.second;
+	}
+	types += ");";
+	}
+	types += "}";
+	}
+	}*/
 
 	//todo: only do this if im a library
 	std::ofstream stable("build/symbols.jlib", std::ios_base::binary);
@@ -690,59 +680,71 @@ void Compilation::OutputIR(const char* filename)
 	module->print(str, &writer);
 }
 
-Jet::Type* Compilation::AdvanceTypeLookup(const std::string& name)
+void Compilation::AdvanceTypeLookup(Jet::Type** dest, const std::string& name)
 {
 	//auto type = types.find(name);
-	if (true)//type == types.end())
+	/*if (false)//true)//type == types.end())
 	{
-		//create it, its not a basic type, todo later
-		if (name[name.length() - 1] == '*')
-		{
-			//its a pointer
-			auto t = this->AdvanceTypeLookup(name.substr(0, name.length() - 1));
+	//create it, its not a basic type, todo later
+	if (name[name.length() - 1] == '*')
+	{
+	//its a pointer
+	auto t = this->AdvanceTypeLookup(name.substr(0, name.length() - 1));
 
-			Type* type = new Type;
-			type->name = name;
-			type->base = t;
-			type->type = Types::Pointer;
+	Type* type = new Type;
+	type->name = name;
+	type->base = t;
+	type->type = Types::Pointer;
 
-			types.push_back({ this->ns, type });
-			//types[name] = type;
-			return type;
-		}
-		else if (name[name.length() - 1] == ']')
-		{
-			//its an array
-			int p = 0;
-			for (p = 0; p < name.length(); p++)
-				if (name[p] == '[')
-					break;
-
-			auto len = name.substr(p + 1, name.length() - p - 2);
-
-			auto tname = name.substr(0, p);
-			auto t = this->LookupType(tname);
-
-			Type* type = new Type;
-			type->base = t;
-			type->name = name;
-			type->type = Types::Array;
-			type->size = std::stoi(len);//cheat for now
-			types.push_back({ this->ns, type });
-			//types[name] = type;
-			return type;
-		}
-		//help im getting type duplication with templates7
-		//who knows what type it is, create a dummy one
-		Type* type = new Type;
-		type->name = name;
-		type->type = Types::Invalid;
-		type->data = 0;
-		types.push_back({ this->ns, type });
-		//types[name] = type;
-
-		return type;
+	types.push_back({ this->ns, type });
+	//types[name] = type;
+	return type;
 	}
+	else if (name[name.length() - 1] == ']')
+	{
+	//its an array
+	int p = 0;
+	for (p = 0; p < name.length(); p++)
+	if (name[p] == '[')
+	break;
+
+	auto len = name.substr(p + 1, name.length() - p - 2);
+
+	auto tname = name.substr(0, p);
+	auto t = this->LookupType(tname);
+
+	Type* type = new Type;
+	type->base = t;
+	type->name = name;
+	type->type = Types::Array;
+	type->size = std::stoi(len);//cheat for now
+	types.push_back({ this->ns, type });
+	//types[name] = type;
+	return type;
+	}
+	//help im getting type duplication with templates7
+	//who knows what type it is, create a dummy one
+	Type* type = new Type;
+	type->name = name;
+	type->type = Types::Invalid;
+	type->data = 0;
+	types.push_back({ this->ns, type });
+	//types[name] = type;
+
+	return type;
+	}*/
+
+	//help im getting type duplication with templates7
+	//who knows what type it is, create a dummy one
+	Type* type = new Type;
+	type->name = name;
+	type->type = Types::Invalid;
+	type->data = 0;
+	type->ns = this->ns;
+	types.push_back({ this->ns, dest });
+	//types[name] = type;
+	*dest = type;
+	//return type;
 	//return type->second;
 }
 
@@ -758,8 +760,22 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 	}
 }
 
-Jet::Type* Compilation::LookupType(const std::string& name)
+Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 {
+	auto pos = name.find_first_of("::");
+	if (pos != -1)
+	{
+		//navigate to correct namespace
+		std::string ns = name.substr(0, pos);
+		auto res = this->ns->members.find(ns);
+		auto old = this->ns;
+		this->ns = res->second.ns;
+		auto out = this->LookupType(name.substr(pos + 2), load);
+		this->ns = old;
+
+		return out;
+	}
+
 	//look through namespaces to find it
 	auto curns = this->ns;
 	auto res = this->ns->members.find(name);
@@ -785,14 +801,19 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 		else if (name[name.length() - 1] == '*')
 		{
 			//its a pointer
-			auto t = this->LookupType(name.substr(0, name.length() - 1));
+			auto t = this->LookupType(name.substr(0, name.length() - 1), load);
 
 			type = new Type;
 			type->name = name;
 			type->base = t;
 			type->type = Types::Pointer;
 
-			curns->members.insert({ name, type });
+			if (load)
+				type->Load(this);
+			else
+				type->ns = type->base->ns;
+			type->base->ns->members.insert({ name, type });
+			//this->ns->members.insert({ name, type });
 			//types[name] = type;
 		}
 		else if (name[name.length() - 1] == ']')
@@ -806,7 +827,7 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 			auto len = name.substr(p + 1, name.length() - p - 2);
 
 			auto tname = name.substr(0, p);
-			auto t = this->LookupType(tname);
+			auto t = this->LookupType(tname, load);
 
 			type = new Type;
 			type->name = name;
@@ -835,17 +856,17 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 				//lets cheat for the moment ok
 				std::string subtype = ParseType(name.c_str(), p);
 
-				Type* t = this->LookupType(subtype);
+				Type* t = this->LookupType(subtype, load);
 				types.push_back(t);
 			} while (name[p++] != '>');
 
 			//look up the base, and lets instantiate it
-			throw 7;
-			//auto t = this->types.find(base);
+			//throw 7;
+			auto t = this->LookupType(base, false);// this->types.find(base);
 			//if (t == this->types.end())
-				//Error("Reference To Undefined Type '" + base + "'", *this->current_function->current_token);
+			//Error("Reference To Undefined Type '" + base + "'", *this->current_function->current_token);
 
-			//type = t->second->Instantiate(this, types);
+			type = t->Instantiate(this, types);
 		}
 		else if (name[name.length() - 1] == ')')
 		{
@@ -853,7 +874,7 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 			int p = 0;
 			int sl = 0;
 			int bl = 0;
-			for (p = name.length()-1; p >= 0; p--)
+			for (p = name.length() - 1; p >= 0; p--)
 			{
 				switch (name[p])
 				{
@@ -875,7 +896,7 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 			}
 
 			std::string ret_type = name.substr(0, p);
-			auto rtype = this->LookupType(ret_type);
+			auto rtype = this->LookupType(ret_type, load);
 
 			std::vector<Type*> args;
 			//parse types
@@ -885,7 +906,7 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 				//lets cheat for the moment ok
 				std::string subtype = ParseType(name.c_str(), p);
 
-				Type* t = this->LookupType(subtype);
+				Type* t = this->LookupType(subtype, load);
 				args.push_back(t);
 				if (name[p] == ',')
 					p++;
@@ -899,8 +920,8 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 			type->name = name;
 			type->function = t;
 			type->type = Types::Function;
-			fix this
-			curns->members.insert({ name, type });
+
+			global->members.insert({ name, type });
 			//types[name] = type;
 		}
 		else
@@ -910,10 +931,15 @@ Jet::Type* Compilation::LookupType(const std::string& name)
 	}
 
 	//load it if it hasnt been loaded
-	if (type->loaded == false)
+	if (load && type->loaded == false)
 	{
+		type->ns = curns;
 		type->Load(this);
 		type->loaded = true;
+	}
+	else if (type->loaded == false)
+	{
+		type->ns = curns;
 	}
 
 	return type;

@@ -150,6 +150,17 @@ namespace Jet
 		}
 	};
 
+	class ScopeParselet : public InfixParselet
+	{
+	public:
+		Expression* parse(Parser* parser, Expression* left, Token token);
+
+		int getPrecedence()
+		{
+			return Precedence::ASSIGNMENT;
+		}
+	};
+
 	class OperatorAssignParselet: public InfixParselet
 	{
 	public:
@@ -468,7 +479,7 @@ namespace Jet
 	public:
 		NamespaceParselet()
 		{
-			this->TrailingSemicolon = true;
+			this->TrailingSemicolon = false;
 		}
 
 		Expression* parse(Parser* parser, Token token);

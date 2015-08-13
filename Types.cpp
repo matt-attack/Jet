@@ -13,7 +13,11 @@ Type Jet::VoidType("void", Types::Void);
 
 Type* Type::GetPointerType(CompilerContext* context)
 {
-	return context->parent->LookupType(this->ToString() + "*");
+	auto old = context->parent->ns;
+	context->parent->ns = this->ns;
+	auto tmp = context->parent->LookupType(this->ToString() + "*");
+	context->parent->ns = old;
+	return tmp;
 }
 
 llvm::DIType* Type::GetDebugType(Compilation* compiler)
@@ -195,7 +199,7 @@ void Type::Load(Compilation* compiler)
 						p++;
 					} while (name[p] != ',' && name[p] != '>');
 
-					Type* t = compiler->AdvanceTypeLookup(subtype);
+					Type* t = compiler->LookupType(subtype);// AdvanceTypeLookup(subtype);
 					types.push_back(t);
 				} while (name[p++] != '>');
 
@@ -295,6 +299,7 @@ void Type::Load(Compilation* compiler)
 	{
 		//load recursively
 		this->base->Load(compiler);
+		this->ns = this->base->ns;
 	}
 	this->loaded = true;
 }
@@ -484,8 +489,16 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	//register the types
 	int i = 0;
 	//std::vector<std::pair<std::string, Type*>> old;
-	for (auto ii : this->data->templates)
+	for (auto& ii : this->data->templates)
 	{
+		if (ii.first->trait == 0)
+		{
+			//need to make sure to load the trait
+			auto oldns = compiler->ns;
+			compiler->ns = ii.first->ns;
+			ii.first->trait = compiler->LookupType(ii.first->name)->trait;
+			compiler->ns = oldns;
+		}
 		//check if traits match
 		if (types[i]->MatchesTrait(compiler, ii.first->trait) == false)
 			compiler->Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
@@ -519,6 +532,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 
 	Type* t = new Type(str->name, Types::Struct, str);
 	t->Load(compiler);
+	t->ns = this->ns;
 
 	//make sure the real thing is stored as this
 	auto realname = t->ToString();
@@ -553,11 +567,12 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 
 		expr->AddConstructorDeclarations(t, compiler->current_function);
 
-		for (auto ii : t->data->expression->members)
-			if (ii.type == StructMember::FunctionMember)
-				ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
+		//need to delay compilation
+		//for (auto ii : t->data->expression->members)
+		//	if (ii.type == StructMember::FunctionMember)
+		//		ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
 
-		expr->AddConstructors(compiler->current_function);
+		//expr->AddConstructors(compiler->current_function);
 
 		compiler->builder.SetCurrentDebugLocation(dp);
 		if (rp)
@@ -696,7 +711,7 @@ void Struct::Load(Compilation* compiler)
 		return;
 
 	//add on items from parent
-	if (this->parent)
+	if (this->parent_struct)
 	{
 		this->parent_struct->Load(compiler);
 

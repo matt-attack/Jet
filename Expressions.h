@@ -91,6 +91,53 @@ namespace Jet
 		}
 	};
 
+	class ScopedExpression : public Expression
+	{
+
+	public:
+		Token token;
+		Expression* left, *right;
+
+		ScopedExpression(Token tok, Expression* left, Expression* right) : left(left), right(right)
+		{
+			this->token = tok;
+		}
+
+		std::string GetName()
+		{
+			return token.text;
+		}
+
+		CValue Compile(CompilerContext* context)
+		{
+			auto v = dynamic_cast<NameExpression*>(left);
+			if (v == 0)
+				context->parent->Error("Invalid Namespace", this->token);
+
+			context->SetNamespace(v->GetName());
+
+			right->Compile(context);
+
+			context->PopNamespace();
+
+			return CValue();
+		}
+
+		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			left->Print(output, source);
+			token.Print(output, source);
+			right->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			//visitor->Visit(this);
+		}
+	};
+
 	/*class ArrayExpression: public Expression
 	{
 	std::vector<Expression*> initializers;
@@ -1414,7 +1461,7 @@ namespace Jet
 			visitor->Visit(this);
 		}
 	};
-	
+
 	class NamespaceExpression : public Expression//, public IStorableExpression
 	{
 		Token begin, end;
@@ -1447,7 +1494,7 @@ namespace Jet
 			return CValue();
 		}
 
-		void CompileDeclarations(CompilerContext* context) 
+		void CompileDeclarations(CompilerContext* context)
 		{
 			context->SetNamespace(this->name.text);
 
@@ -1747,18 +1794,32 @@ namespace Jet
 			for (auto ii : this->funcs)
 			{
 				Function* func = new Function("");
-				func->return_type = context->parent->AdvanceTypeLookup(ii.ret_type.text);
+				/*func->return_type = */context->parent->AdvanceTypeLookup(&func->return_type, ii.ret_type.text);
+				func->arguments.reserve(ii.args.size());
 				for (auto arg : ii.args)
-					func->arguments.push_back({ context->parent->AdvanceTypeLookup(arg.text), "dummy" });
+				{
+					func->arguments.push_back({ 0, "dummy" });
+					context->parent->AdvanceTypeLookup(&func->arguments.back().first, arg.text);
+				}
+					//func->arguments.push_back({ context->parent->AdvanceTypeLookup(arg.text), "dummy" });
 
 				t->funcs.insert({ ii.name.text, func });
 			}
 			if (this->templates)
 			{
+				t->templates.reserve(this->templates->size());
+
 				for (auto ii : *this->templates)
 				{
-					auto trait = ii.first.text.length() ? context->parent->AdvanceTypeLookup(ii.first.text) : 0;
-					t->templates.push_back({ trait, ii.second.text });
+					if (ii.first.text.length() == 0)
+						t->templates.push_back({ 0, ii.second.text });
+					else
+					{
+						t->templates.push_back({ 0, ii.second.text });
+						context->parent->AdvanceTypeLookup(&t->templates.back().first, ii.first.text);
+						//auto trait = context->parent->AdvanceTypeLookup(ii.first.text);
+						//t->templates.push_back({ trait, ii.second.text });
+					}
 				}
 			}
 		}
@@ -2077,10 +2138,10 @@ namespace Jet
 			auto iter = context->parent->types.find(new_type.text);
 			if (iter != context->parent->types.end())
 			{
-				if (iter->second->type == Types::Invalid)
-					context->parent->Error("Please place the typedef before it is used, after is not yet handled properly.", new_type);
-				else
-					context->parent->Error("Type '" + new_type.text + "' already defined!", new_type);
+			if (iter->second->type == Types::Invalid)
+			context->parent->Error("Please place the typedef before it is used, after is not yet handled properly.", new_type);
+			else
+			context->parent->Error("Type '" + new_type.text + "' already defined!", new_type);
 			}
 			context->parent->types[new_type.text] = type;*/
 		};

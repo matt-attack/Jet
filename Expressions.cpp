@@ -734,17 +734,18 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	bool is_trait = false;
 	if (str.length() > 0)
 	{
-		auto type = context->parent->AdvanceTypeLookup(str);
+		//ok, need to look up type without loading it....
+		auto type = context->parent->LookupType(str, false);// AdvanceTypeLookup(str);
 		if (type->type == Types::Trait)
 		{
 			type->Load(context->parent);
 			type->trait->extension_methods.insert({ fname, fun });
 			is_trait = true;
 		}
-		else if (type->type == Types::Invalid)
-		{
-			context->parent->Error("Type '" + str + "' not defined", *context->current_token);
-		}
+		//else if (type->type == Types::Invalid)
+		//{
+		//	context->parent->Error("Type '" + str + "' not defined", *context->current_token);
+		//}
 		else
 		{
 			type->data->functions.insert({ fname, fun });
@@ -755,18 +756,20 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		context->parent->ns->members.insert({ fname, fun });
 
 	if (advlookup)
-		fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type.text);
+		/*fun->return_type = */context->parent->AdvanceTypeLookup(&fun->return_type, this->ret_type.text);
 	else
-		fun->return_type = context->parent->LookupType(this->ret_type.text);
+		fun->return_type = context->parent->LookupType(this->ret_type.text, false);
 
 	if (str.length() > 0)//im a member function
 	{
 		//insert first arg, which is me
 		Type* type = 0;
-		if (is_trait == false)
-			type = context->parent->AdvanceTypeLookup(str + "*");
+		//if (is_trait == false)
+		//	type = context->parent->AdvanceTypeLookup(str + "*");
 
 		fun->arguments.push_back({ type, "this" });
+		if (is_trait == false)
+			context->parent->AdvanceTypeLookup(&fun->arguments.back().first, str + "*");
 	}
 
 	if (this->templates)
@@ -775,15 +778,18 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			fun->templates.push_back({ context->parent->LookupType(ii.first.text), ii.second.text });
 	}
 
+	fun->arguments.reserve(this->args->size());
 	for (auto ii : *this->args)
 	{
 		Type* type = 0;
-		if (advlookup)
-			type = context->parent->AdvanceTypeLookup(ii.first);
-		else
+		//if (advlookup)
+		//type = context->parent->AdvanceTypeLookup(ii.first);
+		if (!advlookup)//else
 			type = context->parent->LookupType(ii.first);
 
 		fun->arguments.push_back({ type, ii.second });
+		if (advlookup)
+			/*type = */context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first);
 	}
 }
 
@@ -797,12 +803,13 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	std::string fname = name.text;
 
 	Function* fun = new Function(fname);
-	fun->return_type = context->parent->AdvanceTypeLookup(this->ret_type.text);
+	/*fun->return_type = */context->parent->AdvanceTypeLookup(&fun->return_type, this->ret_type.text);
 
+	fun->arguments.reserve(this->args->size());
 	for (auto ii : *this->args)
 	{
-		auto type = context->parent->AdvanceTypeLookup(ii.first);
-		fun->arguments.push_back({ type, ii.second });
+		fun->arguments.push_back({ 0, ii.second });
+		/*auto type = */context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first);
 	}
 
 	fun->f = 0;
@@ -908,7 +915,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			llvm::Instruction *Call = context->parent->debug->insertDeclare(
 				Alloca, D, context->parent->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), Alloca);
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
-			
+
 			context->parent->builder.CreateStore(val.val, Alloca);
 		}
 		else
@@ -944,6 +951,8 @@ CValue StructExpression::Compile(CompilerContext* context)
 		}
 		return CValue();
 	}
+	//set the namespace
+
 
 	for (auto ii : this->members)
 	{
@@ -976,7 +985,9 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 	{
 		auto fun = new Function("__" + str->data->name + "_" + strname);//
 		fun->return_type = &VoidType;
-		fun->arguments = { { context->parent->AdvanceTypeLookup(str->data->name + "*"), "this" } };
+		fun->arguments = { { context->parent->LookupType(str->data->name + "*", false), "this" } };
+		//fun->arguments.push_back({ 0, "this" });// = { { context->parent->AdvanceTypeLookup(str->data->name + "*"), "this" } };
+		//context->parent->AdvanceTypeLookup(&fun->arguments.back().first, str->data->name + "*");
 		fun->f = 0;
 		fun->expression = 0;
 		fun->type = (FunctionType*)-1;
@@ -986,7 +997,10 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 	{
 		auto fun = new Function("__" + str->data->name + "_~" + strname);//
 		fun->return_type = &VoidType;
-		fun->arguments = { { context->parent->AdvanceTypeLookup(str->data->name + "*"), "this" } };
+		fun->arguments = { { context->parent->LookupType(str->data->name + "*", false), "this" } };
+		//fun->arguments.push_back({ 0, "this" });// = { { context->parent->AdvanceTypeLookup(str->data->name + "*"), "this" } };
+		//context->parent->AdvanceTypeLookup(&fun->arguments.back().first, str->data->name + "*");
+		//fun->arguments = { { context->parent->AdvanceTypeLookup(str->data->name + "*"), "this" } };
 		fun->f = 0;
 		fun->expression = 0;
 		fun->type = (FunctionType*)-1;
@@ -1180,7 +1194,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			auto dp = context->parent->builder.getCurrentDebugLocation();
 
 			auto iter = ii.second->f->getBasicBlockList().begin()->begin();
-			for (int i = 0; i < ii.second->arguments.size()*3; i++)
+			for (int i = 0; i < ii.second->arguments.size() * 3; i++)
 				iter++;
 			context->parent->builder.SetInsertPoint(iter);
 
@@ -1237,7 +1251,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 						{
 							auto myself = ii.second->context->Load("this");
 							std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(i) };
-							
+
 							auto gep = context->parent->builder.CreateGEP(myself.val, iindex, "getmember");
 							iii->second->Load(context->parent);
 
@@ -1271,7 +1285,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	{
 		//str = ii->second;
 		//if (str->type != Types::Invalid)
-			//context->parent->Error("Struct '" + this->name.text + "' Already Defined", this->token);
+		//context->parent->Error("Struct '" + this->name.text + "' Already Defined", this->token);
 	}
 
 	str->type = Types::Struct;
@@ -1279,24 +1293,36 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	str->data->name = this->name.text;
 	str->data->expression = this;
 	if (this->base_type.text.length())
-		str->data->parent_struct = context->parent->AdvanceTypeLookup(this->base_type.text);
+		/*str->data->parent_struct =*/ context->parent->AdvanceTypeLookup(&str->data->parent_struct, this->base_type.text);
 	if (this->templates)
 	{
+		str->data->templates.reserve(this->templates->size());
 		for (auto ii : *this->templates)
-			str->data->templates.push_back({ context->parent->AdvanceTypeLookup(ii.first.text), ii.second.text });
+		{
+			str->data->templates.push_back({ 0/*context->parent->AdvanceTypeLookup(ii.first.text)*/, ii.second.text });
+			context->parent->AdvanceTypeLookup(&str->data->templates.back().first, ii.first.text);
+		}
 	}
 
 	//register the templates as a type, so all the members end up with the same type
-
+	int size = 0;
+	for (auto ii : this->members)
+	{
+		if (ii.type == StructMember::VariableMember)
+			size++;
+	}
+	str->data->struct_members.reserve(size);
 	for (auto ii : this->members)
 	{
 		if (ii.type == StructMember::VariableMember)
 		{
 			Type* type = 0;
-			if (this->templates == 0)
-				type = context->parent->AdvanceTypeLookup(ii.variable.first.text);
+			//if (this->templates == 0)
+				//type = context->parent->AdvanceTypeLookup(ii.variable.first.text);
 
 			str->data->struct_members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
+			if (this->templates == 0)
+				context->parent->AdvanceTypeLookup(&str->data->struct_members.back().type, ii.variable.first.text);
 		}
 		else
 		{

@@ -65,6 +65,9 @@ namespace Jet
 	struct Trait;
 	struct FunctionType;
 	struct Function;
+	struct Namespace;
+
+	//ok, NEVER compare these based on 
 	class Type
 	{
 		std::vector<std::pair<Type**, Trait*>> traits;//all the traits that apply to this type
@@ -83,7 +86,7 @@ namespace Jet
 		unsigned int size;//for arrays
 
 		std::string name;
-
+		Namespace* ns;
 
 		std::vector<std::pair<Type**, Trait*>> GetTraits(Compilation* compiler);
 		bool MatchesTrait(Compilation* compiler, Trait* trait);
@@ -157,7 +160,7 @@ namespace Jet
 		Function* GetFunction(const std::string& name)
 		{
 			auto r = members.find(name);
-			if (r->second.type == SymbolType::Function)
+			if (r != members.end() && r->second.type == SymbolType::Function)
 				return r->second.fn;
 			return 0;
 		}
@@ -165,7 +168,7 @@ namespace Jet
 		Function* GetFunction(const std::string& name, const std::vector<CValue>& args)
 		{
 			auto r = members.find(name);
-			if (r->second.type == SymbolType::Function)
+			if (r != members.end() && r->second.type == SymbolType::Function)
 				return r->second.fn;
 			return 0;
 		}
@@ -253,8 +256,9 @@ namespace Jet
 		Type* return_type;
 
 		CompilerContext* context;
-		llvm::Function* f;//not always used
 
+
+		llvm::Function* f;//not always used
 		llvm::DISubprogram* scope;
 
 		

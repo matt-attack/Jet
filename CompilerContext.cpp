@@ -327,7 +327,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 	if (Struct == 0)
 	{
 		//global function?
-		auto iter = this->parent->ns->GetFunction(name);// functions.find(name);
+		auto iter = this->parent->GetFunction(name);// functions.find(name);
 		if (iter == 0)//this->parent->functions.end())
 		{
 			//check if its a type, if so try and find a constructor
@@ -369,7 +369,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 		}
 
 		//look for the best one
-		fun = this->parent->ns->GetFunction(name, args);// functions.equal_range(name);
+		fun = this->parent->GetFunction(name, args);// functions.equal_range(name);
 
 		if (fun && fun->templates.size() > 0)
 		{

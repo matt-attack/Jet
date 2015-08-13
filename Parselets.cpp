@@ -12,8 +12,14 @@ Token ParseType(Parser* parser)
 	Token name = parser->Consume(TokenType::Name);
 	std::string out = name.text;
 
-	//parse templates
-	if (parser->MatchAndConsume(TokenType::LessThan))
+	//parse namespaces
+	while (parser->MatchAndConsume(TokenType::Scope))
+	{
+		out += "::";
+		out += parser->Consume(TokenType::Name).text;
+	}
+
+	if (parser->MatchAndConsume(TokenType::LessThan))//parse templates
 	{
 		out += "<";
 		//recursively parse the rest
@@ -138,6 +144,14 @@ Expression* AssignParselet::parse(Parser* parser, Expression* left, Token token)
 	}
 	return new AssignExpression(token, left, right);
 }
+
+Expression* ScopeParselet::parse(Parser* parser, Expression* left, Token token)
+{
+	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
+
+	return new ScopedExpression(token, left, right);
+}
+
 
 Expression* OperatorAssignParselet::parse(Parser* parser, Expression* left, Token token)
 {
@@ -500,9 +514,9 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
 
 	Token stru;
-	if (parser->MatchAndConsume(TokenType::Colon))
+	if (parser->MatchAndConsume(TokenType::Scope))
 	{
-		parser->Consume(TokenType::Colon);
+		//parser->Consume(TokenType::Colon);
 
 		//its a struct definition
 		stru = name;
@@ -891,10 +905,10 @@ Expression* TypedefParselet::parse(Parser* parser, Token token)
 Expression* NamespaceParselet::parse(Parser* parser, Token token)
 {
 	Token name = parser->Consume(TokenType::Name);
-	Token start = parser->Consume(TokenType::LeftBracket);
+	Token start = parser->Consume(TokenType::LeftBrace);
 
 	auto block = parser->parseBlock();
 
-	Token end = parser->Consume(TokenType::RightBracket);
+	Token end = parser->Consume(TokenType::RightBrace);
 	return new NamespaceExpression(token, name, start, block, end);
 }
