@@ -139,6 +139,7 @@ namespace Jet
 					*types[i].second = res;
 				}
 			}
+			this->types.clear();
 			this->ns = oldns;
 		}
 

@@ -311,39 +311,6 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	context->parent->builder.CreateStore(right.val, loc.val);
 }
 
-/*void ObjectExpression::Compile(CompilerContext* context)
-{
-int count = 0;
-if (this->inits)
-{
-count = this->inits->size();
-//set these up
-for (auto ii: *this->inits)
-{
-context->String(ii.first);
-ii.second->Compile(context);
-}
-}
-context->NewObject(count);
-
-//pop off if we dont need the result
-if (dynamic_cast<BlockExpression*>(this->Parent))
-context->Pop();
-}
-
-void ArrayExpression::Compile(CompilerContext* context)
-{
-int count = this->initializers.size();
-for (auto i: this->initializers)
-i->Compile(context);
-
-context->NewArray(count);
-
-//pop off if we dont need the result
-if (dynamic_cast<BlockExpression*>(this->Parent))
-context->Pop();
-}*/
-
 CValue StringExpression::Compile(CompilerContext* context)
 {
 	return context->String(this->value);
@@ -379,21 +346,6 @@ CValue NumberExpression::Compile(CompilerContext* context)
 	else
 		return context->Float(this->value);
 }
-
-/*void SwapExpression::Compile(CompilerContext* context)
-{
-right->Compile(context);
-left->Compile(context);
-
-if (auto rstorable = dynamic_cast<IStorableExpression*>(this->right))
-rstorable->CompileStore(context);
-
-if (dynamic_cast<BlockExpression*>(this->Parent) == 0)
-context->Duplicate();
-
-if (auto lstorable = dynamic_cast<IStorableExpression*>(this->left))
-lstorable->CompileStore(context);
-}*/
 
 CValue AssignExpression::Compile(CompilerContext* context)
 {
@@ -443,7 +395,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 		}
 
 		//push in the this pointer argument kay
-		argsv.push_back(CValue(context->parent->LookupType(stru->ToString() + "*"), self));
+		argsv.push_back(CValue(stru->GetPointerType(context), self));
 	}
 	else
 	{
@@ -667,7 +619,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	context->CurrentToken(&this->ret_type);
 	auto ret = context->parent->LookupType(this->ret_type.text);
-
+	
 	CompilerContext* function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? true : false);// , this->varargs);
 
 	context->parent->current_function = function;
@@ -768,8 +720,10 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		//	type = context->parent->AdvanceTypeLookup(str + "*");
 
 		fun->arguments.push_back({ type, "this" });
-		if (is_trait == false)
+		if (is_trait == false && advlookup)
 			context->parent->AdvanceTypeLookup(&fun->arguments.back().first, str + "*");
+		else if (is_trait == false)
+			fun->arguments.back().first = context->parent->LookupType(str + "*");
 	}
 
 	if (this->templates)
@@ -931,7 +885,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			const std::string& constructor_name = type->data->template_base ? type->data->template_base->name : type->data->name;
 			auto iter = type->data->functions.find(constructor_name);
 			if (iter != type->data->functions.end())
-				context->Call(constructor_name, { CValue(context->parent->LookupType(type->ToString() + "*"), Alloca) }, type);
+				context->Call(constructor_name, { CValue(type->GetPointerType(context), Alloca) }, type);
 		}
 	}
 
@@ -1273,20 +1227,8 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 {
 	//build data about the struct
 	//get or add the struct type from the type table
-	Type* str = 0;
-	//auto ii = context->parent->types.find(this->name.text);
-	if (true)//ii == context->parent->types.end())//its new
-	{
-		str = new Type;
-		context->parent->ns->members.insert({ this->name.text, str });
-		//context->parent->types[this->name.text] = str;
-	}
-	else
-	{
-		//str = ii->second;
-		//if (str->type != Types::Invalid)
-		//context->parent->Error("Struct '" + this->name.text + "' Already Defined", this->token);
-	}
+	Type* str = new Type;
+	context->parent->ns->members.insert({ this->name.text, str });
 
 	str->type = Types::Struct;
 	str->data = new Struct;

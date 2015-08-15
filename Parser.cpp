@@ -132,7 +132,7 @@ Parser::~Parser()
 		delete ii.second;
 };
 
-Expression* Parser::parseExpression(int precedence)
+Expression* Parser::ParseExpression(int precedence)
 {
 	Token token = Consume();
 	PrefixParselet* prefix = mPrefixParselets[token.type];
@@ -146,7 +146,7 @@ Expression* Parser::parseExpression(int precedence)
 	}
 
 	Expression* left = prefix->parse(this, token);
-	while (precedence < getPrecedence())
+	while (precedence < GetPrecedence())
 	{
 		token = Consume();
 
@@ -163,7 +163,7 @@ Expression* Parser::ParseStatement(bool takeTrailingSemicolon)//call this until 
 
 	if (statement == 0)
 	{
-		UniquePtr<Expression*> result(parseExpression());
+		UniquePtr<Expression*> result(ParseExpression());
 
 		if (takeTrailingSemicolon)
 			result->semicolon = Consume(TokenType::Semicolon);
@@ -180,7 +180,7 @@ Expression* Parser::ParseStatement(bool takeTrailingSemicolon)//call this until 
 	return result.Release();
 }
 
-BlockExpression* Parser::parseBlock(bool allowsingle)
+BlockExpression* Parser::ParseBlock(bool allowsingle)
 {
 	std::vector<Expression*> statements;
 
@@ -205,7 +205,7 @@ BlockExpression* Parser::parseBlock(bool allowsingle)
 	return new BlockExpression(start, end, std::move(statements));
 }
 
-BlockExpression* Parser::parseAll()
+BlockExpression* Parser::ParseAll()
 {
 	std::vector<Expression*> statements;
 	while (!Match(TokenType::EoF))
@@ -299,7 +299,7 @@ void Parser::Register(TokenType token, StatementParselet* parselet)
 	this->mStatementParselets[token] = parselet;
 }
 
-int Parser::getPrecedence() {
+int Parser::GetPrecedence() {
 	InfixParselet* parser = mInfixParselets[LookAhead(0).type];
 	if (parser != 0)
 		return parser->getPrecedence();

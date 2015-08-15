@@ -107,15 +107,6 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 	{
 		switch (operation)
 		{
-			/*case TokenType::Increment:
-				parent->builder.create
-				throw 7;
-				//res = parent->builder.CreateFAdd(left.val, right.val);
-				break;
-				case TokenType::Decrement:
-				throw 7;
-				//res = parent->builder.CreateFSub(left.val, right.val);
-				break;*/
 		case TokenType::Minus:
 			res = parent->builder.CreateFNeg(value.val);// parent->builder.CreateFMul(left.val, right.val);
 			break;

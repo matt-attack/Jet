@@ -135,7 +135,7 @@ Expression* NameParselet::parse(Parser* parser, Token token)
 
 Expression* AssignParselet::parse(Parser* parser, Expression* left, Token token)
 {
-	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
+	Expression* right = parser->ParseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
 
 	if (dynamic_cast<IStorableExpression*>(left) == 0)
 	{
@@ -147,7 +147,7 @@ Expression* AssignParselet::parse(Parser* parser, Expression* left, Token token)
 
 Expression* ScopeParselet::parse(Parser* parser, Expression* left, Token token)
 {
-	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
+	Expression* right = parser->ParseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
 
 	return new ScopedExpression(token, left, right);
 }
@@ -158,27 +158,14 @@ Expression* OperatorAssignParselet::parse(Parser* parser, Expression* left, Toke
 	if (dynamic_cast<IStorableExpression*>(left) == 0)
 		ParserError("OperatorAssignParselet: Left hand side must be a storable location!", token);
 
-	Expression* right = parser->parseExpression(Precedence::ASSIGNMENT - 1);
+	Expression* right = parser->ParseExpression(Precedence::ASSIGNMENT - 1);
 
 	return new OperatorAssignExpression(token, left, right);
 }
 
-/*Expression* SwapParselet::parse(Parser* parser, Expression* left, Token token)
-{
-if (dynamic_cast<IStorableExpression*>(left) == 0)
-throw CompilerException(parser->filename, token.line, "SwapParselet: Left hand side must be a storable location!");
-
-UniquePtr<Expression*> right = parser->parseExpression(Precedence::ASSIGNMENT-1);
-
-if (dynamic_cast<IStorableExpression*>((Expression*)right) == 0)
-throw CompilerException(parser->filename, token.line, "SwapParselet: Right hand side must be a storable location!");
-
-return new SwapExpression(left, right.Release());
-}*/
-
 Expression* PrefixOperatorParselet::parse(Parser* parser, Token token)
 {
-	Expression* right = parser->parseExpression(precedence);
+	Expression* right = parser->ParseExpression(precedence);
 	if (right == 0)
 		ParserError("PrefixOperatorParselet: Right hand side missing!", token);
 
@@ -198,7 +185,7 @@ Expression* CastParselet::parse(Parser* parser, Token token)
 	Token type = ::ParseType(parser);
 	Token end = parser->Consume(TokenType::GreaterThan);
 
-	auto right = parser->parseExpression(Precedence::PREFIX);
+	auto right = parser->ParseExpression(Precedence::PREFIX);
 	if (right == 0)
 		ParserError("CastParselet: Right hand side missing!", token);
 
@@ -207,7 +194,7 @@ Expression* CastParselet::parse(Parser* parser, Token token)
 
 Expression* BinaryOperatorParselet::parse(Parser* parser, Expression* left, Token token)
 {
-	Expression* right = parser->parseExpression(precedence - (isRight ? 1 : 0));
+	Expression* right = parser->ParseExpression(precedence - (isRight ? 1 : 0));
 	if (right == 0)
 		ParserError("BinaryOperatorParselet: Right hand side missing!", token);
 
@@ -216,7 +203,7 @@ Expression* BinaryOperatorParselet::parse(Parser* parser, Expression* left, Toke
 
 Expression* GroupParselet::parse(Parser* parser, Token token)
 {
-	UniquePtr<Expression*> exp = parser->parseExpression();
+	UniquePtr<Expression*> exp = parser->ParseExpression();
 	parser->Consume(TokenType::RightParen);
 	return exp.Release();
 }
@@ -225,11 +212,11 @@ Expression* WhileParselet::parse(Parser* parser, Token token)
 {
 	parser->Consume(TokenType::LeftParen);
 
-	UniquePtr<Expression*> condition = parser->parseExpression();
+	UniquePtr<Expression*> condition = parser->ParseExpression();
 
 	parser->Consume(TokenType::RightParen);
 
-	auto block = new ScopeExpression(parser->parseBlock());
+	auto block = new ScopeExpression(parser->ParseBlock());
 	return new WhileExpression(token, condition.Release(), block);
 }
 
@@ -263,10 +250,10 @@ Expression* ForParselet::parse(Parser* parser, Token token)
 				parser->Consume();
 				auto name = parser->Consume();
 				parser->Consume();
-				UniquePtr<Expression*> container = parser->parseExpression();
+				UniquePtr<Expression*> container = parser->ParseExpression();
 				parser->Consume(TokenType::RightParen);
 				throw 7;
-				auto block = new ScopeExpression(parser->parseBlock());
+				auto block = new ScopeExpression(parser->ParseBlock());
 				//return new ForEachExpression(name, container.Release(), block);
 			}
 		}
@@ -274,21 +261,21 @@ Expression* ForParselet::parse(Parser* parser, Token token)
 
 	UniquePtr<Expression*> initial = parser->ParseStatement(true);
 	UniquePtr<Expression*> condition = parser->ParseStatement(true);
-	UniquePtr<Expression*> increment = parser->parseExpression();
+	UniquePtr<Expression*> increment = parser->ParseExpression();
 
 	parser->Consume(TokenType::RightParen);
 
-	auto block = new ScopeExpression(parser->parseBlock());
+	auto block = new ScopeExpression(parser->ParseBlock());
 	return new ForExpression(token, initial.Release(), condition.Release(), increment.Release(), block);
 }
 
 Expression* SwitchParselet::parse(Parser* parser, Token token)
 {
 	parser->Consume(TokenType::LeftParen);
-	UniquePtr<Expression*> var = parser->parseExpression();
+	UniquePtr<Expression*> var = parser->ParseExpression();
 	parser->Consume(TokenType::RightParen);
 
-	BlockExpression* block = parser->parseBlock(false);
+	BlockExpression* block = parser->ParseBlock(false);
 
 	return new SwitchExpression(token, var.Release(), block);
 }
@@ -298,10 +285,10 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 	std::vector<Branch*> branches;
 	//take parens
 	parser->Consume(TokenType::LeftParen);
-	UniquePtr<Expression*> ifcondition = parser->parseExpression();
+	UniquePtr<Expression*> ifcondition = parser->ParseExpression();
 	parser->Consume(TokenType::RightParen);
 
-	BlockExpression* ifblock = parser->parseBlock(true);
+	BlockExpression* ifblock = parser->ParseBlock(true);
 
 	branches.push_back(new Branch(token, ifblock, ifcondition.Release()));
 
@@ -316,10 +303,10 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 
 			//keep going
 			parser->Consume(TokenType::LeftParen);
-			UniquePtr<Expression*> condition = parser->parseExpression();
+			UniquePtr<Expression*> condition = parser->ParseExpression();
 			parser->Consume(TokenType::RightParen);
 
-			BlockExpression* block = parser->parseBlock(true);
+			BlockExpression* block = parser->ParseBlock(true);
 
 			branches.push_back(new Branch(t, block, condition.Release()));
 		}
@@ -328,7 +315,7 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 			parser->Consume();
 
 			//its an else
-			BlockExpression* block = parser->parseBlock(true);
+			BlockExpression* block = parser->ParseBlock(true);
 
 			Else = new Branch(t, block, 0);
 			break;
@@ -443,7 +430,6 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		if (parser->Match(TokenType::Function))
 		{
 			//parse the function
-
 			auto* expr = parser->ParseStatement(true);
 
 			if (auto fun = dynamic_cast<FunctionExpression*>(expr))
@@ -452,7 +438,6 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 				member.type = StructMember::FunctionMember;
 				member.function = fun;
 				members.push_back(member);
-				//functions->push_back(fun);
 				continue;
 			}
 
@@ -467,23 +452,20 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		{
 			//its an array type
 			//read the number
-			auto size = parser->parseExpression(Precedence::ASSIGNMENT);
+			auto size = parser->ParseExpression(Precedence::ASSIGNMENT);
 
 			parser->Consume(TokenType::RightBracket);
 
 			if (auto s = dynamic_cast<NumberExpression*>(size))
 			{
 				if (s->GetValue() <= 0)
-				{
 					ParserError("Cannot size array with a zero or negative size", token);
-					//throw 7;
-				}
+
 				type.text += "[" + std::to_string((int)s->GetValue()) + "]";
 			}
 			else
 			{
 				ParserError("Cannot size array with a non constant size", token);
-				//throw 7;
 			}
 		}
 
@@ -493,11 +475,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		member.type = StructMember::VariableMember;
 		member.variable = { type, name };
 		members.push_back(member);
-		//elements->push_back({ type, name.text });
-
-		//add member functions!!!
 	}
-	//done
 
 	return new StructExpression(token, name, start, end, std::move(members), /*elements, functions,*/ templated, base_name);
 }
@@ -569,7 +547,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 		parser->Consume(TokenType::RightParen);
 	}
 
-	auto block = new ScopeExpression(parser->parseBlock());
+	auto block = new ScopeExpression(parser->ParseBlock());
 	return new FunctionExpression(token, name, ret_type, arguments, block, /*varargs,*/ stru, templated);
 }
 
@@ -666,7 +644,7 @@ Expression* LambdaParselet::parse(Parser* parser, Token token)
 	if (parser->MatchAndConsume(TokenType::Pointy))
 		ret_type = ::ParseType(parser);
 
-	auto block = new ScopeExpression(parser->parseBlock());
+	auto block = new ScopeExpression(parser->ParseBlock());
 	return new FunctionExpression(token, Token(), ret_type, arguments, block, Token(), 0);
 }
 
@@ -678,7 +656,7 @@ Expression* CallParselet::parse(Parser* parser, Expression* left, Token token)
 	{
 		do
 		{
-			arguments->push_back(parser->parseExpression(Precedence::ASSIGNMENT));
+			arguments->push_back(parser->ParseExpression(Precedence::ASSIGNMENT));
 		} while (parser->MatchAndConsume(TokenType::Comma));
 
 		parser->Consume(TokenType::RightParen);
@@ -690,7 +668,7 @@ Expression* ReturnParselet::parse(Parser* parser, Token token)
 {
 	Expression* right = 0;
 	if (parser->Match(TokenType::Semicolon) == false)
-		right = parser->parseExpression(Precedence::ASSIGNMENT);
+		right = parser->ParseExpression(Precedence::ASSIGNMENT);
 
 	return new ReturnExpression(token, right);
 }
@@ -711,7 +689,7 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 		{
 			//its an array type
 			//read the number
-			auto size = parser->parseExpression(Precedence::ASSIGNMENT);
+			auto size = parser->ParseExpression(Precedence::ASSIGNMENT);
 
 			parser->Consume(TokenType::RightBracket);
 
@@ -742,7 +720,7 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 	UniquePtr<std::vector<Expression*>*> rights = new std::vector < Expression* > ;
 	do
 	{
-		Expression* right = parser->parseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
+		Expression* right = parser->ParseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
 
 		rights->push_back(right);
 	} while (parser->MatchAndConsume(TokenType::Comma));
@@ -767,7 +745,7 @@ Expression* ConstParselet::parse(Parser* parser, Token token)
 	std::vector<Expression*>* rights = new std::vector < Expression* > ;
 	do
 	{
-		Expression* right = parser->parseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
+		Expression* right = parser->ParseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
 
 		rights->push_back(right);
 	} while (parser->MatchAndConsume(TokenType::Comma));
@@ -797,7 +775,7 @@ return new ArrayExpression(std::move(inits));
 
 Expression* IndexParselet::parse(Parser* parser, Expression* left, Token token)
 {
-	UniquePtr<Expression*> index = parser->parseExpression();
+	UniquePtr<Expression*> index = parser->ParseExpression();
 	parser->Consume(TokenType::RightBracket);
 
 	return new IndexExpression(left, index.Release(), token);
@@ -806,7 +784,7 @@ Expression* IndexParselet::parse(Parser* parser, Expression* left, Token token)
 Expression* MemberParselet::parse(Parser* parser, Expression* left, Token token)
 {
 	//this is for const members
-	Expression* member = parser->parseExpression(Precedence::CALL);
+	Expression* member = parser->ParseExpression(Precedence::CALL);
 	UniquePtr<NameExpression*> name = dynamic_cast<NameExpression*>(member);
 	if (name == 0)
 	{
@@ -822,7 +800,7 @@ Expression* MemberParselet::parse(Parser* parser, Expression* left, Token token)
 Expression* PointerMemberParselet::parse(Parser* parser, Expression* left, Token token)
 {
 	//this is for const members
-	Expression* member = parser->parseExpression(Precedence::CALL);
+	Expression* member = parser->ParseExpression(Precedence::CALL);
 	UniquePtr<NameExpression*> name = dynamic_cast<NameExpression*>(member);
 	if (name == 0)
 	{
@@ -905,10 +883,12 @@ Expression* TypedefParselet::parse(Parser* parser, Token token)
 Expression* NamespaceParselet::parse(Parser* parser, Token token)
 {
 	Token name = parser->Consume(TokenType::Name);
-	Token start = parser->Consume(TokenType::LeftBrace);
+	//Token start = parser->Consume(TokenType::LeftBrace);
+	Token start;
 
-	auto block = parser->parseBlock();
+	auto block = parser->ParseBlock(false);
 
-	Token end = parser->Consume(TokenType::RightBrace);
+	Token end;
+	//Token end = parser->Consume(TokenType::RightBrace);
 	return new NamespaceExpression(token, name, start, block, end);
 }

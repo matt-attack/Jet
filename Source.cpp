@@ -103,5 +103,5 @@ BlockExpression* Source::GetAST()
 	Lexer lexer(this);
 	Parser parser(&lexer);
 
-	return parser.parseAll();
+	return parser.ParseAll();
 }

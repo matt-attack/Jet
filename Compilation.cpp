@@ -19,6 +19,7 @@
 #include <llvm\Target\TargetSubtargetInfo.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm\IR\DataLayout.h>
+#include <llvm\IR\GlobalVariable.h>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -498,7 +499,7 @@ void Compilation::SetTarget()
 	auto CodeModel = llvm::CodeModel::Default;
 	this->target = TheTarget->createTargetMachine(TheTriple.getTriple(), MCPU, FeaturesStr, Options, RelocModel, CodeModel, OLvl);
 
-	module->setDataLayout(*this->target->getDataLayout());// getSubtargetImpl(*module->getFunctionList().begin())->getDataLayout());
+	module->setDataLayout(*this->target->getDataLayout());
 }
 
 void Compilation::OutputPackage(const std::string& project_name, int o_level)
@@ -682,70 +683,15 @@ void Compilation::OutputIR(const char* filename)
 
 void Compilation::AdvanceTypeLookup(Jet::Type** dest, const std::string& name)
 {
-	//auto type = types.find(name);
-	/*if (false)//true)//type == types.end())
-	{
-	//create it, its not a basic type, todo later
-	if (name[name.length() - 1] == '*')
-	{
-	//its a pointer
-	auto t = this->AdvanceTypeLookup(name.substr(0, name.length() - 1));
-
-	Type* type = new Type;
-	type->name = name;
-	type->base = t;
-	type->type = Types::Pointer;
-
-	types.push_back({ this->ns, type });
-	//types[name] = type;
-	return type;
-	}
-	else if (name[name.length() - 1] == ']')
-	{
-	//its an array
-	int p = 0;
-	for (p = 0; p < name.length(); p++)
-	if (name[p] == '[')
-	break;
-
-	auto len = name.substr(p + 1, name.length() - p - 2);
-
-	auto tname = name.substr(0, p);
-	auto t = this->LookupType(tname);
-
-	Type* type = new Type;
-	type->base = t;
-	type->name = name;
-	type->type = Types::Array;
-	type->size = std::stoi(len);//cheat for now
-	types.push_back({ this->ns, type });
-	//types[name] = type;
-	return type;
-	}
-	//help im getting type duplication with templates7
-	//who knows what type it is, create a dummy one
-	Type* type = new Type;
-	type->name = name;
-	type->type = Types::Invalid;
-	type->data = 0;
-	types.push_back({ this->ns, type });
-	//types[name] = type;
-
-	return type;
-	}*/
-
-	//help im getting type duplication with templates7
-	//who knows what type it is, create a dummy one
+	//who knows what type it is, create a dummy one that will get replaced later
 	Type* type = new Type;
 	type->name = name;
 	type->type = Types::Invalid;
 	type->data = 0;
 	type->ns = this->ns;
 	types.push_back({ this->ns, dest });
-	//types[name] = type;
+
 	*dest = type;
-	//return type;
-	//return type->second;
 }
 
 Jet::Type* Compilation::TryLookupType(const std::string& name)
@@ -788,7 +734,6 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 		res = curns->members.find(name);
 	}
 
-	//auto iter = types.find(name);
 	auto type = (curns != 0 && res != curns->members.end() && res->second.type == SymbolType::Type) ? res->second.ty : 0;
 
 	if (type == 0)
@@ -813,8 +758,6 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			else
 				type->ns = type->base->ns;
 			type->base->ns->members.insert({ name, type });
-			//this->ns->members.insert({ name, type });
-			//types[name] = type;
 		}
 		else if (name[name.length() - 1] == ']')
 		{
@@ -835,7 +778,6 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			type->type = Types::Array;
 			type->size = std::stoi(len);//cheat for now
 			curns->members.insert({ name, type });
-			//types[name] = type;
 		}
 		else if (name[name.length() - 1] == '>')
 		{
@@ -861,10 +803,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			} while (name[p++] != '>');
 
 			//look up the base, and lets instantiate it
-			//throw 7;
-			auto t = this->LookupType(base, false);// this->types.find(base);
-			//if (t == this->types.end())
-			//Error("Reference To Undefined Type '" + base + "'", *this->current_function->current_token);
+			auto t = this->LookupType(base, false);
 
 			type = t->Instantiate(this, types);
 		}
@@ -922,7 +861,6 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			type->type = Types::Function;
 
 			global->members.insert({ name, type });
-			//types[name] = type;
 		}
 		else
 		{
@@ -945,7 +883,6 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 	return type;
 }
 
-#include <llvm\IR\GlobalVariable.h>
 CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t)//, bool Extern = false)
 {
 	auto global = this->globals.find(name);

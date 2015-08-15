@@ -1481,6 +1481,7 @@ namespace Jet
 		void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
+			this->block->SetParent(this);
 		}
 
 		CValue Compile(CompilerContext* context)

@@ -2,6 +2,7 @@
 #include "Compiler.h"
 #include "CompilerContext.h"
 #include "Expressions.h"
+#include "Lexer.h"
 
 //#include <llvm/IR/Attributes.h>
 //#include <llvm/IR/Argument.h>
@@ -108,13 +109,12 @@ llvm::Type* Jet::GetType(Type* t)
 	}
 }
 
-#include "Lexer.h"
 std::string Jet::ParseType(const char* tname, int& p)
 {
 	//int p = 0;
 	//Token name = parser->Consume(TokenType::Name);
 	std::string out;// = name.text;
-	while (IsLetter(tname[p]))
+	while (IsLetter(tname[p]) || IsNumber(tname[p]))
 		out += tname[p++];
 
 	//parse templates
@@ -512,7 +512,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	{
 		if (ii.type == StructMember::VariableMember)
 		{
-			auto type = compiler->LookupType(ii.variable.first.text);
+			auto type = compiler->LookupType(ii.variable.first.text, false);
 
 			str->struct_members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
 		}
@@ -538,17 +538,17 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	auto realname = t->ToString();
 
 	//uh oh, this duplicates
-	auto res = compiler->ns->members.find(realname);// types.find(realname);
-	if (res != compiler->ns->members.end() && res->second.type == SymbolType::Type && res->second.ty->type != Types::Invalid)
+	auto res = t->ns->members.find(realname);// types.find(realname);
+	if (res != t->ns->members.end() && res->second.type == SymbolType::Type && res->second.ty->type != Types::Invalid)
 	{
 		delete t;
 		t = res->second.ty;
 		return t;// goto exit;
 	}
-	else if (res != compiler->ns->members.end() && res->second.type == SymbolType::Type)
+	else if (res != t->ns->members.end() && res->second.type == SymbolType::Type)
 		*res->second.ty = *t;
 	else
-		compiler->ns->members.insert({ realname, t });// compiler->types[realname] = t;
+		t->ns->members.insert({ realname, t });// compiler->types[realname] = t;
 
 	//compile its functions
 	if (t->data->expression->members.size() > 0)
@@ -567,12 +567,14 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 
 		expr->AddConstructorDeclarations(t, compiler->current_function);
 
-		//need to delay compilation
-		//for (auto ii : t->data->expression->members)
-		//	if (ii.type == StructMember::FunctionMember)
-		//		ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
+		//fixme later, compiler->types should have a size of 0 and this should be unnecesary
+		compiler->ResolveTypes();
 
-		//expr->AddConstructors(compiler->current_function);
+		for (auto ii : t->data->expression->members)
+			if (ii.type == StructMember::FunctionMember)
+				ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
+
+		expr->AddConstructors(compiler->current_function);
 
 		compiler->builder.SetCurrentDebugLocation(dp);
 		if (rp)

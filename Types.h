@@ -67,7 +67,6 @@ namespace Jet
 	struct Function;
 	struct Namespace;
 
-	//ok, NEVER compare these based on 
 	class Type
 	{
 		std::vector<std::pair<Type**, Trait*>> traits;//all the traits that apply to this type
@@ -110,17 +109,11 @@ namespace Jet
 		Type* GetBaseType()//returns bottom level type
 		{
 			if (this->type == Types::Pointer)
-			{
 				this->base->GetBaseType();
-			}
 			else if (this->type == Types::Array)
-			{
 				return this->base->GetBaseType();
-			}
 			else
-			{
 				return this;
-			}
 		}
 	};
 
@@ -154,8 +147,6 @@ namespace Jet
 		Namespace* parent;
 
 		std::multimap<std::string, Symbol> members;
-		//std::map<std::string, Symbol> members;
-		//std::multimap<std::string, Function*> functions;
 
 		Function* GetFunction(const std::string& name)
 		{

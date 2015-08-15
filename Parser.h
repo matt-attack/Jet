@@ -30,12 +30,12 @@ namespace Jet
 
 		~Parser();
 
-		Expression* parseExpression(int precedence = 0);
+		Expression* ParseExpression(int precedence = 0);
 		Expression* ParseStatement(bool takeTrailingSemicolon = true);//call this until out of tokens (hit EOF)
-		BlockExpression* parseBlock(bool allowsingle = true);
-		BlockExpression* parseAll();
+		BlockExpression* ParseBlock(bool allowsingle = true);
+		BlockExpression* ParseAll();
 
-		int getPrecedence();
+		int GetPrecedence();
 
 		Token Consume();
 		Token Consume(TokenType expected);
