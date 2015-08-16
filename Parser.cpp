@@ -139,7 +139,7 @@ Expression* Parser::ParseExpression(int precedence)
 
 	if (prefix == 0)
 	{
-		std::string str = "ParseExpression: No Parser Found for: " + token.text;
+		std::string str = "No Parser Found for: " + token.text;
 		//throw CompilerException(this->filename, token.line, str);//printf("Consume: TokenType not as expected!\n");
 		ParserError(str, token);
 		return 0;
@@ -231,7 +231,7 @@ Token Parser::Consume(TokenType expected)
 	auto temp = LookAhead();
 	if (temp.type != expected)
 	{
-		std::string str = "Consume: TokenType Not As Expected! Expected: " + TokenToString[expected] + " Got: " + temp.text;
+		std::string str = "Token Not As Expected! Expected: " + TokenToString[expected] + " Got: " + temp.text;
 		//throw CompilerException(this->filename, temp.line, str);
 
 		//fabricate a fake token

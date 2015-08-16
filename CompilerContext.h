@@ -122,7 +122,7 @@ namespace Jet
 				if (global != this->parent->globals.end())
 					return global->second;
 
-				auto function = this->parent->ns->GetFunction(name);//this->parent->functions.find(name);
+				auto function = this->parent->GetFunction(name);//this->parent->functions.find(name);
 				if (function != 0)//this->parent->functions.end())
 				{
 					function->Load(this->parent);

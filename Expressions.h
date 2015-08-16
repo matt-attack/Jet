@@ -1792,20 +1792,9 @@ namespace Jet
 				context->parent->Error("Type '" + name.text + "' already exists", token);
 			t->valid = true;
 			t->name = this->name.text;
-			for (auto ii : this->funcs)
-			{
-				Function* func = new Function("");
-				/*func->return_type = */context->parent->AdvanceTypeLookup(&func->return_type, ii.ret_type.text);
-				func->arguments.reserve(ii.args.size());
-				for (auto arg : ii.args)
-				{
-					func->arguments.push_back({ 0, "dummy" });
-					context->parent->AdvanceTypeLookup(&func->arguments.back().first, arg.text);
-				}
-					//func->arguments.push_back({ context->parent->AdvanceTypeLookup(arg.text), "dummy" });
+			t->parent = context->parent->ns;
 
-				t->funcs.insert({ ii.name.text, func });
-			}
+			//set this as a namespace, add T as a type
 			if (this->templates)
 			{
 				t->templates.reserve(this->templates->size());
@@ -1821,8 +1810,32 @@ namespace Jet
 						//auto trait = context->parent->AdvanceTypeLookup(ii.first.text);
 						//t->templates.push_back({ trait, ii.second.text });
 					}
+
+					auto type = new Type;
+					type->name = ii.second.text;
+					type->type = Types::Invalid;
+					type->ns = context->parent->ns;
+					context->parent->ns->members.insert({ type->name, type });
 				}
+
+				
 			}
+
+			for (auto ii : this->funcs)
+			{
+				Function* func = new Function("");
+				/*func->return_type = */context->parent->AdvanceTypeLookup(&func->return_type, ii.ret_type.text);
+				func->arguments.reserve(ii.args.size());
+				for (auto arg : ii.args)
+				{
+					func->arguments.push_back({ 0, "dummy" });
+					context->parent->AdvanceTypeLookup(&func->arguments.back().first, arg.text);
+				}
+
+				t->funcs.insert({ ii.name.text, func });
+			}
+
+			context->parent->ns = t->parent;
 		}
 
 		void Print(std::string& output, Source* source)

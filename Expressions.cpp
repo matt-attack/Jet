@@ -619,7 +619,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	context->CurrentToken(&this->ret_type);
 	auto ret = context->parent->LookupType(this->ret_type.text);
-	
+
 	CompilerContext* function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? true : false);// , this->varargs);
 
 	context->parent->current_function = function;
@@ -712,6 +712,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	else
 		fun->return_type = context->parent->LookupType(this->ret_type.text, false);
 
+	fun->arguments.reserve(this->args->size() + (str.length() ? 1 : 0));
 	if (str.length() > 0)//im a member function
 	{
 		//insert first arg, which is me
@@ -732,7 +733,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			fun->templates.push_back({ context->parent->LookupType(ii.first.text), ii.second.text });
 	}
 
-	fun->arguments.reserve(this->args->size());
+
 	for (auto ii : *this->args)
 	{
 		Type* type = 0;
@@ -1260,7 +1261,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		{
 			Type* type = 0;
 			//if (this->templates == 0)
-				//type = context->parent->AdvanceTypeLookup(ii.variable.first.text);
+			//type = context->parent->AdvanceTypeLookup(ii.variable.first.text);
 
 			str->data->struct_members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
 			if (this->templates == 0)
@@ -1273,7 +1274,8 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		}
 	}
 
-	this->AddConstructorDeclarations(str, context);
+	if (this->templates == 0)
+		this->AddConstructorDeclarations(str, context);
 };
 
 CValue DefaultExpression::Compile(CompilerContext* context)

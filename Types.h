@@ -166,10 +166,10 @@ namespace Jet
 	};
 
 	class Function;
-	struct Trait
+	struct Trait: public Namespace
 	{
 		bool valid;
-		std::string name;
+		//std::string name;
 
 		std::multimap<std::string, Function*> funcs;
 		std::multimap<std::string, Function*> extension_methods;
@@ -182,7 +182,7 @@ namespace Jet
 	class StructExpression;
 	struct Struct : public Namespace
 	{
-		std::string name;
+		//std::string name;
 		llvm::Type* type;
 		Type* parent_struct;//when inheritance
 

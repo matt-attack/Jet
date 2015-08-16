@@ -539,7 +539,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 			}*/
 			else
 			{
-				std::string str = "Consume: TokenType not as expected! Expected Name or Ellises Got: " + name.text;
+				std::string str = "Token not as expected! Expected Name or Ellises Got: " + name.text;
 				ParserError(str, name);
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
@@ -594,7 +594,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 			}*/
 			else
 			{
-				std::string str = "Consume: TokenType not as expected! Expected Name or Ellises Got: " + name.text;
+				std::string str = "Token not as expected! Expected Name or Ellises Got: " + name.text;
 				ParserError(str, name);
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
@@ -633,7 +633,7 @@ Expression* LambdaParselet::parse(Parser* parser, Token token)
 			//}
 			else
 			{
-				std::string str = "Consume: TokenType not as expected! Expected Name or Ellises Got: " + name.text;
+				std::string str = "Token not as expected! Expected Name or Ellises Got: " + name.text;
 				ParserError(str, token);
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));

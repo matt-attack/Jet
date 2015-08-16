@@ -15,7 +15,7 @@ Type Jet::VoidType("void", Types::Void);
 Type* Type::GetPointerType(CompilerContext* context)
 {
 	auto old = context->parent->ns;
-	context->parent->ns = this->ns;
+	context->parent->ns = this->ns ? this->ns : context->parent->global;
 	auto tmp = context->parent->LookupType(this->ToString() + "*");
 	context->parent->ns = old;
 	return tmp;
@@ -55,7 +55,9 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		//for (auto ii : ftypes)
 		//ii->dump();
 		llvm::DIType* typ = 0;
-		return compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, 0, 1024, 1024, 0, typ, compiler->debug->getOrCreateArray(ftypes));
+		auto file = compiler->debug->createFile(this->data->name,
+			compiler->debug_info.cu->getDirectory());
+		return compiler->debug->createStructType(file, this->data->name, file, 0, 1024, 1024, 0, typ, compiler->debug->getOrCreateArray(ftypes));
 	}
 	if (this->type == Types::Function)
 	{
@@ -479,16 +481,37 @@ bool Type::MatchesTrait(Compilation* compiler, Trait* t)
 
 Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 {
+	if (this->type == Types::Trait)
+	{
+		//fix traits referenced in templates
+		Type* trait = new Type;
+		trait->type = Types::Trait;
+		trait->name = this->name + "<";
+		int i = 0;
+		for (auto ii : types)
+		{
+			trait->name += ii->name;
+			if (i + 1 < types.size())
+				trait->name += ",";
+		}
+		trait->name += ">";
+		trait->trait = new Trait;
+		*trait->trait = *this->trait;
+		trait->trait->template_args = types;
+
+		return trait;
+	}
+
 	//duplicate and load
 	Struct* str = new Struct;
 
 	//create a new namespace here for the struct
-	str->parent = compiler->ns;
+	str->parent = this->ns;
+	auto oldns = compiler->ns;
 	compiler->ns = str;
 	
 	//register the types
 	int i = 0;
-	//std::vector<std::pair<std::string, Type*>> old;
 	for (auto& ii : this->data->templates)
 	{
 		if (ii.first->trait == 0)
@@ -503,19 +526,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		if (types[i]->MatchesTrait(compiler, ii.first->trait) == false)
 			compiler->Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
 
-		//old.push_back({ ii.second, compiler->types[ii.second] });
-		compiler->ns->members.insert({ ii.second, types[i++] });// types[ii.second] = types[i++];
-	}
-
-	//build members
-	for (auto ii : this->data->expression->members)
-	{
-		if (ii.type == StructMember::VariableMember)
-		{
-			auto type = compiler->LookupType(ii.variable.first.text, false);
-
-			str->struct_members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
-		}
+		compiler->ns->members.insert({ ii.second, types[i++] });
 	}
 
 	str->template_args = types;
@@ -530,6 +541,17 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	str->name += ">";
 	str->expression = this->data->expression;
 
+	//build members
+	for (auto ii : this->data->expression->members)
+	{
+		if (ii.type == StructMember::VariableMember)
+		{
+			auto type = compiler->LookupType(ii.variable.first.text, false);
+
+			str->struct_members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
+		}
+	}
+
 	Type* t = new Type(str->name, Types::Struct, str);
 	t->Load(compiler);
 	t->ns = this->ns;
@@ -543,12 +565,14 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	{
 		delete t;
 		t = res->second.ty;
+
+		//restore namespace
+		compiler->ns = oldns;
+
 		return t;// goto exit;
 	}
-	else if (res != t->ns->members.end() && res->second.type == SymbolType::Type)
-		*res->second.ty = *t;
 	else
-		t->ns->members.insert({ realname, t });// compiler->types[realname] = t;
+		t->ns->members.insert({ realname, t });
 
 	//compile its functions
 	if (t->data->expression->members.size() > 0)
@@ -556,6 +580,8 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		StructExpression* expr = dynamic_cast<StructExpression*>(t->data->expression);
 		auto oldname = expr->name;
 		expr->name.text = t->data->name;
+
+		int start = compiler->types.size();
 
 		//store then restore insertion point
 		auto rp = compiler->builder.GetInsertBlock();
@@ -568,7 +594,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		expr->AddConstructorDeclarations(t, compiler->current_function);
 
 		//fixme later, compiler->types should have a size of 0 and this should be unnecesary
-		compiler->ResolveTypes();
+		assert(start == compiler->types.size());
 
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
@@ -583,7 +609,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	}
 
 	//restore namespace
-	compiler->ns = compiler->ns->parent;
+	compiler->ns = oldns;
 
 	return t;
 }
@@ -649,7 +675,6 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 			fun = ii->second;
 	}
 
-	//auto iter = Struct->data->functions.find(name);
 	if (fun == 0)
 	{
 		//	check for trait extension methods
@@ -660,19 +685,19 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 			for (auto ii = frange.first; ii != frange.second; ii++)
 			{
 				//pick one with the right number of args
-				if (def)
-					fun = ii->second;
-				else if (ii->second->arguments.size() == args.size())
+				if (def || ii->second->arguments.size() == args.size())
 					fun = ii->second;
 			}
 
 			if (fun)
 			{
-				throw 7;
-				//massive hack again, like in templates
-				/*std::vector<std::pair<std::string, Type*>> old;
-				old.push_back({ tr.second->name, context->parent->types[tr.second->name] });
-				context->parent->types[tr.second->name] = this;
+				auto ns = new Namespace;
+				ns->name = tr.second->name;
+				ns->parent = context->parent->ns;
+				context->parent->ns = ns;
+
+				context->parent->ns->members.insert({ tr.second->name, this });
+
 
 				auto rp = context->parent->builder.GetInsertBlock();
 				auto dp = context->parent->builder.getCurrentDebugLocation();
@@ -682,23 +707,20 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 				fun->expression->Struct.text = this->name;
 				int i = 0;
 				for (auto ii : tr.second->templates)
-				{
-					old.push_back({ ii.second, context->parent->types[ii.second] });
-					context->parent->types[ii.second] = tr.first[i++];
-				}
-				//fix these templates, store temp result then restore after
+					context->parent->ns->members.insert({ ii.second, tr.first[i++] });
+				
 				fun->expression->CompileDeclarations(context);
 				fun->expression->DoCompile(context);
 
-				for (auto ii : old)
-					context->parent->types[ii.first] = ii.second;
+				context->parent->ns->members.erase(context->parent->ns->members.find( tr.second->name));
 
+				context->parent->ns = context->parent->ns->parent;
 				fun->expression->Struct.text = oldn;
 
 				context->parent->builder.SetCurrentDebugLocation(dp);
 				context->parent->builder.SetInsertPoint(rp);
 
-				fun = this->data->functions.find(name)->second;*/
+				fun = this->data->functions.find(name)->second;
 
 				break;
 			}

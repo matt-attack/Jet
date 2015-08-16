@@ -2,6 +2,7 @@
 #include "Project.h"
 #include "Source.h"
 #include "Expressions.h"
+#include "Lexer.h"
 
 #include <direct.h>
 
@@ -229,6 +230,9 @@ Compilation* Compilation::Make(JetProject* project)
 		}
 	}
 
+	//this fixes some errors, need to resolve them later
+	compilation->debug_info.file = compilation->debug->createFile("temp",
+		compilation->debug_info.cu->getDirectory());
 	compilation->ResolveTypes();
 
 	//load all types
@@ -257,10 +261,13 @@ Compilation* Compilation::Make(JetProject* project)
 				//catch any exceptions
 				try
 				{
+					assert(compilation->ns == compilation->global);
 					ii->Compile(global);
+					assert(compilation->ns == compilation->global);
 				}
 				catch (...)
 				{
+					compilation->ns = compilation->global;
 					errors++;
 				}
 			}
@@ -706,6 +713,7 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 	}
 }
 
+
 Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 {
 	auto pos = name.find_first_of("::");
@@ -722,17 +730,24 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 		return out;
 	}
 
-	//look through namespaces to find it
+	int i = 0;
+	while (IsLetter(name[i++])) {};
+	std::string base = name.substr(0,i-1);
+
+	//look through namespaces to find the base type
 	auto curns = this->ns;
-	auto res = this->ns->members.find(name);
+	auto res = this->ns->members.find(base);
 	while (res == curns->members.end())
 	{
 		curns = curns->parent;
 		if (curns == 0)
 			break;
 
-		res = curns->members.find(name);
+		res = curns->members.find(base);
 	}
+
+	if (curns)
+		res = curns->members.find(name);
 
 	auto type = (curns != 0 && res != curns->members.end() && res->second.type == SymbolType::Type) ? res->second.ty : 0;
 
@@ -762,10 +777,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 		else if (name[name.length() - 1] == ']')
 		{
 			//its an array
-			int p = 0;
-			for (p = 0; p < name.length(); p++)
-				if (name[p] == '[')
-					break;
+			int p = name.find_first_of('[');
 
 			auto len = name.substr(p + 1, name.length() - p - 2);
 
@@ -783,10 +795,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 		{
 			//its a template
 			//get first bit, then we can instatiate it
-			int p = 0;
-			for (p = 0; p < name.length(); p++)
-				if (name[p] == '<')
-					break;
+			int p = name.find_first_of('<');
 
 			std::string base = name.substr(0, p);
 
@@ -859,7 +868,8 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			type->name = name;
 			type->function = t;
 			type->type = Types::Function;
-
+			type->ns = global;
+			curns = global;
 			global->members.insert({ name, type });
 		}
 		else
