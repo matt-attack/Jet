@@ -884,3 +884,131 @@ Type* Function::GetType(Compilation* compiler)
 	type += ")";
 	return compiler->LookupType(type);
 }
+
+void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
+{
+	for (auto ii : this->members)/// functions)
+	{
+		if (ii.second.type == SymbolType::Function)
+		{
+			data += "extern fun " + ii.second.fn->return_type->ToString() + " ";
+			data += ii.first + "(";
+			bool first = false;
+			for (auto arg : ii.second.fn->arguments)
+			{
+				if (first)
+					data += ",";
+				else
+					first = true;
+
+				data += arg.first->ToString() + " " + arg.second;
+			}
+			data += ");";
+		}
+		else if (ii.second.type == SymbolType::Type)
+		{
+			if (ii.second.ty->type == Types::Struct)
+			{
+				if (ii.second.ty->data->template_base)
+					continue;//dont bother exporting instantiated templates for now
+
+				//export me
+				if (ii.second.ty->data->templates.size() > 0)
+				{
+					data += "struct " + ii.second.ty->data->name + "<";
+					for (int i = 0; i < ii.second.ty->data->templates.size(); i++)
+					{
+						data += ii.second.ty->data->templates[i].first->name + " ";
+						data += ii.second.ty->data->templates[i].second;
+						if (i < ii.second.ty->data->templates.size() - 1)
+							data += ',';
+					}
+					data += ">{";
+				}
+				else
+				{
+					data += "struct " + ii.second.ty->data->name + "{";
+				}
+				for (auto var : ii.second.ty->data->struct_members)
+				{
+					if (var.type == 0 || var.type->type == Types::Invalid)//its a template probably?
+					{
+						data += var.type_name + " ";
+						data += var.name + ";";
+					}
+					else if (var.type->type == Types::Array)
+					{
+						data += var.type->base->ToString() + " ";
+						data += var.name + "[" + std::to_string(var.type->size) + "];";
+					}
+					else
+					{
+						data += var.type->ToString() + " ";
+						data += var.name + ";";
+					}
+				}
+
+				if (ii.second.ty->data->templates.size() > 0 && ii.second.ty->data->template_base == 0)
+				{
+					//output member functions somehow?
+					for (auto fun : ii.second.ty->data->functions)
+					{
+						if (fun.second->expression == 0)
+							continue;
+
+						std::string source; 
+						auto src = fun.second->expression->semicolon.GetSource(compilation);
+						fun.second->expression->Print(source, src);
+						data += source;
+						//printf("%s", source.c_str());
+					}
+					data += "}";
+					continue;
+				}
+				data += "}";
+
+				//output member functions
+				for (auto fun : ii.second.ty->data->functions)
+				{
+					data += "extern fun " + fun.second->return_type->ToString() + " " + ii.second.ty->data->name + "::";
+					data += fun.first + "(";
+					bool first = false;
+					for (int i = 1; i < fun.second->arguments.size(); i++)
+					{
+						if (first)
+							data += ",";
+						else
+							first = true;
+
+						data += fun.second->arguments[i].first->ToString() + " " + fun.second->arguments[i].second;
+					}
+					data += ");";
+				}
+			}
+			else if (ii.second.ty->type == Types::Trait)
+			{
+				data += "trait " + ii.second.ty->trait->name + "{";
+				for (auto fun : ii.second.ty->trait->funcs)
+				{
+					data += " fun " + fun.second->return_type->ToString() + " " + fun.first + "(";
+					bool first = false;
+					for (auto arg : fun.second->arguments)
+					{
+						if (first)
+							data += ",";
+						else
+							first = true;
+
+						data += arg.first->ToString() + " " + arg.second;
+					}
+					data += ");";
+				}
+				data += "}";
+			}
+		}
+		else if (ii.second.type == SymbolType::Namespace)
+		{
+			ii.second.ns->OutputMetadata(data, compilation);
+		}
+	}
+}

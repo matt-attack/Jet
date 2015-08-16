@@ -163,6 +163,8 @@ namespace Jet
 				return r->second.fn;
 			return 0;
 		}
+
+		void OutputMetadata(std::string& data, Compilation* comp);
 	};
 
 	class Function;

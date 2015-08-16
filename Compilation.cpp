@@ -548,7 +548,8 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	//build symbol table for export
 	printf("Building Symbol Table...\n");
 	std::string function;
-	for (auto ii : this->ns->members)/// functions)
+	this->ns->OutputMetadata(function, this);
+	/*for (auto ii : this->ns->members)/// functions)
 	{
 		if (ii.second.type == SymbolType::Function)
 		{
@@ -566,110 +567,110 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 			}
 			function += ");";
 		}
-	}
+	}*/
 
 	std::string types;
 	/*for (auto ii : this->types)
 	{
-	if (ii.second == 0)
-	continue;
-	if (ii.second->type == Types::Struct)
-	{
-	if (ii.second->data->template_base)
-	continue;//dont bother exporting instantiated templates for now
+		if (ii.second == 0)
+			continue;
+		if (ii.second->type == Types::Struct)
+		{
+			if (ii.second->data->template_base)
+				continue;//dont bother exporting instantiated templates for now
 
-	//export me
-	if (ii.second->data->templates.size() > 0)
-	{
-	types += "struct " + ii.second->data->name + "<";
-	for (int i = 0; i < ii.second->data->templates.size(); i++)
-	{
-	types += ii.second->data->templates[i].first->name + " ";
-	types += ii.second->data->templates[i].second;
-	if (i < ii.second->data->templates.size() - 1)
-	types += ',';
-	}
-	types += ">{";
-	}
-	else
-	{
-	types += "struct " + ii.second->data->name + "{";
-	}
-	for (auto var : ii.second->data->struct_members)
-	{
-	if (var.type == 0 || var.type->type == Types::Invalid)//its a template probably?
-	{
-	types += var.type_name + " ";
-	types += var.name + ";";
-	}
-	else if (var.type->type == Types::Array)
-	{
-	types += var.type->base->ToString() + " ";
-	types += var.name + "[" + std::to_string(var.type->size) + "];";
-	}
-	else
-	{
-	types += var.type->ToString() + " ";
-	types += var.name + ";";
-	}
-	}
+			//export me
+			if (ii.second->data->templates.size() > 0)
+			{
+				types += "struct " + ii.second->data->name + "<";
+				for (int i = 0; i < ii.second->data->templates.size(); i++)
+				{
+					types += ii.second->data->templates[i].first->name + " ";
+					types += ii.second->data->templates[i].second;
+					if (i < ii.second->data->templates.size() - 1)
+						types += ',';
+				}
+				types += ">{";
+			}
+			else
+			{
+				types += "struct " + ii.second->data->name + "{";
+			}
+			for (auto var : ii.second->data->struct_members)
+			{
+				if (var.type == 0 || var.type->type == Types::Invalid)//its a template probably?
+				{
+					types += var.type_name + " ";
+					types += var.name + ";";
+				}
+				else if (var.type->type == Types::Array)
+				{
+					types += var.type->base->ToString() + " ";
+					types += var.name + "[" + std::to_string(var.type->size) + "];";
+				}
+				else
+				{
+					types += var.type->ToString() + " ";
+					types += var.name + ";";
+				}
+			}
 
-	if (ii.second->data->templates.size() > 0 && ii.second->data->template_base == 0)
-	{
-	//output member functions somehow?
-	for (auto fun : ii.second->data->functions)
-	{
-	if (fun.second->expression == 0)
-	continue;
+			if (ii.second->data->templates.size() > 0 && ii.second->data->template_base == 0)
+			{
+				//output member functions somehow?
+				for (auto fun : ii.second->data->functions)
+				{
+					if (fun.second->expression == 0)
+						continue;
 
-	std::string source;
-	fun.second->expression->Print(source, current_source);
-	types += source;
-	//printf("%s", source.c_str());
-	}
-	types += "}";
-	continue;
-	}
-	types += "}";
+					std::string source;
+					fun.second->expression->Print(source, current_source);
+					types += source;
+					//printf("%s", source.c_str());
+				}
+				types += "}";
+				continue;
+			}
+			types += "}";
 
-	//output member functions
-	for (auto fun : ii.second->data->functions)
-	{
-	function += "extern fun " + fun.second->return_type->ToString() + " " + ii.second->data->name + "::";
-	function += fun.first + "(";
-	bool first = false;
-	for (int i = 1; i < fun.second->arguments.size(); i++)
-	{
-	if (first)
-	function += ",";
-	else
-	first = true;
+			//output member functions
+			for (auto fun : ii.second->data->functions)
+			{
+				function += "extern fun " + fun.second->return_type->ToString() + " " + ii.second->data->name + "::";
+				function += fun.first + "(";
+				bool first = false;
+				for (int i = 1; i < fun.second->arguments.size(); i++)
+				{
+					if (first)
+						function += ",";
+					else
+						first = true;
 
-	function += fun.second->arguments[i].first->ToString() + " " + fun.second->arguments[i].second;
-	}
-	function += ");";
-	}
-	}
-	if (ii.second->type == Types::Trait)
-	{
-	types += "trait " + ii.second->trait->name + "{";
-	for (auto fun : ii.second->trait->funcs)
-	{
-	types += " fun " + fun.second->return_type->ToString() + " " + fun.first + "(";
-	bool first = false;
-	for (auto arg : fun.second->arguments)
-	{
-	if (first)
-	types += ",";
-	else
-	first = true;
+					function += fun.second->arguments[i].first->ToString() + " " + fun.second->arguments[i].second;
+				}
+				function += ");";
+			}
+		}
+		if (ii.second->type == Types::Trait)
+		{
+			types += "trait " + ii.second->trait->name + "{";
+			for (auto fun : ii.second->trait->funcs)
+			{
+				types += " fun " + fun.second->return_type->ToString() + " " + fun.first + "(";
+				bool first = false;
+				for (auto arg : fun.second->arguments)
+				{
+					if (first)
+						types += ",";
+					else
+						first = true;
 
-	types += arg.first->ToString() + " " + arg.second;
-	}
-	types += ");";
-	}
-	types += "}";
-	}
+					types += arg.first->ToString() + " " + arg.second;
+				}
+				types += ");";
+			}
+			types += "}";
+		}
 	}*/
 
 	//todo: only do this if im a library
@@ -703,14 +704,41 @@ void Compilation::AdvanceTypeLookup(Jet::Type** dest, const std::string& name)
 
 Jet::Type* Compilation::TryLookupType(const std::string& name)
 {
-	try
+	auto pos = name.find_first_of("::");
+	if (pos != -1)
 	{
-		return this->LookupType(name);
+		//navigate to correct namespace
+		std::string ns = name.substr(0, pos);
+		auto res = this->ns->members.find(ns);
+		auto old = this->ns;
+		this->ns = res->second.ns;
+		auto out = this->TryLookupType(name.substr(pos + 2));
+		this->ns = old;
+
+		return out;
 	}
-	catch (...)
+
+	int i = 0;
+	while (IsLetter(name[i++])) {};
+	std::string base = name.substr(0, i - 1);
+
+	//look through namespaces to find the base type
+	auto curns = this->ns;
+	auto res = this->ns->members.find(base);
+	while (res == curns->members.end())
 	{
-		return 0;
+		curns = curns->parent;
+		if (curns == 0)
+			break;
+
+		res = curns->members.find(base);
 	}
+
+	if (curns)
+		res = curns->members.find(name);
+
+	auto type = (curns != 0 && res != curns->members.end() && res->second.type == SymbolType::Type) ? res->second.ty : 0;
+	return type;
 }
 
 
@@ -732,18 +760,26 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 
 	int i = 0;
 	while (IsLetter(name[i++])) {};
-	std::string base = name.substr(0,i-1);
-
+	std::string base = name.substr(0, i - 1);
+	
 	//look through namespaces to find the base type
 	auto curns = this->ns;
 	auto res = this->ns->members.find(base);
-	while (res == curns->members.end())
+	if (name.back() != ')')
 	{
-		curns = curns->parent;
-		if (curns == 0)
-			break;
+		while (res == curns->members.end())
+		{
+			curns = curns->parent;
+			if (curns == 0)
+				break;
 
-		res = curns->members.find(base);
+			res = curns->members.find(base);
+		}
+	}
+	else
+	{
+		res = this->ns->members.end();
+		curns = this->ns;
 	}
 
 	if (curns)
@@ -869,8 +905,23 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			type->function = t;
 			type->type = Types::Function;
 			type->ns = global;
-			curns = global;
-			global->members.insert({ name, type });
+
+			//ok, avoid duplication
+			std::string real_name = type->ToString();
+			auto res = global->members.find(real_name);
+			if (res != global->members.end())
+			{
+				curns = global;
+
+				delete type;
+				delete t;
+				type = res->second.ty;
+			}
+			else
+			{
+				curns = global;
+				global->members.insert({ name, type });
+			}
 		}
 		else
 		{
