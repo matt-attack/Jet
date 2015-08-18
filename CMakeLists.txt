@@ -13,21 +13,26 @@ add_definitions(${LLVM_DEFINITIONS})
 
 include_directories("${PROJECT_BINARY_DIR}")
 
+source_group(Types REGULAR_EXPRESSION Types/*)
 
 add_executable(Jet 
 	jetc.cpp
+	
 	Compiler.cpp
 	CompilerContext.cpp
 	Expressions.cpp
 	Parser.cpp
 	Parselets.cpp
 	Source.cpp
-	Types.cpp
+	Types/Types.cpp
+	Types/Function.cpp
 	Lexer.cpp
 	Token.cpp
 	Project.cpp
 	Compilation.cpp
 )
+
+source_group(Types REGULAR_EXPRESSION Types/*)
 
 add_library(Racer
 	SHARED
@@ -40,7 +45,8 @@ add_library(Racer
 	Parser.cpp
 	Parselets.cpp
 	Source.cpp
-	Types.cpp
+	Types/Types.cpp
+	Types/Function.cpp
 	Lexer.cpp
 	Token.cpp
 	Project.cpp

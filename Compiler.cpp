@@ -20,6 +20,11 @@ using namespace Jet;
 //MCJITHelper* JITHelper;
 #ifdef _WIN32
 #include <Windows.h>
+
+#include <sys/stat.h>
+#else
+#include <sys/types.h>
+#include <unistd.h>
 #endif
 
 class StackTime
@@ -46,7 +51,6 @@ StackTime::StackTime(char* name)
 	QueryPerformanceFrequency((LARGE_INTEGER *)&rate);
 #endif
 }
-extern Source* current_source;
 StackTime::~StackTime()
 {
 	long long  end;
@@ -60,6 +64,9 @@ StackTime::~StackTime()
 	float dt = ((double)diff) / ((double)rate);
 	printf("%s Time: %f seconds\n", this->name, dt);
 }
+
+
+extern Source* current_source;
 
 void Jet::JetError::Print()
 {
@@ -193,7 +200,11 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 	printf("\nCompiling Project: %s\n", projectdir);
 
 	//read in buildtimes
+#ifdef false//_WIN32
 	std::vector<std::pair<int, int>> buildtimes;
+#else
+	std::vector<int> buildtimes;
+#endif
 	std::ifstream rebuild("build/rebuild.txt");
 	std::string compiler_version;
 	if (rebuild.is_open())
@@ -205,6 +216,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 			std::getline(rebuild, line, '\n');
 			if (line.length() == 0)
 				break;
+#ifdef false//_WIN32
 			int hi, lo;
 			sscanf(line.c_str(), "%i,%i", &hi, &lo);
 
@@ -217,20 +229,45 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 			{
 				buildtimes.push_back({ hi, lo });
 			}
+#else
+			int hi;
+			sscanf(line.c_str(), "%i", &hi);
+
+			if (first)
+			{
+				compiler_version = line;
+				first = false;
+			}
+			else
+			{
+				buildtimes.push_back(hi);
+			}
+#endif
 		} while (true);
 	}
 
 
+	
+#ifdef false _WIN32
 	std::vector<std::pair<int, int>> modifiedtimes;
 	auto file = CreateFileA("project.jp", GENERIC_READ, FILE_SHARE_READ, NULL,
 		OPEN_EXISTING, 0, NULL);
 	FILETIME create, modified, access;
 	GetFileTime(file, &create, &access, &modified);
-
 	CloseHandle(file);
 	modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
+#else
+	std::vector<time_t> modifiedtimes;
+	struct stat data;
+	int x = stat("project.jp",&data);
+
+	modifiedtimes.push_back(data.st_mtime);
+#endif
+
+	
 	for (auto ii : project->files)
 	{
+#ifdef false//_WIN32
 		auto file = CreateFileA(ii.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
 			OPEN_EXISTING, 0, NULL);
 		FILETIME create, modified, access;
@@ -238,6 +275,12 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 
 		CloseHandle(file);
 		modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
+#else
+		struct stat data;
+		int x = stat("project.jp",&data);
+
+		modifiedtimes.push_back(data.st_mtime);
+#endif
 	}
 
 	FILE* jlib = fopen("build/symbols.jlib", "rb");
@@ -258,7 +301,11 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 	{
 		for (int i = 0; i < modifiedtimes.size(); i++)
 		{
+#ifdef false//_WIN32
 			if (modifiedtimes[i].first == buildtimes[i].first && modifiedtimes[i].second == buildtimes[i].second)
+#else
+			if (modifiedtimes[i] == buildtimes[i])// && modifiedtimes[i].second == buildtimes[i].second)
+#endif
 			{
 				if (i == modifiedtimes.size() - 1)
 				{
@@ -306,7 +353,11 @@ error:
 		for (auto ii : modifiedtimes)
 		{
 			char str[150];
+#ifdef false //_WIN32
 			int len = sprintf(str, "%i,%i\n", ii.first, ii.second);
+#else
+			int len = sprintf(str, "%i\n", ii);
+#endif
 			rebuild.write(str, len);
 		}
 

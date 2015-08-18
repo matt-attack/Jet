@@ -50,6 +50,8 @@ namespace Jet
 
 		std::map<std::string, Trait*> traits;
 
+		std::map<int, Type*> function_types;
+
 		std::vector<JetError> errors;
 
 		CompilerContext* current_function;
@@ -100,6 +102,8 @@ namespace Jet
 		void Assemble(int olevel);
 
 	private:
+
+		Type* GetFunctionType(Type* return_type, const std::vector<Type*>& args);
 
 		Function* GetFunction(const std::string& name, const std::vector<CValue>& args)
 		{

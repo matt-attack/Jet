@@ -1,5 +1,6 @@
 #include "Compiler.h"
 #include "CompilerContext.h"
+#include "Types/Function.h"
 
 #include "Lexer.h"
 #include "Expressions.h"
@@ -518,4 +519,163 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]).val);//try and cast to the correct type if we can
 
 	return CValue(fun->return_type, this->parent->builder.CreateCall(fun->f, argsv));
+}
+
+void CompilerContext::SetDebugLocation(const Token& t)
+{
+	assert(this->function->loaded);
+	this->parent->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope));
+}
+
+
+CValue CompilerContext::GetVariable(const std::string& name)
+{
+	auto cur = this->scope;
+	CValue value;
+	do
+	{
+		auto iter = cur->named_values.find(name);
+		if (iter != cur->named_values.end())
+		{
+			value = iter->second;
+			break;
+		}
+		cur = cur->prev;
+	} while (cur);
+
+	if (value.type->type == Types::Void)
+	{
+		//ok, now search globals
+		auto global = this->parent->globals.find(name);
+		if (global != this->parent->globals.end())
+			return global->second;
+
+		auto function = this->parent->GetFunction(name);//this->parent->functions.find(name);
+		if (function != 0)//this->parent->functions.end())
+		{
+			function->Load(this->parent);
+			return CValue(function->GetType(this->parent), function->f);
+		}
+
+		this->parent->Error("Undeclared identifier '" + name + "'", *current_token);
+	}
+	return value;
+}
+
+llvm::ReturnInst* CompilerContext::Return(CValue ret)
+{
+	//try and cast if we can
+	if (this->function == 0)
+		this->parent->Error("Cannot return from outside function!", *current_token);
+
+	//call destructors
+	auto cur = this->scope;
+	do
+	{
+		for (auto ii : cur->named_values)
+		{
+			if (ii.second.type->type == Types::Struct)
+			{
+				//look for destructor
+				auto name = "~" + (ii.second.type->data->template_base ? ii.second.type->data->template_base->name : ii.second.type->data->name);
+				auto destructor = ii.second.type->data->functions.find(name);
+				if (destructor != ii.second.type->data->functions.end())
+				{
+					//call it
+					this->Call(name, { CValue(this->parent->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
+				}
+			}
+		}
+		cur = cur->prev;
+	} while (cur);
+
+	if (ret.val)
+		ret = this->DoCast(this->function->return_type, ret);
+	return parent->builder.CreateRet(ret.val);
+}
+
+CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
+{
+	if (value.type->type == t->type && value.type->data == t->data)
+		return value;
+
+	llvm::Type* tt = GetType(t);
+	if (value.type->type == Types::Float && t->type == Types::Double)
+	{
+		//lets do this
+		return CValue(t, parent->builder.CreateFPExt(value.val, tt));
+	}
+	if (value.type->type == Types::Double && t->type == Types::Float)
+	{
+		//lets do this
+		return CValue(t, parent->builder.CreateFPTrunc(value.val, tt));
+	}
+	if (value.type->type == Types::Double || value.type->type == Types::Float)
+	{
+		//float to int
+		if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
+			return CValue(t, parent->builder.CreateFPToSI(value.val, tt));
+
+		//remove me later float to bool
+		if (t->type == Types::Bool)
+			return CValue(t, parent->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
+	}
+	if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
+	{
+		//int to float
+		if (t->type == Types::Double || t->type == Types::Float)
+			return CValue(t, parent->builder.CreateSIToFP(value.val, tt));
+		if (t->type == Types::Bool)
+			return CValue(t, parent->builder.CreateIsNotNull(value.val));
+		if (t->type == Types::Pointer)
+		{
+			return CValue(t, parent->builder.CreateIntToPtr(value.val, GetType(t)));
+		}
+
+		if (value.type->type == Types::Int && (t->type == Types::Char || t->type == Types::Short))
+		{
+			return CValue(t, parent->builder.CreateTrunc(value.val, GetType(t)));
+		}
+	}
+	if (value.type->type == Types::Pointer)
+	{
+		//pointer to bool
+		if (t->type == Types::Bool)
+			return CValue(t, parent->builder.CreateIsNotNull(value.val));
+		if (Explicit)
+		{
+			if (t->type == Types::Pointer)
+			{
+				//pointer to pointer cast;
+				return CValue(t, parent->builder.CreatePointerCast(value.val, GetType(t), "ptr2ptr"));
+			}
+		}
+	}
+	if (value.type->type == Types::Array)
+	{
+		//array to pointer
+		if (t->type == Types::Pointer)
+		{
+			if (t->base == value.type->base)
+			{
+				//lets just try it
+				//fixme later
+				//ok, this doesnt work because the value is getting loaded beforehand!!!
+				/*std::vector<llvm::Value*> arr = { parent->builder.getInt32(0), parent->builder.getInt32(0) };
+
+				this->f->dump();
+				value.val->dump();
+				value.val = parent->builder.CreateGEP(value.val, arr, "array2ptr");
+				value.val->dump();
+				return CValue(t, value.val);*/
+			}
+		}
+	}
+	if (value.type->type == Types::Function)
+	{
+		if (t->type == Types::Function && t->function == value.type->function)
+			return value;
+	}
+
+	this->parent->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 }

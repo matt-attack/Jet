@@ -3,6 +3,7 @@
 #include "Source.h"
 #include "Expressions.h"
 #include "Lexer.h"
+#include "Types/Function.h"
 
 #include <direct.h>
 
@@ -10,17 +11,17 @@
 #include <llvm/ADT/Triple.h>
 #include <llvm/Support/Host.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
-#include <llvm\IR\AssemblyAnnotationWriter.h>
-#include <llvm\Support\FormattedStream.h>
-#include <llvm\Support\raw_os_ostream.h>
+#include <llvm/IR/AssemblyAnnotationWriter.h>
+#include <llvm/Support/FormattedStream.h>
+#include <llvm/Support/raw_os_ostream.h>
 #include <llvm/CodeGen/CommandFlags.h>
-#include <llvm\Target\TargetRegisterInfo.h>
-#include <llvm\Support\TargetRegistry.h>
-#include <llvm\Target\TargetMachine.h>
-#include <llvm\Target\TargetSubtargetInfo.h>
+#include <llvm/Target/TargetRegisterInfo.h>
+#include <llvm/Support/TargetRegistry.h>
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/Target/TargetSubtargetInfo.h>
 #include <llvm/Transforms/IPO.h>
-#include <llvm\IR\DataLayout.h>
-#include <llvm\IR\GlobalVariable.h>
+#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/GlobalVariable.h>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -744,7 +745,7 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 
 Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 {
-	auto pos = name.find_first_of("::");
+	/*auto pos = name.find_first_of("::");
 	if (pos != -1)
 	{
 		//navigate to correct namespace
@@ -756,10 +757,23 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 		this->ns = old;
 
 		return out;
-	}
+	}*/
 
 	int i = 0;
 	while (IsLetter(name[i++])) {};
+
+	if (name.length() > i + 1 && name[i-1] == ':' && name[i] == ':')
+	{
+		//navigate to correct namespace
+		std::string ns = name.substr(0, i-1);
+		auto res = this->ns->members.find(ns);
+		auto old = this->ns;
+		this->ns = res->second.ns;
+		auto out = this->LookupType(name.substr(i - 1 + 2), load);
+		this->ns = old;
+
+		return out;
+	}
 	std::string base = name.substr(0, i - 1);
 	
 	//look through namespaces to find the base type
@@ -895,8 +909,10 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 				if (name[p] == ',')
 					p++;
 			}
+			curns = global;
+			type = this->GetFunctionType(rtype, args);
 
-			auto t = new FunctionType;
+			/*auto t = new FunctionType;
 			t->args = args;
 			t->return_type = rtype;
 
@@ -921,7 +937,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			{
 				curns = global;
 				global->members.insert({ name, type });
-			}
+			}*/
 		}
 		else
 		{
@@ -966,4 +982,31 @@ void Compilation::Error(const std::string& string, Token token)
 	error.file = current_source->filename;
 	this->errors.push_back(error);
 	throw 7;
+}
+
+::Jet::Type* Compilation::GetFunctionType(::Jet::Type* return_type, const std::vector<::Jet::Type*>& args)
+{
+	int key = (int)return_type;
+	for (auto arg : args)
+		key ^= (int)arg;
+
+	auto f = this->function_types.find(key);
+	if (f == this->function_types.end())
+	{
+		auto t = new FunctionType;
+		t->args = args;
+		t->return_type = return_type;
+
+		auto type = new Type;
+		type->function = t;
+		type->type = Types::Function;
+		type->ns = global;
+		type->name = type->ToString();
+
+		global->members.insert({ type->name, type });
+
+		function_types[key] = type;
+		return type;
+	}
+	return f->second;
 }

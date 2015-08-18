@@ -1772,71 +1772,7 @@ namespace Jet
 			return CValue();
 		}
 
-		void CompileDeclarations(CompilerContext* context)
-		{
-			//check if trait already exists, if its in the table and set as invalid, then we can just fill in the blanks
-			Trait* t;
-			auto tr = context->parent->ns->members.find(name.text);
-			if (tr == context->parent->ns->members.end())
-			{
-				t = new Trait;
-				Type* ty = new Type(name.text, Types::Trait);
-				ty->trait = t;
-				context->parent->ns->members.insert({ name.text, Symbol(ty) });
-				//context->parent->types[name.text] = ty;
-				context->parent->traits[name.text] = t;
-			}
-			//else if (tr->second->valid == false)//make sure it is set as invalid
-			//t = tr->second;
-			else
-				context->parent->Error("Type '" + name.text + "' already exists", token);
-			t->valid = true;
-			t->name = this->name.text;
-			t->parent = context->parent->ns;
-
-			//set this as a namespace, add T as a type
-			if (this->templates)
-			{
-				t->templates.reserve(this->templates->size());
-
-				for (auto ii : *this->templates)
-				{
-					if (ii.first.text.length() == 0)
-						t->templates.push_back({ 0, ii.second.text });
-					else
-					{
-						t->templates.push_back({ 0, ii.second.text });
-						context->parent->AdvanceTypeLookup(&t->templates.back().first, ii.first.text);
-						//auto trait = context->parent->AdvanceTypeLookup(ii.first.text);
-						//t->templates.push_back({ trait, ii.second.text });
-					}
-
-					auto type = new Type;
-					type->name = ii.second.text;
-					type->type = Types::Invalid;
-					type->ns = context->parent->ns;
-					context->parent->ns->members.insert({ type->name, type });
-				}
-
-				
-			}
-
-			for (auto ii : this->funcs)
-			{
-				Function* func = new Function("");
-				/*func->return_type = */context->parent->AdvanceTypeLookup(&func->return_type, ii.ret_type.text);
-				func->arguments.reserve(ii.args.size());
-				for (auto arg : ii.args)
-				{
-					func->arguments.push_back({ 0, "dummy" });
-					context->parent->AdvanceTypeLookup(&func->arguments.back().first, arg.text);
-				}
-
-				t->funcs.insert({ ii.name.text, func });
-			}
-
-			context->parent->ns = t->parent;
-		}
+		void CompileDeclarations(CompilerContext* context);
 
 		void Print(std::string& output, Source* source)
 		{

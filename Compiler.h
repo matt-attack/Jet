@@ -11,7 +11,7 @@
 #include <crtdbg.h>
 #endif*/
 
-#include "Types.h"
+#include "Types/Types.h"
 #include "Token.h"
 #include "Compilation.h"
 

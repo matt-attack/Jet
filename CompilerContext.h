@@ -5,15 +5,15 @@
 //#include "Parser.h"
 //#include "Lexer.h"
 
-#include <llvm\IR\IRBuilder.h>
-#include <llvm\IR\LLVMContext.h>
-#include <llvm\IR\Module.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 
 //#include <string>
 //#include <vector>
 //#include <map>
 
-#include "Types.h"
+#include "Types/Types.h"
 #include "Token.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
@@ -24,13 +24,8 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/Scalar.h"
 
-//lets get functions with the same name but different args working for structs
-//then add templates/generics
 namespace Jet
 {
-	//global compiler context
-
-
 	struct Scope
 	{
 		std::map<std::string, CValue> named_values;
@@ -100,39 +95,7 @@ namespace Jet
 			this->scope->named_values[name] = val;
 		}
 
-		CValue GetVariable(const std::string& name)
-		{
-			auto cur = this->scope;
-			CValue value;
-			do
-			{
-				auto iter = cur->named_values.find(name);
-				if (iter != cur->named_values.end())
-				{
-					value = iter->second;
-					break;
-				}
-				cur = cur->prev;
-			} while (cur);
-
-			if (value.type->type == Types::Void)
-			{
-				//ok, now search globals
-				auto global = this->parent->globals.find(name);
-				if (global != this->parent->globals.end())
-					return global->second;
-
-				auto function = this->parent->GetFunction(name);//this->parent->functions.find(name);
-				if (function != 0)//this->parent->functions.end())
-				{
-					function->Load(this->parent);
-					return CValue(function->GetType(this->parent), function->f);
-				}
-
-				this->parent->Error("Undeclared identifier '" + name + "'", *current_token);
-			}
-			return value;
-		}
+		CValue GetVariable(const std::string& name);
 
 		llvm::StoreInst* Store(const std::string& name, CValue val)
 		{
@@ -153,11 +116,7 @@ namespace Jet
 			return CValue(value.type->base, parent->builder.CreateLoad(value.val, name.c_str()));
 		}
 
-		void SetDebugLocation(const Token& t)
-		{
-			assert(this->function->loaded);
-			this->parent->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope));
-		}
+		void SetDebugLocation(const Token& t);
 
 		void SetNamespace(const std::string& name)
 		{
@@ -173,7 +132,7 @@ namespace Jet
 			ns->name = name;
 			ns->parent = this->parent->ns;
 
-			this->parent->ns->members.insert({ name, Symbol(ns) });// [name] = s;
+			this->parent->ns->members.insert({ name, Symbol(ns) });
 			this->parent->ns = ns;
 		}
 
@@ -220,37 +179,7 @@ namespace Jet
 			this->parent->builder.SetInsertPoint(bb);
 		}
 
-		llvm::ReturnInst* Return(CValue ret)
-		{
-			//try and cast if we can
-			if (this->function == 0)
-				this->parent->Error("Cannot return from outside function!", *current_token);
-
-			//call destructors
-			auto cur = this->scope;
-			do
-			{
-				for (auto ii : cur->named_values)
-				{
-					if (ii.second.type->type == Types::Struct)
-					{
-						//look for destructor
-						auto name = "~" + (ii.second.type->data->template_base ? ii.second.type->data->template_base->name : ii.second.type->data->name);
-						auto destructor = ii.second.type->data->functions.find(name);
-						if (destructor != ii.second.type->data->functions.end())
-						{
-							//call it
-							this->Call(name, { CValue(this->parent->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
-						}
-					}
-				}
-				cur = cur->prev;
-			} while (cur);
-
-			if (ret.val)
-				ret = this->DoCast(this->function->return_type, ret);
-			return parent->builder.CreateRet(ret.val);
-		}
+		llvm::ReturnInst* Return(CValue ret);
 
 		Token* current_token;
 		inline void CurrentToken(Token* token)
@@ -293,91 +222,7 @@ namespace Jet
 			this->scope = this->scope->prev;
 		}
 
-		CValue DoCast(Type* t, CValue value, bool Explicit = false)
-		{
-			if (value.type->type == t->type && value.type->data == t->data)
-				return value;
-
-			llvm::Type* tt = GetType(t);
-			if (value.type->type == Types::Float && t->type == Types::Double)
-			{
-				//lets do this
-				return CValue(t, parent->builder.CreateFPExt(value.val, tt));
-			}
-			if (value.type->type == Types::Double && t->type == Types::Float)
-			{
-				//lets do this
-				return CValue(t, parent->builder.CreateFPTrunc(value.val, tt));
-			}
-			if (value.type->type == Types::Double || value.type->type == Types::Float)
-			{
-				//float to int
-				if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
-					return CValue(t, parent->builder.CreateFPToSI(value.val, tt));
-
-				//remove me later float to bool
-				if (t->type == Types::Bool)
-					return CValue(t, parent->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
-			}
-			if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
-			{
-				//int to float
-				if (t->type == Types::Double || t->type == Types::Float)
-					return CValue(t, parent->builder.CreateSIToFP(value.val, tt));
-				if (t->type == Types::Bool)
-					return CValue(t, parent->builder.CreateIsNotNull(value.val));
-				if (t->type == Types::Pointer)
-				{
-					return CValue(t, parent->builder.CreateIntToPtr(value.val, GetType(t)));
-				}
-
-				if (value.type->type == Types::Int && (t->type == Types::Char || t->type == Types::Short))
-				{
-					return CValue(t, parent->builder.CreateTrunc(value.val, GetType(t)));
-				}
-			}
-			if (value.type->type == Types::Pointer)
-			{
-				//pointer to bool
-				if (t->type == Types::Bool)
-					return CValue(t, parent->builder.CreateIsNotNull(value.val));
-				if (Explicit)
-				{
-					if (t->type == Types::Pointer)
-					{
-						//pointer to pointer cast;
-						return CValue(t,parent->builder.CreatePointerCast(value.val, GetType(t), "ptr2ptr"));
-					}
-				}
-			}
-			if (value.type->type == Types::Array)
-			{
-				//array to pointer
-				if (t->type == Types::Pointer)
-				{
-					if (t->base == value.type->base)
-					{
-						//lets just try it
-						//fixme later
-						//ok, this doesnt work because the value is getting loaded beforehand!!!
-						/*std::vector<llvm::Value*> arr = { parent->builder.getInt32(0), parent->builder.getInt32(0) };
-
-						this->f->dump();
-						value.val->dump();
-						value.val = parent->builder.CreateGEP(value.val, arr, "array2ptr");
-						value.val->dump();
-						return CValue(t, value.val);*/
-					}
-				}
-			}
-			if (value.type->type == Types::Function)
-			{
-				if (t->type == Types::Function && t->function == value.type->function)
-					return value;
-			}
-
-			this->parent->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
-		}
+		CValue DoCast(Type* t, CValue value, bool Explicit = false);
 
 		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member = false);
 
