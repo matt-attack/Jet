@@ -392,13 +392,13 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 					i++;
 				}
 			}
-			
+
 			for (int i = 0; i < fun->templates.size(); i++)
 			{
 				if (templates[i] == 0)
 					this->parent->Error("Could not infer template type", *this->current_token);
 			}
-			
+
 			auto oldname = fun->expression->name.text;
 			fun->expression->name.text += '<';
 			for (int i = 0; i < fun->templates.size(); i++)
@@ -409,7 +409,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 			}
 			fun->expression->name.text += '>';
 			auto rname = fun->expression->name.text;
-			
+
 			//register the types
 			int i = 0;
 			for (auto ii : fun->templates)
@@ -495,10 +495,8 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			{
 				if (var.type->type == Types::Pointer && var.type->base->type == Types::Struct && var.type->base->data->template_base && var.type->base->data->template_base->name == "function")
 				{
-					//var.val->dump();
-					//var.val->getType()->dump();
 					auto function_ptr = this->parent->builder.CreateGEP(var.val, { this->parent->builder.getInt32(0), this->parent->builder.getInt32(0) }, "fptr");
-					
+
 					auto type = var.type->base->data->members.find("T")->second.ty;
 					std::vector<llvm::Value*> argsv;
 					for (int i = 0; i < args.size(); i++)
@@ -506,13 +504,20 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 					//add the data
 					auto data_ptr = this->parent->builder.CreateGEP(var.val, { this->parent->builder.getInt32(0), this->parent->builder.getInt32(1) });
-					//data_ptr->getType()->dump();
 					data_ptr = this->parent->builder.CreateGEP(data_ptr, { this->parent->builder.getInt32(0), this->parent->builder.getInt32(0) });
-					//data_ptr->getType()->dump();
 					argsv.push_back(data_ptr);
 
-					auto fun = this->parent->builder.CreateLoad(function_ptr);
-					//fun->dump();
+					llvm::Value* fun = this->parent->builder.CreateLoad(function_ptr);
+					fun->getType()->dump();
+
+					auto rtype = fun->getType()->getContainedType(0)->getContainedType(0);
+					std::vector<llvm::Type*> fargs;
+					for (int i = 1; i < fun->getType()->getContainedType(0)->getNumContainedTypes(); i++)
+						fargs.push_back(fun->getType()->getContainedType(0)->getContainedType(i));
+					fargs.push_back(this->parent->builder.getInt8PtrTy());
+
+					auto fp = llvm::FunctionType::get(rtype, fargs, false)->getPointerTo();
+					fun = this->parent->builder.CreatePointerCast(fun, fp);
 					return CValue(type->function->return_type, this->parent->builder.CreateCall(fun, argsv));
 				}
 				else
@@ -551,7 +556,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		//this->DoCast(fun->arguments[i].first, args[i]).val->dump();
 		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]).val);//try and cast to the correct type if we can
 	}
-	
+
 	//fun->f->dump();
 	return CValue(fun->return_type, this->parent->builder.CreateCall(fun->f, argsv));
 }

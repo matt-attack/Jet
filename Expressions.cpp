@@ -650,7 +650,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			std::vector<Type*> args;
 			for (auto ii : argsv)
 				args.push_back(ii.first);
-			args.push_back(context->parent->LookupType("char*"));
+			//args.push_back(context->parent->LookupType("char*"));
 
 			lambda_type = context->parent->LookupType("function<" + context->parent->GetFunctionType(ret, args)->ToString() + ">");
 			lambda = context->parent->builder.CreateAlloca(GetType(lambda_type));
@@ -680,7 +680,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 				captured.push_back({ var.text, val.type });
 			}
 
-			argsv.push_back({ args.back(), "_capture_data" });
+			argsv.push_back({ context->parent->LookupType("char*"), "_capture_data" });
 		}
 	}
 
@@ -754,6 +754,8 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	if (lambda)
 	{
 		auto ptr = context->parent->builder.CreateGEP(lambda, { context->parent->builder.getInt32(0), context->parent->builder.getInt32(0) }, "name");
+
+		ptr = context->parent->builder.CreatePointerCast(ptr, function->f->getType()->getPointerTo());
 		context->parent->builder.CreateStore(function->f, ptr);
 	}
 
