@@ -610,6 +610,25 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 Expression* LambdaParselet::parse(Parser* parser, Token token)
 {
 	//parser->Consume(TokenType::LeftParen);
+	//parse captures
+	auto captures = new std::vector < Token > ;
+	if (parser->LookAhead().type != TokenType::RightBracket)
+	{
+		do
+		{
+			Token name = parser->Consume(TokenType::Name);
+			captures->push_back(name);
+		} while (parser->MatchAndConsume(TokenType::Comma));
+	}
+	if (captures->size() == 0)
+	{
+		delete captures;
+		captures = 0;
+	}
+
+	parser->Consume(TokenType::RightBracket);
+
+	parser->Consume(TokenType::LeftParen);
 
 	//NameExpression* varargs = 0;
 	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
@@ -618,7 +637,7 @@ Expression* LambdaParselet::parse(Parser* parser, Token token)
 		do
 		{
 			Token type;
-			if (parser->LookAhead(1).type != TokenType::Comma && parser->LookAhead(1).type != TokenType::RightBracket)
+			if (parser->LookAhead(1).type != TokenType::Comma && parser->LookAhead(1).type != TokenType::RightParen)
 				type = ::ParseType(parser);
 
 			Token name = parser->Consume();
@@ -640,13 +659,13 @@ Expression* LambdaParselet::parse(Parser* parser, Token token)
 		} while (parser->MatchAndConsume(TokenType::Comma));
 	}
 
-	parser->Consume(TokenType::RightBracket);
+	parser->Consume(TokenType::RightParen);
 	Token ret_type;
 	if (parser->MatchAndConsume(TokenType::Pointy))
 		ret_type = ::ParseType(parser);
 
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, Token(), ret_type, arguments, block, Token(), 0);
+	return new FunctionExpression(token, Token(), ret_type, arguments, block, Token(), 0, captures);
 }
 
 Expression* CallParselet::parse(Parser* parser, Expression* left, Token token)

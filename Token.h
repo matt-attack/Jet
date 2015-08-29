@@ -134,6 +134,7 @@ namespace Jet
 
 		Token()
 		{
+			line = 1;
 		}
 
 		Token(const char* source, unsigned int trivia_length, unsigned int line, unsigned int column, TokenType type, std::string txt)

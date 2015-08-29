@@ -5,10 +5,17 @@
 #include <map>
 #include <vector>
 
+#include "Token.h"
+#include "Types\Types.h"
+
 #include <llvm\IR\IRBuilder.h>
 #include <llvm\IR\LLVMContext.h>
 #include <llvm\IR\Module.h>
 
+namespace llvm
+{
+	class DIBuilder;
+}
 namespace Jet
 {
 	struct JetError
@@ -23,6 +30,10 @@ namespace Jet
 		void Print();
 	};
 
+	class Namespace;
+	class Source;
+	class Type;
+	class Trait;
 	class CompilerContext;
 	class JetProject;
 	class BlockExpression;
@@ -110,42 +121,9 @@ namespace Jet
 			return this->GetFunction(name);
 		}
 
-		Function* GetFunction(const std::string& name)
-		{
-			auto r = this->ns->members.find(name);
-			if (r != this->ns->members.end() && r->second.type == SymbolType::Function)
-				return r->second.fn;
-			//try lower one
-			auto next = this->ns->parent;
-			while (next)
-			{
-				r = next->members.find(name);
-				if (r != next->members.end() && r->second.type == SymbolType::Function)
-					return r->second.fn;
+		Function* GetFunction(const std::string& name);
 
-				next = next->parent;
-			}
-			return 0;
-		}
-
-		void ResolveTypes()
-		{
-			auto oldns = this->ns;
-			for (int i = 0; i < this->types.size(); i++)// auto ii : this->types)
-			{
-				if ((*types[i].second)->type == Types::Invalid)
-				{
-					//resolve me
-
-					this->ns = types[i].first;
-
-					auto res = this->LookupType((*types[i].second)->name, false);
-					*types[i].second = res;
-				}
-			}
-			this->types.clear();
-			this->ns = oldns;
-		}
+		void ResolveTypes();
 
 		void Optimize(int level);
 

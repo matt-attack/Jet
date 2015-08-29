@@ -4,13 +4,14 @@
 //#include "Compiler.h"
 //#include "Parser.h"
 //#include "Lexer.h"
+#include "Compilation.h"
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
 //#include <string>
-//#include <vector>
+#include <vector>
 //#include <map>
 
 #include "Types/Types.h"
@@ -187,15 +188,7 @@ namespace Jet
 			current_token = token;
 		}
 
-		Scope* PushScope()
-		{
-			auto temp = this->scope;
-			this->scope = new Scope;
-			this->scope->prev = temp;
-
-			temp->next.push_back(this->scope);
-			return this->scope;
-		}
+		Scope* PushScope();
 
 		void PopScope()
 		{

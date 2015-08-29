@@ -606,6 +606,21 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 				if (this->ret_type.text.length() == 0)//infer return type
 					this->ret_type.text = type->function->return_type->ToString();
 			}
+			else if (type->type == Types::Struct && type->data->template_base->name == "function")
+			{
+				//do type inference
+				auto fun = type->data->template_args[0]->function;
+				int i2 = 0;
+				for (auto& ii : *this->args)
+				{
+					if (ii.first.length() == 0)//do type inference
+						ii.first = fun->args[i2]->ToString();
+					i2++;
+				}
+
+				if (this->ret_type.text.length() == 0)//infer return type
+					this->ret_type.text = fun->return_type->ToString();
+			}
 		}
 		else
 		{
@@ -622,6 +637,52 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	context->CurrentToken(&this->ret_type);
 	auto ret = context->parent->LookupType(this->ret_type.text);
+
+	llvm::Value* lambda = 0;
+	std::vector<std::pair<std::string, Type*>> captured;
+	Type* lambda_type = 0;
+	llvm::Type* storage_t = 0;
+	if (is_lambda)
+	{
+		if (this->captures)
+		{
+			//allocate the function object
+			std::vector<Type*> args;
+			for (auto ii : argsv)
+				args.push_back(ii.first);
+			args.push_back(context->parent->LookupType("char*"));
+
+			lambda_type = context->parent->LookupType("function<" + context->parent->GetFunctionType(ret, args)->ToString() + ">");
+			lambda = context->parent->builder.CreateAlloca(GetType(lambda_type));
+
+			std::vector<llvm::Type*> elements;
+			for (auto ii : *this->captures)
+			{
+				auto var = context->GetVariable(ii.text);
+				elements.push_back(GetType(var.type->base));
+			}
+
+			storage_t = llvm::StructType::get(context->parent->context, elements);
+
+			for (int i = 0; i < this->captures->size(); i++)
+			{
+				auto var = (*this->captures)[i];
+
+				//get pointer to data location
+				auto ptr = context->parent->builder.CreateGEP(lambda, { context->parent->builder.getInt32(0), context->parent->builder.getInt32(1) }, "lamda_data");
+				ptr = context->parent->builder.CreatePointerCast(ptr, storage_t->getPointerTo());
+				ptr = context->parent->builder.CreateGEP(ptr, { context->parent->builder.getInt32(0), context->parent->builder.getInt32(i) });
+
+				//then store it
+				auto val = context->Load(var.text);
+				context->parent->builder.CreateStore(val.val, ptr);
+
+				captured.push_back({ var.text, val.type });
+			}
+
+			argsv.push_back({ args.back(), "_capture_data" });
+		}
+	}
 
 	CompilerContext* function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? true : false);// , this->varargs);
 
@@ -654,6 +715,27 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		function->RegisterLocal(aname, CValue(argsv[Idx].first->GetPointerType(context), Alloca));
 	}
 
+	if (lambda)
+	{
+		CValue location = function->Load("_capture_data");
+		auto data = context->parent->builder.CreatePointerCast(location.val, storage_t->getPointerTo());// GetType(ii.second->GetPointerType(context)));
+
+		int i = 0;
+		for (auto ii : captured)
+		{
+			//load it, then store it as a local
+			auto val = context->parent->builder.CreateGEP(data, { context->parent->builder.getInt32(0), context->parent->builder.getInt32(i++) });
+			
+			CValue value;
+			value.val = context->parent->builder.CreateAlloca(GetType(ii.second));
+			value.type = ii.second->GetPointerType(context);
+
+			function->RegisterLocal(ii.first, value);
+
+			context->parent->builder.CreateStore(context->parent->builder.CreateLoad(val), value.val);
+		}
+	}
+
 	block->Compile(function);
 
 	//check for return, and insert one or error if there isnt one
@@ -668,7 +750,18 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		context->parent->builder.SetInsertPoint(rp);
 
 	context->parent->current_function = context;
-	return CValue(function->function->GetType(context->parent), function->f);
+
+	if (lambda)
+	{
+		auto ptr = context->parent->builder.CreateGEP(lambda, { context->parent->builder.getInt32(0), context->parent->builder.getInt32(0) }, "name");
+		context->parent->builder.CreateStore(function->f, ptr);
+	}
+
+	context->CurrentToken(&this->token);
+	if (lambda)
+		return CValue(lambda_type, context->parent->builder.CreateLoad(lambda));
+	else
+		return CValue(function->function->GetType(context->parent), function->f);
 }
 
 void FunctionExpression::CompileDeclarations(CompilerContext* context)
@@ -736,7 +829,8 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			fun->templates.push_back({ context->parent->LookupType(ii.first.text), ii.second.text });
 	}
 
-
+	//if (is_trait == false)
+	//{
 	for (auto ii : *this->args)
 	{
 		Type* type = 0;
@@ -746,9 +840,10 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			type = context->parent->LookupType(ii.first);
 
 		fun->arguments.push_back({ type, ii.second });
-		if (advlookup)
+		if (advlookup && is_trait == false)
 			/*type = */context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first);
 	}
+	//}
 }
 
 CValue ExternExpression::Compile(CompilerContext* context)

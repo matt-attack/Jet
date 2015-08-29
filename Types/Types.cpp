@@ -69,6 +69,10 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 
 		return compiler->debug->createSubroutineType(compiler->debug_info.file, compiler->debug->getOrCreateTypeArray(ftypes));
 	}
+	if (this->type == Types::Array)
+	{
+		return compiler->debug->createArrayType(this->size, 8, this->base->GetDebugType(compiler), 0);
+	}
 	printf("oops");
 }
 
@@ -697,7 +701,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 				if (def || ii->second->arguments.size() == args.size())
 					fun = ii->second;
 			}
-
+			
 			if (fun)
 			{
 				auto ns = new Namespace;

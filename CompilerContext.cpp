@@ -489,10 +489,41 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		else
 		{
 			//try to find it in variables
-			auto var = this->Load(name);
+			auto var = this->GetVariable(name);
 
-			if (var.type->type != Types::Function)
-				this->parent->Error("Cannot call non-function type", *this->current_token);
+			if (var.type->type != Types::Function && (var.type->type != Types::Pointer || var.type->base->type != Types::Function))
+			{
+				if (var.type->type == Types::Pointer && var.type->base->type == Types::Struct && var.type->base->data->template_base && var.type->base->data->template_base->name == "function")
+				{
+					//var.val->dump();
+					//var.val->getType()->dump();
+					auto function_ptr = this->parent->builder.CreateGEP(var.val, { this->parent->builder.getInt32(0), this->parent->builder.getInt32(0) }, "fptr");
+					
+					auto type = var.type->base->data->members.find("T")->second.ty;
+					std::vector<llvm::Value*> argsv;
+					for (int i = 0; i < args.size(); i++)
+						argsv.push_back(this->DoCast(type->function->args[i], args[i]).val);//try and cast to the correct type if we can
+
+					//add the data
+					auto data_ptr = this->parent->builder.CreateGEP(var.val, { this->parent->builder.getInt32(0), this->parent->builder.getInt32(1) });
+					//data_ptr->getType()->dump();
+					data_ptr = this->parent->builder.CreateGEP(data_ptr, { this->parent->builder.getInt32(0), this->parent->builder.getInt32(0) });
+					//data_ptr->getType()->dump();
+					argsv.push_back(data_ptr);
+
+					auto fun = this->parent->builder.CreateLoad(function_ptr);
+					//fun->dump();
+					return CValue(type->function->return_type, this->parent->builder.CreateCall(fun, argsv));
+				}
+				else
+					this->parent->Error("Cannot call non-function type", *this->current_token);
+			}
+
+			if (var.type->type == Types::Pointer && var.type->base->type == Types::Function)
+			{
+				var.val = this->parent->builder.CreateLoad(var.val);
+				var.type = var.type->base;
+			}
 
 			std::vector<llvm::Value*> argsv;
 			for (int i = 0; i < args.size(); i++)
@@ -516,8 +547,12 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 	std::vector<llvm::Value*> argsv;
 	for (int i = 0; i < args.size(); i++)// auto ii : args)
+	{
+		//this->DoCast(fun->arguments[i].first, args[i]).val->dump();
 		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]).val);//try and cast to the correct type if we can
-
+	}
+	
+	//fun->f->dump();
 	return CValue(fun->return_type, this->parent->builder.CreateCall(fun->f, argsv));
 }
 
@@ -678,4 +713,14 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	}
 
 	this->parent->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
+}
+
+Scope* CompilerContext::PushScope()
+{
+	auto temp = this->scope;
+	this->scope = new Scope;
+	this->scope->prev = temp;
+
+	temp->next.push_back(this->scope);
+	return this->scope;
 }

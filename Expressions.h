@@ -1598,6 +1598,7 @@ namespace Jet
 		friend struct Struct;
 		Token name;
 		std::vector<std::pair<std::string, std::string>>* args;
+		std::vector<Token>* captures;
 		ScopeExpression* block;
 		Token token;
 
@@ -1614,7 +1615,7 @@ namespace Jet
 			return block;
 		}
 
-		FunctionExpression(Token token, Token name, Token ret_type, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, std::vector<std::pair<Token, Token>>* templates)
+		FunctionExpression(Token token, Token name, Token ret_type, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures = 0)
 		{
 			this->ret_type = ret_type;
 			this->args = args;
@@ -1624,6 +1625,7 @@ namespace Jet
 			this->varargs = 0;// varargs;
 			this->Struct = Struct;
 			this->templates = templates;
+			this->captures = captures;
 		}
 
 		~FunctionExpression()

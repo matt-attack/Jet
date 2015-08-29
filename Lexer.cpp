@@ -97,8 +97,7 @@ public:
 		keywords["fun"] = TokenType::Function;
 		keywords["return"] = TokenType::Ret;
 		keywords["for"] = TokenType::For;
-		//add spanish mode yo!
-		keywords["por"] = TokenType::For;
+		
 		keywords["local"] = TokenType::Local;
 		keywords["break"] = TokenType::Break;
 		keywords["continue"] = TokenType::Continue;
