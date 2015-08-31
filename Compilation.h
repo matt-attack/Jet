@@ -60,6 +60,7 @@ namespace Jet
 		} debug_info;
 
 		std::map<std::string, Trait*> traits;
+		std::vector<llvm::Function*> functions;//a list of all functions to be able to optimize and shizzle
 
 		std::map<int, Type*> function_types;
 

@@ -1557,6 +1557,11 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context);
 
+		Type* GetReturnType()
+		{
+			return 0;
+		}
+
 		void CompileDeclarations(CompilerContext* context) {};
 
 		void Print(std::string& output, Source* source)

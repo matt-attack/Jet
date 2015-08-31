@@ -53,7 +53,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		auto ft = llvm::FunctionType::get(GetType(ret), oargs, false);
 
 		func->f = n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
-
+		this->parent->functions.push_back(n->f);
 		n->function = func;
 
 		if (member == false)
@@ -508,7 +508,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 					argsv.push_back(data_ptr);
 
 					llvm::Value* fun = this->parent->builder.CreateLoad(function_ptr);
-					fun->getType()->dump();
+					//fun->getType()->dump();
 
 					auto rtype = fun->getType()->getContainedType(0)->getContainedType(0);
 					std::vector<llvm::Type*> fargs;

@@ -117,9 +117,7 @@ llvm::Type* Jet::GetType(Type* t)
 
 std::string Jet::ParseType(const char* tname, int& p)
 {
-	//int p = 0;
-	//Token name = parser->Consume(TokenType::Name);
-	std::string out;// = name.text;
+	std::string out;
 	while (IsLetter(tname[p]) || IsNumber(tname[p]))
 		out += tname[p++];
 
@@ -129,11 +127,11 @@ std::string Jet::ParseType(const char* tname, int& p)
 		p += 2;
 		out += "::";
 		while (IsLetter(tname[p]) || IsNumber(tname[p]))
-			out += tname[p++]; //out += parser->Consume(TokenType::Name).text;
+			out += tname[p++];
 	}
 
 	//parse templates
-	if (tname[p] == '<')//parser->MatchAndConsume(TokenType::LessThan))
+	if (tname[p] == '<')
 	{
 		p++;
 		out += "<";
@@ -148,10 +146,9 @@ std::string Jet::ParseType(const char* tname, int& p)
 		} while (tname[p] == ',' && p++);
 
 		p++;
-		//parser->Consume(TokenType::GreaterThan);
 		out += ">";
 	}
-	else if (tname[p] == '(')//parser->MatchAndConsume(TokenType::LeftParen))
+	else if (tname[p] == '(')
 	{
 		p++;
 		out += "(";
@@ -163,14 +160,13 @@ std::string Jet::ParseType(const char* tname, int& p)
 				out += ",";
 			first = false;
 			out += ParseType(tname, p);
-		} while (tname[p] == ',' && p++);//parser->MatchAndConsume(TokenType::Comma));
+		} while (tname[p] == ',' && p++);
 
 		p++;
-		//parser->Consume(TokenType::RightParen);
 		out += ")";
 	}
 
-	while (tname[p] == '*')//parser->MatchAndConsume(TokenType::Asterisk))//parse pointers
+	while (tname[p] == '*')//parse pointers
 	{
 		out += '*';
 		p++;
@@ -245,19 +241,19 @@ void Type::Load(Compilation* compiler)
 			auto iter = compiler->types.find(realname);
 			if (iter == compiler->types.end())
 			{
-				*this = *res;
+			*this = *res;
 
-				//make sure the real thing is stored as this
-				auto realname = res->ToString();
+			//make sure the real thing is stored as this
+			auto realname = res->ToString();
 
-				compiler->types[realname] = res;
+			compiler->types[realname] = res;
 			}
 			else
 			{
-				if (this != iter->second)
-					*this = *iter->second;
-				else
-					*this = *res;
+			if (this != iter->second)
+			*this = *iter->second;
+			else
+			*this = *res;
 			}*/
 		}
 		else if (this->name.back() == ')')
@@ -295,15 +291,15 @@ void Type::Load(Compilation* compiler)
 			/*auto iter = compiler->types.find(realname);
 			if (iter == compiler->types.end())
 			{
-				compiler->types[name] = this;
+			compiler->types[name] = this;
 			}
 			else
 			{
-				//if (iter->second == this)
+			//if (iter->second == this)
 
-				//compiler->Error("Whoops", Token());
-				if (iter->second != this)
-					*this = *iter->second;
+			//compiler->Error("Whoops", Token());
+			if (iter->second != this)
+			*this = *iter->second;
 			}*/
 			//types[name] = type;
 		}
@@ -336,13 +332,13 @@ bool IsMatch(Function* a, Function* b)
 	return true;
 }
 
-bool FindTemplates(Compilation* compiler, Type** types, Type* type, Type* match_type, Trait* trait)
+bool FindTemplates(Compilation* compiler, Type** types, Type* type, Type* match_type, Trait* trait, const std::string& match_name)
 {
 	int i = 0;
 	bool was_template = false;
 	for (auto temp : trait->templates)
 	{
-		if (match_type->name == temp.second)
+		if (match_name/*match_type->name*/ == temp.second)
 		{
 			if (types[i] && types[i] != type)
 				return false;// Error("Does not match trait", *compiler->current_function->current_token);
@@ -356,22 +352,30 @@ bool FindTemplates(Compilation* compiler, Type** types, Type* type, Type* match_
 	{
 		auto traits = type->GetTraits(compiler);
 		//see if it is templated, if it is, look through its templates
-		std::string basename = match_type->name.substr(0, match_type->name.length() - 3);
+		std::string basename = match_type->name.substr(0, match_type->name.find_first_of('<'));// match_type->name.length() - 3);
 		for (auto ii : traits)
 		{
 			if (ii.second->name == basename)
 			{
 				match_type->Load(compiler);
-				for (int i = 0; i < type->data->template_args.size(); i++)
+
+				//ok, we now have what template args are used in the trait, see if any are the ones we are looking for
+				for (int x = 0; x < match_type->trait->template_args.size(); x++)
 				{
-					bool res = FindTemplates(compiler, types, type->data->template_args[i], match_type->trait->template_args[i], ii.second);
-					if (res == false)
-						return false;
+					for (int i = 0; i < ii.second->templates.size();/* type->data->template_args.size();*/ i++)
+					{
+						bool res = FindTemplates(compiler, types, ii.first[i], match_type->trait->template_args[x], ii.second, match_type->trait->templates[x].second);
+						if (res == false)
+							return false;
+					}
 				}
 
+				return true;
 				break;
 			}
 		}
+
+		//otherwise try and determine type in the template
 	}
 	return true;
 }
@@ -407,7 +411,7 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 
 					if (range.first->second->return_type)
 					{
-						bool res = FindTemplates(compiler, types, range.first->second->return_type, fun.second->return_type, ii.second);
+						bool res = FindTemplates(compiler, types, range.first->second->return_type, fun.second->return_type, ii.second, fun.second->return_type->name);
 						if (res == false)
 						{
 							match = false;
@@ -422,14 +426,14 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 					}
 
 					//do it for args
-					if (range.first->second->arguments.size() != fun.second->arguments.size()+1)
+					if (range.first->second->arguments.size() != fun.second->arguments.size() + 1)
 					{
 						match = false;
 						break;
 					}
 					for (int i = 1; i < range.first->second->arguments.size(); i++)
 					{
-						bool res = FindTemplates(compiler, types, range.first->second->arguments[i].first, fun.second->arguments[i - 1].first, ii.second);
+						bool res = FindTemplates(compiler, types, range.first->second->arguments[i].first, fun.second->arguments[i - 1].first, ii.second, fun.second->arguments[i - 1].first->name);
 						if (res == false)
 						{
 							match = false;
@@ -446,6 +450,7 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 					this->traits.push_back({ types, ii.second });
 				continue;
 			}
+
 			bool match = true;
 			for (auto fun : ii.second->funcs)
 			{
@@ -515,6 +520,9 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		return trait;
 	}
 
+	if (this->data->templates.size() != types.size())
+		compiler->Error("Incorrect number of template arguments. Got " + std::to_string(types.size()) + " Expected " + std::to_string(this->data->templates.size()), *compiler->current_function->current_token);
+
 	//duplicate and load
 	Struct* str = new Struct;
 
@@ -522,7 +530,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	str->parent = this->ns;
 	auto oldns = compiler->ns;
 	compiler->ns = str;
-	
+
 	//register the types
 	int i = 0;
 	for (auto& ii : this->data->templates)
@@ -701,7 +709,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 				if (def || ii->second->arguments.size() == args.size())
 					fun = ii->second;
 			}
-			
+
 			if (fun)
 			{
 				auto ns = new Namespace;
@@ -721,11 +729,11 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 				int i = 0;
 				for (auto ii : tr.second->templates)
 					context->parent->ns->members.insert({ ii.second, tr.first[i++] });
-				
+
 				fun->expression->CompileDeclarations(context);
 				fun->expression->DoCompile(context);
 
-				context->parent->ns->members.erase(context->parent->ns->members.find( tr.second->name));
+				context->parent->ns->members.erase(context->parent->ns->members.find(tr.second->name));
 
 				context->parent->ns = context->parent->ns->parent;
 				fun->expression->Struct.text = oldn;
@@ -858,7 +866,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 						if (fun.second->expression == 0)
 							continue;
 
-						std::string source; 
+						std::string source;
 						auto src = fun.second->expression->semicolon.GetSource(compilation);
 						fun.second->expression->Print(source, src);
 						data += source;

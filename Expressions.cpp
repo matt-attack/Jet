@@ -89,7 +89,12 @@ Type* IndexExpression::GetBaseType(CompilerContext* context)
 		return context->GetVariable(p->GetName()).type->base;
 	else if (i)
 		return i->GetType(context);
-
+	else if (auto c = dynamic_cast<CallExpression*>(left))
+	{
+		//fix this
+		context->parent->Error("Chaining function calls not yet implemented", token);
+		//return c->Compile(context).type;
+	}
 	context->parent->Error("wat", token);
 }
 
@@ -385,16 +390,15 @@ CValue CallExpression::Compile(CompilerContext* context)
 		//im a struct yo
 		fname = index->member.text;
 		stru = index->GetBaseType(context);
-
-		llvm::Value* self;
+		assert(stru->loaded);
+		llvm::Value* self = index->GetBaseElementPointer(context).val;
 		if (index->token.type == TokenType::Pointy)
 		{
+			if (stru->type != Types::Pointer && stru->type != Types::Array)
+				context->parent->Error("Cannot dereference type " + stru->ToString(), this->token);
+
 			stru = stru->base;
-			self = context->parent->builder.CreateLoad(index->GetBaseElementPointer(context).val);
-		}
-		else
-		{
-			self = index->GetBaseElementPointer(context).val;
+			self = context->parent->builder.CreateLoad(self);
 		}
 
 		//push in the this pointer argument kay
@@ -805,7 +809,9 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	else
 		context->parent->ns->members.insert({ fname, fun });
 
-	if (advlookup)
+	if (is_trait)
+		fun->return_type = 0;
+	else if (advlookup)
 		/*fun->return_type = */context->parent->AdvanceTypeLookup(&fun->return_type, this->ret_type.text);
 	else
 		fun->return_type = context->parent->LookupType(this->ret_type.text, false);
@@ -831,8 +837,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			fun->templates.push_back({ context->parent->LookupType(ii.first.text), ii.second.text });
 	}
 
-	//if (is_trait == false)
-	//{
+
 	for (auto ii : *this->args)
 	{
 		Type* type = 0;
@@ -845,7 +850,6 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		if (advlookup && is_trait == false)
 			/*type = */context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first);
 	}
-	//}
 }
 
 CValue ExternExpression::Compile(CompilerContext* context)
