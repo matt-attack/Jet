@@ -66,7 +66,7 @@ namespace Jet
 	struct FunctionType;
 	struct Function;
 	struct Namespace;
-
+	struct Token;
 	class Type
 	{
 		std::vector<std::pair<Type**, Trait*>> traits;//all the traits that apply to this type
@@ -81,6 +81,7 @@ namespace Jet
 			Type* base;//for pointers and arrays
 			Trait* trait;
 			FunctionType* function;
+			Token* _location;
 		};
 		unsigned int size;//for arrays
 

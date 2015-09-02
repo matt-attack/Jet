@@ -2086,7 +2086,8 @@ namespace Jet
 			if (this->Parent->Parent != 0)
 				context->parent->Error("Cannot use typedef outside of global scope", token);
 
-			context->parent->Error("Typedef not implemented atm", token);
+			context->parent->ns->members.insert({this->new_type.text, context->parent->LookupType(this->other_type.text)});
+			//context->parent->Error("Typedef not implemented atm", token);
 
 			/*context->CurrentToken(&other_type);
 			auto type = context->parent->AdvanceTypeLookup(other_type.text);

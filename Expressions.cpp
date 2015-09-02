@@ -812,7 +812,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	if (is_trait)
 		fun->return_type = 0;
 	else if (advlookup)
-		/*fun->return_type = */context->parent->AdvanceTypeLookup(&fun->return_type, this->ret_type.text);
+		/*fun->return_type = */context->parent->AdvanceTypeLookup(&fun->return_type, this->ret_type.text, &this->ret_type);
 	else
 		fun->return_type = context->parent->LookupType(this->ret_type.text, false);
 
@@ -826,7 +826,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 
 		fun->arguments.push_back({ type, "this" });
 		if (is_trait == false && advlookup)
-			context->parent->AdvanceTypeLookup(&fun->arguments.back().first, str + "*");
+			context->parent->AdvanceTypeLookup(&fun->arguments.back().first, str + "*", &this->token);
 		else if (is_trait == false)
 			fun->arguments.back().first = context->parent->LookupType(str + "*");
 	}
@@ -848,7 +848,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 
 		fun->arguments.push_back({ type, ii.second });
 		if (advlookup && is_trait == false)
-			/*type = */context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first);
+			/*type = */context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first, &this->token);
 	}
 }
 
@@ -862,13 +862,13 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	std::string fname = name.text;
 
 	Function* fun = new Function(fname);
-	/*fun->return_type = */context->parent->AdvanceTypeLookup(&fun->return_type, this->ret_type.text);
+	/*fun->return_type = */context->parent->AdvanceTypeLookup(&fun->return_type, this->ret_type.text, &this->ret_type);
 
 	fun->arguments.reserve(this->args->size());
 	for (auto ii : *this->args)
 	{
 		fun->arguments.push_back({ 0, ii.second });
-		/*auto type = */context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first);
+		/*auto type = */context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first, &this->token);
 	}
 
 	fun->f = 0;
@@ -1340,14 +1340,14 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	str->data->name = this->name.text;
 	str->data->expression = this;
 	if (this->base_type.text.length())
-		/*str->data->parent_struct =*/ context->parent->AdvanceTypeLookup(&str->data->parent_struct, this->base_type.text);
+		/*str->data->parent_struct =*/ context->parent->AdvanceTypeLookup(&str->data->parent_struct, this->base_type.text, &this->base_type);
 	if (this->templates)
 	{
 		str->data->templates.reserve(this->templates->size());
 		for (auto ii : *this->templates)
 		{
 			str->data->templates.push_back({ 0/*context->parent->AdvanceTypeLookup(ii.first.text)*/, ii.second.text });
-			context->parent->AdvanceTypeLookup(&str->data->templates.back().first, ii.first.text);
+			context->parent->AdvanceTypeLookup(&str->data->templates.back().first, ii.first.text, &ii.first);
 		}
 	}
 
@@ -1369,7 +1369,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 
 			str->data->struct_members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
 			if (this->templates == 0)
-				context->parent->AdvanceTypeLookup(&str->data->struct_members.back().type, ii.variable.first.text);
+				context->parent->AdvanceTypeLookup(&str->data->struct_members.back().type, ii.variable.first.text, &ii.variable.first);
 		}
 		else
 		{
@@ -1511,6 +1511,8 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 	t->name = this->name.text;
 	t->parent = context->parent->ns;
 
+	context->parent->ns = t;
+
 	//set this as a namespace, add T as a type
 	if (this->templates)
 	{
@@ -1523,7 +1525,7 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 			else
 			{
 				t->templates.push_back({ 0, ii.second.text });
-				context->parent->AdvanceTypeLookup(&t->templates.back().first, ii.first.text);
+				context->parent->AdvanceTypeLookup(&t->templates.back().first, ii.first.text, &ii.first);
 				//auto trait = context->parent->AdvanceTypeLookup(ii.first.text);
 				//t->templates.push_back({ trait, ii.second.text });
 			}
@@ -1532,19 +1534,20 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 			type->name = ii.second.text;
 			type->type = Types::Invalid;
 			type->ns = context->parent->ns;
-			context->parent->ns->members.insert({ type->name, type });
+			t->members.insert({ type->name, type });
+			//context->parent->ns->members.insert({ type->name, type });
 		}
 	}
 
 	for (auto ii : this->funcs)
 	{
 		Function* func = new Function("");
-		/*func->return_type = */context->parent->AdvanceTypeLookup(&func->return_type, ii.ret_type.text);
+		/*func->return_type = */context->parent->AdvanceTypeLookup(&func->return_type, ii.ret_type.text, &ii.ret_type);
 		func->arguments.reserve(ii.args.size());
 		for (auto arg : ii.args)
 		{
 			func->arguments.push_back({ 0, "dummy" });
-			context->parent->AdvanceTypeLookup(&func->arguments.back().first, arg.text);
+			context->parent->AdvanceTypeLookup(&func->arguments.back().first, arg.text, &arg);
 		}
 
 		t->funcs.insert({ ii.name.text, func });

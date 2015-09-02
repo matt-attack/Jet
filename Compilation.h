@@ -92,7 +92,7 @@ namespace Jet
 		~Compilation();
 
 		std::vector<std::pair<Namespace*, Type**>> types;//a list of all referenced types and their locations
-		void AdvanceTypeLookup(Type** dest, const std::string& name);
+		void AdvanceTypeLookup(Type** dest, const std::string& name, Token* location);
 
 		//std::map<std::string, Type*> types;
 		Type* LookupType(const std::string& name, bool load = true);

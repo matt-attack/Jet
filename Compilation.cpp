@@ -7,7 +7,7 @@
 
 #include <direct.h>
 
-
+#include <llvm-c\Core.h>
 #include <llvm/ADT/Triple.h>
 #include <llvm/Support/Host.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
@@ -162,7 +162,7 @@ Compilation* Compilation::Make(JetProject* project)
 	//ok this will be the main entry point it initializes everything, then calls the program's entry point
 	int errors = 0;
 	auto global = new CompilerContext(compilation);
-
+	compilation->current_function = global;
 	compilation->sources = project->GetSources();
 
 	//read in symbols from lib
@@ -234,7 +234,16 @@ Compilation* Compilation::Make(JetProject* project)
 	//this fixes some errors, need to resolve them later
 	compilation->debug_info.file = compilation->debug->createFile("temp",
 		compilation->debug_info.cu->getDirectory());
-	compilation->ResolveTypes();
+
+	try
+	{
+		compilation->ResolveTypes();
+	}
+	catch (...)
+	{
+		errors++;
+		goto error;
+	}
 
 	//load all types
 	//for (auto ii : this->types)
@@ -439,7 +448,7 @@ void Compilation::Optimize(int level)
 	// Do the main datalayout
 	//OurFPM.add(new llvm::DataLayoutPass());
 	// Provide basic AliasAnalysis support for GVN.
-	//OurFPM.add(llvm::createBasicAliasAnalysisPass());
+	OurFPM.add(llvm::createBasicAliasAnalysisPass());
 	// Do simple "peephole" optimizations and bit-twiddling optzns.
 	OurFPM.add(llvm::createInstructionCombiningPass());
 	// Reassociate expressions.
@@ -459,25 +468,12 @@ void Compilation::Optimize(int level)
 
 	OurFPM.doInitialization();
 
-
+	//run it on all functions
 	for (auto ii : this->functions)
 	{
 		if (ii)
 			OurFPM.run(*ii);
 	}
-
-	//run it on member functions
-	/*for (auto ii : this->types)
-	{
-	if (ii.second && ii.second->type == Types::Struct)
-	{
-	for (auto fun : ii.second->data->functions)
-	{
-	if (fun.second->f)
-	OurFPM.run(*fun.second->f);
-	}
-	}
-	}*/
 }
 
 void Compilation::SetTarget()
@@ -552,133 +548,9 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	printf("Building Symbol Table...\n");
 	std::string function;
 	this->ns->OutputMetadata(function, this);
-	/*for (auto ii : this->ns->members)/// functions)
-	{
-	if (ii.second.type == SymbolType::Function)
-	{
-	function += "extern fun " + ii.second.fn->return_type->ToString() + " ";
-	function += ii.first + "(";
-	bool first = false;
-	for (auto arg : ii.second.fn->arguments)
-	{
-	if (first)
-	function += ",";
-	else
-	first = true;
-
-	function += arg.first->ToString() + " " + arg.second;
-	}
-	function += ");";
-	}
-	}*/
-
-	std::string types;
-	/*for (auto ii : this->types)
-	{
-	if (ii.second == 0)
-	continue;
-	if (ii.second->type == Types::Struct)
-	{
-	if (ii.second->data->template_base)
-	continue;//dont bother exporting instantiated templates for now
-
-	//export me
-	if (ii.second->data->templates.size() > 0)
-	{
-	types += "struct " + ii.second->data->name + "<";
-	for (int i = 0; i < ii.second->data->templates.size(); i++)
-	{
-	types += ii.second->data->templates[i].first->name + " ";
-	types += ii.second->data->templates[i].second;
-	if (i < ii.second->data->templates.size() - 1)
-	types += ',';
-	}
-	types += ">{";
-	}
-	else
-	{
-	types += "struct " + ii.second->data->name + "{";
-	}
-	for (auto var : ii.second->data->struct_members)
-	{
-	if (var.type == 0 || var.type->type == Types::Invalid)//its a template probably?
-	{
-	types += var.type_name + " ";
-	types += var.name + ";";
-	}
-	else if (var.type->type == Types::Array)
-	{
-	types += var.type->base->ToString() + " ";
-	types += var.name + "[" + std::to_string(var.type->size) + "];";
-	}
-	else
-	{
-	types += var.type->ToString() + " ";
-	types += var.name + ";";
-	}
-	}
-
-	if (ii.second->data->templates.size() > 0 && ii.second->data->template_base == 0)
-	{
-	//output member functions somehow?
-	for (auto fun : ii.second->data->functions)
-	{
-	if (fun.second->expression == 0)
-	continue;
-
-	std::string source;
-	fun.second->expression->Print(source, current_source);
-	types += source;
-	//printf("%s", source.c_str());
-	}
-	types += "}";
-	continue;
-	}
-	types += "}";
-
-	//output member functions
-	for (auto fun : ii.second->data->functions)
-	{
-	function += "extern fun " + fun.second->return_type->ToString() + " " + ii.second->data->name + "::";
-	function += fun.first + "(";
-	bool first = false;
-	for (int i = 1; i < fun.second->arguments.size(); i++)
-	{
-	if (first)
-	function += ",";
-	else
-	first = true;
-
-	function += fun.second->arguments[i].first->ToString() + " " + fun.second->arguments[i].second;
-	}
-	function += ");";
-	}
-	}
-	if (ii.second->type == Types::Trait)
-	{
-	types += "trait " + ii.second->trait->name + "{";
-	for (auto fun : ii.second->trait->funcs)
-	{
-	types += " fun " + fun.second->return_type->ToString() + " " + fun.first + "(";
-	bool first = false;
-	for (auto arg : fun.second->arguments)
-	{
-	if (first)
-	types += ",";
-	else
-	first = true;
-
-	types += arg.first->ToString() + " " + arg.second;
-	}
-	types += ");";
-	}
-	types += "}";
-	}
-	}*/
 
 	//todo: only do this if im a library
 	std::ofstream stable("build/symbols.jlib", std::ios_base::binary);
-	stable.write(types.data(), types.length());
 	stable.write(function.data(), function.length());
 	stable.close();
 }
@@ -692,7 +564,7 @@ void Compilation::OutputIR(const char* filename)
 	module->print(str, &writer);
 }
 
-void Compilation::AdvanceTypeLookup(Jet::Type** dest, const std::string& name)
+void Compilation::AdvanceTypeLookup(Jet::Type** dest, const std::string& name, Token* location)
 {
 	//who knows what type it is, create a dummy one that will get replaced later
 	Type* type = new Type;
@@ -700,6 +572,7 @@ void Compilation::AdvanceTypeLookup(Jet::Type** dest, const std::string& name)
 	type->type = Types::Invalid;
 	type->data = 0;
 	type->ns = this->ns;
+	type->_location = location;
 	types.push_back({ this->ns, dest });
 
 	*dest = type;
@@ -747,20 +620,6 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 
 Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 {
-	/*auto pos = name.find_first_of("::");
-	if (pos != -1)
-	{
-	//navigate to correct namespace
-	std::string ns = name.substr(0, pos);
-	auto res = this->ns->members.find(ns);
-	auto old = this->ns;
-	this->ns = res->second.ns;
-	auto out = this->LookupType(name.substr(pos + 2), load);
-	this->ns = old;
-
-	return out;
-	}*/
-
 	int i = 0;
 	while (IsLetter(name[i++])) {};
 
@@ -913,33 +772,6 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			}
 			curns = global;
 			type = this->GetFunctionType(rtype, args);
-
-			/*auto t = new FunctionType;
-			t->args = args;
-			t->return_type = rtype;
-
-			type = new Type;
-			type->name = name;
-			type->function = t;
-			type->type = Types::Function;
-			type->ns = global;
-
-			//ok, avoid duplication
-			std::string real_name = type->ToString();
-			auto res = global->members.find(real_name);
-			if (res != global->members.end())
-			{
-			curns = global;
-
-			delete type;
-			delete t;
-			type = res->second.ty;
-			}
-			else
-			{
-			curns = global;
-			global->members.insert({ name, type });
-			}*/
 		}
 		else
 		{
@@ -1021,7 +853,7 @@ void Compilation::ResolveTypes()
 		if ((*types[i].second)->type == Types::Invalid)
 		{
 			//resolve me
-
+			this->current_function->current_token = (*types[i].second)->_location;
 			this->ns = types[i].first;
 
 			auto res = this->LookupType((*types[i].second)->name, false);
