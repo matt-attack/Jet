@@ -19,6 +19,7 @@
 #include "Project.h"
 #include "Compiler.h"
 #include "Expressions.h"
+#include "Types\Function.h"
 
 #include <iostream>
 #include <string>
@@ -203,10 +204,10 @@ extern "C"
 		auto compilation = Compilation::Make(project);
 
 		//lets just check types for now
-		auto res = compilation->types.find(symbol);
-		if (res != compilation->types.end() && res->second)
+		auto res = compilation->TryLookupType(symbol);// types.find(symbol);
+		if (res != 0)
 		{
-			strcpy(data, res->second->ToString().c_str());
+			strcpy(data, res->ToString().c_str());
 			return data;
 		}
 
@@ -253,12 +254,12 @@ extern "C"
 		}
 
 		//look for global functions
-		auto fun = compilation->functions.find(symbol);
-		if (fun != compilation->functions.end())
+		auto fun = compilation->ns->members.find(symbol);// functions.find(symbol);
+		if (fun != compilation->ns->members.end())
 		{
-			if (fun->first == symbol)
+			if (fun->first == symbol && fun->second.type == SymbolType::Function)
 			{
-				strcpy(data, fun->second->GetType(compilation)->ToString().c_str());
+				strcpy(data, fun->second.fn->GetType(compilation)->ToString().c_str());
 				return data;
 			}
 		}

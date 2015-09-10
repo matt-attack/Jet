@@ -532,6 +532,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 {
 	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 
+	context->current_token = &this->token;
 	//need to not compile if template or trait
 	if (this->templates)
 	{
@@ -781,7 +782,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	bool advlookup = true;
 	Function* fun = new Function(this->GetRealName());
 	fun->expression = this;
-
+	
 	auto str = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 
 	fun->f = 0;
@@ -1344,7 +1345,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	if (this->templates)
 	{
 		str->data->templates.reserve(this->templates->size());
-		for (auto ii : *this->templates)
+		for (auto& ii : *this->templates)
 		{
 			str->data->templates.push_back({ 0/*context->parent->AdvanceTypeLookup(ii.first.text)*/, ii.second.text });
 			context->parent->AdvanceTypeLookup(&str->data->templates.back().first, ii.first.text, &ii.first);
@@ -1359,7 +1360,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 			size++;
 	}
 	str->data->struct_members.reserve(size);
-	for (auto ii : this->members)
+	for (auto& ii : this->members)
 	{
 		if (ii.type == StructMember::VariableMember)
 		{

@@ -154,7 +154,7 @@ Compilation* Compilation::Make(JetProject* project)
 	compilation->module = new llvm::Module("hi.im.jet", compilation->context);
 	//compilation->module->
 
-	compilation->debug = new llvm::DIBuilder(*compilation->module);
+	compilation->debug = new llvm::DIBuilder(*compilation->module, true);
 	compilation->debug_info.cu = compilation->debug->createCompileUnit(dwarf::DW_LANG_C, "../aaaa.jet", ".", "Jet Compiler", false, "", 0, "");
 
 	//compile it
@@ -239,7 +239,7 @@ Compilation* Compilation::Make(JetProject* project)
 	{
 		compilation->ResolveTypes();
 	}
-	catch (...)
+	catch (int x)
 	{
 		errors++;
 		goto error;
@@ -469,10 +469,12 @@ void Compilation::Optimize(int level)
 	OurFPM.doInitialization();
 
 	//run it on all functions
-	for (auto ii : this->functions)
+	for (auto fun : this->functions)
 	{
-		if (ii)
-			OurFPM.run(*ii);
+		if (fun && fun->f && fun->expression)
+		{
+			OurFPM.run(*fun->f);
+		}
 	}
 }
 
@@ -850,14 +852,18 @@ void Compilation::ResolveTypes()
 	auto oldns = this->ns;
 	for (int i = 0; i < this->types.size(); i++)// auto ii : this->types)
 	{
-		if ((*types[i].second)->type == Types::Invalid)
+		auto loc = types[i].second;
+		if ((*loc)->type == Types::Invalid)
 		{
 			//resolve me
-			this->current_function->current_token = (*types[i].second)->_location;
+			this->current_function->current_token = (*loc)->_location;
 			this->ns = types[i].first;
 
-			auto res = this->LookupType((*types[i].second)->name, false);
-			*types[i].second = res;
+			auto res = this->LookupType((*loc)->name, false);
+
+			//delete *types[i].second;
+
+			*loc = res;
 		}
 	}
 	this->types.clear();

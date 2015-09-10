@@ -59,8 +59,10 @@ namespace Jet
 			llvm::DIFile* file;
 		} debug_info;
 
+		std::vector<std::pair<Namespace*, Type**>> types;//a list of all referenced types and their locations, used for type lookahead
+
 		std::map<std::string, Trait*> traits;
-		std::vector<llvm::Function*> functions;//a list of all functions to be able to optimize and shizzle
+		std::vector<Function*> functions;//a list of all functions to be able to optimize and shizzle
 
 		std::map<int, Type*> function_types;
 
@@ -91,7 +93,6 @@ namespace Jet
 
 		~Compilation();
 
-		std::vector<std::pair<Namespace*, Type**>> types;//a list of all referenced types and their locations
 		void AdvanceTypeLookup(Type** dest, const std::string& name, Token* location);
 
 		//std::map<std::string, Type*> types;

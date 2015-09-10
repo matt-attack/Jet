@@ -535,7 +535,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	int i = 0;
 	for (auto& ii : this->data->templates)
 	{
-		if (ii.first->trait == 0)
+		if (ii.first->trait == 0 || ii.first->type == Types::Invalid)
 		{
 			//need to make sure to load the trait
 			auto oldns = compiler->ns;
@@ -663,6 +663,8 @@ std::string Type::ToString()
 		return "Undefined Type";
 	case Types::Trait:
 		return this->trait->name;
+	case Types::Long:
+		return "long";
 	case Types::Function:
 		std::string out = this->function->return_type->ToString() + "(";
 		bool first = true;
