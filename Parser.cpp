@@ -108,6 +108,7 @@ Parser::Parser(Lexer* l)
 	this->Register(TokenType::Continue, new ContinueParselet());
 
 	this->Register(TokenType::SizeOf, new SizeofParselet());
+	this->Register(TokenType::New, new NewParselet());
 
 	this->Register(TokenType::Typedef, new TypedefParselet());
 
@@ -241,6 +242,34 @@ Token Parser::Consume(TokenType expected)
 
 		mRead.pop_front();
 		return Token(0, 0, temp.line, temp.column, expected, "uh");
+	}
+	mRead.pop_front();
+	return temp;
+}
+
+Token Parser::ConsumeTemplateGT()
+{
+	auto temp = LookAhead();
+	if (temp.type != TokenType::GreaterThan && temp.type != TokenType::RightShift)
+	{
+		std::string str = "Token Not As Expected! Expected: " + TokenToString[TokenType::GreaterThan] + " Got: " + temp.text;
+		//throw CompilerException(this->filename, temp.line, str);
+
+		//fabricate a fake token
+		ParserError(str, temp);
+		//lets give up on this, it doesnt work well
+		//throw 7;
+
+		mRead.pop_front();
+		return Token(0, 0, temp.line, temp.column, TokenType::GreaterThan, "uh");
+	}
+	else if (temp.type == TokenType::RightShift)
+	{
+		//split the token
+		mRead.pop_front();
+		mRead.push_front(Token(temp.text_ptr+1, 0, temp.line, temp.column, TokenType::GreaterThan, ">"));
+
+		return Token(temp.text_ptr, temp.trivia_length, temp.line, temp.column+1, TokenType::GreaterThan, ">");
 	}
 	mRead.pop_front();
 	return temp;

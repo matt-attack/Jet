@@ -33,6 +33,8 @@ namespace Jet
 	class SizeofExpression;
 	class TypedefExpression;
 	class NamespaceExpression;
+	class NewExpression;
+	class ScopedExpression;
 	class ExpressionVisitor
 	{
 	public:
@@ -84,8 +86,11 @@ namespace Jet
 
 		virtual void Visit(SizeofExpression* exp) {};
 		virtual void Visit(TypedefExpression* exp) {};
+		virtual void Visit(NewExpression* exp) {};
 
 		virtual void Visit(NamespaceExpression* exp) {};
+		virtual void Visit(ScopedExpression* exp) {};
+
 	};
 }
 

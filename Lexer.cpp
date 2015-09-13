@@ -121,6 +121,7 @@ public:
 		//internal "functions"
 		keywords["sizeof"] = TokenType::SizeOf;
 		keywords["offsetof"] = TokenType::OffsetOf;
+		keywords["new"] = TokenType::New;
 
 		keywords["typedef"] = TokenType::Typedef;
 		//keywords["const"] = TokenType::Const;

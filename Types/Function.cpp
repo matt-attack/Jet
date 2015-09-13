@@ -12,12 +12,21 @@ void Function::Load(Compilation* compiler)
 	if (this->loaded)
 		return;
 
-	this->return_type->Load(compiler);
+	if (this->return_type->type == Types::Invalid)
+	{
+		this->return_type = compiler->LookupType(this->return_type->name);
+	}
+	//this->return_type->Load(compiler);
 
 	std::vector<llvm::Type*> args;
 	std::vector<llvm::Metadata*> ftypes;
-	for (auto type : this->arguments)
+	for (auto& type : this->arguments)
 	{
+		if (type.first->type == Types::Invalid)
+		{
+			type.first = compiler->LookupType(type.first->name);
+		}
+
 		type.first->Load(compiler);
 		args.push_back(::GetType(type.first));
 

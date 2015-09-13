@@ -27,44 +27,6 @@ using namespace Jet;
 #include <unistd.h>
 #endif
 
-class StackTime
-{
-public:
-	long long start;
-	long long rate;
-	char* name;
-
-	StackTime(char* name);
-
-	~StackTime();
-};
-
-StackTime::StackTime(char* name)
-{
-	this->name = name;
-
-#ifndef _WIN32
-	start = gettime2();
-	rate = 1000000;
-#else
-	QueryPerformanceCounter((LARGE_INTEGER *)&start);
-	QueryPerformanceFrequency((LARGE_INTEGER *)&rate);
-#endif
-}
-StackTime::~StackTime()
-{
-	long long  end;
-#ifdef _WIN32
-	QueryPerformanceCounter((LARGE_INTEGER *)&end);
-#else
-	end = gettime2();
-#endif
-
-	long long diff = end - start;
-	float dt = ((double)diff) / ((double)rate);
-	printf("%s Time: %f seconds\n", this->name, dt);
-}
-
 
 extern Source* current_source;
 
@@ -110,10 +72,19 @@ void Error(const std::string& msg, Token start, Token end)
 void Jet::ParserError(const std::string& msg, Token token)
 {
 	int startrow = token.column;// -token.text.length();
+	int start = 0;
+	if (token.column > 40)
+		start = token.column - 40;
+
 	int endrow = token.column + token.text.length();
 	std::string code = current_source->GetLine(token.line);
 	std::string underline = "";
-	for (int i = 0; i < code.length(); i++)
+
+	int stop = code.length();
+	if (endrow + 30 < code.length())
+		stop = endrow + 30;
+
+	for (int i = start; i < stop; i++)
 	{
 		if (code[i] == '\t')
 			underline += '\t';
@@ -122,6 +93,9 @@ void Jet::ParserError(const std::string& msg, Token token)
 		else
 			underline += ' ';
 	}
+
+	code = code.substr(start, stop - start);
+
 	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", current_source->filename.c_str(), token.line, startrow, token.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
 	throw 7;
 }

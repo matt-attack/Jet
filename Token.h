@@ -106,6 +106,7 @@ namespace Jet
 
 		SizeOf,
 		OffsetOf,
+		New,
 
 		Typedef, 
 

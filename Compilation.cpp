@@ -76,14 +76,14 @@ Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), 
 
 Compilation::~Compilation()
 {
-	//ok, instantiated template types end up being duplicates, that causes the crash when trying to delete them
-	//for (auto ii : this->types)
-	//if (ii.second && ii.second->type == Types::Struct)//Types::Void)//add more later
-	//delete ii.second;
+	//free global namespace
+	delete this->global;
 
-	//for (auto ii : this->functions)
-	//	delete ii.second;
+	//free functions
+	for (auto ii : this->functions)
+		delete ii;
 
+	//free ASTs
 	for (auto ii : asts)
 	{
 		//std::string out;
@@ -99,12 +99,58 @@ Compilation::~Compilation()
 		delete ii.second;
 	}
 
+	//free sources
 	for (auto ii : sources)
 		delete ii.second;
 
-	//for (auto ii : this->traits)
-	//delete ii.second;
+	//free function types
+	for (auto ii : function_types)
+		delete ii.second;
+
+	//free traits
+	for (auto ii : this->traits)
+		delete ii.second;
 }
+
+class StackTime
+{
+public:
+	long long start;
+	long long rate;
+	char* name;
+
+	StackTime(char* name);
+
+	~StackTime();
+};
+
+StackTime::StackTime(char* name)
+{
+	this->name = name;
+
+#ifndef _WIN32
+	start = gettime2();
+	rate = 1000000;
+#else
+	QueryPerformanceCounter((LARGE_INTEGER *)&start);
+	QueryPerformanceFrequency((LARGE_INTEGER *)&rate);
+#endif
+}
+StackTime::~StackTime()
+{
+	long long  end;
+#ifdef _WIN32
+	QueryPerformanceCounter((LARGE_INTEGER *)&end);
+#else
+	end = gettime2();
+#endif
+
+	long long diff = end - start;
+	float dt = ((double)diff) / ((double)rate);
+	printf("%s Time: %f seconds\n", this->name, dt);
+}
+
+
 
 Compilation* Compilation::Make(JetProject* project)
 {
@@ -166,10 +212,10 @@ Compilation* Compilation::Make(JetProject* project)
 	compilation->sources = project->GetSources();
 
 	//read in symbols from lib
-	std::vector<Expression*> symbol_asts;
+	std::vector<BlockExpression*> symbol_asts;
 	std::vector<Source*> symbol_sources;
 	{
-		//StackTime timer("Reading Symbols");
+		StackTime timer("Reading Symbols");
 		for (auto buffer : lib_symbols)
 		{
 			Source* src = new Source(buffer, "symbols");
@@ -191,13 +237,22 @@ Compilation* Compilation::Make(JetProject* project)
 				errors = 1;
 				goto error;
 			}
+
+			compilation->asts["symbols_" + std::to_string(symbol_asts.size())] = result;
+			compilation->sources["symbols_" + std::to_string(symbol_asts.size())] = src;
+
+			//this fixes some errors, need to resolve them later
+			compilation->debug_info.file = compilation->debug->createFile("temp",
+				compilation->debug_info.cu->getDirectory());
+
+			compilation->ResolveTypes();
 		}
 	}
 
 	//read in each file
 	//these two blocks could be multithreaded! theoretically
 	{
-		//StackTime timer("Parsing Files and Compiling Declarations");
+		StackTime timer("Parsing Files and Compiling Declarations");
 
 		for (auto file : compilation->sources)
 		{
@@ -227,7 +282,20 @@ Compilation* Compilation::Make(JetProject* project)
 
 			//do this for each file
 			for (auto ii : result->statements)
-				ii->CompileDeclarations(global);//guaranteed not to throw?
+			{
+				try
+				{
+					ii->CompileDeclarations(global);//guaranteed not to throw?
+				}
+				catch (int x)
+				{
+					//printf("Compilation Stopped, Parser Error\n");
+					errors++;
+					//delete compilation;
+					//compilation = 0;
+					goto error;
+				}
+			}
 		}
 	}
 
@@ -237,6 +305,7 @@ Compilation* Compilation::Make(JetProject* project)
 
 	try
 	{
+		StackTime tt("Resolving Types");
 		compilation->ResolveTypes();
 	}
 	catch (int x)
@@ -251,7 +320,7 @@ Compilation* Compilation::Make(JetProject* project)
 	//	ii.second->Load(this);
 
 	{
-		//StackTime timer("Final Compiler Pass");
+		StackTime timer("Final Compiler Pass");
 
 		for (auto result : compilation->asts)
 		{
@@ -301,11 +370,11 @@ Compilation* Compilation::Make(JetProject* project)
 error:
 
 	//delete stuff
-	for (auto ii : symbol_asts)
-		delete ii;
+	//for (auto ii : symbol_asts)
+	//delete ii;
 
-	for (auto ii : symbol_sources)
-		delete ii;
+	//for (auto ii : symbol_sources)
+	//delete ii;
 
 	//restore working directory
 	chdir(olddir);
@@ -316,7 +385,8 @@ void Compilation::Assemble(int olevel)
 {
 	if (this->errors.size() > 0)
 		return;
-	//StackTime timer("Building Output");
+
+	StackTime timer("Assembling Output");
 
 	char olddir[500];
 	getcwd(olddir, 500);
@@ -676,11 +746,14 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			//its a pointer
 			auto t = this->LookupType(name.substr(0, name.length() - 1), load);
 
+			if (t->pointer_type)
+				return t->pointer_type;
+
 			type = new Type;
 			type->name = name;
 			type->base = t;
 			type->type = Types::Pointer;
-
+			t->pointer_type = type;
 			if (load)
 				type->Load(this);
 			else
@@ -850,7 +923,7 @@ void Compilation::Error(const std::string& string, Token token)
 void Compilation::ResolveTypes()
 {
 	auto oldns = this->ns;
-	for (int i = 0; i < this->types.size(); i++)// auto ii : this->types)
+	for (int i = 0; i < this->types.size(); i++)
 	{
 		auto loc = types[i].second;
 		if ((*loc)->type == Types::Invalid)
@@ -861,7 +934,7 @@ void Compilation::ResolveTypes()
 
 			auto res = this->LookupType((*loc)->name, false);
 
-			//delete *types[i].second;
+			delete *loc;//free the temporary
 
 			*loc = res;
 		}

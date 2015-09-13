@@ -15,11 +15,19 @@ Type Jet::VoidType("void", Types::Void);
 
 Type* Type::GetPointerType(CompilerContext* context)
 {
-	auto old = context->parent->ns;
-	context->parent->ns = this->ns ? this->ns : context->parent->global;
-	auto tmp = context->parent->LookupType(this->ToString() + "*");
-	context->parent->ns = old;
-	return tmp;
+	if (this->pointer_type)
+		return this->pointer_type;
+
+	auto type = new Type;
+	type->name = name;
+	type->base = this;
+	type->type = Types::Pointer;
+	this->pointer_type = type;
+
+	type->ns = type->base->ns;
+	type->base->ns->members.insert({ name, type });
+
+	return type;// tmp;
 }
 
 llvm::DIType* Type::GetDebugType(Compilation* compiler)
@@ -186,7 +194,7 @@ void Type::Load(Compilation* compiler)
 	}
 	else if (type == Types::Invalid)
 	{
-		if (this->name.back() == '>')//im a template!
+		/*if (this->name.back() == '>')//im a template!
 		{
 			//get first bit, then we can instatiate it
 			int p = name.find_first_of('<');
@@ -237,24 +245,6 @@ void Type::Load(Compilation* compiler)
 			Type* res = t->Instantiate(compiler, types);
 			//check to see if it was already instantiated
 			throw 7;
-			/*auto realname = res->ToString();
-			auto iter = compiler->types.find(realname);
-			if (iter == compiler->types.end())
-			{
-			*this = *res;
-
-			//make sure the real thing is stored as this
-			auto realname = res->ToString();
-
-			compiler->types[realname] = res;
-			}
-			else
-			{
-			if (this != iter->second)
-			*this = *iter->second;
-			else
-			*this = *res;
-			}*/
 		}
 		else if (this->name.back() == ')')
 		{
@@ -288,23 +278,10 @@ void Type::Load(Compilation* compiler)
 
 			auto realname = this->ToString();
 			throw 7;
-			/*auto iter = compiler->types.find(realname);
-			if (iter == compiler->types.end())
-			{
-			compiler->types[name] = this;
-			}
-			else
-			{
-			//if (iter->second == this)
-
-			//compiler->Error("Whoops", Token());
-			if (iter->second != this)
-			*this = *iter->second;
-			}*/
 			//types[name] = type;
 		}
-		else
-			compiler->Error("Tried To Use Undefined Type '" + this->name + "'", *compiler->current_function->current_token);
+		else*/
+		compiler->Error("Tried To Use Undefined Type '" + this->name + "'", *compiler->current_function->current_token);
 	}
 	else if (type == Types::Pointer)
 	{
@@ -863,16 +840,16 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 				if (ii.second.ty->data->templates.size() > 0 && ii.second.ty->data->template_base == 0)
 				{
 					//output member functions somehow?
-					for (auto fun : ii.second.ty->data->functions)
+					auto expr = ii.second.ty->data->expression;
+					for (auto ii : expr->members)
 					{
-						if (fun.second->expression == 0)
-							continue;
-
-						std::string source;
-						auto src = fun.second->expression->semicolon.GetSource(compilation);
-						fun.second->expression->Print(source, src);
-						data += source;
-						//printf("%s", source.c_str());
+						if (ii.type == ii.FunctionMember)
+						{
+							std::string source;
+							auto src = ii.function->GetBlock()->start.GetSource(compilation);
+							ii.function->Print(source, src);
+							data += source;
+						}
 					}
 					data += "}";
 					continue;
@@ -899,10 +876,23 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 			}
 			else if (ii.second.ty->type == Types::Trait)
 			{
-				data += "trait " + ii.second.ty->trait->name + "{";
+				data += "trait " + ii.second.ty->trait->name;
+				for (int i = 0; i < ii.second.ty->trait->templates.size(); i++)
+				{
+					if (i == 0)
+						data += '<';
+
+					data += ii.second.ty->trait->templates[i].second;
+
+					if (i == ii.second.ty->trait->templates.size() - 1)
+						data += '>';
+					else
+						data += ',';
+				}
+				data += "{";
 				for (auto fun : ii.second.ty->trait->funcs)
 				{
-					data += " fun " + fun.second->return_type->ToString() + " " + fun.first + "(";
+					data += " fun " + fun.second->return_type->name/*ToString()*/ + " " + fun.first + "(";
 					bool first = false;
 					for (auto arg : fun.second->arguments)
 					{

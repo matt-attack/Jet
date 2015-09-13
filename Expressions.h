@@ -134,7 +134,68 @@ namespace Jet
 
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
-			//visitor->Visit(this);
+			visitor->Visit(this);
+		}
+	};
+
+	class NewExpression : public Expression
+	{
+
+	public:
+		Token token, type;
+
+		NewExpression(Token tok, Token type)
+		{
+			this->token = tok;
+			this->type = type;
+		}
+
+		CValue Compile(CompilerContext* context)
+		{
+			context->CurrentToken(&this->token);
+			//auto v = dynamic_cast<NameExpression*>(left);
+			//if (v == 0)
+			//	context->parent->Error("Invalid Namespace", this->token);
+			auto ty = context->parent->LookupType(type.text);
+			auto size = context->GetSizeof(ty);
+			CValue val = context->Call("malloc", { size });
+
+			auto ptr = context->DoCast(ty->GetPointerType(context), val, true);
+
+			//fix array casting
+			//add constructor
+			if (ptr.type->type == Types::Struct)
+			{
+
+			}
+			else if (ptr.type->type == Types::Array)
+			{
+
+			}
+
+			//context->SetNamespace(v->GetName());
+			return ptr;
+			//right->Compile(context);
+
+			////context->PopNamespace();
+			//todo
+
+			//return CValue();
+		}
+
+		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			//left->Print(output, source);
+			token.Print(output, source);
+			type.Print(output, source);
+			//right->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
 		}
 	};
 

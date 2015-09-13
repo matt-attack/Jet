@@ -158,6 +158,14 @@ namespace Jet
 			loops.pop();
 		}
 
+		CValue GetSizeof(Type* t)
+		{
+			auto null = llvm::ConstantPointerNull::get(GetType(t)->getPointerTo());
+			auto ptr = parent->builder.CreateGEP(null, parent->builder.getInt32(1));
+			ptr = parent->builder.CreatePtrToInt(ptr, GetType(parent->IntType), "sizeof");
+			return CValue(parent->IntType, ptr);
+		}
+
 		void Continue()
 		{
 			if (loops.empty())

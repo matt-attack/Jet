@@ -69,8 +69,10 @@ namespace Jet
 	struct Token;
 	class Type
 	{
+		friend class Compilation;
 		std::vector<std::pair<Type**, Trait*>> traits;//all the traits that apply to this type
 
+		Type* pointer_type;
 	public:
 
 		Types type : 8;
@@ -91,9 +93,9 @@ namespace Jet
 		std::vector<std::pair<Type**, Trait*>> GetTraits(Compilation* compiler);
 		bool MatchesTrait(Compilation* compiler, Trait* trait);
 
-		Type() { data = 0; type = Types::Void; loaded = false; size = 0; }
-		Type(std::string name, Types type, Struct *data = 0) : type(type), data(data), loaded(false), size(0), name(name) {}
-		Type(std::string name, Types type, Type* base, int size = 0) : type(type), base(base), loaded(false), size(size), name(name) {}
+		Type() { data = 0; type = Types::Void; loaded = false; size = 0; pointer_type = 0;}
+		Type(std::string name, Types type, Struct *data = 0) : type(type), data(data), loaded(false), size(0), name(name), pointer_type(0) {}
+		Type(std::string name, Types type, Type* base, int size = 0) : type(type), base(base), loaded(false), size(size), name(name), pointer_type(0) {}
 
 		void Load(Compilation* compiler);
 

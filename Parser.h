@@ -40,6 +40,8 @@ namespace Jet
 		Token Consume();
 		Token Consume(TokenType expected);
 
+		Token ConsumeTemplateGT();
+
 		Token LookAhead(unsigned int num = 0);
 
 		bool Match(TokenType expected);

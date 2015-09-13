@@ -33,7 +33,8 @@ Token ParseType(Parser* parser)
 			out += ParseType(parser).text;
 		} while (parser->MatchAndConsume(TokenType::Comma));
 
-		parser->Consume(TokenType::GreaterThan);
+		parser->ConsumeTemplateGT();
+		//parser->Consume(TokenType::GreaterThan);
 		out += ">";
 	}
 	else if (parser->MatchAndConsume(TokenType::LeftParen))
@@ -55,6 +56,31 @@ Token ParseType(Parser* parser)
 
 	while (parser->MatchAndConsume(TokenType::Asterisk))//parse pointers
 		out += '*';
+
+	//parse arrays
+	if (parser->MatchAndConsume(TokenType::LeftBracket))
+	{
+		//its an array type
+		//read the number
+		auto size = parser->ParseExpression(Precedence::ASSIGNMENT);
+
+		auto tok = parser->Consume(TokenType::RightBracket);
+
+		if (auto s = dynamic_cast<NumberExpression*>(size))
+		{
+			if (s->GetValue() <= 0)
+			{
+				ParserError("Cannot size array with a zero or negative size", tok);
+				//throw 7;
+			}
+			out += "[" + std::to_string((int)s->GetValue()) + "]";
+		}
+		else
+		{
+			ParserError("Cannot size array with a non constant size", tok);
+			//throw 7;
+		}
+	}
 
 	Token ret;
 	ret.column = name.column;
@@ -562,9 +588,9 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
 
 	std::string stru;
-	if (parser->MatchAndConsume(TokenType::Colon))
+	if (parser->MatchAndConsume(TokenType::Scope))
 	{
-		parser->Consume(TokenType::Colon);
+		//parser->Consume(TokenType::Colon);
 
 		//its a struct definition
 		stru = name.text;
@@ -911,4 +937,12 @@ Expression* NamespaceParselet::parse(Parser* parser, Token token)
 	Token end;
 	//Token end = parser->Consume(TokenType::RightBrace);
 	return new NamespaceExpression(token, name, start, block, end);
+}
+
+Expression* NewParselet::parse(Parser* parser, Token token)
+{
+	//auto expression = parser->ParseExpression(Precedence::PREFIX);
+	auto type = ::ParseType(parser);
+
+	return new NewExpression(token, type);
 }

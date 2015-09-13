@@ -61,7 +61,7 @@ namespace Jet
 
 		std::vector<std::pair<Namespace*, Type**>> types;//a list of all referenced types and their locations, used for type lookahead
 
-		std::map<std::string, Trait*> traits;
+		std::map<std::string, Trait*> traits;//a list of all traits
 		std::vector<Function*> functions;//a list of all functions to be able to optimize and shizzle
 
 		std::map<int, Type*> function_types;
@@ -95,7 +95,7 @@ namespace Jet
 
 		void AdvanceTypeLookup(Type** dest, const std::string& name, Token* location);
 
-		//std::map<std::string, Type*> types;
+
 		Type* LookupType(const std::string& name, bool load = true);
 		Type* TryLookupType(const std::string& name);
 

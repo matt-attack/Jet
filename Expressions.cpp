@@ -49,10 +49,10 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 CValue SizeofExpression::Compile(CompilerContext* context)
 {
 	auto t = context->parent->LookupType(type.text);
-	auto null = llvm::ConstantPointerNull::get(GetType(t)->getPointerTo());
-	auto ptr = context->parent->builder.CreateGEP(null, context->parent->builder.getInt32(1));
-	ptr = context->parent->builder.CreatePtrToInt(ptr, GetType(context->parent->IntType), "sizeof");
-	return CValue(context->parent->IntType, ptr);// context->DoCast(t, right->Compile(context), true);
+	//auto null = llvm::ConstantPointerNull::get(GetType(t)->getPointerTo());
+	//auto ptr = context->parent->builder.CreateGEP(null, context->parent->builder.getInt32(1));
+	//ptr = context->parent->builder.CreatePtrToInt(ptr, GetType(context->parent->IntType), "sizeof");
+	return context->GetSizeof(t);// CValue(context->parent->IntType, ptr);// context->DoCast(t, right->Compile(context), true);
 }
 
 CValue PostfixExpression::Compile(CompilerContext* context)
@@ -1519,7 +1519,7 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 	{
 		t->templates.reserve(this->templates->size());
 
-		for (auto ii : *this->templates)
+		for (auto& ii : *this->templates)
 		{
 			if (ii.first.text.length() == 0)
 				t->templates.push_back({ 0, ii.second.text });

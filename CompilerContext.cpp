@@ -9,7 +9,7 @@ using namespace Jet;
 
 CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member)
 {
-	auto iter = parent->ns->GetFunction(fname);// functions.find(fname);
+	auto iter = parent->ns->GetFunction(fname);
 	Function* func = 0;
 	if (member)
 	{
@@ -361,7 +361,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 		}
 
 		//look for the best one
-		fun = this->parent->GetFunction(name, args);// functions.equal_range(name);
+		fun = this->parent->GetFunction(name, args);
 
 		if (fun && fun->templates.size() > 0)
 		{
@@ -551,13 +551,9 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		this->parent->Error("Mismatched function parameters in call", *this->current_token);//todo: add better checks later
 
 	std::vector<llvm::Value*> argsv;
-	for (int i = 0; i < args.size(); i++)// auto ii : args)
-	{
-		//this->DoCast(fun->arguments[i].first, args[i]).val->dump();
+	for (int i = 0; i < args.size(); i++)
 		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]).val);//try and cast to the correct type if we can
-	}
 
-	//fun->f->dump();
 	return CValue(fun->return_type, this->parent->builder.CreateCall(fun->f, argsv));
 }
 
@@ -682,6 +678,10 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		//pointer to bool
 		if (t->type == Types::Bool)
 			return CValue(t, parent->builder.CreateIsNotNull(value.val));
+
+		if (t->type == Types::Pointer && value.type->base->type == Types::Array && value.type->base->base == t->base)
+			return CValue(t, parent->builder.CreatePointerCast(value.val, GetType(t), "arraycast"));
+
 		if (Explicit)
 		{
 			if (t->type == Types::Pointer)
