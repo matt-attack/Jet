@@ -107,7 +107,7 @@ namespace Jet
 
 		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, CompilerContext* context, bool def = false);
 
-		Type* GetPointerType(CompilerContext* context);
+		Type* GetPointerType();
 
 		Type* GetBaseType()//returns bottom level type
 		{

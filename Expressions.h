@@ -143,11 +143,12 @@ namespace Jet
 
 	public:
 		Token token, type;
-
-		NewExpression(Token tok, Token type)
+		Expression* size;
+		NewExpression(Token tok, Token type, Expression* size)
 		{
 			this->token = tok;
 			this->type = type;
+			this->size = size;
 		}
 
 		CValue Compile(CompilerContext* context)
@@ -158,9 +159,13 @@ namespace Jet
 			//	context->parent->Error("Invalid Namespace", this->token);
 			auto ty = context->parent->LookupType(type.text);
 			auto size = context->GetSizeof(ty);
+			if (this->size)
+			{
+				size.val = context->parent->builder.CreateMul(size.val, this->size->Compile(context).val);
+			}
 			CValue val = context->Call("malloc", { size });
 
-			auto ptr = context->DoCast(ty->GetPointerType(context), val, true);
+			auto ptr = context->DoCast(ty->GetPointerType(), val, true);
 
 			//fix array casting
 			//add constructor
@@ -190,6 +195,13 @@ namespace Jet
 			//left->Print(output, source);
 			token.Print(output, source);
 			type.Print(output, source);
+
+			if (this->size)
+			{
+				output += '[';
+				size->Print(output, source);
+				output += ']';
+			}
 			//right->Print(output, source);
 		}
 

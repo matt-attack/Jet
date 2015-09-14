@@ -8,7 +8,7 @@
 using namespace Jet;
 
 
-Token ParseType(Parser* parser)
+Token ParseType(Parser* parser, bool parse_arrays = true)
 {
 	Token name = parser->Consume(TokenType::Name);
 	std::string out = name.text;
@@ -58,7 +58,7 @@ Token ParseType(Parser* parser)
 		out += '*';
 
 	//parse arrays
-	if (parser->MatchAndConsume(TokenType::LeftBracket))
+	if (parse_arrays && parser->MatchAndConsume(TokenType::LeftBracket))
 	{
 		//its an array type
 		//read the number
@@ -942,7 +942,15 @@ Expression* NamespaceParselet::parse(Parser* parser, Token token)
 Expression* NewParselet::parse(Parser* parser, Token token)
 {
 	//auto expression = parser->ParseExpression(Precedence::PREFIX);
-	auto type = ::ParseType(parser);
+	auto type = ::ParseType(parser, false);
 
-	return new NewExpression(token, type);
+	//try and parse size expression
+	Expression* size = 0;
+	if (auto tok = parser->MatchAndConsume(TokenType::LeftBracket))
+	{
+		size = parser->ParseExpression(Precedence::ASSIGNMENT);
+
+		parser->Consume(TokenType::RightBracket);
+	}
+	return new NewExpression(token, type, size);
 }

@@ -13,7 +13,7 @@ using namespace Jet;
 
 Type Jet::VoidType("void", Types::Void);
 
-Type* Type::GetPointerType(CompilerContext* context)
+Type* Type::GetPointerType()
 {
 	if (this->pointer_type)
 		return this->pointer_type;

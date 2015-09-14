@@ -245,7 +245,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-			return CValue(type->data->struct_members[index].type->GetPointerType(context), loc);
+			return CValue(type->data->struct_members[index].type->GetPointerType(), loc);
 		}
 
 		context->parent->Error("unimplemented!", this->token);
@@ -277,7 +277,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			std::vector<llvm::Value*> iindex = { context->parent->builder.getInt32(0), context->parent->builder.getInt32(index) };
 
 			auto loc = context->parent->builder.CreateGEP(lhs.val, iindex, "index");
-			return CValue(lhs.type->base->data->struct_members[index].type->GetPointerType(context), loc);
+			return CValue(lhs.type->base->data->struct_members[index].type->GetPointerType(), loc);
 		}
 		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
 		{
@@ -402,7 +402,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 		}
 
 		//push in the this pointer argument kay
-		argsv.push_back(CValue(stru->GetPointerType(context), self));
+		argsv.push_back(CValue(stru->GetPointerType(), self));
 	}
 	else
 	{
@@ -717,7 +717,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
 
 		// Add arguments to variable symbol table.
-		function->RegisterLocal(aname, CValue(argsv[Idx].first->GetPointerType(context), Alloca));
+		function->RegisterLocal(aname, CValue(argsv[Idx].first->GetPointerType(), Alloca));
 	}
 
 	if (lambda)
@@ -733,7 +733,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			
 			CValue value;
 			value.val = context->parent->builder.CreateAlloca(GetType(ii.second));
-			value.type = ii.second->GetPointerType(context);
+			value.type = ii.second->GetPointerType();
 
 			function->RegisterLocal(ii.first, value);
 
@@ -982,7 +982,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			context->parent->Error("Cannot infer type from nothing!", ii.second);
 
 		// Add arguments to variable symbol table.
-		context->RegisterLocal(aname, CValue(type->GetPointerType(context), Alloca));
+		context->RegisterLocal(aname, CValue(type->GetPointerType(), Alloca));
 
 		//construct it!
 		if (this->_right == 0 && type->type == Types::Struct)
@@ -991,7 +991,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			const std::string& constructor_name = type->data->template_base ? type->data->template_base->name : type->data->name;
 			auto iter = type->data->functions.find(constructor_name);
 			if (iter != type->data->functions.end())
-				context->Call(constructor_name, { CValue(type->GetPointerType(context), Alloca) }, type);
+				context->Call(constructor_name, { CValue(type->GetPointerType(), Alloca) }, type);
 		}
 	}
 
@@ -1125,7 +1125,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 					Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
 
 					// Add arguments to variable symbol table.
-					function->RegisterLocal(aname, CValue(argsv[Idx].first->GetPointerType(context), Alloca));
+					function->RegisterLocal(aname, CValue(argsv[Idx].first->GetPointerType(), Alloca));
 				}
 
 				//compile stuff here
@@ -1207,7 +1207,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 					Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
 
 					// Add arguments to variable symbol table.
-					function->RegisterLocal(aname, CValue(argsv[Idx].first->GetPointerType(context), Alloca));
+					function->RegisterLocal(aname, CValue(argsv[Idx].first->GetPointerType(), Alloca));
 				}
 
 				//compile stuff here
