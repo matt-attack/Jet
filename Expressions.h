@@ -1669,6 +1669,7 @@ namespace Jet
 
 	class FunctionExpression : public Expression
 	{
+		friend class Namespace;
 		friend class Compiler;
 		friend class CompilerContext;
 		friend class Type;

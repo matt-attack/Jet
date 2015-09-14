@@ -906,6 +906,30 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 					data += ");";
 				}
 				data += "}";
+
+				//export extension methods
+				for (auto fun : ii.second.ty->trait->extension_methods)
+				{
+					auto source = fun.second->expression->GetBlock()->start.GetSource(compilation);
+
+					data += "fun ";
+					fun.second->expression->ret_type.Print(data, source);// .->ToString()
+					data += " ";
+					data += ii.second.ty->trait->name + "::";
+					data += fun.first + "(";
+					int i = 0;
+					for (auto ii : *fun.second->expression->args)
+					{
+						data += ii.first + " " + ii.second;
+						if (i != fun.second->expression->args->size() - 1)
+							data += ", ";
+						//ii->Print(output, source);
+						i++;
+					}
+					data += ")";
+
+					fun.second->expression->GetBlock()->Print(data, source);
+				}
 			}
 		}
 		else if (ii.second.type == SymbolType::Namespace)
