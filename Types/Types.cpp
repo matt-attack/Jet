@@ -655,6 +655,7 @@ std::string Type::ToString()
 
 		return out + ")";
 	}
+	assert(false && "Unhandled Type::ToString()");
 	//Error("Unhandled Type::ToString()", Token());
 }
 

@@ -128,7 +128,7 @@ namespace Jet
 		
 		//Range text;
 		const char* text_ptr;
-		int length, trivia_length;//length of preceding whitespace/comments
+		int trivia_length;//length of preceding whitespace/comments
 
 		unsigned int line;
 		unsigned int column;

@@ -45,6 +45,7 @@ namespace Jet
 		friend class Compiler;
 		friend class Expression;
 		friend class CompilerContext;
+		friend class NewExpression;
 		friend class FunctionExpression;
 		friend class ExternExpression;
 		friend class TraitExpression;

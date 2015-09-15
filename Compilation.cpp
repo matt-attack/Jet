@@ -289,10 +289,8 @@ Compilation* Compilation::Make(JetProject* project)
 				}
 				catch (int x)
 				{
-					//printf("Compilation Stopped, Parser Error\n");
 					errors++;
-					//delete compilation;
-					//compilation = 0;
+
 					goto error;
 				}
 			}
@@ -367,14 +365,8 @@ Compilation* Compilation::Make(JetProject* project)
 	}
 	init->Return(global->Integer(0));
 
+	//compilation->module->dump();
 error:
-
-	//delete stuff
-	//for (auto ii : symbol_asts)
-	//delete ii;
-
-	//for (auto ii : symbol_sources)
-	//delete ii;
 
 	//restore working directory
 	chdir(olddir);
@@ -618,10 +610,12 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	//add runtime option to switch between gcc and link
 	//build symbol table for export
 	printf("Building Symbol Table...\n");
+	StackTime timer("Writing Symbol Output");
 	std::string function;
 	this->ns->OutputMetadata(function, this);
 
 	//todo: only do this if im a library
+	
 	std::ofstream stable("build/symbols.jlib", std::ios_base::binary);
 	stable.write(function.data(), function.length());
 	stable.close();
@@ -700,6 +694,8 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 		//navigate to correct namespace
 		std::string ns = name.substr(0, i - 1);
 		auto res = this->ns->members.find(ns);
+		if (res == this->ns->members.end())
+			this->Error("Namespace " + ns + " not found", *this->current_function->current_token);
 		auto old = this->ns;
 		this->ns = res->second.ns;
 		auto out = this->LookupType(name.substr(i - 1 + 2), load);

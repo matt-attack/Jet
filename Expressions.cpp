@@ -730,7 +730,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		{
 			//load it, then store it as a local
 			auto val = context->parent->builder.CreateGEP(data, { context->parent->builder.getInt32(0), context->parent->builder.getInt32(i++) });
-			
+
 			CValue value;
 			value.val = context->parent->builder.CreateAlloca(GetType(ii.second));
 			value.type = ii.second->GetPointerType();
@@ -782,7 +782,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	bool advlookup = true;
 	Function* fun = new Function(this->GetRealName());
 	fun->expression = this;
-	
+
 	auto str = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 
 	fun->f = 0;
@@ -922,7 +922,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 	for (auto ii : *this->_names) {
 		auto aname = ii.second.text;
 
-		llvm::IRBuilder<> TmpB(&context->f->getEntryBlock(), context->f->getEntryBlock().begin());
+		//llvm::IRBuilder<> TmpB(&context->f->getEntryBlock(), context->f->getEntryBlock().begin());
 		Type* type = 0;
 		llvm::AllocaInst* Alloca = 0;
 		if (ii.first.text.length() > 0)//type was specified
@@ -930,7 +930,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			type = context->parent->LookupType(ii.first.text);
 
 			if (type->type == Types::Array)
-				Alloca = TmpB.CreateAlloca(GetType(type), context->parent->builder.getInt32(type->size), aname);
+				Alloca = context->parent->builder.CreateAlloca(GetType(type), context->parent->builder.getInt32(type->size), aname);
 			else
 			{
 				if (type->GetBaseType()->type == Types::Trait)
@@ -938,7 +938,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 				auto ty = GetType(type);
 
-				Alloca = TmpB.CreateAlloca(GetType(type), 0, aname);
+				Alloca = context->parent->builder.CreateAlloca(GetType(type), 0, aname);
 			}
 
 			auto D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, context->parent->debug_info.file, ii.second.line,
@@ -960,12 +960,17 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		else if (this->_right)
 		{
 			//infer the type
+			//auto ip = context->parent->builder.GetInsertPoint();
 			auto val = (*this->_right)[i++]->Compile(context);
-			type = val.type;
+			type = val.type; 
+
+			//auto newip = context->parent->builder.GetInsertPoint();
+
+			//context->parent->builder.SetInsertPoint(ip);
 			if (val.type->type == Types::Array)
-				Alloca = TmpB.CreateAlloca(GetType(val.type), context->parent->builder.getInt32(val.type->size), aname);
+				Alloca = context->parent->builder.CreateAlloca(GetType(val.type), context->parent->builder.getInt32(val.type->size), aname);
 			else
-				Alloca = TmpB.CreateAlloca(GetType(val.type), 0, aname);
+				Alloca = context->parent->builder.CreateAlloca(GetType(val.type), 0, aname);
 
 			llvm::DIFile* unit = context->parent->debug_info.file;
 			type->Load(context->parent);
@@ -977,6 +982,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
 
 			context->parent->builder.CreateStore(val.val, Alloca);
+			//context->parent->builder.SetInsertPoint(newip);
 		}
 		else
 			context->parent->Error("Cannot infer type from nothing!", ii.second);
@@ -1332,16 +1338,15 @@ void StructExpression::AddConstructors(CompilerContext* context)
 void StructExpression::CompileDeclarations(CompilerContext* context)
 {
 	//build data about the struct
-	//get or add the struct type from the type table
 	Type* str = new Type;
 	context->parent->ns->members.insert({ this->name.text, str });
-
+	str->name = this->name.text;
 	str->type = Types::Struct;
 	str->data = new Struct;
 	str->data->name = this->name.text;
 	str->data->expression = this;
 	if (this->base_type.text.length())
-		/*str->data->parent_struct =*/ context->parent->AdvanceTypeLookup(&str->data->parent_struct, this->base_type.text, &this->base_type);
+		context->parent->AdvanceTypeLookup(&str->data->parent_struct, this->base_type.text, &this->base_type);
 	if (this->templates)
 	{
 		str->data->templates.reserve(this->templates->size());
@@ -1365,9 +1370,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		if (ii.type == StructMember::VariableMember)
 		{
 			Type* type = 0;
-			//if (this->templates == 0)
-			//type = context->parent->AdvanceTypeLookup(ii.variable.first.text);
-
+			
 			str->data->struct_members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
 			if (this->templates == 0)
 				context->parent->AdvanceTypeLookup(&str->data->struct_members.back().type, ii.variable.first.text, &ii.variable.first);
@@ -1501,7 +1504,6 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 		Type* ty = new Type(name.text, Types::Trait);
 		ty->trait = t;
 		context->parent->ns->members.insert({ name.text, Symbol(ty) });
-		//context->parent->types[name.text] = ty;
 		context->parent->traits[name.text] = t;
 	}
 	//else if (tr->second->valid == false)//make sure it is set as invalid
@@ -1527,8 +1529,6 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 			{
 				t->templates.push_back({ 0, ii.second.text });
 				context->parent->AdvanceTypeLookup(&t->templates.back().first, ii.first.text, &ii.first);
-				//auto trait = context->parent->AdvanceTypeLookup(ii.first.text);
-				//t->templates.push_back({ trait, ii.second.text });
 			}
 
 			auto type = new Type;
@@ -1536,7 +1536,6 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 			type->type = Types::Invalid;
 			type->ns = context->parent->ns;
 			t->members.insert({ type->name, type });
-			//context->parent->ns->members.insert({ type->name, type });
 		}
 	}
 
@@ -1555,4 +1554,59 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 	}
 
 	context->parent->ns = t->parent;
+}
+
+CValue NewExpression::Compile(CompilerContext* context)
+{
+	context->CurrentToken(&this->token);
+
+	auto ty = context->parent->LookupType(type.text);
+	auto size = context->GetSizeof(ty);
+	auto arr_size = this->size ? this->size->Compile(context).val : 0;
+	if (this->size)
+	{
+		size.val = context->parent->builder.CreateMul(size.val, arr_size);
+	}
+	CValue val = context->Call("malloc", { size });
+
+	auto ptr = context->DoCast(ty->GetPointerType(), val, true);
+
+	//run constructors
+	if (ty->type == Types::Struct)
+	{
+		auto fun = ty->GetMethod(ty->data->name, {ptr}, context);
+		fun->Load(context->parent);
+		if (this->size == 0)
+		{//just one element, construct it
+			context->parent->builder.CreateCall(fun->f, { ptr.val });
+		}
+		else
+		{//construct each child element
+			llvm::Value* counter = context->parent->builder.CreateAlloca(GetType(context->parent->IntType), 0, "newcounter");
+			context->parent->builder.CreateStore(context->Integer(0).val, counter);
+
+			auto start = llvm::BasicBlock::Create(context->parent->context, "start", context->parent->current_function->f);
+			auto body = llvm::BasicBlock::Create(context->parent->context, "body", context->parent->current_function->f);
+			auto end = llvm::BasicBlock::Create(context->parent->context, "end", context->parent->current_function->f);
+
+			context->parent->builder.CreateBr(start);
+			context->parent->builder.SetInsertPoint(start);
+			auto cval = context->parent->builder.CreateLoad(counter, "curcount");
+			auto res = context->parent->builder.CreateICmpUGE(cval, arr_size);
+			context->parent->builder.CreateCondBr(res, end, body);
+
+			context->parent->builder.SetInsertPoint(body);
+			auto elementptr = context->parent->builder.CreateGEP(ptr.val, { cval });
+			context->parent->builder.CreateCall(fun->f, { elementptr });
+
+			auto inc = context->parent->builder.CreateAdd(cval, context->Integer(1).val);
+			context->parent->builder.CreateStore(inc, counter);
+
+			context->parent->builder.CreateBr(start);
+
+			context->parent->builder.SetInsertPoint(end);
+		}
+	}
+
+	return ptr;
 }

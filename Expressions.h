@@ -151,42 +151,7 @@ namespace Jet
 			this->size = size;
 		}
 
-		CValue Compile(CompilerContext* context)
-		{
-			context->CurrentToken(&this->token);
-			//auto v = dynamic_cast<NameExpression*>(left);
-			//if (v == 0)
-			//	context->parent->Error("Invalid Namespace", this->token);
-			auto ty = context->parent->LookupType(type.text);
-			auto size = context->GetSizeof(ty);
-			if (this->size)
-			{
-				size.val = context->parent->builder.CreateMul(size.val, this->size->Compile(context).val);
-			}
-			CValue val = context->Call("malloc", { size });
-
-			auto ptr = context->DoCast(ty->GetPointerType(), val, true);
-
-			//fix array casting
-			//add constructor
-			if (ptr.type->type == Types::Struct)
-			{
-
-			}
-			else if (ptr.type->type == Types::Array)
-			{
-
-			}
-
-			//context->SetNamespace(v->GetName());
-			return ptr;
-			//right->Compile(context);
-
-			////context->PopNamespace();
-			//todo
-
-			//return CValue();
-		}
+		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
 
