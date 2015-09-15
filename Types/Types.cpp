@@ -84,9 +84,9 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 	printf("oops");
 }
 
-llvm::Type* Jet::GetType(Type* t)
+llvm::Type* Type::GetLLVMType()
 {
-	switch (t->type)
+	switch (this->type)
 	{
 	case Types::Double:
 		return llvm::Type::getDoubleTy(llvm::getGlobalContext());
@@ -105,18 +105,18 @@ llvm::Type* Jet::GetType(Type* t)
 	case Types::Bool:
 		return llvm::Type::getInt1Ty(llvm::getGlobalContext());
 	case Types::Struct:
-		assert(t->loaded);
-		return t->data->type;
+		assert(this->loaded);
+		return this->data->type;
 	case Types::Array:
-		return llvm::ArrayType::get(GetType(t->base), t->size);
+		return llvm::ArrayType::get(this->base->GetLLVMType(), this->size);
 	case Types::Pointer:
-		return llvm::PointerType::get(GetType(t->base), 0);//address space, wat?
+		return llvm::PointerType::get(this->base->GetLLVMType(), 0);//address space, wat?
 	case Types::Function:
 	{
 		std::vector<llvm::Type*> args;
-		for (auto ii : t->function->args)
-			args.push_back(GetType(ii));
-		return llvm::FunctionType::get(GetType(t->function->return_type), args, false)->getPointerTo();
+		for (auto ii : this->function->args)
+			args.push_back(ii->GetLLVMType());
+		return llvm::FunctionType::get(this->function->return_type->GetLLVMType(), args, false)->getPointerTo();
 	}
 	case Types::Trait:
 		return 0;
@@ -765,7 +765,7 @@ void Struct::Load(Compilation* compiler)
 		auto type = ii.type;
 		ii.type->Load(compiler);
 
-		elementss.push_back(GetType(type));
+		elementss.push_back(type->GetLLVMType());
 	}
 	if (elementss.size() == 0)
 		compiler->Error("Struct contains no elements!! Fix this not being ok!", *compiler->current_function->current_token);

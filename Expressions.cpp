@@ -474,7 +474,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 
 		context->f->getBasicBlockList().push_back(end_block);
 		context->parent->builder.SetInsertPoint(end_block);
-		auto phi = context->parent->builder.CreatePHI(GetType(cond.type), 2, "land");
+		auto phi = context->parent->builder.CreatePHI(cond.type->GetLLVMType(), 2, "land");
 		phi->addIncoming(cond.val, cur_block);
 		phi->addIncoming(cond2.val, else_block);
 
@@ -500,7 +500,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		context->f->getBasicBlockList().push_back(end_block);
 		context->parent->builder.SetInsertPoint(end_block);
 
-		auto phi = context->parent->builder.CreatePHI(GetType(cond.type), 2, "lor");
+		auto phi = context->parent->builder.CreatePHI(cond.type->GetLLVMType(), 2, "lor");
 		phi->addIncoming(cond.val, cur_block);
 		phi->addIncoming(cond2.val, else_block);
 		return CValue(context->parent->BoolType, phi);
@@ -655,16 +655,15 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			std::vector<Type*> args;
 			for (auto ii : argsv)
 				args.push_back(ii.first);
-			//args.push_back(context->parent->LookupType("char*"));
 
 			lambda_type = context->parent->LookupType("function<" + context->parent->GetFunctionType(ret, args)->ToString() + ">");
-			lambda = context->parent->builder.CreateAlloca(GetType(lambda_type));
+			lambda = context->parent->builder.CreateAlloca(lambda_type->GetLLVMType());
 
 			std::vector<llvm::Type*> elements;
 			for (auto ii : *this->captures)
 			{
 				auto var = context->GetVariable(ii.text);
-				elements.push_back(GetType(var.type->base));
+				elements.push_back(var.type->base->GetLLVMType());
 			}
 
 			storage_t = llvm::StructType::get(context->parent->context, elements);
@@ -703,7 +702,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		auto aname = argsv[Idx].second;
 
 		llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
-		auto Alloca = TmpB.CreateAlloca(GetType(argsv[Idx].first), 0, aname);
+		auto Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
 		// Store the initial value into the alloca.
 		function->parent->builder.CreateStore(AI, Alloca);
 
@@ -732,7 +731,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			auto val = context->parent->builder.CreateGEP(data, { context->parent->builder.getInt32(0), context->parent->builder.getInt32(i++) });
 
 			CValue value;
-			value.val = context->parent->builder.CreateAlloca(GetType(ii.second));
+			value.val = context->parent->builder.CreateAlloca(ii.second->GetLLVMType());
 			value.type = ii.second->GetPointerType();
 
 			function->RegisterLocal(ii.first, value);
@@ -797,10 +796,6 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			type->trait->extension_methods.insert({ fname, fun });
 			is_trait = true;
 		}
-		//else if (type->type == Types::Invalid)
-		//{
-		//	context->parent->Error("Type '" + str + "' not defined", *context->current_token);
-		//}
 		else
 		{
 			type->data->functions.insert({ fname, fun });
@@ -822,9 +817,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	{
 		//insert first arg, which is me
 		Type* type = 0;
-		//if (is_trait == false)
-		//	type = context->parent->AdvanceTypeLookup(str + "*");
-
+		
 		fun->arguments.push_back({ type, "this" });
 		if (is_trait == false && advlookup)
 			context->parent->AdvanceTypeLookup(&fun->arguments.back().first, str + "*", &this->token);
@@ -842,14 +835,12 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	for (auto ii : *this->args)
 	{
 		Type* type = 0;
-		//if (advlookup)
-		//type = context->parent->AdvanceTypeLookup(ii.first);
 		if (!advlookup)//else
 			type = context->parent->LookupType(ii.first);
 
 		fun->arguments.push_back({ type, ii.second });
 		if (advlookup && is_trait == false)
-			/*type = */context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first, &this->token);
+			context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first, &this->token);
 	}
 }
 
@@ -869,7 +860,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	for (auto ii : *this->args)
 	{
 		fun->arguments.push_back({ 0, ii.second });
-		/*auto type = */context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first, &this->token);
+		context->parent->AdvanceTypeLookup(&fun->arguments.back().first, ii.first, &this->token);
 	}
 
 	fun->f = 0;
@@ -922,7 +913,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 	for (auto ii : *this->_names) {
 		auto aname = ii.second.text;
 
-		//llvm::IRBuilder<> TmpB(&context->f->getEntryBlock(), context->f->getEntryBlock().begin());
 		Type* type = 0;
 		llvm::AllocaInst* Alloca = 0;
 		if (ii.first.text.length() > 0)//type was specified
@@ -930,15 +920,15 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			type = context->parent->LookupType(ii.first.text);
 
 			if (type->type == Types::Array)
-				Alloca = context->parent->builder.CreateAlloca(GetType(type), context->parent->builder.getInt32(type->size), aname);
+				Alloca = context->parent->builder.CreateAlloca(type->GetLLVMType(), context->parent->builder.getInt32(type->size), aname);
 			else
 			{
 				if (type->GetBaseType()->type == Types::Trait)
 					context->parent->Error("Cannot instantiate trait", ii.second);
 
-				auto ty = GetType(type);
+				//auto ty = type->GetLLVMType();
 
-				Alloca = context->parent->builder.CreateAlloca(GetType(type), 0, aname);
+				Alloca = context->parent->builder.CreateAlloca(type->GetLLVMType(), 0, aname);
 			}
 
 			auto D = context->parent->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, context->parent->debug_info.file, ii.second.line,
@@ -960,17 +950,13 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		else if (this->_right)
 		{
 			//infer the type
-			//auto ip = context->parent->builder.GetInsertPoint();
 			auto val = (*this->_right)[i++]->Compile(context);
 			type = val.type; 
 
-			//auto newip = context->parent->builder.GetInsertPoint();
-
-			//context->parent->builder.SetInsertPoint(ip);
 			if (val.type->type == Types::Array)
-				Alloca = context->parent->builder.CreateAlloca(GetType(val.type), context->parent->builder.getInt32(val.type->size), aname);
+				Alloca = context->parent->builder.CreateAlloca(val.type->GetLLVMType(), context->parent->builder.getInt32(val.type->size), aname);
 			else
-				Alloca = context->parent->builder.CreateAlloca(GetType(val.type), 0, aname);
+				Alloca = context->parent->builder.CreateAlloca(val.type->GetLLVMType(), 0, aname);
 
 			llvm::DIFile* unit = context->parent->debug_info.file;
 			type->Load(context->parent);
@@ -982,7 +968,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
 
 			context->parent->builder.CreateStore(val.val, Alloca);
-			//context->parent->builder.SetInsertPoint(newip);
 		}
 		else
 			context->parent->Error("Cannot infer type from nothing!", ii.second);
@@ -1117,7 +1102,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 					auto aname = argsv[Idx].second;
 
 					llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
-					auto Alloca = TmpB.CreateAlloca(GetType(argsv[Idx].first), 0, aname);
+					auto Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
 					// Store the initial value into the alloca.
 					function->parent->builder.CreateStore(AI, Alloca);
 
@@ -1197,7 +1182,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 					auto aname = argsv[Idx].second;
 
 					llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
-					auto Alloca = TmpB.CreateAlloca(GetType(argsv[Idx].first), 0, aname);
+					auto Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
 					// Store the initial value into the alloca.
 					function->parent->builder.CreateStore(AI, Alloca);
 
@@ -1582,7 +1567,7 @@ CValue NewExpression::Compile(CompilerContext* context)
 		}
 		else
 		{//construct each child element
-			llvm::Value* counter = context->parent->builder.CreateAlloca(GetType(context->parent->IntType), 0, "newcounter");
+			llvm::Value* counter = context->parent->builder.CreateAlloca(context->parent->IntType->GetLLVMType(), 0, "newcounter");
 			context->parent->builder.CreateStore(context->Integer(0).val, counter);
 
 			auto start = llvm::BasicBlock::Create(context->parent->context, "start", context->parent->current_function->f);

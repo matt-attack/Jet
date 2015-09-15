@@ -103,7 +103,10 @@ namespace Jet
 
 		std::string ToString();
 
+		//get llvm infos
 		llvm::DIType* GetDebugType(Compilation* compiler);
+		llvm::Type* GetLLVMType();
+
 
 		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, CompilerContext* context, bool def = false);
 
@@ -222,7 +225,5 @@ namespace Jet
 
 		void Load(Compilation* compiler);
 	};
-
-	llvm::Type* GetType(Type* t);
 }
 #endif

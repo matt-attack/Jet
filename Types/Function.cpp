@@ -28,13 +28,13 @@ void Function::Load(Compilation* compiler)
 		}
 
 		type.first->Load(compiler);
-		args.push_back(::GetType(type.first));
+		args.push_back(type.first->GetLLVMType());
 
 		//add debug stuff
 		ftypes.push_back(type.first->GetDebugType(compiler));
 	}
 
-	llvm::FunctionType *ft = llvm::FunctionType::get(::GetType(this->return_type), /*this->*/args, false);
+	llvm::FunctionType *ft = llvm::FunctionType::get(this->return_type->GetLLVMType(), /*this->*/args, false);
 
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
 	compiler->functions.push_back(this);

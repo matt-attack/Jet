@@ -160,9 +160,9 @@ namespace Jet
 
 		CValue GetSizeof(Type* t)
 		{
-			auto null = llvm::ConstantPointerNull::get(GetType(t)->getPointerTo());
+			auto null = llvm::ConstantPointerNull::get(t->GetLLVMType()->getPointerTo());
 			auto ptr = parent->builder.CreateGEP(null, parent->builder.getInt32(1));
-			ptr = parent->builder.CreatePtrToInt(ptr, GetType(parent->IntType), "sizeof");
+			ptr = parent->builder.CreatePtrToInt(ptr, parent->IntType->GetLLVMType(), "sizeof");
 			return CValue(parent->IntType, ptr);
 		}
 

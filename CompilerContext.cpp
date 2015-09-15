@@ -44,13 +44,13 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		std::vector<llvm::Metadata*> ftypes;
 		for (int i = 0; i < args.size(); i++)
 		{
-			oargs.push_back(GetType(args[i].first));
+			oargs.push_back(args[i].first->GetLLVMType());
 			ftypes.push_back(args[i].first->GetDebugType(this->parent));
 		}
 
 		auto n = new CompilerContext(this->parent);
 
-		auto ft = llvm::FunctionType::get(GetType(ret), oargs, false);
+		auto ft = llvm::FunctionType::get(ret->GetLLVMType(), oargs, false);
 
 		func->f = n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, parent->module);
 		this->parent->functions.push_back(func);
@@ -469,7 +469,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				//ok, we allocate, call then 
 				//allocate thing
 				type->Load(this->parent);
-				auto Alloca = this->parent->builder.CreateAlloca(GetType(type), 0, "constructortemp");
+				auto Alloca = this->parent->builder.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
 
 				std::vector<llvm::Value*> argsv;
 				int i = 1;
@@ -635,7 +635,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	if (value.type->type == t->type && value.type->data == t->data)
 		return value;
 
-	llvm::Type* tt = GetType(t);
+	llvm::Type* tt = t->GetLLVMType();// GetType(t);
 	if (value.type->type == Types::Float && t->type == Types::Double)
 	{
 		//lets do this
@@ -665,12 +665,12 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 			return CValue(t, parent->builder.CreateIsNotNull(value.val));
 		if (t->type == Types::Pointer)
 		{
-			return CValue(t, parent->builder.CreateIntToPtr(value.val, GetType(t)));
+			return CValue(t, parent->builder.CreateIntToPtr(value.val,t->GetLLVMType()));
 		}
 
 		if (value.type->type == Types::Int && (t->type == Types::Char || t->type == Types::Short))
 		{
-			return CValue(t, parent->builder.CreateTrunc(value.val, GetType(t)));
+			return CValue(t, parent->builder.CreateTrunc(value.val, t->GetLLVMType()));
 		}
 	}
 	if (value.type->type == Types::Pointer)
@@ -680,14 +680,14 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 			return CValue(t, parent->builder.CreateIsNotNull(value.val));
 
 		if (t->type == Types::Pointer && value.type->base->type == Types::Array && value.type->base->base == t->base)
-			return CValue(t, parent->builder.CreatePointerCast(value.val, GetType(t), "arraycast"));
+			return CValue(t, parent->builder.CreatePointerCast(value.val, t->GetLLVMType(), "arraycast"));
 
 		if (Explicit)
 		{
 			if (t->type == Types::Pointer)
 			{
 				//pointer to pointer cast;
-				return CValue(t, parent->builder.CreatePointerCast(value.val, GetType(t), "ptr2ptr"));
+				return CValue(t, parent->builder.CreatePointerCast(value.val, t->GetLLVMType(), "ptr2ptr"));
 			}
 		}
 	}

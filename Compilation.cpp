@@ -872,7 +872,7 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t)//, bool Ext
 		Error("Global variable '" + name + "' already exists", *this->current_function->current_token);
 
 	//auto cons = this->module->getOrInsertGlobal(name, GetType(value.type));
-	auto ng = new llvm::GlobalVariable(*module, GetType(t), false, llvm::GlobalValue::LinkageTypes::ExternalLinkage, 0, name);
+	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, llvm::GlobalValue::LinkageTypes::ExternalLinkage, 0, name);
 
 	this->globals[name] = CValue(t, ng);
 	return CValue(t, ng);
