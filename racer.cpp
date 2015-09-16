@@ -139,7 +139,7 @@ extern "C"
 		auto compilation = Compilation::Make(project);
 
 		//lets just check types for now
-		auto res = compilation->TryLookupType(symbol);// types.find(symbol);
+		auto res = compilation->TryLookupType(symbol);
 		if (res != 0)
 		{
 			strcpy(data, res->ToString().c_str());
@@ -237,7 +237,7 @@ extern "C"
 		auto compilation = Compilation::Make(project);
 
 		std::string out;
-		for (auto ii : compilation->ns->members)//functions)
+		for (auto ii : compilation->ns->members)
 		{
 			if (ii.second.type == SymbolType::Function)// && ii.second.fn->expression)
 			{
@@ -262,12 +262,18 @@ extern "C"
 		{
 			Scope* scope = f->expression->GetBlock()->scope;
 			for (auto ii : scope->named_values)
-				out += ii.first + "L/"+ii.second.type->ToString() + " " + ii.first+"/";
+				if (ii.second.type->type == Types::Pointer )
+					out += ii.first + "L/"+ii.second.type->base->ToString() + " " + ii.first+"/";
+				else
+					out += ii.first + "L/" + ii.second.type->ToString() + " " + ii.first + "/";
 
 			if (scope->prev)
 			{
 				for (auto ii : scope->prev->named_values)
-					out += ii.first + "L/" + ii.second.type->ToString() + " " + ii.first + "/";
+					if (ii.second.type->type == Types::Pointer)
+						out += ii.first + "L/" + ii.second.type->base->ToString() + " " + ii.first + "/";
+					else
+						out += ii.first + "L/" + ii.second.type->ToString() + " " + ii.first + "/";
 			}
 		}
 

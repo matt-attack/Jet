@@ -37,7 +37,7 @@ void Function::Load(Compilation* compiler)
 	llvm::FunctionType *ft = llvm::FunctionType::get(this->return_type->GetLLVMType(), /*this->*/args, false);
 
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
-	compiler->functions.push_back(this);
+	//compiler->functions.push_back(this);
 	llvm::DIFile* unit = compiler->debug_info.file;
 
 	auto functiontype = compiler->debug->createSubroutineType(unit, compiler->debug->getOrCreateTypeArray(ftypes));

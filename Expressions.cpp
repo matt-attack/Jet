@@ -786,7 +786,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	bool advlookup = true;
 	Function* fun = new Function(this->GetRealName());
 	fun->expression = this;
-
+	context->parent->functions.push_back(fun);
 	auto str = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 
 	fun->f = 0;
