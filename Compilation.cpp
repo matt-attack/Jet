@@ -77,11 +77,11 @@ Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), 
 Compilation::~Compilation()
 {
 	//free global namespace
-	delete this->global;
+	//delete this->global;
 
 	//free functions
-	for (auto ii : this->functions)
-		delete ii;
+	//for (auto ii : this->functions)
+	//	delete ii;
 
 	//free ASTs
 	for (auto ii : asts)
@@ -238,8 +238,8 @@ Compilation* Compilation::Make(JetProject* project)
 				goto error;
 			}
 
-			compilation->asts["symbols_" + std::to_string(symbol_asts.size())] = result;
-			compilation->sources["symbols_" + std::to_string(symbol_asts.size())] = src;
+			compilation->asts["#symbols_" + std::to_string(symbol_asts.size())] = result;
+			compilation->sources["#symbols_" + std::to_string(symbol_asts.size())] = src;
 
 			//this fixes some errors, need to resolve them later
 			compilation->debug_info.file = compilation->debug->createFile("temp",
@@ -262,6 +262,9 @@ Compilation* Compilation::Make(JetProject* project)
 				errors = 1;
 				goto error;
 			}
+
+			if (file.first[0] == '#')
+				continue;
 
 			BlockExpression* result = 0;
 			try
@@ -322,6 +325,9 @@ Compilation* Compilation::Make(JetProject* project)
 
 		for (auto result : compilation->asts)
 		{
+			if (result.first[0] == '#')
+				continue;
+
 			current_source = compilation->sources[result.first];
 			compilation->current_function = global;
 

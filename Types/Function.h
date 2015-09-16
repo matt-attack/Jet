@@ -47,6 +47,7 @@ namespace Jet
 
 		CompilerContext* context;
 
+		bool do_export;
 
 		llvm::Function* f;//not always used
 		llvm::DISubprogram* scope;
@@ -61,6 +62,7 @@ namespace Jet
 
 		Function(const std::string& name)
 		{
+			this->do_export = true;
 			this->name = name;
 			context = 0;
 			f = 0;

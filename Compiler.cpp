@@ -101,7 +101,7 @@ void Jet::ParserError(const std::string& msg, Token token)
 }
 
 
-
+ 
 class MemberRenamer : public ExpressionVisitor
 {
 	std::string stru, member, newname;
@@ -221,7 +221,6 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 	}
 
 
-	
 #ifdef false _WIN32
 	std::vector<std::pair<int, int>> modifiedtimes;
 	auto file = CreateFileA("project.jp", GENERIC_READ, FILE_SHARE_READ, NULL,
@@ -337,6 +336,8 @@ error:
 
 		printf("Project built successfully.\n\n");
 	}
+
+	delete compilation;
 
 	//restore working directory
 	chdir(olddir);

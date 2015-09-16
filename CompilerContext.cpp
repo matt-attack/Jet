@@ -448,7 +448,9 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 
 CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct)
 {
+	auto old_tok = this->current_token;
 	Function* fun = this->GetMethod(name, args, Struct);
+	this->current_token = old_tok;
 
 	if (fun == 0 && Struct == 0)
 	{

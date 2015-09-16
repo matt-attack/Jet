@@ -692,7 +692,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 {
 	for (auto ii : this->members)/// functions)
 	{
-		if (ii.second.type == SymbolType::Function)
+		if (ii.second.type == SymbolType::Function && ii.second.fn->do_export)
 		{
 			data += "extern fun " + ii.second.fn->return_type->ToString() + " ";
 			data += ii.first + "(";

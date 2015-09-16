@@ -423,6 +423,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 	for (auto ii : *this->args)
 		argsv.push_back(ii->Compile(context));
 
+	context->CurrentToken(&this->token);
 	return context->Call(fname, argsv, stru);
 }
 
@@ -695,6 +696,9 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	function->function->context = function;
 	function->function->Load(context->parent);
 	function->SetDebugLocation(this->token);
+
+	if (is_lambda)
+		function->function->do_export = false;
 
 	//alloc args
 	auto AI = function->f->arg_begin();

@@ -143,6 +143,8 @@ extern "C"
 		if (res != 0)
 		{
 			strcpy(data, res->ToString().c_str());
+			delete compilation;
+			delete project;
 			return data;
 		}
 
@@ -157,11 +159,17 @@ extern "C"
 					if (ii.second.type->type == Types::Pointer)
 					{
 						strcpy(data, ii.second.type->base->ToString().c_str());
+
+						delete compilation;
+						delete project;
+
 						return data;
 					}
 					else
 					{
 						strcpy(data, ii.second.type->ToString().c_str());
+						delete compilation;
+						delete project;
 						return data;
 					}
 				}
@@ -176,11 +184,19 @@ extern "C"
 						if (ii.second.type->type == Types::Pointer)
 						{
 							strcpy(data, ii.second.type->base->ToString().c_str());
+
+							delete compilation;
+							delete project;
+
 							return data;
 						}
 						else
 						{
 							strcpy(data, ii.second.type->ToString().c_str());
+
+							delete compilation;
+							delete project;
+
 							return data;
 						}
 					}
@@ -195,9 +211,17 @@ extern "C"
 			if (fun->first == symbol && fun->second.type == SymbolType::Function)
 			{
 				strcpy(data, fun->second.fn->GetType(compilation)->ToString().c_str());
+
+				delete compilation;
+				delete project;
+
 				return data;
 			}
 		}
+
+		delete compilation;
+		delete project;
+
 		return "";
 	}
 
@@ -215,7 +239,7 @@ extern "C"
 		std::string out;
 		for (auto ii : compilation->ns->members)//functions)
 		{
-			if (ii.second.type == SymbolType::Function && ii.second.fn->expression)
+			if (ii.second.type == SymbolType::Function)// && ii.second.fn->expression)
 			{
 				out += ii.first + "F/";
 				out += "fun " + ii.second.fn->return_type->ToString() + " " + ii.second.fn->name;
@@ -246,6 +270,9 @@ extern "C"
 					out += ii.first + "L/" + ii.second.type->ToString() + " " + ii.first + "/";
 			}
 		}
+
+		delete compilation;
+		delete project;
 
 		strcpy(data, out.c_str());
 		return data;
