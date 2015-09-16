@@ -36,7 +36,7 @@ using namespace Jet;
 
 extern "C"
 {
-	__declspec(dllexport) const char* GetFunction(const char* ffile, int line)
+	/*__declspec(dllexport) const char* GetFunction(const char* ffile, int line)
 	{
 		//a little test
 		//return "hello";
@@ -110,72 +110,7 @@ extern "C"
 			}
 		}
 		return 0;
-	}
-
-	
-	Function* GetFunctionAtPoint(Compilation* compilation, const char* file, int line)
-	{
-		for (auto ii : compilation->functions)
-		{
-			if (ii.second->expression)
-			{
-				auto block = ii.second->expression->GetBlock();
-				if (block->start.line <= line && block->end.line >= line)
-				{
-					auto src = block->start.GetSource(compilation);
-					if (src->filename == file)
-					{
-						printf("found it");
-						return ii.second;
-					}
-				}
-			}
-		}
-
-
-		for (auto ty : compilation->types)
-		{
-			if (ty.second->type == Types::Struct)
-			{
-				for (auto ii : ty.second->data->functions)
-				{
-					if (ii.second->expression)
-					{
-						auto block = ii.second->expression->GetBlock();
-						if (block->start.line <= line && block->end.line >= line)
-						{
-							auto src = block->start.GetSource(compilation);
-							if (src->filename == file)
-							{
-								printf("found it");
-								return ii.second;
-							}
-						}
-					}
-				}
-			}
-			else if (ty.second->type == Types::Trait)
-			{
-				for (auto ii : ty.second->trait->extension_methods)
-				{
-					if (ii.second->expression)
-					{
-						auto block = ii.second->expression->GetBlock();
-						if (block->start.line <= line && block->end.line >= line)
-						{
-							auto src = block->start.GetSource(compilation);
-							if (src->filename == file)
-							{
-								printf("found it");
-								return ii.second;
-							}
-						}
-					}
-				}
-			}
-		}
-		return 0;
-	}
+	}*/
 
 	std::string GetDirectoryFromPath(const char* path)
 	{
@@ -211,7 +146,7 @@ extern "C"
 			return data;
 		}
 
-		Function* f = GetFunctionAtPoint(compilation, ffile, line);
+		Function* f = compilation->GetFunctionAtPoint(ffile, line);
 		if (f && f->expression)
 		{
 			Scope* scope = f->expression->GetBlock()->scope;
@@ -278,27 +213,27 @@ extern "C"
 		auto compilation = Compilation::Make(project);
 
 		std::string out;
-		for (auto ii : compilation->functions)
+		for (auto ii : compilation->ns->members)//functions)
 		{
-			if (ii.second->expression)
+			if (ii.second.type == SymbolType::Function && ii.second.fn->expression)
 			{
 				out += ii.first + "F/";
-				out += "fun " + ii.second->return_type->ToString() + " " + ii.second->name;
+				out += "fun " + ii.second.fn->return_type->ToString() + " " + ii.second.fn->name;
 				out += "(";
 				bool first = false;
-				for (int i = 1; i < ii.second->arguments.size(); i++)
+				for (int i = 1; i < ii.second.fn->arguments.size(); i++)
 				{
 					if (first)
 						out += ",";
 					else
 						first = true;
 
-					out += ii.second->arguments[i].first->ToString() + " " + ii.second->arguments[i].second;
+					out += ii.second.fn->arguments[i].first->ToString() + " " + ii.second.fn->arguments[i].second;
 				}
 				out += ")/";
 			}
 		}
-		Function* f = GetFunctionAtPoint(compilation, ffile, line);
+		Function* f = compilation->GetFunctionAtPoint(ffile, line);
 		if (f && f->expression)
 		{
 			Scope* scope = f->expression->GetBlock()->scope;

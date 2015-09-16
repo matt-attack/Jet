@@ -251,7 +251,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 		modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
 #else
 		struct stat data;
-		int x = stat("project.jp",&data);
+		int x = stat(ii.c_str(),&data);
 
 		modifiedtimes.push_back(data.st_mtime);
 #endif

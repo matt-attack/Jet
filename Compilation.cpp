@@ -956,3 +956,66 @@ Jet::Function* Compilation::GetFunction(const std::string& name)
 	}
 	return 0;
 }
+
+Jet::Function* Compilation::GetFunctionAtPoint(const char* file, int line)
+{
+	for (auto ii : this->functions)
+	{
+		if (ii->expression)
+		{
+			auto block = ii->expression->GetBlock();
+			if (block->start.line <= line && block->end.line >= line)
+			{
+				auto src = block->start.GetSource(this);
+				if (src->filename == file)
+				{
+					printf("found it");
+					return ii;
+				}
+			}
+		}
+	}
+
+	/*for (auto ty : this->types)
+	{
+		if (ty.second->type == Types::Struct)
+		{
+			for (auto ii : ty.second->data->functions)
+			{
+				if (ii.second->expression)
+				{
+					auto block = ii.second->expression->GetBlock();
+					if (block->start.line <= line && block->end.line >= line)
+					{
+						auto src = block->start.GetSource(this);
+						if (src->filename == file)
+						{
+							printf("found it");
+							return ii.second;
+						}
+					}
+				}
+			}
+		}
+		else if (ty.second->type == Types::Trait)
+		{
+			for (auto ii : ty.second->trait->extension_methods)
+			{
+				if (ii.second->expression)
+				{
+					auto block = ii.second->expression->GetBlock();
+					if (block->start.line <= line && block->end.line >= line)
+					{
+						auto src = block->start.GetSource(this);
+						if (src->filename == file)
+						{
+							printf("found it");
+							return ii.second;
+						}
+					}
+				}
+			}
+		}
+	}*/
+	return 0;
+}

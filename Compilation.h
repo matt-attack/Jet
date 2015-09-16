@@ -115,6 +115,10 @@ namespace Jet
 		//generates and outputs an exe or lib file
 		void Assemble(int olevel);
 
+
+		//racer stuff
+		Function* GetFunctionAtPoint(const char* file, int line);
+
 	private:
 
 		Type* GetFunctionType(Type* return_type, const std::vector<Type*>& args);

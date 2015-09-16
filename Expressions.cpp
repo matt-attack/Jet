@@ -662,6 +662,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			std::vector<llvm::Type*> elements;
 			for (auto ii : *this->captures)
 			{
+				context->CurrentToken(&ii);
 				auto var = context->GetVariable(ii.text);
 				elements.push_back(var.type->base->GetLLVMType());
 			}
@@ -1559,7 +1560,11 @@ CValue NewExpression::Compile(CompilerContext* context)
 	//run constructors
 	if (ty->type == Types::Struct)
 	{
-		auto fun = ty->GetMethod(ty->data->name, {ptr}, context);
+		Function* fun = 0;
+		if (ty->data->template_base)
+			fun = ty->GetMethod(ty->data->template_base->name, { ptr }, context);
+		else
+			fun = ty->GetMethod(ty->data->name, { ptr }, context);
 		fun->Load(context->parent);
 		if (this->size == 0)
 		{//just one element, construct it
