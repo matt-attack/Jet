@@ -140,7 +140,7 @@ public:
 	}
 };
 
-bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
+bool Compiler::Compile(const char* projectdir, CompilerOptions* options, const std::string& config_name)
 {
 	JetProject* project = JetProject::Load(projectdir);
 	if (project == 0)
@@ -298,6 +298,23 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options)
 	if (jlib) fclose(jlib);
 	if (output) fclose(output);
 
+	//get the config, or default
+	JetProject::BuildConfig configuration;
+	if (config_name.length() > 0)
+	{
+		auto f = project->configurations.find(config_name);
+		if (f != project->configurations.end())
+			configuration = f->second;
+	}
+	else
+	{
+		if (project->configurations.size() > 0)
+			configuration = project->configurations.begin()->second;
+	}
+
+	//running prebuild
+	if (configuration.prebuild.length() > 0)
+		printf("%s", exec(configuration.prebuild.c_str()).c_str());
 
 	Compilation* compilation = Compilation::Make(project);
 
@@ -335,6 +352,10 @@ error:
 		}
 
 		printf("Project built successfully.\n\n");
+
+		//running postbuild
+		if (configuration.postbuild.length() > 0)
+			printf("%s", exec(configuration.postbuild.c_str()).c_str());
 	}
 
 	delete compilation;

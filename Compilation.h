@@ -18,6 +18,8 @@ namespace llvm
 }
 namespace Jet
 {
+	std::string exec(const char* cmd);
+
 	struct JetError
 	{
 		std::string message;

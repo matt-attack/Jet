@@ -38,78 +38,78 @@ extern "C"
 {
 	/*__declspec(dllexport) const char* GetFunction(const char* ffile, int line)
 	{
-		//a little test
-		//return "hello";
-		OutputDebugString(ffile);
-		//return ffile;
-		auto project = JetProject::Load("C:/users/matthew/desktop/vm/asmvm2/asmvm/jetcore");
-		auto compilation = Compilation::Make(project);
-		//compilation->Assemble(0);
+	//a little test
+	//return "hello";
+	OutputDebugString(ffile);
+	//return ffile;
+	auto project = JetProject::Load("C:/users/matthew/desktop/vm/asmvm2/asmvm/jetcore");
+	auto compilation = Compilation::Make(project);
+	//compilation->Assemble(0);
 
-		//lets make a line# to function translator
-		std::string file = ffile;
-		for (auto ii : compilation->functions)
-		{
-			if (ii.second->expression)
-			{
-				auto block = ii.second->expression->GetBlock();
-				if (block->start.line <= line && block->end.line >= line)
-				{
-					auto src = block->start.GetSource(compilation);
-					if (src->filename == file)
-					{
-						printf("found it");
-						return ii.second->name.c_str();
-						break;
-					}
-				}
-			}
-		}
+	//lets make a line# to function translator
+	std::string file = ffile;
+	for (auto ii : compilation->functions)
+	{
+	if (ii.second->expression)
+	{
+	auto block = ii.second->expression->GetBlock();
+	if (block->start.line <= line && block->end.line >= line)
+	{
+	auto src = block->start.GetSource(compilation);
+	if (src->filename == file)
+	{
+	printf("found it");
+	return ii.second->name.c_str();
+	break;
+	}
+	}
+	}
+	}
 
-		for (auto ty : compilation->types)
-		{
-			if (ty.second->type == Types::Struct)
-			{
-				for (auto ii : ty.second->data->functions)
-				{
-					if (ii.second->expression)
-					{
-						auto block = ii.second->expression->GetBlock();
-						if (block->start.line <= line && block->end.line >= line)
-						{
-							auto src = block->start.GetSource(compilation);
-							if (src->filename == file)
-							{
-								printf("found it");
-								return ii.second->name.c_str();
-								break;
-							}
-						}
-					}
-				}
-			}
-			else if (ty.second->type == Types::Trait)
-			{
-				for (auto ii : ty.second->trait->extension_methods)
-				{
-					if (ii.second->expression)
-					{
-						auto block = ii.second->expression->GetBlock();
-						if (block->start.line <= line && block->end.line >= line)
-						{
-							auto src = block->start.GetSource(compilation);
-							if (src->filename == file)
-							{
-								printf("found it");
-								return ii.second->name.c_str();
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
-		return 0;
+	for (auto ty : compilation->types)
+	{
+	if (ty.second->type == Types::Struct)
+	{
+	for (auto ii : ty.second->data->functions)
+	{
+	if (ii.second->expression)
+	{
+	auto block = ii.second->expression->GetBlock();
+	if (block->start.line <= line && block->end.line >= line)
+	{
+	auto src = block->start.GetSource(compilation);
+	if (src->filename == file)
+	{
+	printf("found it");
+	return ii.second->name.c_str();
+	break;
+	}
+	}
+	}
+	}
+	}
+	else if (ty.second->type == Types::Trait)
+	{
+	for (auto ii : ty.second->trait->extension_methods)
+	{
+	if (ii.second->expression)
+	{
+	auto block = ii.second->expression->GetBlock();
+	if (block->start.line <= line && block->end.line >= line)
+	{
+	auto src = block->start.GetSource(compilation);
+	if (src->filename == file)
+	{
+	printf("found it");
+	return ii.second->name.c_str();
+	break;
+	}
+	}
+	}
+	}
+	}
+	}
+	return 0;
 	}*/
 
 	std::string GetDirectoryFromPath(const char* path)
@@ -225,11 +225,11 @@ extern "C"
 		return "";
 	}
 
-	
+
 	__declspec(dllexport) const char* GetAutoCompletes(const char* proj, const char* ffile, int line)
 	{
 		auto path = GetDirectoryFromPath(proj);
-		
+
 		auto project = JetProject::Load(path);
 		if (project == 0)
 			return "";//project didnt load, just return 0
@@ -262,8 +262,8 @@ extern "C"
 		{
 			Scope* scope = f->expression->GetBlock()->scope;
 			for (auto ii : scope->named_values)
-				if (ii.second.type->type == Types::Pointer )
-					out += ii.first + "L/"+ii.second.type->base->ToString() + " " + ii.first+"/";
+				if (ii.second.type->type == Types::Pointer)
+					out += ii.first + "L/" + ii.second.type->base->ToString() + " " + ii.first + "/";
 				else
 					out += ii.first + "L/" + ii.second.type->ToString() + " " + ii.first + "/";
 

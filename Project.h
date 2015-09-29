@@ -29,6 +29,13 @@ namespace Jet
 		std::vector<std::string> dependencies;
 		std::vector<std::string> libs;//libraries to link to
 
+		struct BuildConfig
+		{
+			std::string prebuild, postbuild;
+			std::string options;
+		};
+		std::map<std::string, BuildConfig> configurations;
+
 		bool IsExecutable()
 		{
 			return this->is_executable;

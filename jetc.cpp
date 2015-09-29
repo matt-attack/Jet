@@ -83,7 +83,9 @@ class OptionParser
 {
 
 	std::map<std::string, OptionVar> vars;
+	
 public:
+	std::vector<std::string> commands;
 
 	OptionVar& GetOption(const char* name)
 	{
@@ -117,6 +119,17 @@ public:
 				if (find != vars.end())
 					vars[option].SetValue(value);
 			}
+			else
+			{
+				//read in value
+				std::string value;
+				value += c;
+				while (args[pos] && args[pos] != ' ')
+					value += args[pos++];
+
+				pos++;
+				this->commands.push_back(value);
+			}
 		}
 	}
 
@@ -140,6 +153,17 @@ public:
 				auto find = vars.find(option);
 				if (find != vars.end())
 					vars[option].SetValue(value);
+			}
+			else
+			{
+				//read in value
+				std::string value;
+		
+				int pos = 0;
+				while (args[i][pos])
+					value += args[i][pos++];
+
+				this->commands.push_back(value);
 			}
 		}
 	}
@@ -198,7 +222,10 @@ int main(int argc, char* argv[])
 		CompilerOptions options;
 		options.optimization = parser.GetOption("o").GetInt();
 		options.force = parser.GetOption("f").GetString().length() == 0;
-		c2.Compile(command, &options);
+		std::string config = "";
+		if (parser.commands.size())
+			config = parser.commands.front();
+		c2.Compile(command, &options, config);
 	}
 
 	return 0;

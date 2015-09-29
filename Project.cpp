@@ -33,21 +33,27 @@ std::string Jet::GetNameFromPath(const std::string& path)
 	return name;
 }
 
-bool JetProject::_Load(const std::string& projectdir)
+struct Element;
+struct Document
 {
-	//ok, lets parse the jp file
-	std::ifstream pf(std::string(projectdir) + "/project.jp", std::ios::in | std::ios::binary);
-	if (pf.is_open() == false)
-	{
-		printf("Error: Could not find project file %s/project.jp\n", projectdir.c_str());
-		return false;
-	}
+	std::map<std::string, Element*> sections;
+};
 
-	this->path = projectdir;
+struct Element
+{
+	std::map<std::string, std::vector<std::string>*> children;
+};
 
-	is_executable = true;
-	int current_block = 0;
-	project_name = GetNameFromPath(projectdir);
+Document* ParseConfig(std::ifstream& pf)
+{
+	Document* e = new Document;
+	auto cur = new Element;
+	//	use sections like
+	//	[debug]
+	//thing: a
+	//rather than{}
+	std::vector<std::string>* cur_item = 0;
+	e->sections[""] = cur;
 	while (pf.peek() != EOF)
 	{
 		std::string file;//read in a filename
@@ -65,56 +71,148 @@ bool JetProject::_Load(const std::string& projectdir)
 
 		pf.get();
 
-		if (file == "files:")
+		if (file.length() == 0)
 		{
-			current_block = 1;
-			continue;
-		}
-		else if (file == "requires:")
-		{
-			current_block = 2;
-			continue;
-		}
-		else if (file == "lib:")
-		{
-			current_block = 3;
-			is_executable = false;
-			continue;
-		}
-		else if (file == "libs:")
-		{
-			current_block = 4;
-			continue;
-		}
-		else if (file == "\n" || file == "")
-		{
-			continue;
-		}
 
-		switch (current_block)
+		}
+		else if (file.back() == ':')
 		{
-		case 1:
-			if (file.length() > 0)
-				files.push_back(file);
-			break;
-		case 2:
-			if (file.length() > 0)
-				dependencies.push_back(file);
-			break;//do me later
-		case 3:
-			break;
-		case 4:
-			if (file.length() > 0)
-				libs.push_back(file);
-			break;
-		default:
-			printf("Malformatted Project File!\n");
+			cur_item = new std::vector < std::string > ;
+			cur->children[file.substr(0, file.length() - 1)] = cur_item;
+		}
+		else if (file.front() == '[' && file.back() == ']')
+		{
+			cur = new Element;
+			e->sections[file.substr(1, file.length() - 2)] = cur;
+		}
+		else
+		{
+			if (cur_item)
+				cur_item->push_back(file);
+			else
+			{
+				printf("Error: no current key");
+				throw 7;
+			}
+		}
+	}
+	//add build configs like debug release and post / pre build command hooks
+
+	return e;
+}
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+void GetFilesInDirectory(std::vector<std::string> &out, const std::string &directory)
+{
+#ifdef _WIN32
+	HANDLE dir;
+	WIN32_FIND_DATA file_data;
+
+	if ((dir = FindFirstFile((directory + "/*").c_str(), &file_data)) == INVALID_HANDLE_VALUE)
+		return; /* No files found */
+
+	do {
+		const std::string file_name = file_data.cFileName;
+		const std::string full_file_name = directory + "/" + file_name;
+		const bool is_directory = (file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+
+		if (file_name[0] == '.')
+			continue;
+
+		if (is_directory)
+			continue;
+
+		out.push_back(file_name);
+	} while (FindNextFile(dir, &file_data));
+
+	FindClose(dir);
+#else
+	DIR *dir;
+	class dirent *ent;
+	class stat st;
+
+	dir = opendir(directory);
+	while ((ent = readdir(dir)) != NULL) {
+		const std::string file_name = ent->d_name;
+		const std::string full_file_name = directory + "/" + file_name;
+
+		if (file_name[0] == '.')
+			continue;
+
+		if (stat(full_file_name.c_str(), &st) == -1)
+			continue;
+
+		const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+
+		if (is_directory)
+			continue;
+
+		out.push_back(file_name);
+	}
+	closedir(dir);
+#endif
+} // GetFilesInDirectory
+
+bool JetProject::_Load(const std::string& projectdir)
+{
+	//ok, lets parse the jp file
+	std::ifstream pf(std::string(projectdir) + "/project.jp", std::ios::in | std::ios::binary);
+	if (pf.is_open() == false)
+	{
+		printf("Error: Could not find project file %s/project.jp\n", projectdir.c_str());
+		return false;
+	}
+
+	this->path = projectdir;
+
+	is_executable = true;
+	int current_block = 0;
+	project_name = GetNameFromPath(projectdir);
+	auto doc = ParseConfig(pf);
+	auto root = doc->sections[""];
+	if (root->children.find("lib") != root->children.end())
+		is_executable = false;
+
+	if (root->children["files"])
+		files = *root->children["files"];
+
+	if (root->children["libs"])
+		libs = *root->children["libs"];
+
+	if (root->children["requires"])
+		dependencies = *root->children["requires"];
+
+	for (auto ii : doc->sections)
+	{
+		if (ii.first.length() > 0)
+		{
+			std::string pre, post, config;
+			if (ii.second->children["prebuild"] && ii.second->children["prebuild"]->size() > 0)
+				pre = ii.second->children["prebuild"]->front();
+			if (ii.second->children["postbuild"] && ii.second->children["postbuild"]->size() > 0)
+				post = ii.second->children["postbuild"]->front();
+			if (ii.second->children["config"] && ii.second->children["config"]->size() > 0)
+				config = ii.second->children["config"]->front();
+			this->configurations[ii.first] = { pre, post, config };
 		}
 	}
 
+	delete doc;
 	if (files.size() == 0)
 	{
 		//if no files, then just add all.jet files in the directory
+		std::vector<std::string> files_found;
+		GetFilesInDirectory(files_found, projectdir);
+
+		for (auto ii : files_found)
+		{
+			if (ii.substr(ii.length() - 4) == ".jet")
+				files.push_back(ii);
+		}
+		printf("hi");
+		//do it
 	}
 	this->opened = true;
 	return true;

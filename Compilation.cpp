@@ -39,7 +39,7 @@ Source* current_source = 0;
 #define USE_GCC
 #endif
 
-std::string exec(const char* cmd) {
+std::string Jet::exec(const char* cmd) {
 	FILE* pipe = _popen(cmd, "r");
 	if (!pipe) return "ERROR";
 	char buffer[128];
@@ -198,7 +198,6 @@ Compilation* Compilation::Make(JetProject* project)
 
 	//module = JITHelper->getModuleForNewFunction();
 	compilation->module = new llvm::Module("hi.im.jet", compilation->context);
-	//compilation->module->
 
 	compilation->debug = new llvm::DIBuilder(*compilation->module, true);
 	compilation->debug_info.cu = compilation->debug->createCompileUnit(dwarf::DW_LANG_C, "../aaaa.jet", ".", "Jet Compiler", false, "", 0, "");
@@ -344,9 +343,7 @@ Compilation* Compilation::Make(JetProject* project)
 				//catch any exceptions
 				try
 				{
-					//assert(compilation->ns == compilation->global);
 					ii->Compile(global);
-					//assert(compilation->ns == compilation->global);
 				}
 				catch (...)
 				{
@@ -367,11 +364,11 @@ Compilation* Compilation::Make(JetProject* project)
 		//init->Call("puts", { init->String("hello from initializer") });
 
 		//todo: put intializers here
-		init->Call("main", {});
+		if (project->IsExecutable())
+			init->Call("main", {});
 	}
 	init->Return(global->Integer(0));
 
-	//compilation->module->dump();
 error:
 
 	//restore working directory
@@ -413,7 +410,6 @@ void Compilation::Assemble(int olevel)
 	this->OutputIR("build/output.ir");
 
 
-
 	//then, if and only if I am an executable, make the .exe
 	if (project->IsExecutable())
 	{
@@ -430,7 +426,7 @@ void Compilation::Assemble(int olevel)
 			cmd += "-L" + ii + "/build/ ";
 
 			cmd += "-l" + GetNameFromPath(ii) + " ";
-		}
+}
 
 		cmd += " -L.";
 		for (auto ii : project->libs)
@@ -621,7 +617,7 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	this->ns->OutputMetadata(function, this);
 
 	//todo: only do this if im a library
-	
+
 	std::ofstream stable("build/symbols.jlib", std::ios_base::binary);
 	stable.write(function.data(), function.length());
 	stable.close();
@@ -984,44 +980,44 @@ Jet::Function* Compilation::GetFunctionAtPoint(const char* file, int line)
 
 	/*for (auto ty : this->types)
 	{
-		if (ty.second->type == Types::Struct)
-		{
-			for (auto ii : ty.second->data->functions)
-			{
-				if (ii.second->expression)
-				{
-					auto block = ii.second->expression->GetBlock();
-					if (block->start.line <= line && block->end.line >= line)
-					{
-						auto src = block->start.GetSource(this);
-						if (src->filename == file)
-						{
-							printf("found it");
-							return ii.second;
-						}
-					}
-				}
-			}
-		}
-		else if (ty.second->type == Types::Trait)
-		{
-			for (auto ii : ty.second->trait->extension_methods)
-			{
-				if (ii.second->expression)
-				{
-					auto block = ii.second->expression->GetBlock();
-					if (block->start.line <= line && block->end.line >= line)
-					{
-						auto src = block->start.GetSource(this);
-						if (src->filename == file)
-						{
-							printf("found it");
-							return ii.second;
-						}
-					}
-				}
-			}
-		}
+	if (ty.second->type == Types::Struct)
+	{
+	for (auto ii : ty.second->data->functions)
+	{
+	if (ii.second->expression)
+	{
+	auto block = ii.second->expression->GetBlock();
+	if (block->start.line <= line && block->end.line >= line)
+	{
+	auto src = block->start.GetSource(this);
+	if (src->filename == file)
+	{
+	printf("found it");
+	return ii.second;
+	}
+	}
+	}
+	}
+	}
+	else if (ty.second->type == Types::Trait)
+	{
+	for (auto ii : ty.second->trait->extension_methods)
+	{
+	if (ii.second->expression)
+	{
+	auto block = ii.second->expression->GetBlock();
+	if (block->start.line <= line && block->end.line >= line)
+	{
+	auto src = block->start.GetSource(this);
+	if (src->filename == file)
+	{
+	printf("found it");
+	return ii.second;
+	}
+	}
+	}
+	}
+	}
 	}*/
 	return 0;
 }

@@ -44,7 +44,7 @@ namespace Jet
 	public:
 
 		//returns if was successful
-		bool Compile(const char* projectfile, CompilerOptions* options = 0);
+		bool Compile(const char* projectfile, CompilerOptions* options = 0, const std::string& config = "");
 	};
 };
 
