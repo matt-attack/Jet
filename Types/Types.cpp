@@ -32,27 +32,30 @@ Type* Type::GetPointerType()
 
 llvm::DIType* Type::GetDebugType(Compilation* compiler)
 {
-	assert(this->loaded);
-	if (this->type == Types::Bool)
-		return compiler->debug->createBasicType("bool", 1, 8, llvm::dwarf::DW_ATE_boolean);
-	if (this->type == Types::Int)
-		return compiler->debug->createBasicType("int", 32, 32, llvm::dwarf::DW_ATE_signed);
-	if (this->type == Types::Short)
-		return compiler->debug->createBasicType("short", 16, 16, llvm::dwarf::DW_ATE_signed);
-	if (this->type == Types::Char)
-		return compiler->debug->createBasicType("char", 8, 8, llvm::dwarf::DW_ATE_signed_char);
-	if (this->type == Types::Float)
-		return compiler->debug->createBasicType("float", 32, 32, llvm::dwarf::DW_ATE_float);
-	if (this->type == Types::Double)
-		return compiler->debug->createBasicType("double", 64, 64, llvm::dwarf::DW_ATE_float);
-	if (this->type == Types::Pointer)
-		return compiler->debug->createPointerType(this->base->GetDebugType(compiler), 32, 32, "pointer");
-	if (this->type == Types::Function)
-		return compiler->debug->createBasicType("fun_pointer", 32, 32, llvm::dwarf::DW_ATE_address);
-	if (this->type == Types::Struct)
-	{
+	if (this->loaded == false)
 		this->Load(compiler);
 
+	if (this->debug_type)
+		return this->debug_type;
+
+	if (this->type == Types::Bool)
+		this->debug_type = compiler->debug->createBasicType("bool", 1, 8, llvm::dwarf::DW_ATE_boolean);
+	else if (this->type == Types::Int)
+		this->debug_type = compiler->debug->createBasicType("int", 32, 32, llvm::dwarf::DW_ATE_signed);
+	else if (this->type == Types::Short)
+		this->debug_type = compiler->debug->createBasicType("short", 16, 16, llvm::dwarf::DW_ATE_signed);
+	else if (this->type == Types::Char)
+		this->debug_type = compiler->debug->createBasicType("char", 8, 8, llvm::dwarf::DW_ATE_signed_char);
+	else if (this->type == Types::Float)
+		this->debug_type = compiler->debug->createBasicType("float", 32, 32, llvm::dwarf::DW_ATE_float);
+	else if (this->type == Types::Double)
+		this->debug_type = compiler->debug->createBasicType("double", 64, 64, llvm::dwarf::DW_ATE_float);
+	else if (this->type == Types::Pointer)
+		this->debug_type = compiler->debug->createPointerType(this->base->GetDebugType(compiler), 32, 32, "pointer");
+	else if (this->type == Types::Function)
+		this->debug_type = compiler->debug->createBasicType("fun_pointer", 32, 32, llvm::dwarf::DW_ATE_address);
+	else if (this->type == Types::Struct)
+	{
 		std::vector<llvm::Metadata*> ftypes;
 		for (auto type : this->data->struct_members)
 		{
@@ -65,22 +68,28 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		llvm::DIType* typ = 0;
 		auto file = compiler->debug->createFile(this->data->name,
 			compiler->debug_info.cu->getDirectory());
-		return compiler->debug->createStructType(file, this->data->name, file, 0, 1024, 1024, 0, typ, compiler->debug->getOrCreateArray(ftypes));
-	}
-	if (this->type == Types::Function)
-	{
-		this->Load(compiler);
 
+		int line = 0;
+		if (this->data->expression)
+			line = this->data->expression->token.line;
+		//compiler->debug_info.file->dump();
+		this->debug_type = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 4, 0, typ, compiler->debug->getOrCreateArray(ftypes));
+	}
+	else if (this->type == Types::Function)
+	{
 		std::vector<llvm::Metadata*> ftypes;
 		for (auto type : this->function->args)
 			ftypes.push_back(type->GetDebugType(compiler));
 
-		return compiler->debug->createSubroutineType(compiler->debug_info.file, compiler->debug->getOrCreateTypeArray(ftypes));
+		this->debug_type = compiler->debug->createSubroutineType(compiler->debug_info.file, compiler->debug->getOrCreateTypeArray(ftypes));
 	}
-	if (this->type == Types::Array)
+	else if (this->type == Types::Array)
 	{
-		return compiler->debug->createArrayType(this->size, 8, this->base->GetDebugType(compiler), 0);
+		this->debug_type = compiler->debug->createArrayType(this->size, 8, this->base->GetDebugType(compiler), 0);
 	}
+
+	if (this->debug_type)
+		return this->debug_type;
 	printf("oops");
 }
 

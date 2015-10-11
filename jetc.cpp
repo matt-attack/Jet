@@ -115,6 +115,8 @@ public:
 				while (args[pos] && args[pos] != ' ')
 					value += args[pos++];
 				
+				pos++;
+
 				auto find = vars.find(option);
 				if (find != vars.end())
 					vars[option].SetValue(value);

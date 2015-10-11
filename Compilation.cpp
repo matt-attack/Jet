@@ -396,12 +396,10 @@ void Compilation::Assemble(int olevel)
 	//set target
 	this->SetTarget();
 
+	debug->finalize();
+
 	if (olevel > 0)
 		this->Optimize(olevel);
-
-	//figure out why the debug fails on larger files 
-	//add more debug location emits
-	debug->finalize();
 
 	//output the .o file for this package
 	this->OutputPackage(project->project_name, olevel);
@@ -505,6 +503,14 @@ void Compilation::Assemble(int olevel)
 
 void Compilation::Optimize(int level)
 {
+	//do inlining
+	llvm::legacy::PassManager MPM;
+	if (level > 0)
+	{
+		MPM.add(llvm::createFunctionInliningPass(level, 3));
+	//	MPM.run(*module);
+	}
+
 	llvm::legacy::FunctionPassManager OurFPM(module);
 	// Set up the optimizer pipeline.  Start with registering info about how the
 	// target lays out data structures.
@@ -517,6 +523,9 @@ void Compilation::Optimize(int level)
 	OurFPM.add(llvm::createInstructionCombiningPass());
 	// Reassociate expressions.
 	OurFPM.add(llvm::createReassociatePass());
+
+	OurFPM.add(llvm::createInstructionSimplifierPass());
+
 	// Promote allocas to registers
 	OurFPM.add(llvm::createPromoteMemoryToRegisterPass());
 	// Eliminate Common SubExpressions.
@@ -524,12 +533,9 @@ void Compilation::Optimize(int level)
 	// Simplify the control flow graph (deleting unreachable blocks, etc).
 	OurFPM.add(llvm::createCFGSimplificationPass());
 
-
 	if (level > 1)
-	{
 		OurFPM.add(llvm::createDeadCodeEliminationPass());
-	}
-
+	
 	OurFPM.doInitialization();
 
 	//run it on all functions
@@ -583,16 +589,7 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	llvm::formatted_raw_ostream oo(strr);
 	llvm::AssemblyAnnotationWriter writer;
 
-	//no idea what this does LOL
-	//llvm::TargetLibraryInfo *TLI = new llvm::TargetLibraryInfo::;
-	//if (true)
-	//TLI->disableAllFunctions();
-	//MPM.add(TLI);
-	if (o_level > 0)
-	{
-		MPM.add(llvm::createFunctionInliningPass(o_level, 3));
-	}
-	//MPM.add(new llvm::DataLayoutPass());
+	//add pass to emit the object file
 	target->addPassesToEmitFile(MPM, strr, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
 
 	//std::error_code ecc;
