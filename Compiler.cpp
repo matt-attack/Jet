@@ -140,7 +140,9 @@ public:
 	}
 };
 
-bool Compiler::Compile(const char* projectdir, CompilerOptions* options, const std::string& config_name)
+#include "OptionParser.h"
+
+bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std::string& confg_name, OptionParser* parser)
 {
 	JetProject* project = JetProject::Load(projectdir);
 	if (project == 0)
@@ -232,12 +234,11 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options, const s
 #else
 	std::vector<time_t> modifiedtimes;
 	struct stat data;
-	int x = stat("project.jp",&data);
+	int x = stat("project.jp", &data);
 
 	modifiedtimes.push_back(data.st_mtime);
 #endif
 
-	
 	for (auto ii : project->files)
 	{
 #ifdef false//_WIN32
@@ -250,15 +251,60 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options, const s
 		modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
 #else
 		struct stat data;
-		int x = stat(ii.c_str(),&data);
+		int x = stat(ii.c_str(), &data);
 
 		modifiedtimes.push_back(data.st_mtime);
 #endif
 	}
 
+	//OptionParser parser;
+	std::string config_name = "";
+	if (parser)
+	{
+		parser->AddOption("o", "0");
+		parser->AddOption("f", "0");
+
+		if (parser->commands.size())
+			config_name = parser->commands.front();
+	}
+
+	//get the config, or default
+	JetProject::BuildConfig configuration;
+	if (config_name.length() > 0)
+	{
+		auto f = project->configurations.find(config_name);
+		if (f != project->configurations.end())
+			configuration = f->second;
+	}
+	else
+	{
+		if (project->configurations.size() > 0)
+			configuration = project->configurations.begin()->second;
+	}
+
+	//read in config from command and stuff
+	CompilerOptions options;
+	if (parser)
+	{
+		parser->Parse(configuration.options);
+		options.optimization = parser->GetOption("o").GetInt();
+		options.force = parser->GetOption("f").GetString().length() == 0;
+	}
+	else
+	{
+		OptionParser p;
+		p.AddOption("o", "0");
+		p.AddOption("f", "0");
+		p.Parse(configuration.options);
+
+		options.optimization = p.GetOption("o").GetInt();
+		options.force = p.GetOption("f").GetString().length() == 0;
+	}
+
+	//add options to this later
 	FILE* jlib = fopen("build/symbols.jlib", "rb");
 	FILE* output = fopen(("build/" + project->project_name + ".o").c_str(), "rb");
-	if (options && options->force)
+	if (options.force)// && options->force)
 	{
 		//the rebuild was forced
 	}
@@ -298,20 +344,6 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* options, const s
 	if (jlib) fclose(jlib);
 	if (output) fclose(output);
 
-	//get the config, or default
-	JetProject::BuildConfig configuration;
-	if (config_name.length() > 0)
-	{
-		auto f = project->configurations.find(config_name);
-		if (f != project->configurations.end())
-			configuration = f->second;
-	}
-	else
-	{
-		if (project->configurations.size() > 0)
-			configuration = project->configurations.begin()->second;
-	}
-
 	//running prebuild
 	if (configuration.prebuild.length() > 0)
 		printf("%s", exec(configuration.prebuild.c_str()).c_str());
@@ -333,7 +365,7 @@ error:
 	}
 	else
 	{
-		compilation->Assemble(options ? options->optimization : 0);
+		compilation->Assemble(options.optimization);
 
 		//output build times
 		std::ofstream rebuild("build/rebuild.txt");

@@ -24,6 +24,8 @@
 //#include "llvm/Transforms/Scalar.h"
 
 
+class OptionParser;
+
 namespace Jet
 {
 	void ParserError(const std::string& msg, Token token);//todo
@@ -44,7 +46,7 @@ namespace Jet
 	public:
 
 		//returns if was successful
-		bool Compile(const char* projectfile, CompilerOptions* options = 0, const std::string& config = "");
+		bool Compile(const char* projectfile, CompilerOptions* options = 0, const std::string& config = "", OptionParser* parser = 0);
 	};
 };
 
