@@ -1,1 +1,2 @@
-hello 
+language: c++
+script: bash -e .travis-ci.sh cmake -f CMakeLists.txt
