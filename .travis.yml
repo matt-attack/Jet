@@ -6,4 +6,4 @@ addons:
     packages:
     - llvm-3.7
 install: true
-script: cmake -f CMakeLists.txt=
+script: cmake -f CMakeLists.txt

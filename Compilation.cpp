@@ -79,6 +79,8 @@ Compilation::~Compilation()
 	//free global namespace
 	//delete this->global;
 
+	delete this->global;
+
 	//free functions
 	//for (auto ii : this->functions)
 	//	delete ii;
@@ -106,6 +108,10 @@ Compilation::~Compilation()
 	//free function types
 	for (auto ii : function_types)
 		delete ii.second;
+
+	//free functions
+	for (auto ii : this->functions)
+		delete ii;
 
 	//free traits
 	for (auto ii : this->traits)
@@ -430,7 +436,7 @@ void Compilation::Assemble(int olevel)
 		for (auto ii : project->libs)
 			cmd += " -l:\"" + ii + "\" ";
 #else
-		std::string cmd = "link.exe /ENTRY:_jet_initializer /DEBUG /INCREMENTAL:NO /NOLOGO ";
+		std::string cmd = "link.exe /DEBUG /INCREMENTAL:NO /NOLOGO ";///ENTRY:_jet_initializer
 
 		cmd += "build/" + project->project_name + ".o ";
 		cmd += "/OUT:build/" + project->project_name + ".exe ";
