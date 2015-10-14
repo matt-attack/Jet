@@ -1,3 +1,4 @@
 language: c++
+sudo: required
 install: bash -e .travis-ci.sh
 script: cmake -f CMakeLists.txt
