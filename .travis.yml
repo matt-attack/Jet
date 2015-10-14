@@ -1,2 +1,3 @@
 language: c++
-script: bash -e .travis-ci.sh cmake -f CMakeLists.txt
+install: ./.travis-ci.sh
+script: cmake -f CMakeLists.txt
