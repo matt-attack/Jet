@@ -1,4 +1,9 @@
 language: c++
-sudo: required
-install: bash -e .travis-ci.sh
-script: cmake -f CMakeLists.txt
+addons:
+	apt:
+		sources:
+			- llvm-toolchain-precise-3.7
+		packages:
+			- llvm-3.7
+install: true
+script: cmake -f CMakeLists.txt=
