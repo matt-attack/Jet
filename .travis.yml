@@ -10,5 +10,6 @@ addons:
     - libllm3.7
     - libstdc++6
     - cmake
-install: true
+    - build-essential
+install: bash -e .travis-ci.sh
 script: cmake -f CMakeLists.txt
