@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.8.7)
 
 project(Jet)
 
-find_package(LLVM 3.7.0 REQUIRED CONFIG HINTS C:/users/matthew/desktop/llvm-3.7.0 llvm3.7-appveyor/)
+find_package(LLVM 3.7.0 REQUIRED CONFIG HINTS C:/users/matthew/desktop/llvm-3.7.0 llvm3.7-appveyor/llvm-3.7)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
