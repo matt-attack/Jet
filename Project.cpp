@@ -96,8 +96,7 @@ Document* ParseConfig(std::ifstream& pf)
 			}
 		}
 	}
-	//add build configs like debug release and post / pre build command hooks
-
+	
 	return e;
 }
 
@@ -211,8 +210,6 @@ bool JetProject::_Load(const std::string& projectdir)
 			if (ii.substr(ii.length() - 4) == ".jet")
 				files.push_back(ii);
 		}
-		printf("hi");
-		//do it
 	}
 	this->opened = true;
 	return true;

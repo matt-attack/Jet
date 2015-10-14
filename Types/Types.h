@@ -156,6 +156,8 @@ namespace Jet
 
 		std::multimap<std::string, Symbol> members;
 
+		~Namespace();
+
 		Function* GetFunction(const std::string& name)
 		{
 			auto r = members.find(name);

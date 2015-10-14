@@ -697,9 +697,18 @@ void Struct::Load(Compilation* compiler)
 	this->loaded = true;
 }
 
+Namespace::~Namespace()
+{
+	for (auto ii : this->members)
+	{
+		if (ii.second.type == SymbolType::Namespace)
+			delete ii.second.ns;
+	}
+}
+
 void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 {
-	for (auto ii : this->members)/// functions)
+	for (auto ii : this->members)
 	{
 		if (ii.second.type == SymbolType::Function && ii.second.fn->do_export)
 		{
@@ -836,7 +845,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 					auto source = fun.second->expression->GetBlock()->start.GetSource(compilation);
 
 					data += "fun ";
-					fun.second->expression->ret_type.Print(data, source);// .->ToString()
+					fun.second->expression->ret_type.Print(data, source);
 					data += " ";
 					data += ii.second.ty->trait->name + "::";
 					data += fun.first + "(";
