@@ -15,5 +15,7 @@ install: bash -e .travis-ci.sh
 cache:
   directories:
   - $HOME/cmake-3.2.2
+  - $HOME/llvm-3.7.0
+  - $HOME/llvm-3.7.0.src
   
 script: cmake -f CMakeLists.txt

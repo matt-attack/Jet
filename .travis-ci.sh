@@ -5,3 +5,8 @@
 #make
 #make install
 
+wget http://llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
+tar -xv llvm-3.7.0.src.tar.xz
+mkdir llvm-3.7.0
+cd llvm-3.7.0
+cmake ../llvm-3.7.0.src/CMakeLists.txt
