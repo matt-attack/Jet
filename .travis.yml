@@ -1,9 +1,9 @@
 language: c++
 addons:
-	apt:
-		sources:
-			- llvm-toolchain-precise-3.7
-		packages:
-			- llvm-3.7
+  apt:
+    sources:
+    - llvm-toolchain-precise-3.7
+    packages:
+    - llvm-3.7
 install: true
 script: cmake -f CMakeLists.txt=
