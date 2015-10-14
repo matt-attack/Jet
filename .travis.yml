@@ -3,8 +3,10 @@ addons:
   apt:
     sources:
     - llvm-toolchain-precise-3.7
+    - kalakris-cmake
     packages:
     - llvm-3.7
+    - llvm-3.7-runtime
     - cmake
 install: true
 script: cmake -f CMakeLists.txt
