@@ -7,6 +7,8 @@ addons:
     packages:
     - llvm-3.7
     - llvm-3.7-runtime
+    - libllm3.7
+    - libstdc++6
     - cmake
 install: true
 script: cmake -f CMakeLists.txt
