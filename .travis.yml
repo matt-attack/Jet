@@ -7,7 +7,7 @@ addons:
     packages:
     - llvm-3.7
     - llvm-3.7-runtime
-    - libllm3.7
+    - libllvm3.7
     - libstdc++6
     - cmake
     - build-essential
