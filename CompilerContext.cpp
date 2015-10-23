@@ -612,15 +612,16 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 	{
 		for (auto ii : cur->named_values)
 		{
-			if (ii.second.type->type == Types::Struct)
+			if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
 			{
+				auto type = ii.second.type->base;
 				//look for destructor
-				auto name = "~" + (ii.second.type->data->template_base ? ii.second.type->data->template_base->name : ii.second.type->data->name);
-				auto destructor = ii.second.type->data->functions.find(name);
-				if (destructor != ii.second.type->data->functions.end())
+				auto name = "~" + (type->data->template_base ? type->data->template_base->name : type->data->name);
+				auto destructor = type->data->functions.find(name);
+				if (destructor != type->data->functions.end())
 				{
 					//call it
-					this->Call(name, { CValue(this->parent->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
+					this->Call(name, { CValue(ii.second.type, ii.second.val) }, ii.second.type->base);
 				}
 			}
 		}
