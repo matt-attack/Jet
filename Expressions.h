@@ -1677,6 +1677,7 @@ namespace Jet
 			delete block;
 			delete varargs;
 			delete args;
+			delete captures;
 		}
 
 		std::string GetRealName();

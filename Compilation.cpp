@@ -191,9 +191,12 @@ Compilation* Compilation::Make(JetProject* project)
 		symbols.seekg(0, std::ios::end);    // go to the end
 		std::streamoff length = symbols.tellg();           // report location (this is the length)
 		symbols.seekg(0, std::ios::beg);    // go back to the beginning
-		char* buffer = new char[length + 1];    // allocate memory for a buffer of appropriate dimension
+		int start;
+		symbols.read((char*)&start, 4);
+		symbols.seekg(start + 4, std::ios::beg);
+		char* buffer = new char[length + 1 - start - 4];    // allocate memory for a buffer of appropriate dimension
 		symbols.read(buffer, length);       // read the whole file into the buffer
-		buffer[length] = 0;
+		buffer[length - start - 4] = 0;
 		symbols.close();
 
 		lib_symbols.push_back(buffer);
@@ -382,6 +385,26 @@ error:
 	return compilation;
 }
 
+char* ReadDependenciesFromSymbols(const char* path, int& size)
+{
+	auto file = fopen(path, "rb");
+	if (file)
+	{
+		fread(&size, 4, 1, file);
+		if (size < 0)
+		{
+			printf("Invalid dependency symbol file!\n");
+			return 0;
+		}
+		char* data = new char[size];
+		fread(data, size, 1, file);
+		fclose(file);
+
+		return data;
+	}
+	return 0;
+}
+
 void Compilation::Assemble(int olevel)
 {
 	if (this->errors.size() > 0)
@@ -430,7 +453,7 @@ void Compilation::Assemble(int olevel)
 			cmd += "-L" + ii + "/build/ ";
 
 			cmd += "-l" + GetNameFromPath(ii) + " ";
-}
+		}
 
 		cmd += " -L.";
 		for (auto ii : project->libs)
@@ -444,6 +467,30 @@ void Compilation::Assemble(int olevel)
 		//need to link each dependency
 		for (auto ii : project->dependencies)
 			cmd += ii + "/build/lib" + GetNameFromPath(ii) + ".a ";
+
+		//then for each dependency add libs that it needs to link
+		for (auto ii : project->dependencies)
+		{
+			//open up and read first part of the jlib file
+			int size;
+			char* data = ReadDependenciesFromSymbols((ii + "/build/symbols.jlib").c_str(), size);
+
+			if (data == 0)
+			{
+				//probably an error
+			}
+
+			int pos = 0;
+			while (pos < size)
+			{
+				const char* file = &data[pos];
+				if (file[0])
+					cmd += " \"" + std::string(file) + "\"";
+
+				pos += strlen(&data[pos]) + 1;
+			}
+			delete[] data;
+		}
 
 		for (auto ii : project->libs)
 			cmd += " \"" + ii + "\"";
@@ -514,7 +561,7 @@ void Compilation::Optimize(int level)
 	if (level > 0)
 	{
 		MPM.add(llvm::createFunctionInliningPass(level, 3));
-	//	MPM.run(*module);
+		//	MPM.run(*module);
 	}
 
 	llvm::legacy::FunctionPassManager OurFPM(module);
@@ -541,7 +588,7 @@ void Compilation::Optimize(int level)
 
 	if (level > 1)
 		OurFPM.add(llvm::createDeadCodeEliminationPass());
-	
+
 	OurFPM.doInitialization();
 
 	//run it on all functions
@@ -620,8 +667,49 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	this->ns->OutputMetadata(function, this);
 
 	//todo: only do this if im a library
+	if (this->project->IsExecutable())
+		return;
 
 	std::ofstream stable("build/symbols.jlib", std::ios_base::binary);
+	//write names of libraries to link
+	std::string libnames;
+	//add libs from dependencies
+	for (auto ii : this->project->dependencies)
+	{
+		//open up and read first part of the jlib file
+		int size;
+		char* data = ReadDependenciesFromSymbols((ii + "/build/symbols.jlib").c_str(), size);
+
+		if (data == 0)
+		{
+			//probably an error
+		}
+
+		int pos = 0;
+		while (pos < size)
+		{
+			const char* file = &data[pos];
+			if (file[0])
+			{
+				libnames += std::string(file);
+				libnames += '\0';
+			}
+
+			pos += strlen(&data[pos]) + 1;
+		}
+		delete[] data;
+	}
+
+	for (auto ii : this->project->libs)
+	{
+		libnames += ii;//todo: make absolute path
+		libnames += '\0';
+	}
+
+	int size = libnames.length() + 1;
+	stable.write((char*)&size, 4);
+	stable.write(libnames.c_str(), libnames.length() + 1);
+
 	stable.write(function.data(), function.length());
 	stable.close();
 }

@@ -708,8 +708,10 @@ Namespace::~Namespace()
 
 void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 {
+	//ok, change this to output in blocks, give size and location/namespace
 	for (auto ii : this->members)
 	{
+		//ok, lets add debug location info
 		if (ii.second.type == SymbolType::Function && ii.second.fn->do_export)
 		{
 			data += "extern fun " + ii.second.fn->return_type->ToString() + " ";
