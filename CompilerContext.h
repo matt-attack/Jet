@@ -42,13 +42,15 @@ namespace Jet
 		Scope* scope;
 
 	public:
-		Compilation* parent;
+		Compilation* root;
+		CompilerContext* parent;
 
 		llvm::Function* f;
 		Function* function;
 
-		CompilerContext(Compilation* parent)
+		CompilerContext(Compilation* root, CompilerContext* parent)
 		{
+			this->root = root;
 			this->parent = parent;
 			this->scope = new Scope;
 			this->scope->prev = 0;
@@ -63,19 +65,19 @@ namespace Jet
 
 		CValue Float(double value)
 		{
-			return CValue(parent->DoubleType, llvm::ConstantFP::get(parent->context, llvm::APFloat(value)));
+			return CValue(root->DoubleType, llvm::ConstantFP::get(root->context, llvm::APFloat(value)));
 		}
 
 		CValue Integer(int value)
 		{
-			return CValue(parent->IntType, llvm::ConstantInt::get(parent->context, llvm::APInt(32, value, true)));
+			return CValue(root->IntType, llvm::ConstantInt::get(root->context, llvm::APInt(32, value, true)));
 		}
 
 		CValue String(const std::string& str)
 		{
-			auto fname = llvm::ConstantDataArray::getString(parent->context, str, true);
+			auto fname = llvm::ConstantDataArray::getString(root->context, str, true);
 
-			auto FBloc = new llvm::GlobalVariable(*parent->module, fname->getType(), true,
+			auto FBloc = new llvm::GlobalVariable(*root->module, fname->getType(), true,
 				llvm::GlobalValue::InternalLinkage, fname,
 				"const_string");
 			auto const_inst32 = llvm::ConstantInt::get(llvm::getGlobalContext(), llvm::APInt(32, llvm::StringRef("0"), 10));
@@ -83,16 +85,16 @@ namespace Jet
 			auto type = FBloc->getType()->getElementType()->getArrayElementType()->getPointerTo();
 			//FBloc->getType()->getElementType()->getArrayElementType()->getPointerTo()->dump();
 
-			auto res = this->parent->builder.CreateGEP(FBloc, const_ptr_7_indices, "x");
+			auto res = this->root->builder.CreateGEP(FBloc, const_ptr_7_indices, "x");
 			//auto res = llvm::ConstantExpr::getGetElementPtr(FBloc, const_ptr_7_indices, "x");
 			//fname->get
-			return CValue(this->parent->LookupType("char*"), res);
+			return CValue(this->root->LookupType("char*"), res);
 		}
 
 		void RegisterLocal(const std::string& name, CValue val)
 		{
 			if (this->scope->named_values.find(name) != this->scope->named_values.end())
-				this->parent->Error("Variable '" + name + "' already defined", *this->current_token);
+				this->root->Error("Variable '" + name + "' already defined", *this->current_token);
 			this->scope->named_values[name] = val;
 		}
 
@@ -105,7 +107,7 @@ namespace Jet
 
 			val = this->DoCast(value.type->base, val);
 
-			return parent->builder.CreateStore(val.val, value.val);
+			return root->builder.CreateStore(val.val, value.val);
 		}
 
 		CValue Load(const std::string& name)
@@ -114,32 +116,32 @@ namespace Jet
 			if (value.type->type == Types::Function)
 				return value;
 			
-			return CValue(value.type->base, parent->builder.CreateLoad(value.val, name.c_str()));
+			return CValue(value.type->base, root->builder.CreateLoad(value.val, name.c_str()));
 		}
 
 		void SetDebugLocation(const Token& t);
 
 		void SetNamespace(const std::string& name)
 		{
-			auto res = this->parent->ns->members.find(name);
-			if (res != this->parent->ns->members.end())
+			auto res = this->root->ns->members.find(name);
+			if (res != this->root->ns->members.end())
 			{
-				this->parent->ns = res->second.ns;
+				this->root->ns = res->second.ns;
 				return;
 			}
 
 			//create new one
 			auto ns = new Namespace;
 			ns->name = name;
-			ns->parent = this->parent->ns;
+			ns->parent = this->root->ns;
 
-			this->parent->ns->members.insert({ name, Symbol(ns) });
-			this->parent->ns = ns;
+			this->root->ns->members.insert({ name, Symbol(ns) });
+			this->root->ns = ns;
 		}
 
 		void PopNamespace()
 		{
-			this->parent->ns = this->parent->ns->parent;
+			this->root->ns = this->root->ns->parent;
 		}
 
 
@@ -161,31 +163,31 @@ namespace Jet
 		CValue GetSizeof(Type* t)
 		{
 			auto null = llvm::ConstantPointerNull::get(t->GetLLVMType()->getPointerTo());
-			auto ptr = parent->builder.CreateGEP(null, parent->builder.getInt32(1));
-			ptr = parent->builder.CreatePtrToInt(ptr, parent->IntType->GetLLVMType(), "sizeof");
-			return CValue(parent->IntType, ptr);
+			auto ptr = root->builder.CreateGEP(null, root->builder.getInt32(1));
+			ptr = root->builder.CreatePtrToInt(ptr, root->IntType->GetLLVMType(), "sizeof");
+			return CValue(root->IntType, ptr);
 		}
 
 		void Continue()
 		{
 			if (loops.empty())
-				this->parent->Error("Cannot continue from outside loop!", *current_token);
+				this->root->Error("Cannot continue from outside loop!", *current_token);
 
-			this->parent->builder.CreateBr(loops.top().second);
+			this->root->builder.CreateBr(loops.top().second);
 
-			llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "post.continue", this->f);
-			this->parent->builder.SetInsertPoint(bb);
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "post.continue", this->f);
+			this->root->builder.SetInsertPoint(bb);
 		}
 
 		void Break()
 		{
 			if (loops.empty())
-				this->parent->Error("Cannot break from outside loop!", *current_token);
+				this->root->Error("Cannot break from outside loop!", *current_token);
 
-			this->parent->builder.CreateBr(loops.top().first);
+			this->root->builder.CreateBr(loops.top().first);
 
-			llvm::BasicBlock *bb = llvm::BasicBlock::Create(parent->context, "post.break", this->f);
-			this->parent->builder.SetInsertPoint(bb);
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "post.break", this->f);
+			this->root->builder.SetInsertPoint(bb);
 		}
 
 		llvm::ReturnInst* Return(CValue ret);
@@ -213,7 +215,7 @@ namespace Jet
 						if (destructor != ii.second.type->data->functions.end())
 						{
 							//call it
-							this->Call(name, { CValue(this->parent->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
+							this->Call(name, { CValue(this->root->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
 						}
 					}
 				}
@@ -225,10 +227,13 @@ namespace Jet
 
 		CValue DoCast(Type* t, CValue value, bool Explicit = false);
 
-		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member = false);
+		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member, bool lambda);
 
 		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0);
 		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0);
+
+		std::vector<std::string> captures;
+		void WriteCaptures(llvm::Value* lambda);
 	};
 };
 #endif

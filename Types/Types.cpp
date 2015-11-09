@@ -601,7 +601,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 	if (fun == 0)
 	{
 		//	check for trait extension methods
-		auto ttraits = this->GetTraits(context->parent);
+		auto ttraits = this->GetTraits(context->root);
 		for (auto tr : ttraits)
 		{
 			auto frange = tr.second->extension_methods.equal_range(name);
@@ -616,32 +616,32 @@ Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& ar
 			{
 				auto ns = new Namespace;
 				ns->name = tr.second->name;
-				ns->parent = context->parent->ns;
-				context->parent->ns = ns;
+				ns->parent = context->root->ns;
+				context->root->ns = ns;
 
-				context->parent->ns->members.insert({ tr.second->name, this });
+				context->root->ns->members.insert({ tr.second->name, this });
 
 
-				auto rp = context->parent->builder.GetInsertBlock();
-				auto dp = context->parent->builder.getCurrentDebugLocation();
+				auto rp = context->root->builder.GetInsertBlock();
+				auto dp = context->root->builder.getCurrentDebugLocation();
 
 				//compile function
 				auto oldn = fun->expression->Struct.text;
 				fun->expression->Struct.text = this->name;
 				int i = 0;
 				for (auto ii : tr.second->templates)
-					context->parent->ns->members.insert({ ii.second, tr.first[i++] });
+					context->root->ns->members.insert({ ii.second, tr.first[i++] });
 
 				fun->expression->CompileDeclarations(context);
 				fun->expression->DoCompile(context);
 
-				context->parent->ns->members.erase(context->parent->ns->members.find(tr.second->name));
+				context->root->ns->members.erase(context->root->ns->members.find(tr.second->name));
 
-				context->parent->ns = context->parent->ns->parent;
+				context->root->ns = context->root->ns->parent;
 				fun->expression->Struct.text = oldn;
 
-				context->parent->builder.SetCurrentDebugLocation(dp);
-				context->parent->builder.SetInsertPoint(rp);
+				context->root->builder.SetCurrentDebugLocation(dp);
+				context->root->builder.SetInsertPoint(rp);
 
 				fun = this->data->functions.find(name)->second;
 

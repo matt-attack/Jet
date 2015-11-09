@@ -112,7 +112,7 @@ namespace Jet
 		{
 			auto v = dynamic_cast<NameExpression*>(left);
 			if (v == 0)
-				context->parent->Error("Invalid Namespace", this->token);
+				context->root->Error("Invalid Namespace", this->token);
 
 			context->SetNamespace(v->GetName());
 
@@ -609,7 +609,7 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
-			auto t = context->parent->LookupType(type.text);
+			auto t = context->root->LookupType(type.text);
 
 			return context->DoCast(t, right->Compile(context), true);
 		}
@@ -657,7 +657,7 @@ namespace Jet
 		void CompileStore(CompilerContext* context, CValue right)
 		{
 			if (_operator.type != TokenType::Asterisk)
-				context->parent->Error("Cannot store into this expression!", _operator);
+				context->root->Error("Cannot store into this expression!", _operator);
 
 			if (this->_operator.type == TokenType::Asterisk)
 			{
@@ -666,10 +666,10 @@ namespace Jet
 
 				right = context->DoCast(loc.type->base, right);
 
-				context->parent->builder.CreateStore(right.val, loc.val);
+				context->root->builder.CreateStore(right.val, loc.val);
 				return;
 			}
-			context->parent->Error("Unimplemented!", _operator);
+			context->root->Error("Unimplemented!", _operator);
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -948,26 +948,26 @@ namespace Jet
 			llvm::BasicBlock *end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "whileend");
 
 
-			context->parent->builder.CreateBr(start);
+			context->root->builder.CreateBr(start);
 			context->f->getBasicBlockList().push_back(start);
-			context->parent->builder.SetInsertPoint(start);
+			context->root->builder.SetInsertPoint(start);
 
 			auto cond = this->condition->Compile(context);
-			cond = context->DoCast(context->parent->BoolType, cond);
-			context->parent->builder.CreateCondBr(cond.val, body, end);
+			cond = context->DoCast(context->root->BoolType, cond);
+			context->root->builder.CreateCondBr(cond.val, body, end);
 
 
 			context->f->getBasicBlockList().push_back(body);
-			context->parent->builder.SetInsertPoint(body);
+			context->root->builder.SetInsertPoint(body);
 
 			context->PushLoop(end, start);
 			this->block->Compile(context);
 			context->PopLoop();
 
-			context->parent->builder.CreateBr(start);
+			context->root->builder.CreateBr(start);
 
 			context->f->getBasicBlockList().push_back(end);
-			context->parent->builder.SetInsertPoint(end);
+			context->root->builder.SetInsertPoint(end);
 
 			return CValue();
 		}
@@ -1037,34 +1037,34 @@ namespace Jet
 			llvm::BasicBlock *cont = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forcontinue");
 
 			//insert stupid branch
-			context->parent->builder.CreateBr(start);
+			context->root->builder.CreateBr(start);
 			context->f->getBasicBlockList().push_back(start);
-			context->parent->builder.SetInsertPoint(start);
+			context->root->builder.SetInsertPoint(start);
 
 			auto cond = this->condition->Compile(context);
-			cond = context->DoCast(context->parent->BoolType, cond);
+			cond = context->DoCast(context->root->BoolType, cond);
 
-			context->parent->builder.CreateCondBr(cond.val, body, end);
+			context->root->builder.CreateCondBr(cond.val, body, end);
 
 			context->f->getBasicBlockList().push_back(body);
-			context->parent->builder.SetInsertPoint(body);
+			context->root->builder.SetInsertPoint(body);
 
 			context->PushLoop(end, cont);
 			this->block->Compile(context);
 			context->PopLoop();
 
-			context->parent->builder.CreateBr(cont);
+			context->root->builder.CreateBr(cont);
 
 			//insert continue branch here
 			context->f->getBasicBlockList().push_back(cont);
-			context->parent->builder.SetInsertPoint(cont);
+			context->root->builder.SetInsertPoint(cont);
 
 			this->incr->Compile(context);
 
-			context->parent->builder.CreateBr(start);
+			context->root->builder.CreateBr(start);
 
 			context->f->getBasicBlockList().push_back(end);
-			context->parent->builder.SetInsertPoint(end);
+			context->root->builder.SetInsertPoint(end);
 
 			return CValue();
 		}
@@ -1391,21 +1391,21 @@ namespace Jet
 			for (auto& ii : this->branches)
 			{
 				if (NextBB)
-					context->parent->builder.SetInsertPoint(NextBB);
+					context->root->builder.SetInsertPoint(NextBB);
 
 				auto cond = ii->condition->Compile(context);
-				cond = context->DoCast(context->parent->BoolType, cond);//try and cast to bool
+				cond = context->DoCast(context->root->BoolType, cond);//try and cast to bool
 
 				llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "then", context->f);
 				NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(llvm::getGlobalContext(), "elseif", context->f);
 
-				context->parent->builder.CreateCondBr(cond.val, ThenBB, NextBB);
+				context->root->builder.CreateCondBr(cond.val, ThenBB, NextBB);
 
 				//statement body
-				context->parent->builder.SetInsertPoint(ThenBB);
+				context->root->builder.SetInsertPoint(ThenBB);
 				ii->block->Compile(context);
-				if (context->parent->builder.GetInsertBlock()->getTerminator() == 0)
-					context->parent->builder.CreateBr(EndBB);//branch to end
+				if (context->root->builder.GetInsertBlock()->getTerminator() == 0)
+					context->root->builder.CreateBr(EndBB);//branch to end
 
 				pos++;
 			}
@@ -1413,13 +1413,13 @@ namespace Jet
 			if (hasElse)
 			{
 				context->f->getBasicBlockList().push_back(ElseBB);
-				context->parent->builder.SetInsertPoint(ElseBB);
+				context->root->builder.SetInsertPoint(ElseBB);
 
 				this->Else->block->Compile(context);
-				context->parent->builder.CreateBr(EndBB);
+				context->root->builder.CreateBr(EndBB);
 			}
 			context->f->getBasicBlockList().push_back(EndBB);
-			context->parent->builder.SetInsertPoint(EndBB);
+			context->root->builder.SetInsertPoint(EndBB);
 
 			return CValue();
 		}
@@ -2010,7 +2010,7 @@ namespace Jet
 			if (right)
 				context->Return(right->Compile(context));
 			else
-				context->parent->builder.CreateRetVoid();
+				context->root->builder.CreateRetVoid();
 
 			return CValue();
 		}
@@ -2116,7 +2116,7 @@ namespace Jet
 		CValue Compile(CompilerContext* context)
 		{
 			if (this->Parent->Parent != 0)
-				context->parent->Error("Cannot use typedef outside of global scope", token);
+				context->root->Error("Cannot use typedef outside of global scope", token);
 
 			return CValue();
 		}
@@ -2124,24 +2124,24 @@ namespace Jet
 		void CompileDeclarations(CompilerContext* context)
 		{
 			if (this->Parent->Parent != 0)
-				context->parent->Error("Cannot use typedef outside of global scope", token);
+				context->root->Error("Cannot use typedef outside of global scope", token);
 
-			context->parent->ns->members.insert({this->new_type.text, context->parent->LookupType(this->other_type.text)});
-			//context->parent->Error("Typedef not implemented atm", token);
+			context->root->ns->members.insert({this->new_type.text, context->root->LookupType(this->other_type.text)});
+			//context->root->Error("Typedef not implemented atm", token);
 
 			/*context->CurrentToken(&other_type);
-			auto type = context->parent->AdvanceTypeLookup(other_type.text);
+			auto type = context->root->AdvanceTypeLookup(other_type.text);
 
 			//this can be fixed by adding a third pass over the typedefs
-			auto iter = context->parent->types.find(new_type.text);
-			if (iter != context->parent->types.end())
+			auto iter = context->root->types.find(new_type.text);
+			if (iter != context->root->types.end())
 			{
 			if (iter->second->type == Types::Invalid)
-			context->parent->Error("Please place the typedef before it is used, after is not yet handled properly.", new_type);
+			context->root->Error("Please place the typedef before it is used, after is not yet handled properly.", new_type);
 			else
-			context->parent->Error("Type '" + new_type.text + "' already defined!", new_type);
+			context->root->Error("Type '" + new_type.text + "' already defined!", new_type);
 			}
-			context->parent->types[new_type.text] = type;*/
+			context->root->types[new_type.text] = type;*/
 		};
 
 		void Print(std::string& output, Source* source)

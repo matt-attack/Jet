@@ -215,7 +215,7 @@ Compilation* Compilation::Make(JetProject* project)
 	//first lets create the global context!!
 	//ok this will be the main entry point it initializes everything, then calls the program's entry point
 	int errors = 0;
-	auto global = new CompilerContext(compilation);
+	auto global = new CompilerContext(compilation,0);
 	compilation->current_function = global;
 	compilation->sources = project->GetSources();
 
@@ -366,7 +366,7 @@ Compilation* Compilation::Make(JetProject* project)
 	}
 
 	//figure out how to get me working with multiple definitions
-	auto init = global->AddFunction("_jet_initializer", compilation->ns->members.find("int")->second.ty, {});
+	auto init = global->AddFunction("_jet_initializer", compilation->ns->members.find("int")->second.ty, {}, false, false);
 	if (project->IsExecutable())
 	{
 		//this->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, init->function->scope.get()));
@@ -659,14 +659,17 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	//go through global scope
 	//int(*FP)() = (int(*)())(intptr_t)res;
 	//FP();
+
 	//add runtime option to switch between gcc and link
 	//build symbol table for export
 	printf("Building Symbol Table...\n");
 	StackTime timer("Writing Symbol Output");
+
+	//write out symbol data
 	std::string function;
 	this->ns->OutputMetadata(function, this);
 
-	//todo: only do this if im a library
+	//only make jlib file if i'm a library
 	if (this->project->IsExecutable())
 		return;
 

@@ -10,6 +10,7 @@ namespace llvm
 	class Type;
 	class Function;
 	class DISubprogram;
+	class StructType;
 }
 namespace Jet
 {
@@ -48,6 +49,8 @@ namespace Jet
 		CompilerContext* context;
 
 		bool do_export;
+		bool is_lambda;
+		llvm::StructType* storage_type;//for lambdas
 
 		llvm::Function* f;//not always used
 		llvm::DISubprogram* scope;
@@ -60,12 +63,13 @@ namespace Jet
 
 		bool loaded;
 
-		Function(const std::string& name)
+		Function(const std::string& name, bool is_lambda)
 		{
 			this->do_export = true;
 			this->name = name;
 			context = 0;
 			f = 0;
+			this->is_lambda = is_lambda;
 			expression = 0;
 			loaded = false;
 			template_base = 0;

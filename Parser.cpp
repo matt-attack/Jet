@@ -235,12 +235,14 @@ Token Parser::Consume(TokenType expected)
 		std::string str = "Token Not As Expected! Expected: " + TokenToString[expected] + " Got: " + temp.text;
 		//throw CompilerException(this->filename, temp.line, str);
 
+		//if (temp.type == TokenType::Semicolon)
+			//it was probably forgotten, insert dummy
 		//fabricate a fake token
-		ParserError(str, temp);
+		ParserError(str, temp);//need to make this throw again
 		//lets give up on this, it doesnt work well
 		//throw 7;
-
-		mRead.pop_front();
+		//ok, now need to make this work right
+		//mRead.pop_front();
 		return Token(0, 0, temp.line, temp.column, expected, "uh");
 	}
 	mRead.pop_front();
