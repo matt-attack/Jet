@@ -685,6 +685,10 @@ void Struct::Load(Compilation* compiler)
 	for (auto ii : this->struct_members)
 	{
 		auto type = ii.type;
+		
+		if (ii.type->type == Types::Struct && ii.type->data == this)
+			compiler->Error("Circular dependency", *compiler->current_function->current_token);
+
 		ii.type->Load(compiler);
 
 		elementss.push_back(type->GetLLVMType());

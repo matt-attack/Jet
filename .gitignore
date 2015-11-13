@@ -9,7 +9,6 @@
 *.sln
 TTest/
 Test/
-JetCore/
 Release/
 RelWithDebInfo/
 Win32/

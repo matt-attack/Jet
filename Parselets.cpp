@@ -70,14 +70,14 @@ Token ParseType(Parser* parser, bool parse_arrays = true)
 		{
 			if (s->GetValue() <= 0)
 			{
-				ParserError("Cannot size array with a zero or negative size", tok);
+				parser->Error("Cannot size array with a zero or negative size", tok);
 				//throw 7;
 			}
 			out += "[" + std::to_string((int)s->GetValue()) + "]";
 		}
 		else
 		{
-			ParserError("Cannot size array with a non constant size", tok);
+			parser->Error("Cannot size array with a non constant size", tok);
 			//throw 7;
 		}
 	}
@@ -167,7 +167,7 @@ Expression* AssignParselet::parse(Parser* parser, Expression* left, Token token)
 	if (dynamic_cast<IStorableExpression*>(left) == 0)
 	{
 		delete right;
-		ParserError("AssignParselet: Left hand side must be a storable location!", token);
+		parser->Error("AssignParselet: Left hand side must be a storable location!", token);
 	}
 	return new AssignExpression(token, left, right);
 }
@@ -183,7 +183,7 @@ Expression* ScopeParselet::parse(Parser* parser, Expression* left, Token token)
 Expression* OperatorAssignParselet::parse(Parser* parser, Expression* left, Token token)
 {
 	if (dynamic_cast<IStorableExpression*>(left) == 0)
-		ParserError("OperatorAssignParselet: Left hand side must be a storable location!", token);
+		parser->Error("OperatorAssignParselet: Left hand side must be a storable location!", token);
 
 	Expression* right = parser->ParseExpression(Precedence::ASSIGNMENT - 1);
 
@@ -194,7 +194,7 @@ Expression* PrefixOperatorParselet::parse(Parser* parser, Token token)
 {
 	Expression* right = parser->ParseExpression(precedence);
 	if (right == 0)
-		ParserError("PrefixOperatorParselet: Right hand side missing!", token);
+		parser->Error("PrefixOperatorParselet: Right hand side missing!", token);
 
 	return new PrefixExpression(token, right);
 }
@@ -214,7 +214,7 @@ Expression* CastParselet::parse(Parser* parser, Token token)
 
 	auto right = parser->ParseExpression(Precedence::PREFIX);
 	if (right == 0)
-		ParserError("CastParselet: Right hand side missing!", token);
+		parser->Error("CastParselet: Right hand side missing!", token);
 
 	return new CastExpression(type, token, right, end);
 }
@@ -223,7 +223,7 @@ Expression* BinaryOperatorParselet::parse(Parser* parser, Expression* left, Toke
 {
 	Expression* right = parser->ParseExpression(precedence - (isRight ? 1 : 0));
 	if (right == 0)
-		ParserError("BinaryOperatorParselet: Right hand side missing!", token);
+		parser->Error("BinaryOperatorParselet: Right hand side missing!", token);
 
 	return new OperatorExpression(left, token, right);
 }
@@ -266,7 +266,7 @@ Expression* DefaultParselet::parse(Parser* parser, Token token)
 Expression* ForParselet::parse(Parser* parser, Token token)
 {
 	parser->Consume(TokenType::LeftParen);
-	if (parser->LookAhead().type == TokenType::Local)
+	/*if (parser->LookAhead().type == TokenType::Local)
 	{
 		if (parser->LookAhead(1).type == TokenType::Name)
 		{
@@ -284,7 +284,7 @@ Expression* ForParselet::parse(Parser* parser, Token token)
 				//return new ForEachExpression(name, container.Release(), block);
 			}
 		}
-	}
+	}*/
 
 	UniquePtr<Expression*> initial = parser->ParseStatement(true);
 	UniquePtr<Expression*> condition = parser->ParseStatement(true);
@@ -426,7 +426,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		//parse types and stuff
 		do
 		{
-			Token ttname = ParseTrait(parser);// parser->Consume(TokenType::Name);
+			Token ttname = ParseTrait(parser);
 			Token tname = parser->Consume(TokenType::Name);
 
 			templated->push_back({ ttname, tname });
@@ -443,15 +443,13 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 
 	std::vector<StructMember> members;
 	Token end;
-	while (true)//parser->MatchAndConsume(TokenType::RightBrace) == false)
+	while (true)
 	{
 		if (parser->Match(TokenType::RightBrace))
 		{
 			end = parser->Consume(TokenType::RightBrace);
 			break;
 		}
-
-		//Expression* statement = parser->ParseStatement(true);
 
 		//first read type
 		if (parser->Match(TokenType::Function))
@@ -468,7 +466,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 				continue;
 			}
 
-			ParserError("Not implemented!", token);
+			parser->Error("Member function definition must have body!", token);
 		}
 
 		Token type = ::ParseType(parser);
@@ -486,13 +484,13 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 			if (auto s = dynamic_cast<NumberExpression*>(size))
 			{
 				if (s->GetValue() <= 0)
-					ParserError("Cannot size array with a zero or negative size", token);
+					parser->Error("Cannot size array with a zero or negative size", token);
 
 				type.text += "[" + std::to_string((int)s->GetValue()) + "]";
 			}
 			else
 			{
-				ParserError("Cannot size array with a non constant size", token);
+				parser->Error("Cannot size array with a non constant size", token);
 			}
 		}
 
@@ -516,13 +514,11 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	Token name = parser->Consume(TokenType::Name);
 	if (destructor)
 		name.text = "~" + name.text;
-	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
+	auto arguments = new std::vector < std::pair<std::string, std::string> >;
 
 	Token stru;
 	if (parser->MatchAndConsume(TokenType::Scope))
 	{
-		//parser->Consume(TokenType::Colon);
-
 		//its a struct definition
 		stru = name;
 		name = parser->Consume(TokenType::Name);//parse the real function name
@@ -536,7 +532,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 		//parse types and stuff
 		do
 		{
-			Token ttname = ParseTrait(parser);// parser->Consume(TokenType::Name);
+			Token ttname = ParseTrait(parser);
 			Token tname = parser->Consume(TokenType::Name);
 
 			templated->push_back({ ttname, tname });
@@ -558,16 +554,10 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 			{
 				arguments->push_back({ type.text, name.text });
 			}
-			/*else if (name.type == TokenType::Ellipses)
-			{
-			varargs = new NameExpression(parser->Consume(TokenType::Name).getText());
-
-			break;//this is end of parsing arguments
-			}*/
 			else
 			{
-				std::string str = "Token not as expected! Expected Name or Ellises Got: " + name.text;
-				ParserError(str, name);
+				std::string str = "Token not as expected! Expected name or got: " + name.text;
+				parser->Error(str, name);
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
 
@@ -590,8 +580,6 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	std::string stru;
 	if (parser->MatchAndConsume(TokenType::Scope))
 	{
-		//parser->Consume(TokenType::Colon);
-
 		//its a struct definition
 		stru = name.text;
 		bool destructor = parser->MatchAndConsume(TokenType::BNot);
@@ -621,8 +609,8 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 			}*/
 			else
 			{
-				std::string str = "Token not as expected! Expected Name or Ellises Got: " + name.text;
-				ParserError(str, name);
+				std::string str = "Token not as expected! Expected name or got: " + name.text;
+				parser->Error(str, name);
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
 
@@ -635,7 +623,6 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 
 Expression* LambdaParselet::parse(Parser* parser, Token token)
 {
-	//parser->Consume(TokenType::LeftParen);
 	//parse captures
 	auto captures = new std::vector < Token > ;
 	if (parser->LookAhead().type != TokenType::RightBracket)
@@ -656,7 +643,6 @@ Expression* LambdaParselet::parse(Parser* parser, Token token)
 
 	parser->Consume(TokenType::LeftParen);
 
-	//NameExpression* varargs = 0;
 	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
 	if (parser->LookAhead().type != TokenType::RightParen)
 	{
@@ -671,16 +657,10 @@ Expression* LambdaParselet::parse(Parser* parser, Token token)
 			{
 				arguments->push_back({type.text, name.text});
 			}
-			//else if (name.type == TokenType::Ellipses)
-			//{
-				//varargs = new NameExpression(parser->Consume(TokenType::Name).text);
-
-			//	break;//this is end of parsing arguments
-			//}
 			else
 			{
-				std::string str = "Token not as expected! Expected Name or Ellises Got: " + name.text;
-				ParserError(str, token);
+				std::string str = "Token not as expected! Expected name got: " + name.text;
+				parser->Error(str, token);
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
 	}
@@ -743,14 +723,14 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 			{
 				if (s->GetValue() <= 0)
 				{
-					ParserError("Cannot size array with a zero or negative size", token);
+					parser->Error("Cannot size array with a zero or negative size", token);
 					//throw 7;
 				}
 				type.text += "[" + std::to_string((int)s->GetValue()) + "]";
 			}
 			else
 			{
-				ParserError("Cannot size array with a non constant size", token);
+				parser->Error("Cannot size array with a non constant size", token);
 				//throw 7;
 			}
 		}
@@ -776,7 +756,7 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 
 Expression* ConstParselet::parse(Parser* parser, Token token)
 {
-	ParserError("Not Implemented", token);
+	parser->Error("Not Implemented", token);
 
 	auto names = new std::vector < std::pair<Token, Token> > ;
 	do
@@ -835,7 +815,7 @@ Expression* MemberParselet::parse(Parser* parser, Expression* left, Token token)
 	if (name == 0)
 	{
 		delete member; delete left;
-		ParserError("Cannot access member name that is not a string", token);
+		parser->Error("Cannot access member name that is not a string", token);
 	}
 
 	auto ret = new IndexExpression(left, name->token, token);
@@ -851,7 +831,7 @@ Expression* PointerMemberParselet::parse(Parser* parser, Expression* left, Token
 	if (name == 0)
 	{
 		delete member; delete left;
-		ParserError("Cannot access member name that is not a string", token);
+		parser->Error("Cannot access member name that is not a string", token);
 	}
 
 	auto ret = new IndexExpression(left, name->token, token);
@@ -929,14 +909,10 @@ Expression* TypedefParselet::parse(Parser* parser, Token token)
 Expression* NamespaceParselet::parse(Parser* parser, Token token)
 {
 	Token name = parser->Consume(TokenType::Name);
-	//Token start = parser->Consume(TokenType::LeftBrace);
-	Token start;
-
+	
 	auto block = parser->ParseBlock(false);
 
-	Token end;
-	//Token end = parser->Consume(TokenType::RightBrace);
-	return new NamespaceExpression(token, name, start, block, end);
+	return new NamespaceExpression(token, name, block);
 }
 
 Expression* NewParselet::parse(Parser* parser, Token token)

@@ -28,7 +28,7 @@ class OptionParser;
 
 namespace Jet
 {
-	void ParserError(const std::string& msg, Token token);//todo
+	//void ParserError(const std::string& msg, Token token);//todo
 
 	struct CompilerOptions
 	{

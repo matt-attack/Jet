@@ -24,9 +24,11 @@ namespace Jet
 		std::map<TokenType, StatementParselet*> mStatementParselets;
 		std::deque<Token> mRead;
 
+		DiagnosticBuilder* diag;
+
 	public:
 		std::string filename;
-		Parser(Lexer* l);
+		Parser(Lexer* l, DiagnosticBuilder* diag);
 
 		~Parser();
 
@@ -43,6 +45,8 @@ namespace Jet
 		Token ConsumeTemplateGT();
 
 		Token LookAhead(unsigned int num = 0);
+
+		void Error(const std::string& error, const Token& token);
 
 		bool Match(TokenType expected);
 		bool MatchAndConsume(TokenType expected);

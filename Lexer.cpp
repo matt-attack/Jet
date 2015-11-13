@@ -48,7 +48,7 @@ public:
 		operators[":"] = TokenType::Colon;
 		operators[";"] = TokenType::Semicolon;
 		operators[","] = TokenType::Comma;
-		
+
 		operators["::"] = TokenType::Scope;
 
 		operators["++"] = TokenType::Increment;
@@ -97,7 +97,7 @@ public:
 		keywords["fun"] = TokenType::Function;
 		keywords["return"] = TokenType::Ret;
 		keywords["for"] = TokenType::For;
-		
+
 		keywords["local"] = TokenType::Local;
 		keywords["break"] = TokenType::Break;
 		keywords["continue"] = TokenType::Continue;
@@ -165,8 +165,9 @@ bool Jet::IsNumber(char c)
 	return (c >= '0' && c <= '9');
 }
 
-Lexer::Lexer(Source* source)// std::istream* input, std::string filename)
+Lexer::Lexer(Source* source, DiagnosticBuilder* diag)// std::istream* input, std::string filename)
 {
+	this->diag = diag;
 	this->last_index = 0;
 	this->src = source;
 	//this->stream = input;
@@ -205,7 +206,7 @@ Token Lexer::Next()
 
 		char c = src->ConsumeChar();
 		std::string str;
-		str += c;// = text.substr(index - 1, 1);
+		str += c;
 		bool found = false; unsigned int len = 0;
 		TokenType toktype;
 		auto iter = ls.operatorsearch.find(str[0]);
@@ -213,7 +214,7 @@ Token Lexer::Next()
 		{
 			for (auto ii : iter->second)
 			{
-				if (ii.first.length() > src->Remaining())///(text.length() + 1 - index))
+				if (ii.first.length() > src->Remaining())
 					continue;
 
 				//pick the longest matching operator/keyword
@@ -221,7 +222,7 @@ Token Lexer::Next()
 					continue;
 
 				//check if the characters match the operator/keyword
-				if (src->IsOperator(ii.first))// memcmp(ii.first.c_str(), &text.c_str()[index - 1], ii.first.length()) == 0)
+				if (src->IsOperator(ii.first))
 				{
 					len = ii.first.length();
 					str = ii.first;
@@ -258,7 +259,7 @@ Token Lexer::Next()
 			else if (toktype == TokenType::CommentBegin)
 			{
 				int startline = src->linenumber;
-				//Token n = this->Next();
+				
 				while (true)
 				{
 					char c = src->ConsumeChar();
@@ -268,9 +269,10 @@ Token Lexer::Next()
 						break;
 					}
 					else if (c == 0)
-						ParserError("Missing end to comment block starting at line " + std::to_string(startline), Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
-
-					//throw CompilerException(this->filename, this->linenumber, "Missing end to comment block starting at line " + std::to_string(startline));
+					{
+						diag->Error("Missing end to comment block starting at line " + std::to_string(startline), Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
+						throw 7;
+					}
 				}
 
 				continue;
@@ -280,14 +282,14 @@ Token Lexer::Next()
 				std::string txt;
 
 				//int start = index;
-				while (src->IsAtEnd() == false)//index < text.length())
+				while (src->IsAtEnd() == false)
 				{
 					char p = src->PeekChar();
-					if (p == '\\')//text[index] == '\\')
+					if (p == '\\')
 					{
 						src->ConsumeChar();
 						//handle escape sequences
-						char c = src->ConsumeChar();// text[index + 1];
+						char c = src->ConsumeChar();
 						switch (c)
 						{
 						case 'n':
@@ -311,13 +313,9 @@ Token Lexer::Next()
 						default:
 							std::string ch;
 							ch += c;
-							ParserError("Invalid Escape Sequence '\\" + ch/*text.substr(index - 1, 1)*/ + "'", Token(t_ptr, 0, src->linenumber, src->column-2, TokenType::String, std::string("\\")+ch));
-							//ParserError("Invalid Escape Sequence '\\" + std::to_string(c) + "'", Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
-
-							//throw CompilerException(filename, this->linenumber, "Invalid Escape Sequence '\\" + text.substr(index + 1, 1) + "'");
+							diag->Error("Invalid Escape Sequence '\\" + ch/*text.substr(index - 1, 1)*/ + "'", Token(t_ptr, 0, src->linenumber, src->column - 2, TokenType::String, std::string("\\") + ch));
+							throw 7;
 						}
-
-						//index += 2;
 					}
 					else if (p == '"')
 					{
@@ -326,18 +324,17 @@ Token Lexer::Next()
 					}
 					else
 					{
-						txt.push_back(src->ConsumeChar());// text[index++]);
+						txt.push_back(src->ConsumeChar());
 					}
 				}
 				this->last_index = src->GetIndex();
 
-				//index++;
 				return Token(t_ptr, trivia_length, src->linenumber, column, toktype, txt);
 			}
 			else if (toktype == TokenType::BlockString)
 			{
-				ParserError("Block Strings Not Implemented", Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
-
+				diag->Error("Block Strings Not Implemented", Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
+				throw 7;
 				/*std::string txt;
 
 				int start = index;
@@ -391,7 +388,6 @@ Token Lexer::Next()
 		}
 		else if (IsLetter(c) || c == '_')//word
 		{
-			//int start = index - 1;
 			std::string name;
 			name += c;
 			while (true)
@@ -406,7 +402,6 @@ Token Lexer::Next()
 
 			this->last_index = src->GetIndex();
 
-			//std::string name = text.substr(start, index - start);
 			//check if it is a keyword
 			auto keyword = ls.keywords.find(name);
 			if (keyword != ls.keywords.end())//is keyword?
@@ -417,7 +412,6 @@ Token Lexer::Next()
 		else if (IsNumber(c))//number
 		{
 			//finish adding different literal types
-			//int start = index - 1;
 			if (c != '0')
 			{
 				std::string num;
@@ -433,7 +427,6 @@ Token Lexer::Next()
 
 				this->last_index = src->GetIndex();
 
-				//std::string num = text.substr(start, index - start);
 				return Token(t_ptr, trivia_length, src->linenumber, column, TokenType::Number, num);
 			}
 			else
@@ -456,9 +449,7 @@ Token Lexer::Next()
 					}
 					this->last_index = src->GetIndex();
 
-					//std::string num = text.substr(start, index - start);
 					return Token(t_ptr, trivia_length, src->linenumber, column, TokenType::Number, num);
-					break;
 				}
 				case 'x'://hex literal
 				{
@@ -474,9 +465,7 @@ Token Lexer::Next()
 					}
 					this->last_index = src->GetIndex();
 
-					//std::string num = text.substr(start, index - start);
 					return Token(t_ptr, trivia_length, src->linenumber, column, TokenType::Number, num);
-					break;
 				}
 				default:
 				{
@@ -490,7 +479,6 @@ Token Lexer::Next()
 					}
 					this->last_index = src->GetIndex();
 
-					//std::string num = text.substr(start, index - start);
 					return Token(t_ptr, trivia_length, src->linenumber, column, TokenType::Number, str);
 				}
 				}
@@ -524,7 +512,8 @@ Token Lexer::Next()
 				{
 					std::string ch;
 					ch += cc;
-					ParserError("Invalid Escape Sequence '\\" + ch/*text.substr(index - 1, 1)*/ + "'", Token(t_ptr, 0, src->linenumber, src->column - 2, TokenType::String, std::string("\\") + ch));
+					diag->Error("Invalid Escape Sequence '\\" + ch/*text.substr(index - 1, 1)*/ + "'", Token(t_ptr, 0, src->linenumber, src->column - 2, TokenType::String, std::string("\\") + ch));
+					throw 7;
 				}
 				}
 			}
@@ -532,11 +521,13 @@ Token Lexer::Next()
 
 			char endc = src->ConsumeChar();
 			if (endc != '\'')
-				ParserError("Closing ' expected for character literal.", Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
+			{
+				diag->Error("Closing ' expected for character literal.", Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
+				throw 7;
+			}
 
 			this->last_index = src->GetIndex();
 
-			//	throw CompilerException(filename, linenumber, "Closing ' expected for character literal.");
 			return Token(t_ptr, trivia_length, src->linenumber, column, TokenType::Number, num);
 		}
 		else
@@ -545,8 +536,10 @@ Token Lexer::Next()
 			if (c == ' ' || c == '\t' || c == '\n' || c == '\r')
 				continue;
 			else
-				ParserError("Unexpected character: '" + str + "'", Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
-			//throw CompilerException(this->filename, this->linenumber, "Unexpected character: '" + str + "'");
+			{
+				diag->Error("Unexpected character: '" + str + "'", Token(t_ptr, 0, src->linenumber, column, TokenType::String, ""));
+				throw 7;
+			}
 		}
 	}
 	this->last_index = src->GetIndex();

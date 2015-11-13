@@ -1,0 +1,4 @@
+lib:
+requires: ../jetc
+files: core.jet vector.jet string.jet
+libs: 

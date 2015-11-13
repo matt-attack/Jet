@@ -1,0 +1,52 @@
+
+namespace Jet
+{
+	struct Namespace
+	{
+		char* name;
+	}
+	
+	struct Type
+	{
+		int type;
+		bool loaded;
+		
+		
+		//for arrays
+		int size;
+		
+		Namespace* ns;
+		
+		char* name;
+		
+		fun void Type()
+		{
+		
+		}
+		
+		fun void Type(char* name)
+		{
+		
+		}
+		
+		fun char* ToString()
+		{
+			return 0;
+		}
+		
+		fun LLVMTypeRef GetLLVMType()
+		{
+			return 0;
+		}
+		
+		fun Type* GetPointerType()
+		{
+			return 0;
+		}
+		
+		fun Type* GetBaseType()
+		{
+			return 0;
+		}
+	}
+}

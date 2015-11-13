@@ -1,0 +1,49 @@
+
+struct Pointy 
+{ 
+	int x; 
+	double y; 
+	int* q;
+	int array;//[10];
+	
+	fun void print()
+	{
+		puts("hi from member function");
+	} 
+}
+
+trait Any
+{
+
+}
+
+extern fun char* malloc(int size);
+extern fun void free(char* data);
+
+//extern fun void printf(int arg1);
+
+//extern fun int printf(char* h, int h);
+
+extern fun int puts(char* str);	
+/*fun Pointy Tttt(Pointy x)
+{
+	return x;
+}
+
+fun vector<int> Testing()
+{
+	local vector<int> y;
+	
+	//y.DoStuff();
+	//local x = 7;
+	//local char* file = fopen("testing.txt", "w");
+	//local int p = fwrite("Hello!", 6, 1, file);
+	//local int i = fclose(file);
+	return y;
+}	*/
+
+//extern fun char* fopen(char* name, char* mode);
+
+//extern fun int fclose(char* file);
+
+//extern fun int fwrite(char* data, int x, int x, char* file);

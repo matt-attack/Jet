@@ -1,0 +1,63 @@
+
+extern fun int strlen(char* str);
+extern fun void strcpy(char* dest, char* src);
+
+local int v;// = 7;
+struct string
+{
+	char* data;
+	int max_size;
+	int cur_size; 
+	
+	fun void string()
+	{
+		//v = 8;
+		this->data = <char*>malloc(sizeof(char)*4);
+		this->max_size = 4;
+	}
+	
+	/*fun void string(char* data)
+	{
+		local size = strlen(data);
+		this->data = <char*>malloc(sizeof(char)*(size+2));
+		this->max_size = size+2;
+		this->cur_size = size;
+		strcpy(this->data, data);
+	}*/
+	
+	fun void ~string()
+	{
+		free(<char*>this->data);
+	}
+	
+	fun void push_back(char v)
+	{
+		if (this->cur_size >= this->max_size)
+		{
+			//resize
+			this->resize(this->cur_size*2);
+		}
+		
+		this->data[this->cur_size++] = v;
+	}
+	
+	fun char get(int index)
+	{
+		return this->data[index];
+	}
+	
+	fun void resize(int size)
+	{
+		local neww = <char*>malloc(sizeof(char)*size);
+		
+		//copy
+		for (local int i = 0; i < this->cur_size; i++)
+		{
+			neww[i] = this->data[i];
+		}
+		
+		free(<char*>this->data);
+		this->data = neww;
+		this->max_size = size;
+	}
+}

@@ -32,10 +32,10 @@ extern Source* current_source;
 
 void Jet::JetError::Print()
 {
-	int startrow = token.column;// -token.text.length();
+	int startrow = token.column;
 	int endrow = token.column + token.text.length();
 
-	std::string code = this->line;// current_source->GetLine(token.line);
+	std::string code = this->line;
 	std::string underline = "";
 	for (int i = 0; i < code.length(); i++)
 	{
@@ -49,8 +49,8 @@ void Jet::JetError::Print()
 	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", this->file.c_str(), token.line, startrow, token.line, endrow, message.c_str(), code.c_str(), underline.c_str());
 }
 
-//finish me later
-void Error(const std::string& msg, Token start, Token end)
+
+/*void Error(const std::string& msg, Token start, Token end)
 {
 	int startrow = start.column;// -token.text.length();
 	int endrow = end.column + end.text.length();
@@ -67,9 +67,9 @@ void Error(const std::string& msg, Token start, Token end)
 	}
 	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", current_source->filename.c_str(), start.line, startrow, end.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
 	throw 7;
-}
+}*/
 
-void Jet::ParserError(const std::string& msg, Token token)
+/*void Jet::ParserError(const std::string& msg, Token token)
 {
 	int startrow = token.column;// -token.text.length();
 	int start = 0;
@@ -98,7 +98,7 @@ void Jet::ParserError(const std::string& msg, Token token)
 
 	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", current_source->filename.c_str(), token.line, startrow, token.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
 	throw 7;
-}
+}*/
 
 
  

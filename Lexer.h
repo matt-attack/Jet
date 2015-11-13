@@ -11,6 +11,7 @@ namespace Jet
 	bool IsNumber(char c);
 
 	class Source;
+	class DiagnosticBuilder;
 
 	extern std::map<TokenType,std::string> TokenToString; 
 	class Lexer
@@ -18,8 +19,9 @@ namespace Jet
 		Source* src;
 		int last_index;//location where last token ended, used for tracking whitespace
 
+		DiagnosticBuilder* diag;
 	public:
-		Lexer(Source* source);
+		Lexer(Source* source, DiagnosticBuilder* diag);
 
 		Token Next();
 	};

@@ -1502,17 +1502,14 @@ namespace Jet
 
 	class NamespaceExpression : public Expression//, public IStorableExpression
 	{
-		Token begin, end;
 		Token name;
 		Token token;
 		BlockExpression* block;
 	public:
-		NamespaceExpression(Token token, Token name, Token start, BlockExpression* block, Token end)
+		NamespaceExpression(Token token, Token name, BlockExpression* block)
 		{
 			this->name = name;
-			this->begin = start;
 			this->token = token;
-			this->end = end;
 			this->block = block;
 		}
 
@@ -1546,9 +1543,7 @@ namespace Jet
 		{
 			token.Print(output, source);
 			name.Print(output, source);
-			begin.Print(output, source);
 			block->Print(output, source);
-			end.Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)

@@ -1,0 +1,140 @@
+
+
+typedef LLVMContextRef = char*;
+typedef LLVMModuleRef = char*;
+typedef LLVMValueRef = char*;
+typedef LLVMTypeRef = char*;
+typedef LLVMBasicBlockRef = char*;
+typedef LLVMBuilderRef = char*;
+typedef LLVMBool = int;
+
+
+extern fun LLVMContextRef LLVMContextCreate();
+extern fun void LLVMContextDispose(LLVMContextRef C);
+
+extern fun LLVMModuleRef LLVMModuleCreateWithName(char* ModuleID);
+extern fun LLVMModuleRef LLVMModuleCreateWithNameInContext(char* ModuleID, LLVMContextRef C);
+
+extern fun void LLVMDisposeModule(LLVMModuleRef M);
+extern fun void LLVMSetDataLayout(LLVMModuleRef M, char* Triple);
+extern fun void LLVMSetTarget(LLVMModuleRef M, char* Triple);
+
+extern fun void LLVMDumpModule(LLVMModuleRef M);
+
+extern fun LLVMBool LLVMPrintModuleToFile(LLVMModuleRef M, char *Filename,
+                               char **ErrorMessage);
+							   
+extern fun LLVMTypeRef LLVMGetTypeByName(LLVMModuleRef M, char *Name);
+
+extern fun LLVMValueRef LLVMAddFunction(LLVMModuleRef M, char *Name,
+                             LLVMTypeRef FunctionTy);
+extern fun LLVMTypeRef LLVMFunctionType(LLVMTypeRef ReturnType,
+                             LLVMTypeRef *ParamTypes, int/*unsigned*/ ParamCount,
+                             LLVMBool IsVarArg);
+							 
+extern fun LLVMTypeRef LLVMStructType(LLVMTypeRef *ElementTypes, /*unsigned*/int ElementCount,
+                           LLVMBool Packed);
+						   
+extern fun LLVMTypeRef LLVMPointerType(LLVMTypeRef ElementType, /*unsigned*/int AddressSpace);
+							 
+extern fun void LLVMDumpType(LLVMTypeRef Val);
+
+//types
+extern fun LLVMTypeRef LLVMVoidTypeInContext(LLVMContextRef C);
+extern fun LLVMTypeRef LLVMInt1TypeInContext(LLVMContextRef C);
+extern fun LLVMTypeRef LLVMInt8TypeInContext(LLVMContextRef C);
+extern fun LLVMTypeRef LLVMInt16TypeInContext(LLVMContextRef C);
+extern fun LLVMTypeRef LLVMInt32TypeInContext(LLVMContextRef C);
+extern fun LLVMTypeRef LLVMInt64TypeInContext(LLVMContextRef C);
+//extern fun LLVMTypeRef LLVMIntTypeInContext(LLVMContextRef C, unsigned NumBits);
+extern fun LLVMTypeRef LLVMFloatTypeInContext(LLVMContextRef C);
+extern fun LLVMTypeRef LLVMDoubleTypeInContext(LLVMContextRef C);
+
+
+extern fun LLVMTypeRef LLVMTypeOf(LLVMValueRef Val);
+
+extern fun void LLVMDumpValue(LLVMValueRef Val);
+
+
+extern fun LLVMValueRef LLVMConstReal(LLVMTypeRef RealTy, double N);
+extern fun LLVMValueRef LLVMConstInt(LLVMTypeRef IntTy, long/*unsigned long long*/ N,
+                          LLVMBool SignExtend);
+extern fun LLVMValueRef LLVMConstStringInContext(LLVMContextRef C, char *Str,
+                                      /*unsigned*/int Length, LLVMBool DontNullTerminate);
+									  
+extern fun LLVMValueRef LLVMAddGlobal(LLVMModuleRef M, LLVMTypeRef Ty, char *Name);
+									  
+									  
+extern fun LLVMBasicBlockRef LLVMInsertBasicBlockInContext(LLVMContextRef C,
+                                                LLVMBasicBlockRef BB,
+                                                char *Name);
+												
+												
+												
+
+extern fun LLVMBuilderRef LLVMCreateBuilderInContext(LLVMContextRef C);
+extern fun void LLVMDisposeBuilder(LLVMBuilderRef Builder);
+
+
+extern fun void LLVMSetCurrentDebugLocation(LLVMBuilderRef Builder, LLVMValueRef L);
+extern fun LLVMValueRef LLVMGetCurrentDebugLocation(LLVMBuilderRef Builder);
+
+
+//terminators
+extern fun LLVMValueRef LLVMBuildRetVoid(LLVMBuilderRef x);
+extern fun LLVMValueRef LLVMBuildRet(LLVMBuilderRef x, LLVMValueRef V);
+extern fun LLVMValueRef LLVMBuildSwitch(LLVMBuilderRef x, LLVMValueRef V,
+                             LLVMBasicBlockRef Else, /*unsigned*/int NumCases);
+extern fun LLVMValueRef LLVMBuildBr(LLVMBuilderRef x, LLVMBasicBlockRef Dest);
+extern fun LLVMValueRef LLVMBuildCondBr(LLVMBuilderRef x , LLVMValueRef If,
+                             LLVMBasicBlockRef Then, LLVMBasicBlockRef Else);
+							 
+extern fun void LLVMAddCase(LLVMValueRef Switch, LLVMValueRef OnVal,
+                 LLVMBasicBlockRef Dest);
+				 
+extern fun LLVMValueRef LLVMBuildAdd(LLVMBuilderRef x, LLVMValueRef LHS, LLVMValueRef RHS,
+                          char *Name);
+extern fun LLVMValueRef LLVMBuildFAdd(LLVMBuilderRef x, LLVMValueRef LHS, LLVMValueRef RHS,
+                           char *Name);
+extern fun LLVMValueRef LLVMBuildSub(LLVMBuilderRef x, LLVMValueRef LHS, LLVMValueRef RHS,
+                          char *Name);
+extern fun LLVMValueRef LLVMBuildFSub(LLVMBuilderRef x, LLVMValueRef LHS, LLVMValueRef RHS,
+                           char *Name);
+extern fun LLVMValueRef LLVMBuildMul(LLVMBuilderRef x, LLVMValueRef LHS, LLVMValueRef RHS,
+                          char *Name);
+						  
+extern fun LLVMValueRef LLVMBuildFMul(LLVMBuilderRef x, LLVMValueRef LHS, LLVMValueRef RHS,
+                          char *Name);
+extern fun LLVMValueRef LLVMBuildFDiv(LLVMBuilderRef x, LLVMValueRef LHS, LLVMValueRef RHS,
+                          char *Name);
+						  
+extern fun LLVMValueRef LLVMBuildAnd(LLVMBuilderRef x, LLVMValueRef LHS, LLVMValueRef RHS,
+                          char *Name);
+extern fun LLVMValueRef LLVMBuildOr(LLVMBuilderRef x, LLVMValueRef LHS, LLVMValueRef RHS,
+                          char *Name);
+extern fun LLVMValueRef LLVMBuildXor(LLVMBuilderRef x, LLVMValueRef LHS, LLVMValueRef RHS,
+                          char *Name);
+						  
+extern fun LLVMValueRef LLVMBuildNeg(LLVMBuilderRef x, LLVMValueRef V, char *Name);
+extern fun LLVMValueRef LLVMBuildFNeg(LLVMBuilderRef x, LLVMValueRef V, char *Name);
+extern fun LLVMValueRef LLVMBuildNot(LLVMBuilderRef x, LLVMValueRef V, char *Name);
+
+
+
+//memory
+extern fun LLVMValueRef LLVMBuildLoad(LLVMBuilderRef x, LLVMValueRef PointerVal,
+                           char *Name);
+extern fun LLVMValueRef LLVMBuildStore(LLVMBuilderRef x, LLVMValueRef Val, LLVMValueRef Ptr);
+extern fun LLVMValueRef LLVMBuildGEP(LLVMBuilderRef B, LLVMValueRef Pointer,
+                          LLVMValueRef *Indices, /*unsigned*/int NumIndices,
+                          char *Name);
+						  
+//casts
+extern fun LLVMValueRef LLVMBuildPointerCast(LLVMBuilderRef x, LLVMValueRef Val,
+                                  LLVMTypeRef DestTy, char *Name);
+								  
+								  
+//others
+extern fun LLVMValueRef LLVMBuildCall(LLVMBuilderRef x, LLVMValueRef Fn,
+                           LLVMValueRef *Args, /*unsigned*/int NumArgs,
+                           char *Name);

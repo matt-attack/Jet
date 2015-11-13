@@ -36,14 +36,8 @@ std::string Source::GetLine(unsigned int line)
 const char* Source::GetLinePointer(unsigned int line)
 {
 	auto l = this->lines[line - 1];
-	//if (l.second == 0)
-	//{
-		//search for the end
-		//while (l.first[l.second] != 0 && l.first[l.second] != '\n')
-			//l.second++;
-		//printf("oops");
-	//}
-	return l.first;//, l.second);
+	
+	return l.first;
 }
 
 char Source::ConsumeChar()
@@ -96,12 +90,31 @@ bool Source::IsAtEnd()
 	return this->index >= length;
 }
 
+
+
 extern Source* current_source;
-BlockExpression* Source::GetAST()
+BlockExpression* Source::GetAST(DiagnosticBuilder* builder)
 {
 	current_source = this;
-	Lexer lexer(this);
-	Parser parser(&lexer);
 
-	return parser.ParseAll();
+
+	Lexer lexer(this, builder);
+	Parser parser(&lexer, builder);
+
+	//if (builder->GetErrors().size() > 0)
+		//throw 7;
+
+	BlockExpression* result = 0;
+
+	try
+	{
+		result = parser.ParseAll();
+	}
+	catch (...)
+	{
+
+	}
+
+	return result;
 }
+

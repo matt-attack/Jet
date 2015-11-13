@@ -4,10 +4,10 @@
 
 using namespace Jet;
 
-Parser::Parser(Lexer* l)
+Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 {
+	this->diag = diag;
 	this->lexer = l;
-	//this->filename = l->filename;
 
 	this->Register(TokenType::Name, new NameParselet());
 	this->Register(TokenType::Number, new NumberParselet());
@@ -142,7 +142,7 @@ Expression* Parser::ParseExpression(int precedence)
 	{
 		std::string str = "No Parser Found for: " + token.text;
 		//throw CompilerException(this->filename, token.line, str);//printf("Consume: TokenType not as expected!\n");
-		ParserError(str, token);
+		this->Error(str, token);
 		return 0;
 	}
 
@@ -238,7 +238,7 @@ Token Parser::Consume(TokenType expected)
 		//if (temp.type == TokenType::Semicolon)
 			//it was probably forgotten, insert dummy
 		//fabricate a fake token
-		ParserError(str, temp);//need to make this throw again
+		this->Error(str, temp);//need to make this throw again
 		//lets give up on this, it doesnt work well
 		//throw 7;
 		//ok, now need to make this work right
@@ -258,7 +258,7 @@ Token Parser::ConsumeTemplateGT()
 		//throw CompilerException(this->filename, temp.line, str);
 
 		//fabricate a fake token
-		ParserError(str, temp);
+		this->Error(str, temp);
 		//lets give up on this, it doesnt work well
 		//throw 7;
 
@@ -336,4 +336,11 @@ int Parser::GetPrecedence() {
 		return parser->getPrecedence();
 
 	return 0;
+}
+
+extern Source* current_source;
+void Parser::Error(const std::string& string, const Token& token)
+{
+	this->diag->Error(string, token);
+	//throw 7;
 }

@@ -32,6 +32,19 @@ namespace Jet
 		void Print();
 	};
 
+	class DiagnosticBuilder
+	{
+		std::vector<JetError> diagnostics;
+	public:
+
+		void Error(const std::string& text, const Token& token);
+
+		std::vector<JetError> GetErrors()
+		{
+			return diagnostics;
+		}
+	};
+
 	class Namespace;
 	class Source;
 	class Type;

@@ -1,0 +1,7 @@
+fun void hello()
+{
+
+}
+
+extern fun char getchar();
+extern fun void puts(char* x);

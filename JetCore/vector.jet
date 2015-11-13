@@ -1,0 +1,297 @@
+
+
+struct function<Any T>
+{
+	T ptr;
+	char data[64];
+}
+
+fun void ttttt()
+{
+	puts("im a function pointer");
+}
+
+fun bool TestWhere(int x)
+{
+	return x > 5;
+}
+
+struct doubletest<Any x, Any y>
+{
+	x x;
+	y y;
+}
+
+fun void apple(int y, int z)
+{
+	
+}
+struct Reference
+{
+	CallbackMachine x;
+}
+
+struct CallbackMachine
+{
+	int x;
+	vector<void(int,char*)> callbacks;
+	
+	fun void CallbackMachine()
+	{
+		puts("CallbackMachine constructor");
+	}
+	
+	fun void Add(void(int,char*) callback)
+	{
+		this->callbacks.push_back(callback);
+	}
+	
+	fun void Execute(char* str)
+	{
+		local enum = this->callbacks.GetEnumerator();
+		while (enum.MoveNext() == 1)
+		{
+			enum.Current()(1, str);
+		}
+	}
+}
+
+trait IEnumerator<TT>
+{
+	fun TT Current();
+	
+	fun void Reset();
+	fun int MoveNext();
+}
+
+trait IEnumerable<T>
+{
+	fun IEnumerator<T> GetEnumerator();
+}
+
+
+fun int main()
+{
+	/*local x = 5;
+	x += 2;
+	local y = 7;
+	x = 7+y;*/
+	//local doubletest<int, double> ttt;
+	local vector<int> x;
+	//local vector<VectorIterator<int> > test;
+	//local vector<int> x2;
+	x.push_back(5);
+	x.push_back(6);
+	x.push_back(7);
+	x.push_back(1);
+	x.push_back(2);
+	x.push_back(22);
+	
+	local p = new int;
+
+	//local string = "hello";
+	//string = x;
+	//local x3 = ttttt;
+	//x3();
+	//string = ttt;
+	//x.DoStuff();
+	//x.Print();
+	
+	//local res = x.Contains(1);
+	//res = 1;
+	//if (res)
+		//puts("x contains 5");
+	//local q = x.Where;
+	
+	//x.Where(TestWhere);
+	local num = 6;
+	local string = "helloooo roham";
+	local t = x.Where([num,string](x) { puts(string); return x > num; });
+	t.Print();
+	//t.Print();
+	//puts("next");
+	//local p = &x;
+	//p->Where([x] { return x < 2; });
+	//x2();
+	
+	//local CallbackMachine cb;
+	//local Reference ref;
+	//cb.Add([](x,y) { puts("try 1"); puts(y);});
+	//cb.Add([](x,y) { puts("try 2"); puts(y);});
+	//cb.Add([](x,y) { puts("try 3"); puts(y);});
+	
+	//cb.Execute("hello");
+	//getc();
+	//cb = *<CallbackMachine*>0;
+	return 0;
+}
+
+fun int IEnumerable::DoStuff()
+{
+	puts("helloooooo");
+	return sizeof(T);
+	//printf("Hi %d", sizeof(T));
+}
+
+fun void IEnumerable::Print()
+{
+	local enum = this->GetEnumerator();
+	while (enum.MoveNext() == 1)
+	{
+		puts("Got one!");
+	}
+}
+
+struct WhereIterable<Any T, Any Base>
+{
+	Base* iterable;
+	function<bool(T)> fn;
+		
+	fun WhereIterator<T, VectorIterator<T> > GetEnumerator()
+	{
+		local WhereIterator<T, VectorIterator<T> > x;
+		x.iter = this->iterable->GetEnumerator();
+		x.fn = this->fn;
+		return x;
+	}
+}
+
+struct WhereIterator<Any T, Any Base>
+{
+	Base iter;
+	function<bool(T)> fn;
+		
+	fun T Current()
+	{
+		return this->iter.Current();
+	}
+		
+	fun void Reset()
+	{
+		this->iter.Reset();
+	}
+		
+	fun int MoveNext()
+	{
+		while (this->iter.MoveNext())
+		{
+			local fn = this->fn;
+			if (fn(this->iter.Current()))
+				return 1;
+		}
+		return 0;
+	}
+}
+
+
+fun WhereIterable<T, IEnumerable > IEnumerable::Where(function<bool(T)> fn)
+{
+	local WhereIterable<T, IEnumerable > x;
+	x.iterable = this;
+	x.fn = fn;
+	return x;
+}
+
+fun int IEnumerable::Contains(T t)
+{
+	local enum = this->GetEnumerator();
+	while (enum.MoveNext() == 1)
+	{
+		if (enum.Current() == t)
+			return 1;
+	}
+	return 0;
+}
+
+struct VectorIterator<Any TTT>
+{
+	int position;
+	int size;
+	TTT* data;
+	
+	fun TTT Current()
+	{
+		return this->data[this->position];
+	}
+	
+	fun void Reset()
+	{
+		this->position = 0;
+	}
+	
+	fun int MoveNext()
+	{
+		this->position++;
+		local res = 0;
+		if (this->position >= this->size)
+			res = 0;
+		else
+			res = 1;
+		return res;
+	}
+}
+
+struct vector<Any TT>
+{
+	TT* data;
+	int max_size;
+	int cur_size; 
+	
+	fun void vector()
+	{
+		puts("constructor a");
+		this->cur_size = 0;
+		this->data = new TT[4];//
+		//this->data = <TT*>malloc(sizeof(TT)*4);
+		this->max_size = 4;
+	}
+	
+	fun void ~vector()
+	{
+		puts("destructor");
+		free(<char*>this->data);
+	}
+	
+	fun VectorIterator<TT> GetEnumerator()
+	{
+		local VectorIterator<TT> iter;
+		iter.position = -1;
+		iter.size = this->cur_size;
+		iter.data = this->data;
+		return iter;
+	}
+	
+	fun void push_back(TT v)
+	{
+		if (this->cur_size >= this->max_size)
+		{
+			//resize
+			puts("resizing");
+			this->resize(this->cur_size*2);
+		}
+		
+		this->data[this->cur_size++] = v;
+	}
+
+	fun TT get(int index)
+	{
+		return this->data[index];
+	}
+	
+	fun void resize(int size)
+	{
+		//todo
+		local ne = new TT[size];//<TT*>malloc(sizeof(TT)*size);
+		
+		puts("malloced");
+		//copy
+		for (local int i = 0; i < this->cur_size; i++)
+		{
+			ne[i] = this->data[i];
+		}
+		puts("copied data");
+		free(<char*>this->data);
+		this->data = ne;
+		this->max_size = size;
+	}
+}

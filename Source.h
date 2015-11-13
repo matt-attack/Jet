@@ -6,6 +6,7 @@
 
 namespace Jet
 {
+	class DiagnosticBuilder;
 	class BlockExpression;
 	class Source
 	{
@@ -69,7 +70,7 @@ namespace Jet
 		}
 
 		//throw this in a try catch statement, as it can throw errors
-		BlockExpression* GetAST();
+		BlockExpression* GetAST(DiagnosticBuilder* diagnostics);
 
 		std::string filename;
 

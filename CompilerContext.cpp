@@ -588,8 +588,8 @@ CValue CompilerContext::GetVariable(const std::string& name)
 		if (global != this->root->globals.end())
 			return global->second;
 
-		auto function = this->root->GetFunction(name);//this->root->functions.find(name);
-		if (function != 0)//this->root->functions.end())
+		auto function = this->root->GetFunction(name);
+		if (function != 0)
 		{
 			function->Load(this->root);
 			return CValue(function->GetType(this->root), function->f);

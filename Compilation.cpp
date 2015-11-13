@@ -63,22 +63,20 @@ Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), 
 	//insert basic types
 	ns->members.insert({ "float", new Type("float", Types::Float) });
 	this->DoubleType = new Type("double", Types::Double);
-	ns->members.insert({ "double", this->DoubleType }); //types["double"] = this->DoubleType;// new Type("double", Types::Double);// &DoubleType;// new Type(Types::Float);
-	ns->members.insert({ "long", new Type("long", Types::Long) }); //types["long"] = new Type("long", Types::Long);
+	ns->members.insert({ "double", this->DoubleType });
+	ns->members.insert({ "long", new Type("long", Types::Long) });
 	this->IntType = new Type("int", Types::Int);
-	ns->members.insert({ "int", this->IntType });//types["int"] = this->IntType;// new Type("int", Types::Int);// &IntType;// new Type(Types::Int);
-	ns->members.insert({ "short", new Type("short", Types::Short) });//types["short"] = new Type("short", Types::Short);
-	ns->members.insert({ "char", new Type("char", Types::Char) });//types["char"] = new Type("char", Types::Char);
-	this->BoolType = new Type("bool", Types::Bool);// &BoolType;// new Type(Types::Bool);
-	ns->members.insert({ "bool", this->BoolType });// types["bool"] = this->BoolType;
-	ns->members.insert({ "void", new Type("void", Types::Void) });// types["void"] = new Type("void", Types::Void);// &VoidType;// new Type(Types::Void);
+	ns->members.insert({ "int", this->IntType });
+	ns->members.insert({ "short", new Type("short", Types::Short) });
+	ns->members.insert({ "char", new Type("char", Types::Char) });
+	this->BoolType = new Type("bool", Types::Bool);
+	ns->members.insert({ "bool", this->BoolType });
+	ns->members.insert({ "void", new Type("void", Types::Void) });
 }
 
 Compilation::~Compilation()
 {
 	//free global namespace
-	//delete this->global;
-
 	delete this->global;
 
 	//free functions
@@ -157,7 +155,6 @@ StackTime::~StackTime()
 }
 
 
-
 Compilation* Compilation::Make(JetProject* project)
 {
 	Compilation* compilation = new Compilation(project);
@@ -201,11 +198,8 @@ Compilation* Compilation::Make(JetProject* project)
 
 		lib_symbols.push_back(buffer);
 	}
-	//JITHelper = new MCJITHelper(this->context);
 
 	//spin off children and lets compile this!
-
-	//module = JITHelper->getModuleForNewFunction();
 	compilation->module = new llvm::Module("hi.im.jet", compilation->context);
 
 	compilation->debug = new llvm::DIBuilder(*compilation->module, true);
@@ -219,6 +213,8 @@ Compilation* Compilation::Make(JetProject* project)
 	compilation->current_function = global;
 	compilation->sources = project->GetSources();
 
+	DiagnosticBuilder diagnostics;
+
 	//read in symbols from lib
 	std::vector<BlockExpression*> symbol_asts;
 	std::vector<Source*> symbol_sources;
@@ -228,10 +224,19 @@ Compilation* Compilation::Make(JetProject* project)
 		{
 			Source* src = new Source(buffer, "symbols");
 
-			BlockExpression* result = 0;
+			BlockExpression* result = src->GetAST(&diagnostics);
+			if (diagnostics.GetErrors().size())
+			{
+				delete result;
+				printf("Compilation Stopped, Error Parsing Symbols\n");
+				delete compilation;
+				compilation = 0;
+				errors = 1;
+				goto error;
+			}
+
 			try
 			{
-				result = src->GetAST();
 				result->CompileDeclarations(global);
 				symbol_asts.push_back(result);
 				symbol_sources.push_back(src);
@@ -271,22 +276,19 @@ Compilation* Compilation::Make(JetProject* project)
 				goto error;
 			}
 
-			if (file.first[0] == '#')
+			if (file.first[0] == '#')//ignore symbol files, we already parsed them
 				continue;
 
-			BlockExpression* result = 0;
-			try
-			{
-				result = file.second->GetAST();
-			}
-			catch (...)
-			{
+			BlockExpression* result = file.second->GetAST(&diagnostics);
+			if (diagnostics.GetErrors().size())
+			{//stop if we encountered a parsing error
 				printf("Compilation Stopped, Parser Error\n");
 				errors = 1;
 				delete compilation;
 				compilation = 0;
 				goto error;
 			}
+
 			compilation->asts[file.first] = result;
 
 			compilation->current_function = global;
@@ -1114,4 +1116,15 @@ Jet::Function* Compilation::GetFunctionAtPoint(const char* file, int line)
 	}
 	}*/
 	return 0;
+}
+
+void DiagnosticBuilder::Error(const std::string& text, const Token& token)
+{
+	JetError error;
+	error.token = token;
+	error.message = text;
+	error.line = current_source->GetLine(token.line);
+	error.file = current_source->filename;
+	error.Print();//lets do it immediately
+	this->diagnostics.push_back(error);
 }

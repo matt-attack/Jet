@@ -1,0 +1,52 @@
+
+extern fun char* malloc(int x);
+
+fun Jet::Compilation* MakeCompilation(char* project)
+{
+	local c = new Jet::Compilation;
+	local ctx = LLVMContextCreate();
+	
+	c->module = LLVMModuleCreateWithNameInContext("test", ctx);
+	local voidt = LLVMVoidTypeInContext(ctx);
+	
+	local funtype = LLVMFunctionType(voidt, 0, 0, 0);
+	
+	LLVMDumpType(funtype);
+	LLVMAddFunction(c->module, "test", funtype);
+	LLVMPrintModuleToFile(c->module, "out.txt",
+                               0);
+	LLVMDumpModule(c->module);
+	return c;
+}
+
+namespace Jet
+{
+	struct Compiler
+	{
+		int x;
+		fun void Compile(char* command)
+		{
+		
+		}
+	}
+	
+	struct Compilation
+	{
+		LLVMModuleRef module;
+		
+		fun void ~Compilation()
+		{
+			LLVMDisposeModule(this->module);
+		}
+	}
+}
+
+fun void main()
+{
+	local Jet::Compiler c;
+	
+	MakeCompilation("jetcore");
+	
+	c.Compile("jetcore");
+	puts("hello");
+}
