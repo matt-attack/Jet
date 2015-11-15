@@ -40,17 +40,21 @@ Token ParseType(Parser* parser, bool parse_arrays = true)
 	else if (parser->MatchAndConsume(TokenType::LeftParen))
 	{
 		out += "(";
-		//recursively parse the rest
-		bool first = true;
-		do
+		
+		if (!parser->MatchAndConsume(TokenType::RightParen))
 		{
-			if (first == false)
-				out += ",";
-			first = false;
-			out += ParseType(parser).text;
-		} while (parser->MatchAndConsume(TokenType::Comma));
+			//recursively parse the rest
+			bool first = true;
+			do
+			{
+				if (first == false)
+					out += ",";
+				first = false;
+				out += ParseType(parser).text;
+			} while (parser->MatchAndConsume(TokenType::Comma));
 
-		parser->Consume(TokenType::RightParen);
+			parser->Consume(TokenType::RightParen);
+		}
 		out += ")";
 	}
 
@@ -917,7 +921,6 @@ Expression* NamespaceParselet::parse(Parser* parser, Token token)
 
 Expression* NewParselet::parse(Parser* parser, Token token)
 {
-	//auto expression = parser->ParseExpression(Precedence::PREFIX);
 	auto type = ::ParseType(parser, false);
 
 	//try and parse size expression

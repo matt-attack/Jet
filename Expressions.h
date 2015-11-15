@@ -311,18 +311,49 @@ namespace Jet
 
 	class NumberExpression : public Expression
 	{
-		double value;
 		Token token;
 	public:
-		NumberExpression(double value, Token token)
+		NumberExpression(Token token)
 		{
-			this->value = value;
 			this->token = token;
 		}
 
 		double GetValue()
 		{
-			return this->value;
+			bool isint = true;
+			bool ishex = false;
+			for (int i = 0; i < this->token.text.length(); i++)
+			{
+				if (this->token.text[i] == '.')
+					isint = false;
+				//else if (!(this->token.text[i] <= '9' && this->token.text[i] >= '0'))
+				//	ishex = true;
+			}
+
+			if (token.text.length() >= 3)
+			{
+				std::string substr = token.text.substr(2);
+				if (token.text[1] == 'x')
+				{
+					unsigned long long num = std::stoull(substr, nullptr, 16);
+					return num;
+				}
+				else if (token.text[1] == 'b')
+				{
+					unsigned long long num = std::stoull(substr, nullptr, 2);
+					return num;
+				}
+			}
+
+			//ok, lets get the type from what kind of constant it is
+			//get type from the constant
+			//this is pretty terrible, come back later
+			//if (ishex)
+			//	return context->Integer(std::stoi(this->token.text, 0, 16));
+			if (isint)
+				return std::stoi(this->token.text);
+			else
+				return ::atof(token.text.c_str());// this->value);
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -1872,8 +1903,7 @@ namespace Jet
 		Token token;
 		Token name;
 
-		std::vector<std::pair<Token, Token>>* templates;
-
+		
 		Token start;
 		Token end;
 
@@ -1882,6 +1912,8 @@ namespace Jet
 		void AddConstructorDeclarations(Type* str, CompilerContext* context);
 		void AddConstructors(CompilerContext* context);
 	public:
+
+		std::vector<std::pair<Token, Token>>* templates;
 
 		std::vector<StructMember> members;
 

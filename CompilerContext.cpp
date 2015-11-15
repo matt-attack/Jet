@@ -610,9 +610,8 @@ CValue CompilerContext::GetVariable(const std::string& name)
 		
 			types.push_back(var.type->base->GetLLVMType());
 			storage_t = this->function->storage_type = storage_t->create(types);
-			//type->setBody(types);
 
-			auto data = root->builder.CreatePointerCast(location.val, storage_t->getPointerTo());// GetType(ii.second->GetPointerType(context)));
+			auto data = root->builder.CreatePointerCast(location.val, storage_t->getPointerTo());
 
 			//load it, then store it as a local
 			auto val = root->builder.CreateGEP(data, { root->builder.getInt32(0), root->builder.getInt32(this->captures.size()) });
@@ -772,9 +771,6 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 	if (this->captures.size())
 	{
 		//allocate the function object
-		//lambda_type = context->parent->LookupType("function<" + context->parent->GetFunctionType(ret, args)->ToString() + ">");
-		//lambda = context->parent->builder.CreateAlloca(lambda_type->GetLLVMType());
-
 		std::vector<llvm::Type*> elements;
 		for (auto ii : this->captures)
 		{
@@ -797,8 +793,6 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 			//then store it
 			auto val = parent->Load(var);
 			root->builder.CreateStore(val.val, ptr);
-
-			//captured.push_back({ var, val.type });
 		}
 	}
 	this->captures.clear();

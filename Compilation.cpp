@@ -154,10 +154,43 @@ StackTime::~StackTime()
 	printf("%s Time: %f seconds\n", this->name, dt);
 }
 
+class TraitChecker : public ExpressionVisitor
+{
+	Compilation* compiler;
+public:
 
-Compilation* Compilation::Make(JetProject* project)
+	TraitChecker(Compilation* compiler) : compiler(compiler)
+	{
+
+	}
+
+	virtual void Visit(CallExpression* expr)
+	{
+		auto fun = dynamic_cast<FunctionExpression*>(expr->Parent->Parent);
+		if (fun == 0)
+			return;
+		
+		if (auto index = dynamic_cast<IndexExpression*>(expr->left))
+		{
+			if (auto str = dynamic_cast<StructExpression*>(fun->Parent))
+			{
+				if (str->templates)
+				{
+					auto trait = compiler->LookupType(str->templates->front().first.text);
+					//check if the call fits the trait
+					//auto out = index->GetBaseType(this->compiler);
+					printf("hi");
+				}
+			}
+		}
+	}
+};
+
+
+Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnostics)
 {
 	Compilation* compilation = new Compilation(project);
+	compilation->diagnostics = diagnostics;
 
 	char olddir[500];
 	getcwd(olddir, 500);
@@ -213,8 +246,6 @@ Compilation* Compilation::Make(JetProject* project)
 	compilation->current_function = global;
 	compilation->sources = project->GetSources();
 
-	DiagnosticBuilder diagnostics;
-
 	//read in symbols from lib
 	std::vector<BlockExpression*> symbol_asts;
 	std::vector<Source*> symbol_sources;
@@ -224,8 +255,8 @@ Compilation* Compilation::Make(JetProject* project)
 		{
 			Source* src = new Source(buffer, "symbols");
 
-			BlockExpression* result = src->GetAST(&diagnostics);
-			if (diagnostics.GetErrors().size())
+			BlockExpression* result = src->GetAST(diagnostics);
+			if (diagnostics->GetErrors().size())
 			{
 				delete result;
 				printf("Compilation Stopped, Error Parsing Symbols\n");
@@ -279,8 +310,8 @@ Compilation* Compilation::Make(JetProject* project)
 			if (file.first[0] == '#')//ignore symbol files, we already parsed them
 				continue;
 
-			BlockExpression* result = file.second->GetAST(&diagnostics);
-			if (diagnostics.GetErrors().size())
+			BlockExpression* result = file.second->GetAST(diagnostics);
+			if (diagnostics->GetErrors().size())
 			{//stop if we encountered a parsing error
 				printf("Compilation Stopped, Parser Error\n");
 				errors = 1;
@@ -288,6 +319,8 @@ Compilation* Compilation::Make(JetProject* project)
 				compilation = 0;
 				goto error;
 			}
+			TraitChecker checker(compilation);
+			result->Visit(&checker);
 
 			compilation->asts[file.first] = result;
 
@@ -409,7 +442,7 @@ char* ReadDependenciesFromSymbols(const char* path, int& size)
 
 void Compilation::Assemble(int olevel)
 {
-	if (this->errors.size() > 0)
+	if (this->diagnostics->GetErrors().size() > 0)
 		return;
 
 	StackTime timer("Assembling Output");
@@ -978,12 +1011,14 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t)//, bool Ext
 
 void Compilation::Error(const std::string& string, Token token)
 {
-	JetError error;
-	error.token = token;
-	error.message = string;
-	error.line = current_source->GetLine(token.line);
-	error.file = current_source->filename;
-	this->errors.push_back(error);
+	//Diagnostic error;
+	//error.severity = 0;
+	//error.token = token;
+	//error.message = string;
+	//error.line = current_source->GetLine(token.line);
+	//error.file = current_source->filename;
+	this->diagnostics->Error(string, token);
+	//this->errors.push_back(error);
 	throw 7;
 }
 
@@ -999,6 +1034,12 @@ void Compilation::Error(const std::string& string, Token token)
 		auto t = new FunctionType;
 		t->args = args;
 		t->return_type = return_type;
+
+		for (auto arg : args)
+		{
+			if (arg->type == Types::Void)
+				this->Error("Void is not a valid function argument type", *this->current_function->current_token);
+		}
 
 		auto type = new Type;
 		type->function = t;
@@ -1120,11 +1161,17 @@ Jet::Function* Compilation::GetFunctionAtPoint(const char* file, int line)
 
 void DiagnosticBuilder::Error(const std::string& text, const Token& token)
 {
-	JetError error;
+	Diagnostic error;
 	error.token = token;
 	error.message = text;
 	error.line = current_source->GetLine(token.line);
 	error.file = current_source->filename;
-	error.Print();//lets do it immediately
+	error.severity = 0;
+
+	if (this->callback)
+		this->callback(error);
+
+	//try and remove exceptions from build system
+
 	this->diagnostics.push_back(error);
 }

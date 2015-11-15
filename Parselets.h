@@ -54,7 +54,7 @@ namespace Jet
 	public:
 		Expression* parse(Parser* parser, Token token)
 		{
-			return new NumberExpression(::atof(token.text.c_str()), token);
+			return new NumberExpression(token);
 		}
 	};
 

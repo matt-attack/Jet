@@ -17,6 +17,32 @@ trait Any
 
 }
 
+extern fun void CreateThread(char* security_attributes, int stacksize, void() function, char* data, int flags, int* threadid);
+
+extern fun void WaitForSingleObject(int threadid, int time);
+
+struct Thread//<Any Function>
+{
+	function<void()> fn;
+	int thread_id;
+	
+	fun void Function(function<void()> fn)
+	{
+		this->fn = fn;
+		CreateThread(0, 0, fn.ptr, &fn.data, 0, &this->thread_id);
+	}
+	
+	fun void Function()
+	{
+		this->Join();
+	}
+	
+	fun void Join()
+	{
+		WaitForSingleObject(this->thread_id, 0);
+	}
+}
+
 extern fun char* malloc(int size);
 extern fun void free(char* data);
 

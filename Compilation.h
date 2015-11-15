@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <functional>
 
 #include "Token.h"
 #include "Types\Types.h"
@@ -20,7 +21,7 @@ namespace Jet
 {
 	std::string exec(const char* cmd);
 
-	struct JetError
+	struct Diagnostic
 	{
 		std::string message;
 		std::string file;
@@ -29,17 +30,24 @@ namespace Jet
 		Token token;
 		Token end;//optional
 
+		int severity;//0 = error, 1 = warning, 2 = info ect..
 		void Print();
 	};
 
 	class DiagnosticBuilder
 	{
-		std::vector<JetError> diagnostics;
+		std::vector<Diagnostic> diagnostics;
+		std::function<void(Diagnostic&)> callback;
 	public:
+
+		DiagnosticBuilder(std::function<void(Diagnostic&)> callback) : callback(callback)
+		{
+
+		}
 
 		void Error(const std::string& text, const Token& token);
 
-		std::vector<JetError> GetErrors()
+		std::vector<Diagnostic>& GetErrors()
 		{
 			return diagnostics;
 		}
@@ -82,7 +90,8 @@ namespace Jet
 
 		std::map<int, Type*> function_types;
 
-		std::vector<JetError> errors;
+		//std::vector<Diagnostic> errors;
+		DiagnosticBuilder* diagnostics;
 
 		CompilerContext* current_function;
 
@@ -118,11 +127,11 @@ namespace Jet
 		std::map<std::string, CValue> globals;
 		CValue AddGlobal(const std::string& name, Type* t);
 
-		static Compilation* Make(JetProject* proj);
+		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder);
 
-		std::vector<JetError>& GetErrors()
+		std::vector<Diagnostic>& GetErrors()
 		{
-			return this->errors;
+			return this->diagnostics->GetErrors();// errors;
 		}
 
 		void Error(const std::string& string, Token token);

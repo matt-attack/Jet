@@ -30,7 +30,7 @@ using namespace Jet;
 
 extern Source* current_source;
 
-void Jet::JetError::Print()
+void Jet::Diagnostic::Print()
 {
 	int startrow = token.column;
 	int endrow = token.column + token.text.length();
@@ -49,59 +49,6 @@ void Jet::JetError::Print()
 	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", this->file.c_str(), token.line, startrow, token.line, endrow, message.c_str(), code.c_str(), underline.c_str());
 }
 
-
-/*void Error(const std::string& msg, Token start, Token end)
-{
-	int startrow = start.column;// -token.text.length();
-	int endrow = end.column + end.text.length();
-	std::string code = current_source->GetLine(start.line);
-	std::string underline = "";
-	for (int i = 0; i < code.length(); i++)
-	{
-		if (code[i] == '\t')
-			underline += '\t';
-		else if (i >= startrow && i < endrow)
-			underline += '~';
-		else
-			underline += ' ';
-	}
-	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", current_source->filename.c_str(), start.line, startrow, end.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
-	throw 7;
-}*/
-
-/*void Jet::ParserError(const std::string& msg, Token token)
-{
-	int startrow = token.column;// -token.text.length();
-	int start = 0;
-	if (token.column > 40)
-		start = token.column - 40;
-
-	int endrow = token.column + token.text.length();
-	std::string code = current_source->GetLine(token.line);
-	std::string underline = "";
-
-	int stop = code.length();
-	if (endrow + 30 < code.length())
-		stop = endrow + 30;
-
-	for (int i = start; i < stop; i++)
-	{
-		if (code[i] == '\t')
-			underline += '\t';
-		else if (i >= startrow && i < endrow)
-			underline += '~';
-		else
-			underline += ' ';
-	}
-
-	code = code.substr(start, stop - start);
-
-	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", current_source->filename.c_str(), token.line, startrow, token.line, endrow, msg.c_str(), code.c_str(), underline.c_str());
-	throw 7;
-}*/
-
-
- 
 class MemberRenamer : public ExpressionVisitor
 {
 	std::string stru, member, newname;
@@ -109,6 +56,11 @@ class MemberRenamer : public ExpressionVisitor
 public:
 
 	MemberRenamer(std::string stru, std::string member, std::string newname, Compilation* compiler) : stru(stru), member(member), newname(newname), compiler(compiler)
+	{
+
+	}
+
+	virtual void Visit(CallExpression* expr)
 	{
 
 	}
@@ -348,7 +300,11 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	if (configuration.prebuild.length() > 0)
 		printf("%s", exec(configuration.prebuild.c_str()).c_str());
 
-	Compilation* compilation = Compilation::Make(project);
+	DiagnosticBuilder diagnostics([](Diagnostic& msg)
+	{
+		msg.Print();
+	});
+	Compilation* compilation = Compilation::Make(project, &diagnostics);
 
 error:
 
@@ -358,8 +314,8 @@ error:
 	}
 	else if (compilation->GetErrors().size() > 0)
 	{
-		for (auto ii : compilation->GetErrors())
-			ii.Print();
+		//for (auto ii : compilation->GetErrors())
+			//ii.Print();
 
 		printf("Compiling Failed: %d Errors Found\n", compilation->GetErrors().size());
 	}

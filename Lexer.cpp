@@ -165,28 +165,12 @@ bool Jet::IsNumber(char c)
 	return (c >= '0' && c <= '9');
 }
 
-Lexer::Lexer(Source* source, DiagnosticBuilder* diag)// std::istream* input, std::string filename)
+Lexer::Lexer(Source* source, DiagnosticBuilder* diag)
 {
 	this->diag = diag;
 	this->last_index = 0;
 	this->src = source;
-	//this->stream = input;
-	//this->linenumber = 1;
-	//this->column = 0;
-	//this->index = 0;
-	//this->filename = filename;
 }
-
-/*Lexer::Lexer(std::string text, std::string filename)
-{
-//this->stream = 0;
-//this->column = 0;
-//this->linenumber = 1;
-//this->index = 0;
-//this->text = text;
-this->filename = filename;
-}*/
-
 
 
 //can move to functions at some point
@@ -432,17 +416,19 @@ Token Lexer::Next()
 			else
 			{
 				//ok, its possibly some kind of non base ten literal
+				std::string num;
+				num += c;
 				char c = src->PeekChar();
+				num += c;
 				switch (c)
 				{
 				case 'b':
 				{
 					src->ConsumeChar();
-					std::string num;
 					while (true)
 					{
 						char c = src->PeekChar();
-						if (!(c == '.' || IsNumber(c)))
+						if (!(c == '.' || c == '0' || c == '1'))// IsNumber(c)))
 							break;
 
 						num += src->ConsumeChar();
@@ -454,7 +440,6 @@ Token Lexer::Next()
 				case 'x'://hex literal
 				{
 					src->ConsumeChar();
-					std::string num;
 					while (true)
 					{
 						char c = src->PeekChar();

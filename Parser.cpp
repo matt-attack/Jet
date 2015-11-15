@@ -141,7 +141,7 @@ Expression* Parser::ParseExpression(int precedence)
 	if (prefix == 0)
 	{
 		std::string str = "No Parser Found for: " + token.text;
-		//throw CompilerException(this->filename, token.line, str);//printf("Consume: TokenType not as expected!\n");
+		
 		this->Error(str, token);
 		return 0;
 	}
@@ -233,12 +233,13 @@ Token Parser::Consume(TokenType expected)
 	if (temp.type != expected)
 	{
 		std::string str = "Token Not As Expected! Expected: " + TokenToString[expected] + " Got: " + temp.text;
-		//throw CompilerException(this->filename, temp.line, str);
-
-		//if (temp.type == TokenType::Semicolon)
+		
 			//it was probably forgotten, insert dummy
 		//fabricate a fake token
 		this->Error(str, temp);//need to make this throw again
+
+		if (temp.type != TokenType::Semicolon)
+			throw 7;
 		//lets give up on this, it doesnt work well
 		//throw 7;
 		//ok, now need to make this work right
@@ -255,8 +256,7 @@ Token Parser::ConsumeTemplateGT()
 	if (temp.type != TokenType::GreaterThan && temp.type != TokenType::RightShift)
 	{
 		std::string str = "Token Not As Expected! Expected: " + TokenToString[TokenType::GreaterThan] + " Got: " + temp.text;
-		//throw CompilerException(this->filename, temp.line, str);
-
+		
 		//fabricate a fake token
 		this->Error(str, temp);
 		//lets give up on this, it doesnt work well
@@ -296,9 +296,7 @@ bool Parser::Match(TokenType expected)
 {
 	Token token = LookAhead();
 	if (token.type != expected)
-	{
 		return false;
-	}
 
 	return true;
 }
@@ -307,9 +305,7 @@ bool Parser::MatchAndConsume(TokenType expected)
 {
 	Token token = LookAhead();
 	if (token.type != expected)
-	{
 		return false;
-	}
 
 	mRead.pop_front();
 	return true;
@@ -338,9 +334,7 @@ int Parser::GetPrecedence() {
 	return 0;
 }
 
-extern Source* current_source;
 void Parser::Error(const std::string& string, const Token& token)
 {
 	this->diag->Error(string, token);
-	//throw 7;
 }

@@ -341,18 +341,34 @@ CValue NumberExpression::Compile(CompilerContext* context)
 	{
 		if (this->token.text[i] == '.')
 			isint = false;
-		else if (!(this->token.text[i] <= '9' && this->token.text[i] >= '0'))
-			ishex = true;
+		//else if (!(this->token.text[i] <= '9' && this->token.text[i] >= '0'))
+		//	ishex = true;
 	}
+
+	if (token.text.length() >= 3)
+	{
+		std::string substr = token.text.substr(2);
+		if (token.text[1] == 'x')
+		{
+			unsigned long long num = std::stoull(substr, nullptr, 16);
+			return context->Integer(num);
+		}
+		else if (token.text[1] == 'b')
+		{
+			unsigned long long num = std::stoull(substr, nullptr, 2);
+			return context->Integer(num);
+		}
+	}
+
 	//ok, lets get the type from what kind of constant it is
 	//get type from the constant
 	//this is pretty terrible, come back later
-	if (ishex)
-		return context->Integer(std::stoi(this->token.text, 0, 16));
-	else if (isint)
+	//if (ishex)
+	//	return context->Integer(std::stoi(this->token.text, 0, 16));
+	if (isint)
 		return context->Integer(std::stoi(this->token.text));
 	else
-		return context->Float(this->value);
+		return context->Float(::atof(token.text.c_str()));// this->value);
 }
 
 CValue AssignExpression::Compile(CompilerContext* context)
@@ -985,6 +1001,14 @@ CValue StructExpression::Compile(CompilerContext* context)
 			if (iter == 0 || iter->type != Types::Trait)
 				context->root->Error("Trait '" + ii.first.text + "' is not defined", ii.first);
 		}
+
+		//add in the type and tell it to not actually generate IR, just to check things
+		for (auto ii : this->members)
+		{
+			//if (ii.type == StructMember::FunctionMember)
+				//ii.function->Compile(context);
+		}
+
 		return CValue();
 	}
 	//set the namespace

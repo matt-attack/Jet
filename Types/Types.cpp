@@ -125,6 +125,7 @@ llvm::Type* Type::GetLLVMType()
 		std::vector<llvm::Type*> args;
 		for (auto ii : this->function->args)
 			args.push_back(ii->GetLLVMType());
+
 		return llvm::FunctionType::get(this->function->return_type->GetLLVMType(), args, false)->getPointerTo();
 	}
 	case Types::Trait:

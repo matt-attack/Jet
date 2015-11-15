@@ -13,8 +13,7 @@ fun Jet::Compilation* MakeCompilation(char* project)
 	
 	LLVMDumpType(funtype);
 	LLVMAddFunction(c->module, "test", funtype);
-	LLVMPrintModuleToFile(c->module, "out.txt",
-                               0);
+	LLVMPrintModuleToFile(c->module, "out.txt", 0);
 	LLVMDumpModule(c->module);
 	return c;
 }

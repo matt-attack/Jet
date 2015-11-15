@@ -28,7 +28,6 @@ std::string Source::GetLine(unsigned int line)
 		//search for the end
 		while (l.first[l.second] != 0 && l.first[l.second] != '\n')
 			l.second++;
-		//printf("oops");
 	}
 	return std::string(l.first, l.second);
 }
@@ -97,12 +96,8 @@ BlockExpression* Source::GetAST(DiagnosticBuilder* builder)
 {
 	current_source = this;
 
-
 	Lexer lexer(this, builder);
 	Parser parser(&lexer, builder);
-
-	//if (builder->GetErrors().size() > 0)
-		//throw 7;
 
 	BlockExpression* result = 0;
 
