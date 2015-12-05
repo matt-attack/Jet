@@ -84,12 +84,13 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 
 	//lambda
 	//this->Register(TokenType::Function, new LambdaParselet());
-	this->Register(TokenType::LeftBracket, new LambdaParselet());
+	this->Register(TokenType::LeftBracket, new LambdaAndAttributeParselet());
 
 	//statements
 	this->Register(TokenType::While, new WhileParselet());
 	this->Register(TokenType::If, new IfParselet());
 	this->Register(TokenType::Function, new FunctionParselet());
+	this->Register(TokenType::Generator, new FunctionParselet());
 	this->Register(TokenType::Ret, new ReturnParselet());
 	this->Register(TokenType::For, new ForParselet());
 
@@ -108,6 +109,7 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	this->Register(TokenType::Continue, new ContinueParselet());
 
 	this->Register(TokenType::SizeOf, new SizeofParselet());
+	this->Register(TokenType::TypeOf, new TypeofParselet());
 	this->Register(TokenType::New, new NewParselet());
 
 	this->Register(TokenType::Typedef, new TypedefParselet());
@@ -115,8 +117,8 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	//this->Register(TokenType::Const, new ConstParselet());
 	//this->Register(TokenType::Null, new NullParselet());
 
-	//this->Register(TokenType::Yield, new YieldParselet());
-	//this->Register(TokenType::Yield, new InlineYieldParselet());
+	this->Register(TokenType::Yield, new YieldParselet());
+	this->Register(TokenType::Yield, new InlineYieldParselet());
 	//this->Register(TokenType::Resume, new ResumeParselet());
 	//this->Register(TokenType::Resume, new ResumePrefixParselet());
 }

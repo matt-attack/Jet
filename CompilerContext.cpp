@@ -53,6 +53,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		auto ft = llvm::FunctionType::get(ret->GetLLVMType(), oargs, false);
 
 		func->f = n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, root->module);
+		
 		//this->root->functions.push_back(func);
 		n->function = func;
 
@@ -70,6 +71,8 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 
 		llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->f);
 		root->builder.SetInsertPoint(bb);
+		func->loaded = true;
+
 		return n;
 	}
 	else if (func == 0)
@@ -312,7 +315,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 	this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 }
 
-Function* CompilerContext::GetMethod(const std::string& name, const std::vector<CValue>& args, Type* Struct)
+Function* CompilerContext::GetMethod(const std::string& name, const std::vector<Type*>& args, Type* Struct)
 {
 	Function* fun = 0;
 
@@ -382,10 +385,10 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 						if (iii.first->name == ii.second)
 						{
 							//found it
-							if (templates[i] != 0 && templates[i] != args[i2].type)
+							if (templates[i] != 0 && templates[i] != args[i2])
 								this->root->Error("Could not infer template type", *this->current_token);
 
-							templates[i] = args[i2].type;
+							templates[i] = args[i2];
 						}
 						i2++;
 					}
@@ -449,7 +452,10 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct)
 {
 	auto old_tok = this->current_token;
-	Function* fun = this->GetMethod(name, args, Struct);
+	std::vector<Type*> arsgs;
+	for (auto ii : args)
+		arsgs.push_back(ii.type);
+	Function* fun = this->GetMethod(name, arsgs, Struct);
 	this->current_token = old_tok;
 
 	if (fun == 0 && Struct == 0)
@@ -550,7 +556,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 	fun->Load(this->root);
 
 	if (args.size() != fun->f->arg_size())
-		this->root->Error("Mismatched function parameters in call", *this->current_token);//todo: add better checks later
+		this->root->Error("No function '"+name+" found which takes "+std::to_string(args.size())+" arguments.", *this->current_token);//todo: add better checks later
 
 	std::vector<llvm::Value*> argsv;
 	for (int i = 0; i < args.size(); i++)
@@ -689,8 +695,8 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 			return CValue(t, root->builder.CreateFPToSI(value.val, tt));
 
 		//remove me later float to bool
-		if (t->type == Types::Bool)
-			return CValue(t, root->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
+		//if (t->type == Types::Bool)
+			//return CValue(t, root->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
 	}
 	if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
 	{

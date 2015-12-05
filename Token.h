@@ -85,6 +85,8 @@ namespace Jet
 		Trait,
 		Namespace,
 
+		Generator,
+
 		Scope,//::
 
 		Const,
@@ -106,6 +108,7 @@ namespace Jet
 
 		SizeOf,
 		OffsetOf,
+		TypeOf,
 		New,
 
 		Typedef, 

@@ -37,7 +37,14 @@ void Function::Load(Compilation* compiler)
 	llvm::FunctionType *ft = llvm::FunctionType::get(this->return_type->GetLLVMType(), /*this->*/args, false);
 
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
-	//compiler->functions.push_back(this);
+	//need to add way to specify calling convention
+	switch (this->calling_convention)
+	{
+	case CallingConvention::StdCall:
+		f->setCallingConv(llvm::CallingConv::X86_StdCall);
+		break;
+	}
+	
 	llvm::DIFile* unit = compiler->debug_info.file;
 
 	auto functiontype = compiler->debug->createSubroutineType(unit, compiler->debug->getOrCreateTypeArray(ftypes));

@@ -99,6 +99,8 @@ namespace Jet
 
 		Compilation(JetProject* proj);
 	public:
+		bool typecheck;
+
 		//dont use these k
 		llvm::Module* module;
 		llvm::DIBuilder* debug;
@@ -151,6 +153,12 @@ namespace Jet
 		{
 			return this->GetFunction(name);
 		}
+
+		Function* GetFunction(const std::string& name, const std::vector<Type*>& args)
+		{
+			return this->GetFunction(name);
+		}
+
 
 		Function* GetFunction(const std::string& name);
 

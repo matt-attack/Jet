@@ -6,6 +6,7 @@ struct function<Any T>
 	char data[64];
 }
 
+//[testattribute]
 fun void ttttt()
 {
 	puts("im a function pointer");
@@ -26,12 +27,12 @@ fun void apple(int y, int z)
 {
 	
 }
-struct Reference
+/*struct Reference
 {
 	CallbackMachine x;
-}
+}*/
 
-struct CallbackMachine
+/*struct CallbackMachine
 {
 	int x;
 	vector<void(int,char*)> callbacks;
@@ -54,7 +55,7 @@ struct CallbackMachine
 			enum.Current()(1, str);
 		}
 	}
-}
+}*/
 
 trait IEnumerator<TT>
 {
@@ -70,12 +71,9 @@ trait IEnumerable<T>
 }
 
 
-fun int main()
+/*fun int main()
 {
-	/*local x = 5;
-	x += 2;
-	local y = 7;
-	x = 7+y;*/
+	
 	//local doubletest<int, double> ttt;
 	local vector<int> x;
 	//local vector<VectorIterator<int> > test;
@@ -124,7 +122,7 @@ fun int main()
 	//getc();
 	//cb = *<CallbackMachine*>0;
 	return 0;
-}
+}*/
 
 fun int IEnumerable::DoStuff()
 {
@@ -142,21 +140,21 @@ fun void IEnumerable::Print()
 	}
 }
 
-struct WhereIterable<Any T, Any Base>
+struct WhereIterable<Any T, IEnumerable Base>
 {
 	Base* iterable;
 	function<bool(T)> fn;
 		
 	fun WhereIterator<T, VectorIterator<T> > GetEnumerator()
 	{
-		local WhereIterator<T, VectorIterator<T> > x;
+		local WhereIterator<T, typeof(this->iterable->GetEnumerator()) > x;
 		x.iter = this->iterable->GetEnumerator();
 		x.fn = this->fn;
 		return x;
 	}
 }
 
-struct WhereIterator<Any T, Any Base>
+struct WhereIterator<Any T, IEnumerator Base>
 {
 	Base iter;
 	function<bool(T)> fn;

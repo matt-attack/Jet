@@ -17,9 +17,11 @@ trait Any
 
 }
 
-extern fun void CreateThread(char* security_attributes, int stacksize, void() function, char* data, int flags, int* threadid);
+[stdcall]
+extern fun int CreateThread(char* security_attributes, int stacksize, void() function, char* data, int flags, int* threadid);
 
-extern fun void WaitForSingleObject(int threadid, int time);
+[stdcall]
+extern fun int WaitForSingleObject(int threadid, int time);
 
 struct Thread//<Any Function>
 {

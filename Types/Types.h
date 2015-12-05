@@ -110,7 +110,7 @@ namespace Jet
 		llvm::Type* GetLLVMType();
 
 
-		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, CompilerContext* context, bool def = false);
+		Function* GetMethod(const std::string& name, const std::vector<Type*>& args, CompilerContext* context, bool def = false);
 
 		Type* GetPointerType();
 
@@ -123,6 +123,9 @@ namespace Jet
 			else
 				return this;
 		}
+
+		//can it be instantiated? (no Traits as subtypes)
+		bool IsValid();
 	};
 
 	struct Namespace;
@@ -183,7 +186,7 @@ namespace Jet
 		bool valid;
 		//std::string name;
 
-		std::multimap<std::string, Function*> funcs;
+		std::multimap<std::string, Function*> functions;
 		std::multimap<std::string, Function*> extension_methods;
 
 		//template stuff

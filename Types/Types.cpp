@@ -19,7 +19,7 @@ Type* Type::GetPointerType()
 		return this->pointer_type;
 
 	auto type = new Type;
-	type->name = name;
+	type->name = name + "*";
 	type->base = this;
 	type->type = Types::Pointer;
 	this->pointer_type = type;
@@ -299,7 +299,7 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 					types[i] = 0;//cheat for now
 
 				bool match = true;
-				for (auto fun : ii.second->funcs)
+				for (auto fun : ii.second->functions)
 				{
 					auto range = this->data->functions.equal_range(fun.first);
 					if (range.first == range.second)
@@ -352,7 +352,7 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 			}
 
 			bool match = true;
-			for (auto fun : ii.second->funcs)
+			for (auto fun : ii.second->functions)
 			{
 				auto range = this->data->functions.equal_range(fun.first);
 				if (range.first == range.second)
@@ -374,7 +374,7 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 		}
 		else
 		{
-			if (ii.second->funcs.size())
+			if (ii.second->functions.size())
 				continue;//only add if no functions
 		}
 		this->traits.push_back({ 0, ii.second });
@@ -474,14 +474,14 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	}
 
 	Type* t = new Type(str->name, Types::Struct, str);
-	t->Load(compiler);
+	//t->Load(compiler);
 	t->ns = this->ns;
 
 	//make sure the real thing is stored as this
 	auto realname = t->ToString();
 
 	//uh oh, this duplicates
-	auto res = t->ns->members.find(realname);// types.find(realname);
+	auto res = t->ns->members.find(realname);
 	if (res != t->ns->members.end() && res->second.type == SymbolType::Type && res->second.ty->type != Types::Invalid)
 	{
 		delete t;
@@ -496,8 +496,11 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		t->ns->members.insert({ realname, t });
 
 	//compile its functions
-	if (t->data->expression->members.size() > 0)
-	{
+	if (t->data->expression->members.size() > 0 && (compiler->typecheck == false || t->IsValid()))// t->data->template_args[0]->type != Types::Trait)
+	{//need to still do this when typechecking, if the type actually can be instantiated
+		t->Load(compiler);
+		//fixme, if im typechecking no functions get filled in
+
 		StructExpression* expr = dynamic_cast<StructExpression*>(t->data->expression);
 		auto oldname = expr->name;
 		expr->name.text = t->data->name;
@@ -528,11 +531,49 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 			compiler->builder.SetInsertPoint(rp);
 		expr->name = oldname;
 	}
+	else
+	{
+		StructExpression* expr = dynamic_cast<StructExpression*>(t->data->expression);
+
+		auto oldname = expr->name;
+		expr->name.text = t->data->name;
+		//need this when typechecking
+		for (auto ii : t->data->expression->members)
+			if (ii.type == StructMember::FunctionMember)
+				ii.function->CompileDeclarations(compiler->current_function);
+
+		expr->name = oldname;
+	}
 
 	//restore namespace
 	compiler->ns = oldns;
 
 	return t;
+}
+
+bool Type::IsValid()
+{
+	if (this->type == Types::Trait)
+		return false;
+	else if (this->type == Types::Struct && this->data->template_args.size())
+	{
+		for (auto ii : this->data->template_args)
+		{
+			if (ii->IsValid() == false)
+				return false;
+		}
+	}
+	else if (this->type == Types::Function)
+	{
+		for (auto ii : this->function->args)
+		{
+			if (ii->IsValid() == false)
+				return false;
+		}
+		if (this->function->return_type->IsValid() == false)
+			return false;
+	}
+	return true;
 }
 
 std::string Type::ToString()
@@ -582,8 +623,41 @@ std::string Type::ToString()
 	//Error("Unhandled Type::ToString()", Token());
 }
 
-Function* Type::GetMethod(const std::string& name, const std::vector<CValue>& args, CompilerContext* context, bool def)
+Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& args, CompilerContext* context, bool def)
 {
+	if (this->type == Types::Trait)
+	{
+		//only for typechecking, should never hit this during compilation
+		//printf("hi");
+		//look in this->trait->functions and this->trait->extension_methods
+		//todo
+		Function* fun = 0;
+		auto range = this->trait->functions.equal_range(name);
+		for (auto ii = range.first; ii != range.second; ii++)
+		{
+			//pick one with the right number of args
+			if (def)
+				fun = ii->second;
+			else if (ii->second->arguments.size() + 1 == args.size())
+				fun = ii->second;
+		}
+
+		if (fun == 0)
+		{
+			//check extension_methods
+			auto range = this->trait->extension_methods.equal_range(name);
+			for (auto ii = range.first; ii != range.second; ii++)
+			{
+				//pick one with the right number of args
+				if (def)
+					fun = ii->second;
+				else if (ii->second->arguments.size() + 1 == args.size())
+					fun = ii->second;
+			}
+		}
+
+		return fun;
+	}
 	if (this->type != Types::Struct)
 		return 0;
 
@@ -686,7 +760,7 @@ void Struct::Load(Compilation* compiler)
 	for (auto ii : this->struct_members)
 	{
 		auto type = ii.type;
-		
+
 		if (ii.type->type == Types::Struct && ii.type->data == this)
 			compiler->Error("Circular dependency", *compiler->current_function->current_token);
 
@@ -829,7 +903,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 						data += ',';
 				}
 				data += "{";
-				for (auto fun : ii.second.ty->trait->funcs)
+				for (auto fun : ii.second.ty->trait->functions)
 				{
 					data += " fun " + fun.second->return_type->name/*ToString()*/ + " " + fun.first + "(";
 					bool first = false;

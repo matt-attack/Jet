@@ -105,6 +105,7 @@ public:
 		keywords["null"] = TokenType::Null;
 
 		keywords["yield"] = TokenType::Yield;
+		keywords["generator"] = TokenType::Generator;
 		keywords["resume"] = TokenType::Resume;
 
 		keywords["switch"] = TokenType::Switch;
@@ -121,6 +122,7 @@ public:
 		//internal "functions"
 		keywords["sizeof"] = TokenType::SizeOf;
 		keywords["offsetof"] = TokenType::OffsetOf;
+		keywords["typeof"] = TokenType::TypeOf;
 		keywords["new"] = TokenType::New;
 
 		keywords["typedef"] = TokenType::Typedef;
@@ -146,14 +148,11 @@ public:
 		}
 
 		for (auto ii : keywords)
-		{
 			TokenToString[ii.second] = ii.first;
-		}
 
 		TokenToString[TokenType::Name] = "name";
-	};
+	}
 };
-
 
 bool Jet::IsLetter(char c)
 {

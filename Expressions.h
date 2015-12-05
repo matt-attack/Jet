@@ -15,9 +15,6 @@ namespace Jet
 	class Source;
 	class Compiler;
 
-	//typedef std::function<void(Expression*)> ExpressionVisitor;
-
-
 	class Expression
 	{
 	public:
@@ -43,6 +40,10 @@ namespace Jet
 		virtual void CompileDeclarations(CompilerContext* context) = 0;
 
 		virtual void Print(std::string& output, Source* source) = 0;
+
+		//add a type checking function
+		//will be tricky to get implemented correctly will need somewhere to store variables and member types
+		virtual Type* TypeCheck(CompilerContext* context) = 0;
 
 		virtual void Visit(ExpressionVisitor* visitor) = 0;//visits all subexpressions
 	};
@@ -82,6 +83,12 @@ namespace Jet
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return context->TCGetVariable(token.text)->base;
+			//lookup type
+		}
 
 		void Print(std::string& output, Source* source) { token.Print(output, source); }
 
@@ -132,6 +139,12 @@ namespace Jet
 			right->Print(output, source);
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			throw 7;
+			return 0;
+		}
+
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
 			visitor->Visit(this);
@@ -154,6 +167,12 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			auto ty = context->root->LookupType(type.text);
+			return ty->GetPointerType();
+		}
 
 		void Print(std::string& output, Source* source)
 		{
@@ -275,6 +294,27 @@ namespace Jet
 
 		void CompileDeclarations(CompilerContext* context) {};
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//register the local
+			int i = 0;
+			for (auto ii : *this->_names)
+			{
+				if (ii.first.text.length())
+					context->TCRegisterLocal(ii.second.text, context->root->LookupType(ii.first.text, false)->GetPointerType());
+				else
+				{
+					//type inference
+					auto ty = (*this->_right)[i]->TypeCheck(context);
+					context->TCRegisterLocal(ii.second.text, ty->GetPointerType());
+				}
+				i++;
+			}
+
+			return 0;
+		}
+
+
 		void Print(std::string& output, Source* source)
 		{
 			this->token.Print(output, source);
@@ -326,8 +366,6 @@ namespace Jet
 			{
 				if (this->token.text[i] == '.')
 					isint = false;
-				//else if (!(this->token.text[i] <= '9' && this->token.text[i] >= '0'))
-				//	ishex = true;
 			}
 
 			if (token.text.length() >= 3)
@@ -348,12 +386,10 @@ namespace Jet
 			//ok, lets get the type from what kind of constant it is
 			//get type from the constant
 			//this is pretty terrible, come back later
-			//if (ishex)
-			//	return context->Integer(std::stoi(this->token.text, 0, 16));
 			if (isint)
 				return std::stoi(this->token.text);
 			else
-				return ::atof(token.text.c_str());// this->value);
+				return ::atof(token.text.c_str());
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -363,6 +399,12 @@ namespace Jet
 		void Print(std::string& output, Source* source)
 		{
 			token.Print(output, source);
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//get the type fixme later
+			return context->root->IntType;
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
@@ -408,7 +450,6 @@ namespace Jet
 
 		void Print(std::string& output, Source* source)
 		{
-
 			output += "\"";
 			//fixme!
 			auto cur = &source->GetLinePointer(token.line)[token.column]/* token.text_ptr*/ + 1;
@@ -420,6 +461,11 @@ namespace Jet
 			} while (*cur++ != 0);
 			//token.Print(output, source);
 			output += "\"";
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return context->root->LookupType("char*");
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
@@ -462,8 +508,8 @@ namespace Jet
 		CValue GetElementPointer(CompilerContext* context);
 		CValue GetBaseElementPointer(CompilerContext* context);
 
-		Type* GetType(CompilerContext* context);
-		Type* GetBaseType(CompilerContext* context);
+		Type* GetType(CompilerContext* context, bool tc = false);
+		Type* GetBaseType(CompilerContext* context, bool tc = false);
 		Type* GetBaseType(Compilation* compiler);
 
 		void CompileStore(CompilerContext* context, CValue right);
@@ -481,6 +527,15 @@ namespace Jet
 				index->Print(output, source);
 				output += ']';
 			}
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//auto loc = this->GetElementPointer(context);
+			auto type = this->GetType(context, true);
+			if (type->type == Types::Function)
+				return type;
+			return type;// ->base;
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
@@ -531,6 +586,19 @@ namespace Jet
 			right->Print(output, source);
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			auto tl = left->TypeCheck(context);
+			auto tr = right->TypeCheck(context);
+			//return the type of the left
+			//check if can be assigned
+			if (tl == tr)
+				return tl;
+
+			throw 7;
+			return 0;
+		}
+
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
 			visitor->Visit(this);
@@ -568,6 +636,13 @@ namespace Jet
 		}
 
 		CValue Compile(CompilerContext* context);
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			throw 7;
+			//check it
+			return 0;
+		}
 
 		void CompileDeclarations(CompilerContext* context) {};
 
@@ -645,6 +720,15 @@ namespace Jet
 			return context->DoCast(t, right->Compile(context), true);
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//throw 7;
+			//check if the cast can be made
+			//todo
+			return context->root->LookupType(this->type.text);
+			//return 0;
+		}
+
 		void CompileDeclarations(CompilerContext* context) {};
 
 		void Print(std::string& output, Source* source)
@@ -685,6 +769,92 @@ namespace Jet
 			right->SetParent(this);
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			auto type = this->right->TypeCheck(context);
+			//prefix
+			context->CurrentToken(&this->_operator);
+
+			if (this->_operator.type == TokenType::BAnd)
+			{
+				auto i = dynamic_cast<NameExpression*>(right);
+				auto p = dynamic_cast<IndexExpression*>(right);
+				if (i)
+				{
+					auto var = context->TCGetVariable(i->GetName());
+					return var;// CValue(var.type, var.val);
+				}
+				else if (p)
+				{
+					auto var = p->GetType(context, true);// GetElementPointer(context);
+					return var;// CValue(var.type, var.val);
+				}
+				context->root->Error("Not Implemented", this->_operator);
+			}
+
+			//auto rhs = right->Compile(context);
+
+			//auto res = context->UnaryOperation(this->_operator.type, rhs);
+
+			///llvm::Value* res = 0;
+
+			if (type->type == Types::Float || type->type == Types::Double)
+			{
+				switch (this->_operator.type)
+				{
+				case TokenType::Minus:
+					//res = root->builder.CreateFNeg(value.val);// root->builder.CreateFMul(left.val, right.val);
+					break;
+				default:
+					context->root->Error("Invalid Unary Operation '" /*+ TokenToString[this->_operator.type] + "' On Type '"*/ + type->ToString() + "'", *context->current_token);
+					break;
+				}
+
+				return type;// CValue(value.type, res);
+			}
+			else if (type->type == Types::Int || type->type == Types::Short || type->type == Types::Char)
+			{
+				//integer probably
+				switch (this->_operator.type)
+				{
+				case TokenType::Increment:
+					//res = root->builder.CreateAdd(value.val, root->builder.getInt32(1));
+					break;
+				case TokenType::Decrement:
+					//res = root->builder.CreateSub(value.val, root->builder.getInt32(1));
+					break;
+				case TokenType::Minus:
+					//res = root->builder.CreateNeg(value.val);
+					break;
+				case TokenType::BNot:
+					//res = root->builder.CreateNot(value.val);
+					break;
+				default:
+					context->root->Error("Invalid Unary Operation '" /*+ TokenToString[this->_operator.type] + "' On Type '"*/ + type->ToString() + "'", *context->current_token);
+					break;
+				}
+
+				return type;
+			}
+			else if (type->type == Types::Pointer)
+			{
+				switch (this->_operator.type)
+				{
+				case TokenType::Asterisk:
+				case TokenType::Increment:
+				case TokenType::Decrement:
+					return type->base;
+				default:
+					;
+				}
+
+			}
+			context->root->Error("Invalid Unary Operation '" /*+ TokenToString[this->_operator.type] + "' On Type '"*/ + type->ToString() + "'", *context->current_token);
+			//store here
+			//only do this for ++and--
+			return type;
+		}
+
 		void CompileStore(CompilerContext* context, CValue right)
 		{
 			if (_operator.type != TokenType::Asterisk)
@@ -692,7 +862,6 @@ namespace Jet
 
 			if (this->_operator.type == TokenType::Asterisk)
 			{
-
 				auto loc = this->right->Compile(context);
 
 				right = context->DoCast(loc.type->base, right);
@@ -743,6 +912,13 @@ namespace Jet
 			left->SetParent(this);
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			auto left = this->left->TypeCheck(context);
+			throw 7;
+			return 0;
+		}
+
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
@@ -785,6 +961,30 @@ namespace Jet
 			this->Parent = parent;
 			left->SetParent(this);
 			right->SetParent(this);
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			auto left = this->left->TypeCheck(context);
+			auto right = this->right->TypeCheck(context);
+
+			//ok, lets return the correct type
+
+			switch (this->_operator.type)
+			{
+			case TokenType::LessThan:
+			case TokenType::LessThanEqual:
+			case TokenType::GreaterThan:
+			case TokenType::GreaterThanEqual:
+			case TokenType::Equals:
+			case TokenType::NotEqual:
+				return context->root->BoolType;
+			default:
+				return left;
+			}
+			//check if operation is ok
+			//throw 7;
+			return left;
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -879,11 +1079,17 @@ namespace Jet
 			}
 		};
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			for (auto ii : this->statements)
+				ii->TypeCheck(context);
+			return 0;
+		}
+
 		void Print(std::string& output, Source* source)
 		{
-			//fix these { later
 			if (!no_brackets)
-				this->start.Print(output, source);// output += "{";
+				this->start.Print(output, source);
 			for (auto ii : statements)
 			{
 				ii->Print(output, source);
@@ -891,7 +1097,7 @@ namespace Jet
 					ii->semicolon.Print(output, source);
 			}
 			if (!no_brackets)
-				this->end.Print(output, source);// output += "}";
+				this->end.Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
@@ -919,6 +1125,14 @@ namespace Jet
 			delete r;
 
 			this->scope = 0;
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			context->TCPushScope();
+			BlockExpression::TypeCheck(context);
+			context->TCPopScope();
+			return 0;
 		}
 
 		CValue Compile(CompilerContext* context)
@@ -968,6 +1182,18 @@ namespace Jet
 			this->Parent = parent;
 			block->SetParent(this);
 			condition->SetParent(this);
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//check that type of top can be converted to bool
+			auto ct = condition->TypeCheck(context);
+			if (ct->type != Types::Bool)
+			{
+				throw 7;//need to check if it can be converted
+			}
+			block->TypeCheck(context);
+			return 0;
 		}
 
 		CValue Compile(CompilerContext* context)
@@ -1051,9 +1277,25 @@ namespace Jet
 		{
 			this->Parent = parent;
 			block->SetParent(this);
-			incr->SetParent(block);//block);
-			condition->SetParent(this);//block);
+			incr->SetParent(block);
+			condition->SetParent(this);
 			initial->SetParent(block);
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//check type of middle to be bool or nothing
+			//then just check others
+			initial->TypeCheck(context);
+
+			auto ty = condition->TypeCheck(context);
+			//if (ty && cant convert to bool)
+			//error
+			//incr->TypeCheck(context);
+			block->TypeCheck(context);
+			//now crashing here
+			//throw 7;
+			return 0;
 		}
 
 		CValue Compile(CompilerContext* context)
@@ -1202,7 +1444,6 @@ namespace Jet
 
 	class CaseExpression : public Expression
 	{
-
 		Token token;
 	public:
 		int value;
@@ -1232,6 +1473,12 @@ namespace Jet
 
 			throw 7; //todo
 		}
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			throw 7;
+
+			return 0;
+		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
@@ -1260,6 +1507,13 @@ namespace Jet
 		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			throw 7;
+
+			return 0;
+		}
 
 		void Print(std::string& output, Source* source)
 		{
@@ -1315,6 +1569,13 @@ namespace Jet
 			this->first_case = false;
 			this->def = dest;
 			return tmp;
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			throw 7;
+
+			return 0;
 		}
 
 		virtual void SetParent(Expression* parent)
@@ -1395,6 +1656,20 @@ namespace Jet
 				delete ii;
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			for (auto ii : this->branches)
+			{
+				auto ct = ii->condition->TypeCheck(context);
+				//make sure this is a bool
+				ii->block->TypeCheck(context);
+			}
+
+			if (this->Else)
+				this->Else->block->TypeCheck(context);
+			return 0;
+		}
+
 		virtual void SetParent(Expression* parent)
 		{
 			this->Parent = parent;
@@ -1473,7 +1748,6 @@ namespace Jet
 			{
 				this->Else->token.Print(output, source);
 
-				//this->Else->condition->Print(output, source);
 				this->Else->block->Print(output, source);
 			}
 		}
@@ -1494,7 +1768,7 @@ namespace Jet
 		}
 	};
 
-	class SizeofExpression : public Expression//, public IStorableExpression
+	class SizeofExpression : public Expression
 	{
 		Token begin, end;
 		Token type;
@@ -1529,9 +1803,14 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return 0;
+		}
 	};
 
-	class NamespaceExpression : public Expression//, public IStorableExpression
+	class NamespaceExpression : public Expression
 	{
 		Token name;
 		Token token;
@@ -1561,6 +1840,16 @@ namespace Jet
 			return CValue();
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//push namespace
+			context->SetNamespace(this->name.text);
+			this->block->CompileDeclarations(context);
+			context->PopNamespace();
+
+			return 0;
+		}
+
 		void CompileDeclarations(CompilerContext* context)
 		{
 			context->SetNamespace(this->name.text);
@@ -1586,7 +1875,6 @@ namespace Jet
 	class CallExpression : public Expression
 	{
 		Token token;
-
 
 	public:
 		Expression* left;
@@ -1618,6 +1906,9 @@ namespace Jet
 			for (auto ii : *args)
 				ii->SetParent(this);
 		}
+
+		Function* call; //store the function being called here so we dont have to look up again (if we know it
+		virtual Type* TypeCheck(CompilerContext* context);
 
 		CValue Compile(CompilerContext* context);
 
@@ -1677,6 +1968,7 @@ namespace Jet
 		Token ret_type;
 		NameExpression* varargs;
 
+		bool is_generator;
 		std::vector<std::pair<Token, Token>>* templates;
 	public:
 
@@ -1685,8 +1977,9 @@ namespace Jet
 			return block;
 		}
 
-		FunctionExpression(Token token, Token name, Token ret_type, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures = 0)
+		FunctionExpression(Token token, Token name, Token ret_type, bool generator, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures = 0)
 		{
+			this->is_generator = generator;
 			this->ret_type = ret_type;
 			this->args = args;
 			this->block = block;
@@ -1718,6 +2011,8 @@ namespace Jet
 			this->Parent = parent;
 			block->SetParent(this);
 		}
+
+		virtual Type* TypeCheck(CompilerContext* context);
 
 		CValue Compile(CompilerContext* context);
 		void CompileDeclarations(CompilerContext* context);
@@ -1788,6 +2083,11 @@ namespace Jet
 
 		void CompileDeclarations(CompilerContext* context);
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return 0;
+		}
+
 		void Print(std::string& output, Source* source)
 		{
 			//add tokens for the ( )
@@ -1832,6 +2132,7 @@ namespace Jet
 		std::vector<TraitFunction> funcs;
 		std::vector<std::pair<Token, Token>>* templates;
 	public:
+
 		TraitExpression(Token token, Token name, std::vector<TraitFunction>&& funcs, std::vector<std::pair<Token, Token>>* templates)
 		{
 			this->token = token;
@@ -1877,6 +2178,11 @@ namespace Jet
 			output += "}";
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return 0;
+		}
+
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
 			visitor->Visit(this);
@@ -1903,7 +2209,7 @@ namespace Jet
 		Token token;
 		Token name;
 
-		
+
 		Token start;
 		Token end;
 
@@ -1938,6 +2244,35 @@ namespace Jet
 		std::string GetName()
 		{
 			return this->name.text;
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//push the namespace then define these types
+			auto me = context->root->LookupType(this->name.text, false);
+			auto old = context->root->ns;
+			me->data->parent = old;
+			context->root->ns = me->data;
+			//define template types
+			if (this->templates)
+			{
+				for (auto ii : *this->templates)
+				{
+					//register the type
+					me->data->members.insert({ ii.second.text, context->root->LookupType(ii.first.text, false) });
+				}
+			}
+			for (auto ii : this->members)
+			{
+				if (ii.type == StructMember::FunctionMember)
+					ii.function->TypeCheck(context);
+			}
+
+			context->root->ns = old;
+			//then check members maybe?
+			//throw 7;
+
+			return 0;
 		}
 
 		void SetParent(Expression* parent)
@@ -2042,6 +2377,16 @@ namespace Jet
 			return CValue();
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//check that return type matches return type of the function
+			if (right)
+				right->TypeCheck(context);
+
+			//throw 7;
+			return 0;
+		}
+
 		void CompileDeclarations(CompilerContext* context) {};
 
 		void Print(std::string& output, Source* source)
@@ -2079,6 +2424,11 @@ namespace Jet
 			return CValue();
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return 0;
+		}
+
 		void CompileDeclarations(CompilerContext* context) {};
 
 		void Print(std::string& output, Source* source)
@@ -2112,6 +2462,11 @@ namespace Jet
 			return CValue();
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return 0;
+		}
+
 		void CompileDeclarations(CompilerContext* context) {};
 
 		void Print(std::string& output, Source* source)
@@ -2122,6 +2477,63 @@ namespace Jet
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
 			visitor->Visit(this);
+		}
+	};
+
+	class AttributeExpression : public Expression
+	{
+		Token token;
+		Expression* next;
+	public:
+
+		Token name;
+		AttributeExpression(Token token, Token name, Expression* next) : token(token), name(name), next(next)
+		{
+
+		}
+
+		~AttributeExpression()
+		{
+			delete next;
+		}
+
+		void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+			this->next->Parent = this;
+		}
+
+		void Print(std::string& output, Source* source)
+		{
+			output += '[';
+			token.Print(output, source);
+			name.Print(output, source);
+			output += "]\n";
+			next->Print(output, source);
+		}
+
+		void CompileDeclarations(CompilerContext* context)
+		{
+			next->CompileDeclarations(context);
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//just need to make sure the attribute exists
+			//throw 7;
+			next->TypeCheck(context);
+			return 0;
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+			next->Visit(visitor);
+		}
+
+		CValue Compile(CompilerContext* context)
+		{
+			return next->Compile(context);
 		}
 	};
 
@@ -2148,12 +2560,17 @@ namespace Jet
 			return CValue();
 		}
 
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return 0;
+		}
+
 		void CompileDeclarations(CompilerContext* context)
 		{
 			if (this->Parent->Parent != 0)
 				context->root->Error("Cannot use typedef outside of global scope", token);
 
-			context->root->ns->members.insert({this->new_type.text, context->root->LookupType(this->other_type.text)});
+			context->root->ns->members.insert({ this->new_type.text, context->root->LookupType(this->other_type.text) });
 			//context->root->Error("Typedef not implemented atm", token);
 
 			/*context->CurrentToken(&other_type);
@@ -2185,65 +2602,52 @@ namespace Jet
 		}
 	};
 
-	/*class YieldExpression: public Expression
+	class YieldExpression : public Expression
 	{
-	Token token;
-	Expression* right;
+		Token token;
+		Expression* right;
 	public:
-	YieldExpression(Token t, Expression* right)
-	{
-	this->token = t;
-	this->right = right;
-	}
+		YieldExpression(Token t, Expression* right)
+		{
+			this->token = t;
+			this->right = right;
+		}
 
-	void SetParent(Expression* parent)
-	{
-	this->Parent = parent;
-	if (right)
-	right->SetParent(this);
-	}
+		void SetParent(Expression* parent)
+		{
+			this->Parent = parent;
+			if (right)
+				right->SetParent(this);
+		}
 
-	void Compile(CompilerContext* context)
-	{
-	if (right)
-	right->Compile(context);
-	else
-	context->Null();
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			throw 7;
+			//todo
+			return 0;
+		}
 
-	context->Yield();
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+			//new_type.Print(output, source);
+			//equals.Print(output, source);
+			//other_type.Print(output, source);
+		}
 
-	if (dynamic_cast<BlockExpression*>(this->Parent) !=0)
-	context->Pop();
-	}
+		void CompileDeclarations(CompilerContext* context)
+		{
+
+		}
+
+		CValue Compile(CompilerContext* context);
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			throw 7;//todo
+			//visitor->Visit(this);
+			right->Visit(visitor);
+		}
 	};
-
-	class ResumeExpression: public Expression
-	{
-	Token token;
-	Expression* right;
-	public:
-	ResumeExpression(Token t, Expression* right)
-	{
-	this->token = t;
-	this->right = right;
-	}
-
-	void SetParent(Expression* parent)
-	{
-	this->Parent = parent;
-	if (right)
-	right->SetParent(this);
-	}
-
-	void Compile(CompilerContext* context)
-	{
-	this->right->Compile(context);
-
-	context->Resume();
-
-	if (dynamic_cast<BlockExpression*>(this->Parent))
-	context->Pop();
-	}
-	};*/
 }
 #endif

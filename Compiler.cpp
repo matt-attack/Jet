@@ -314,9 +314,6 @@ error:
 	}
 	else if (compilation->GetErrors().size() > 0)
 	{
-		//for (auto ii : compilation->GetErrors())
-			//ii.Print();
-
 		printf("Compiling Failed: %d Errors Found\n", compilation->GetErrors().size());
 	}
 	else

@@ -35,6 +35,7 @@ namespace Jet
 	class NamespaceExpression;
 	class NewExpression;
 	class ScopedExpression;
+	class AttributeExpression;
 	class ExpressionVisitor
 	{
 	public:
@@ -91,6 +92,7 @@ namespace Jet
 		virtual void Visit(NamespaceExpression* exp) {};
 		virtual void Visit(ScopedExpression* exp) {};
 
+		virtual void Visit(AttributeExpression* exp) {};
 	};
 }
 

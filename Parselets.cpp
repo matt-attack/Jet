@@ -40,7 +40,7 @@ Token ParseType(Parser* parser, bool parse_arrays = true)
 	else if (parser->MatchAndConsume(TokenType::LeftParen))
 	{
 		out += "(";
-		
+
 		if (!parser->MatchAndConsume(TokenType::RightParen))
 		{
 			//recursively parse the rest
@@ -211,6 +211,14 @@ Expression* SizeofParselet::parse(Parser* parser, Token token)
 	return new SizeofExpression(token, left, type, right);
 }
 
+Expression* TypeofParselet::parse(Parser* parser, Token token)
+{
+	Token left = parser->Consume(TokenType::LeftParen);
+	auto x = parser->ParseExpression(0);
+	Token right = parser->Consume(TokenType::RightParen);
+	return 0;
+}
+
 Expression* CastParselet::parse(Parser* parser, Token token)
 {
 	Token type = ::ParseType(parser);
@@ -272,22 +280,22 @@ Expression* ForParselet::parse(Parser* parser, Token token)
 	parser->Consume(TokenType::LeftParen);
 	/*if (parser->LookAhead().type == TokenType::Local)
 	{
-		if (parser->LookAhead(1).type == TokenType::Name)
-		{
-			Token n = parser->LookAhead(2);
-			if (n.type == TokenType::Name && n.text == "in")
-			{
-				//ok its a foreach loop
-				parser->Consume();
-				auto name = parser->Consume();
-				parser->Consume();
-				UniquePtr<Expression*> container = parser->ParseExpression();
-				parser->Consume(TokenType::RightParen);
-				throw 7;
-				auto block = new ScopeExpression(parser->ParseBlock());
-				//return new ForEachExpression(name, container.Release(), block);
-			}
-		}
+	if (parser->LookAhead(1).type == TokenType::Name)
+	{
+	Token n = parser->LookAhead(2);
+	if (n.type == TokenType::Name && n.text == "in")
+	{
+	//ok its a foreach loop
+	parser->Consume();
+	auto name = parser->Consume();
+	parser->Consume();
+	UniquePtr<Expression*> container = parser->ParseExpression();
+	parser->Consume(TokenType::RightParen);
+	throw 7;
+	auto block = new ScopeExpression(parser->ParseBlock());
+	//return new ForEachExpression(name, container.Release(), block);
+	}
+	}
 	}*/
 
 	UniquePtr<Expression*> initial = parser->ParseStatement(true);
@@ -518,7 +526,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	Token name = parser->Consume(TokenType::Name);
 	if (destructor)
 		name.text = "~" + name.text;
-	auto arguments = new std::vector < std::pair<std::string, std::string> >;
+	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
 
 	Token stru;
 	if (parser->MatchAndConsume(TokenType::Scope))
@@ -569,7 +577,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	}
 
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, name, ret_type, arguments, block, /*varargs,*/ stru, templated);
+	return new FunctionExpression(token, name, ret_type, token.type == TokenType::Generator, arguments, block, /*varargs,*/ stru, templated);
 }
 
 Expression* ExternParselet::parse(Parser* parser, Token token)
@@ -577,6 +585,9 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	parser->Consume(TokenType::Function);
 
 	Token ret_type = ::ParseType(parser);
+
+	//add calling convention setting here
+	//if (parser->LookAhead()
 
 	Token name = parser->Consume(TokenType::Name);
 	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
@@ -625,8 +636,39 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 }
 
 
-Expression* LambdaParselet::parse(Parser* parser, Token token)
+Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 {
+	//if im not in a function parser, see where I am
+	//check if im an attribute
+	if (parser->LookAhead().type == TokenType::Name && (parser->LookAhead(1).type == TokenType::LeftParen || parser->LookAhead(1).type == TokenType::RightBracket))
+	{
+		//its an attribute
+		Token attribute = parser->Consume();
+
+		if (parser->MatchAndConsume(TokenType::LeftParen))
+		{
+			//handle arguments for the attribute
+		}
+
+		parser->Consume(TokenType::RightBracket);
+
+		//parse the next thing
+
+		auto thing = parser->ParseStatement(false);
+
+		//ok, add the attribute to the list ok, we need an attribute expression
+
+		auto attr = new AttributeExpression(token, attribute, thing);
+
+		if (dynamic_cast<ExternExpression*>(thing))
+			return attr;
+		else if (dynamic_cast<FunctionExpression*>(thing))
+			return attr;
+
+		parser->Error("Attributes can only be applied to extern and function expressions.", attribute);
+		return attr;
+	}
+
 	//parse captures
 	auto captures = new std::vector < Token > ;
 	if (parser->LookAhead().type != TokenType::RightBracket)
@@ -659,7 +701,7 @@ Expression* LambdaParselet::parse(Parser* parser, Token token)
 			Token name = parser->Consume();
 			if (name.type == TokenType::Name)
 			{
-				arguments->push_back({type.text, name.text});
+				arguments->push_back({ type.text, name.text });
 			}
 			else
 			{
@@ -675,7 +717,7 @@ Expression* LambdaParselet::parse(Parser* parser, Token token)
 		ret_type = ::ParseType(parser);
 
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, Token(), ret_type, arguments, block, Token(), 0, captures);
+	return new FunctionExpression(token, Token(), ret_type, false, arguments, block, Token(), 0, captures);
 }
 
 Expression* CallParselet::parse(Parser* parser, Expression* left, Token token)
@@ -868,27 +910,27 @@ break;//we are done
 }
 parser->Consume(TokenType::RightBrace);//end part
 return new ObjectExpression(inits);
-};
+};*/
 
 Expression* YieldParselet::parse(Parser* parser, Token token)
 {
-Expression* right = 0;
-if (parser->Match(TokenType::Semicolon) == false)
-right = parser->parseExpression(Precedence::ASSIGNMENT);
+	Expression* right = 0;
+	if (parser->Match(TokenType::Semicolon) == false)
+		right = parser->ParseExpression(Precedence::ASSIGNMENT);
 
-return new YieldExpression(token, right);
+	return new YieldExpression(token, right);
 }
 
 Expression* InlineYieldParselet::parse(Parser* parser, Token token)
 {
-Expression* right = 0;
-if (parser->Match(TokenType::Semicolon) == false && parser->LookAhead().type != TokenType::RightParen)
-right = parser->parseExpression(Precedence::ASSIGNMENT);
+	Expression* right = 0;
+	if (parser->Match(TokenType::Semicolon) == false && parser->LookAhead().type != TokenType::RightParen)
+		right = parser->ParseExpression(Precedence::ASSIGNMENT);
 
-return new YieldExpression(token, right);
+	return new YieldExpression(token, right);
 }
 
-Expression* ResumeParselet::parse(Parser* parser, Token token)
+/*Expression* ResumeParselet::parse(Parser* parser, Token token)
 {
 Expression* right = parser->parseExpression(Precedence::ASSIGNMENT);
 
@@ -913,7 +955,7 @@ Expression* TypedefParselet::parse(Parser* parser, Token token)
 Expression* NamespaceParselet::parse(Parser* parser, Token token)
 {
 	Token name = parser->Consume(TokenType::Name);
-	
+
 	auto block = parser->ParseBlock(false);
 
 	return new NamespaceExpression(token, name, block);

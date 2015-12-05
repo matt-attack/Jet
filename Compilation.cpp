@@ -55,6 +55,7 @@ std::string Jet::exec(const char* cmd) {
 
 Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), context(llvm::getGlobalContext()), project(proj)
 {
+	this->typecheck = false;
 	this->target = 0;
 	this->ns = new Namespace;
 	this->ns->parent = 0;
@@ -179,7 +180,7 @@ public:
 					auto trait = compiler->LookupType(str->templates->front().first.text);
 					//check if the call fits the trait
 					//auto out = index->GetBaseType(this->compiler);
-					printf("hi");
+					//printf("hi");
 				}
 			}
 		}
@@ -319,8 +320,8 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 				compilation = 0;
 				goto error;
 			}
-			TraitChecker checker(compilation);
-			result->Visit(&checker);
+			//TraitChecker checker(compilation);
+			//result->Visit(&checker);
 
 			compilation->asts[file.first] = result;
 
@@ -385,8 +386,12 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			for (auto ii : result.second->statements)
 			{
 				//catch any exceptions
+				compilation->typecheck = true;
+				//ii->TypeCheck(global);
+				compilation->typecheck = false;
 				try
 				{
+					//ii->TypeCheck(global);
 					ii->Compile(global);
 				}
 				catch (...)
@@ -442,6 +447,8 @@ char* ReadDependenciesFromSymbols(const char* path, int& size)
 
 void Compilation::Assemble(int olevel)
 {
+	//printf("HI \n\n\n\n\n\n");
+	this->module->dump();
 	if (this->diagnostics->GetErrors().size() > 0)
 		return;
 

@@ -11,6 +11,7 @@ namespace llvm
 	class Function;
 	class DISubprogram;
 	class StructType;
+	class IndirectBrInst;
 }
 namespace Jet
 {
@@ -38,9 +39,17 @@ namespace Jet
 	};
 	
 	class FunctionExpression;
+
+	enum class CallingConvention
+	{
+		Default,
+		StdCall
+	};
 	struct Function
 	{
 		FunctionType* type;
+		CallingConvention calling_convention;
+
 		std::string name;
 
 		std::vector<std::pair<Type*, std::string>> arguments;
@@ -50,6 +59,9 @@ namespace Jet
 
 		bool do_export;
 		bool is_lambda;
+	
+		bool is_generator;//generator stuff
+		llvm::IndirectBrInst* ibr;
 		llvm::StructType* storage_type;//for lambdas
 
 		llvm::Function* f;//not always used
@@ -65,6 +77,7 @@ namespace Jet
 
 		Function(const std::string& name, bool is_lambda)
 		{
+			this->calling_convention = CallingConvention::Default;
 			this->do_export = true;
 			this->name = name;
 			context = 0;
@@ -73,6 +86,7 @@ namespace Jet
 			expression = 0;
 			loaded = false;
 			template_base = 0;
+			this->is_generator = false;
 		}
 
 		bool IsCompatible(Function* f)

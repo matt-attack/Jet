@@ -67,7 +67,7 @@ namespace Jet
 		}
 	};*/
 
-	class LambdaParselet: public PrefixParselet
+	class LambdaAndAttributeParselet : public PrefixParselet
 	{
 	public:
 		Expression* parse(Parser* parser, Token token);
@@ -376,6 +376,17 @@ namespace Jet
 		Expression* parse(Parser* parser, Token token);
 	};
 
+	class TypeofParselet : public PrefixParselet
+	{
+	public:
+		TypeofParselet()
+		{
+
+		}
+
+		Expression* parse(Parser* parser, Token token);
+	};
+
 	class WhileParselet: public StatementParselet
 	{
 	public:
@@ -498,7 +509,7 @@ namespace Jet
 		Expression* parse(Parser* parser, Token token);
 	};
 
-/*	class YieldParselet: public StatementParselet
+	class YieldParselet: public StatementParselet
 	{
 	public:
 		YieldParselet()
@@ -514,7 +525,7 @@ namespace Jet
 		Expression* parse(Parser* parser, Token token);
 	};
 
-	class ResumeParselet: public StatementParselet
+	/*class ResumeParselet: public StatementParselet
 	{
 	public:
 		Expression* parse(Parser* parser, Token token);

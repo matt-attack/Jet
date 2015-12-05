@@ -35,12 +35,20 @@ namespace Jet
 		Scope* prev;
 	};
 
+	struct TCScope
+	{
+		//for doing typecheck
+		std::map<std::string, Type*> named_values;
+		std::vector<TCScope*> next;
+		TCScope* prev;
+	};
+
 	//compiles functions
 	class Compiler;
 	class CompilerContext
 	{
 		Scope* scope;
-
+		TCScope* tscope;
 	public:
 		Compilation* root;
 		CompilerContext* parent;
@@ -54,6 +62,9 @@ namespace Jet
 			this->parent = parent;
 			this->scope = new Scope;
 			this->scope->prev = 0;
+
+			this->tscope = new TCScope;
+			this->tscope->prev = 0;
 		}
 
 		~CompilerContext()
@@ -98,7 +109,80 @@ namespace Jet
 			this->scope->named_values[name] = val;
 		}
 
+		void TCRegisterLocal(const std::string& name, Type* ty)
+		{
+			this->tscope->named_values[name] = ty;
+		}
+
 		CValue GetVariable(const std::string& name);
+
+		Type* TCGetVariable(const std::string& name)
+		{
+			auto cur = this->tscope;
+			Type* value = 0;
+			do
+			{
+				auto iter = cur->named_values.find(name);
+				if (iter != cur->named_values.end())
+				{
+					value = iter->second;
+					break;
+				}
+				cur = cur->prev;
+			} while (cur);
+
+			if (value == 0)//value->type == Types::Void)
+			{
+				throw 7;
+				//ok, now search globals
+				/*auto global = this->root->globals.find(name);
+				if (global != this->root->globals.end())
+					return global->second;
+
+				auto function = this->root->GetFunction(name);
+				if (function != 0)
+				{
+					function->Load(this->root);
+					return CValue(function->GetType(this->root), function->f);
+				}
+
+				if (this->function->is_lambda)
+				{
+					auto var = this->parent->GetVariable(name);
+
+					//look in locals above me
+					CValue location = this->Load("_capture_data");
+					auto storage_t = this->function->storage_type;
+
+					//append the new type
+					std::vector<llvm::Type*> types;
+					for (int i = 0; i < this->captures.size(); i++)
+						types.push_back(storage_t->getContainedType(i));
+
+					types.push_back(var.type->base->GetLLVMType());
+					storage_t = this->function->storage_type = storage_t->create(types);
+
+					auto data = root->builder.CreatePointerCast(location.val, storage_t->getPointerTo());
+
+					//load it, then store it as a local
+					auto val = root->builder.CreateGEP(data, { root->builder.getInt32(0), root->builder.getInt32(this->captures.size()) });
+
+					CValue value;
+					value.val = root->builder.CreateAlloca(var.type->base->GetLLVMType());
+					value.type = var.type;
+
+					this->RegisterLocal(name, value);//need to register it as immutable 
+
+					root->builder.CreateStore(root->builder.CreateLoad(val), value.val);
+					this->captures.push_back(name);
+
+					return value;
+				}
+
+				this->root->Error("Undeclared identifier '" + name + "'", *current_token);*/
+			}
+			return value;
+		}
 
 		llvm::StoreInst* Store(const std::string& name, CValue val)
 		{
@@ -198,6 +282,21 @@ namespace Jet
 			current_token = token;
 		}
 
+		TCScope* TCPushScope()
+		{
+			auto temp = this->tscope;
+			this->tscope = new TCScope;
+			this->tscope->prev = temp;
+
+			temp->next.push_back(this->tscope);
+			return this->tscope;
+		}
+
+		void TCPopScope()
+		{
+			this->tscope = this->tscope->prev;
+		}
+
 		Scope* PushScope();
 
 		void PopScope()
@@ -229,7 +328,7 @@ namespace Jet
 
 		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member, bool lambda);
 
-		Function* GetMethod(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0);
+		Function* GetMethod(const std::string& name, const std::vector<Type*>& args, Type* Struct = 0);
 		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0);
 
 		std::vector<std::string> captures;
