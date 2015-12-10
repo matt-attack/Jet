@@ -47,6 +47,7 @@ namespace Jet
 	class Compiler;
 	class CompilerContext
 	{
+		friend class FunctionExpression;
 		Scope* scope;
 		TCScope* tscope;
 	public:
