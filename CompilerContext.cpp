@@ -40,36 +40,16 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		func = new Function(fname, lambda);
 		func->return_type = ret;
 		func->arguments = args;
-		std::vector<llvm::Type*> oargs;
-		std::vector<llvm::Metadata*> ftypes;
-		for (int i = 0; i < args.size(); i++)
-		{
-			oargs.push_back(args[i].first->GetLLVMType());
-			ftypes.push_back(args[i].first->GetDebugType(this->root));
-		}
 
 		auto n = new CompilerContext(this->root, this);
-
-		auto ft = llvm::FunctionType::get(ret->GetLLVMType(), oargs, false);
-
-		func->f = n->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, root->module);
-		
-		//this->root->functions.push_back(func);
 		n->function = func;
+		func->context = n;
+		func->Load(this->root);
 
 		if (member == false)
-			this->root->ns->members.insert({ fname, func });// [fname] = func;
+			this->root->ns->members.insert({ fname, func });
 
-		llvm::DIFile* unit = root->debug_info.file;
-
-		auto functiontype = root->debug->createSubroutineType(unit, root->debug->getOrCreateTypeArray(ftypes));
-		llvm::DISubprogram* sp = root->debug->createFunction(unit, fname, fname, unit, 0, functiontype, false, true, 0, 0, false, n->f);
-
-		assert(sp->describes(n->f));
-		func->scope = sp;
-		root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
-
-		llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->f);
+		llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->function->f);
 		root->builder.SetInsertPoint(bb);
 		func->loaded = true;
 
@@ -78,7 +58,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 	else if (func == 0)
 	{
 		//select the right one
-		func = root->ns->GetFunction(fname/*, args*/);// functions.equal_range(fname);
+		func = root->ns->GetFunction(fname/*, args*/);
 
 		if (func == 0)
 			this->root->Error("Function '" + fname + "' not found", *this->root->current_function->current_token);
@@ -87,10 +67,9 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 	func->Load(this->root);
 
 	auto n = new CompilerContext(this->root, this);
-	n->f = func->f;
 	n->function = func;
-
-	llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->f);
+	func->context = n;
+	llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->function->f);
 	root->builder.SetInsertPoint(bb);
 
 	this->root->current_function = n;
@@ -112,7 +91,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		switch (operation)
 		{
 		case TokenType::Minus:
-			res = root->builder.CreateFNeg(value.val);// root->builder.CreateFMul(left.val, right.val);
+			res = root->builder.CreateFNeg(value.val);
 			break;
 		default:
 			this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);

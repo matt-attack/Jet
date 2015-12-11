@@ -9,6 +9,7 @@
 #include "CompilerContext.h"
 #include "ExpressionVisitor.h"
 #include "Source.h"
+#include "Types\Function.h"
 
 namespace Jet
 {
@@ -1206,7 +1207,7 @@ namespace Jet
 
 
 			context->root->builder.CreateBr(start);
-			context->f->getBasicBlockList().push_back(start);
+			context->function->f->getBasicBlockList().push_back(start);
 			context->root->builder.SetInsertPoint(start);
 
 			auto cond = this->condition->Compile(context);
@@ -1214,7 +1215,7 @@ namespace Jet
 			context->root->builder.CreateCondBr(cond.val, body, end);
 
 
-			context->f->getBasicBlockList().push_back(body);
+			context->function->f->getBasicBlockList().push_back(body);
 			context->root->builder.SetInsertPoint(body);
 
 			context->PushLoop(end, start);
@@ -1223,7 +1224,7 @@ namespace Jet
 
 			context->root->builder.CreateBr(start);
 
-			context->f->getBasicBlockList().push_back(end);
+			context->function->f->getBasicBlockList().push_back(end);
 			context->root->builder.SetInsertPoint(end);
 
 			return CValue();
@@ -1311,7 +1312,7 @@ namespace Jet
 
 			//insert stupid branch
 			context->root->builder.CreateBr(start);
-			context->f->getBasicBlockList().push_back(start);
+			context->function->f->getBasicBlockList().push_back(start);
 			context->root->builder.SetInsertPoint(start);
 
 			auto cond = this->condition->Compile(context);
@@ -1319,7 +1320,7 @@ namespace Jet
 
 			context->root->builder.CreateCondBr(cond.val, body, end);
 
-			context->f->getBasicBlockList().push_back(body);
+			context->function->f->getBasicBlockList().push_back(body);
 			context->root->builder.SetInsertPoint(body);
 
 			context->PushLoop(end, cont);
@@ -1329,14 +1330,14 @@ namespace Jet
 			context->root->builder.CreateBr(cont);
 
 			//insert continue branch here
-			context->f->getBasicBlockList().push_back(cont);
+			context->function->f->getBasicBlockList().push_back(cont);
 			context->root->builder.SetInsertPoint(cont);
 
 			this->incr->Compile(context);
 
 			context->root->builder.CreateBr(start);
 
-			context->f->getBasicBlockList().push_back(end);
+			context->function->f->getBasicBlockList().push_back(end);
 			context->root->builder.SetInsertPoint(end);
 
 			return CValue();
@@ -1702,8 +1703,8 @@ namespace Jet
 				auto cond = ii->condition->Compile(context);
 				cond = context->DoCast(context->root->BoolType, cond);//try and cast to bool
 
-				llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "then", context->f);
-				NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(llvm::getGlobalContext(), "elseif", context->f);
+				llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "then", context->function->f);
+				NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(llvm::getGlobalContext(), "elseif", context->function->f);
 
 				context->root->builder.CreateCondBr(cond.val, ThenBB, NextBB);
 
@@ -1718,13 +1719,13 @@ namespace Jet
 
 			if (hasElse)
 			{
-				context->f->getBasicBlockList().push_back(ElseBB);
+				context->function->f->getBasicBlockList().push_back(ElseBB);
 				context->root->builder.SetInsertPoint(ElseBB);
 
 				this->Else->block->Compile(context);
 				context->root->builder.CreateBr(EndBB);
 			}
-			context->f->getBasicBlockList().push_back(EndBB);
+			context->function->f->getBasicBlockList().push_back(EndBB);
 			context->root->builder.SetInsertPoint(EndBB);
 
 			return CValue();

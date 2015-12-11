@@ -448,7 +448,7 @@ char* ReadDependenciesFromSymbols(const char* path, int& size)
 void Compilation::Assemble(int olevel)
 {
 	//printf("HI \n\n\n\n\n\n");
-	this->module->dump();
+	//this->module->dump();
 	if (this->diagnostics->GetErrors().size() > 0)
 		return;
 

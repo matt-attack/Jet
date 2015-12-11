@@ -15,6 +15,7 @@
 //#include <map>
 
 #include "Types/Types.h"
+#include "Types/Function.h"
 #include "Token.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
@@ -50,11 +51,13 @@ namespace Jet
 		friend class FunctionExpression;
 		Scope* scope;
 		TCScope* tscope;
+
+		std::stack<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> loops;
+
 	public:
 		Compilation* root;
 		CompilerContext* parent;
 
-		llvm::Function* f;
 		Function* function;
 
 		CompilerContext(Compilation* root, CompilerContext* parent)
@@ -234,7 +237,6 @@ namespace Jet
 
 		CValue BinaryOperation(Jet::TokenType op, CValue left, CValue right);
 
-		std::stack<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> loops;
 		void PushLoop(llvm::BasicBlock* Break, llvm::BasicBlock* Continue)
 		{
 			loops.push({ Break, Continue });
@@ -260,7 +262,7 @@ namespace Jet
 
 			this->root->builder.CreateBr(loops.top().second);
 
-			llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "post.continue", this->f);
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "post.continue", this->function->f);
 			this->root->builder.SetInsertPoint(bb);
 		}
 
@@ -271,7 +273,7 @@ namespace Jet
 
 			this->root->builder.CreateBr(loops.top().first);
 
-			llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "post.break", this->f);
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "post.break", this->function->f);
 			this->root->builder.SetInsertPoint(bb);
 		}
 

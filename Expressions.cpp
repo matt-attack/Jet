@@ -523,14 +523,14 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		cond = context->DoCast(context->root->BoolType, cond);
 		context->root->builder.CreateCondBr(cond.val, else_block, end_block);
 
-		context->f->getBasicBlockList().push_back(else_block);
+		context->function->f->getBasicBlockList().push_back(else_block);
 		context->root->builder.SetInsertPoint(else_block);
 		auto cond2 = this->right->Compile(context);
 
 		cond2 = context->DoCast(context->root->BoolType, cond2);
 		context->root->builder.CreateBr(end_block);
 
-		context->f->getBasicBlockList().push_back(end_block);
+		context->function->f->getBasicBlockList().push_back(end_block);
 		context->root->builder.SetInsertPoint(end_block);
 		auto phi = context->root->builder.CreatePHI(cond.type->GetLLVMType(), 2, "land");
 		phi->addIncoming(cond.val, cur_block);
@@ -549,13 +549,13 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		cond = context->DoCast(context->root->BoolType, cond);
 		context->root->builder.CreateCondBr(cond.val, end_block, else_block);
 
-		context->f->getBasicBlockList().push_back(else_block);
+		context->function->f->getBasicBlockList().push_back(else_block);
 		context->root->builder.SetInsertPoint(else_block);
 		auto cond2 = this->right->Compile(context);
 		cond2 = context->DoCast(context->root->BoolType, cond2);
 		context->root->builder.CreateBr(end_block);
 
-		context->f->getBasicBlockList().push_back(end_block);
+		context->function->f->getBasicBlockList().push_back(end_block);
 		context->root->builder.SetInsertPoint(end_block);
 
 		auto phi = context->root->builder.CreatePHI(cond.type->GetLLVMType(), 2, "lor");
@@ -623,19 +623,19 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	std::vector<std::pair<Type*, std::string>> argsv;
 	auto Struct = dynamic_cast<StructExpression*>(this->Parent) ? dynamic_cast<StructExpression*>(this->Parent)->GetName() : this->Struct.text;
 
+	//insert this argument if I am a member function
 	if (Struct.length() > 0)
-	{   //im a member function
-		//insert first arg, which is me
+	{  
 		auto type = context->root->LookupType(Struct + "*");
 
 		argsv.push_back({ type, "this" });
 	}
 
-	llvm::BasicBlock* yieldbb;
+	llvm::BasicBlock* yieldbb;//location of starting point in generator function
 	if (this->is_generator)
 	{
-		//compile the rest yo
-		auto func = context->root->ns->GetFunction(this->GetRealName());// context->AddFunction(this->GetRealName(), 0, argsv, Struct.length() > 0 ? true : false, is_lambda);
+		//add the context pointer as an argument if this is a generator
+		auto func = context->root->ns->GetFunction(this->GetRealName());
 
 		auto str = func->return_type;
 		str->Load(context->root);
@@ -709,9 +709,11 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		argsv.push_back({ context->root->LookupType(ii.first), ii.second });
 
 	context->CurrentToken(&this->ret_type);
-	auto ret = context->root->LookupType(this->ret_type.text);
+	Type* ret;
 	if (this->is_generator)
 		ret = context->root->LookupType("bool");
+	else
+		ret = context->root->LookupType(this->ret_type.text);
 
 	llvm::Value* lambda = 0;
 
@@ -727,30 +729,23 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		lambda_type = context->root->LookupType("function<" + context->root->GetFunctionType(ret, args)->ToString() + ">");
 		lambda = context->root->builder.CreateAlloca(lambda_type->GetLLVMType());
 
-		std::vector<llvm::Type*> elements;
-
-		storage_t = llvm::StructType::get(context->root->context, elements);
+		storage_t = llvm::StructType::get(context->root->context, {});
 
 		argsv.push_back({ context->root->LookupType("char*"), "_capture_data" });
 	}
 
-	CompilerContext* function;// = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+	CompilerContext* function;
 	if (this->is_generator)
 	{
-		function = context->AddFunction("gen_fun"/*this->GetRealName()*/, ret, { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+		function = context->AddFunction("gen_fun", ret, { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
 		function->function->is_generator = true;
 	}
 	else
 		function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
 
-	assert(function->f == function->function->f);
-
 	function->function->storage_type = storage_t;
 	context->root->current_function = function;
-	function->function->context = function;
 	function->function->Load(context->root);
-
-	assert(function->f == function->function->f);
 
 	function->SetDebugLocation(this->token);
 
@@ -758,18 +753,15 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		function->function->do_export = false;
 
 	//alloc args
-	auto AI = function->f->arg_begin();
-	for (unsigned Idx = 0, e = argsv.size(); Idx != e; ++Idx, ++AI) {
+	auto AI = function->function->f->arg_begin();
+	for (unsigned Idx = 0, e = argsv.size(); Idx != e; ++Idx, ++AI) 
+	{
 		// Create an alloca for this variable.
-		auto aname = argsv[Idx].second;
-
-		if (Idx > 0 && this->is_generator)
+		if (!(Idx > 0 && this->is_generator))
 		{
+			auto aname = argsv[Idx].second;
 
-		}
-		else
-		{
-			llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
+			llvm::IRBuilder<> TmpB(&function->function->f->getEntryBlock(), function->function->f->getEntryBlock().begin());
 			auto Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
 			// Store the initial value into the alloca.
 			function->root->builder.CreateStore(AI, Alloca);
@@ -790,7 +782,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	if (this->is_generator)
 	{
-		//add indirect br stuff
+		//compile the start code for a generator function
 		auto data = function->Load("_context");//basically "this"
 
 		//add local vars
@@ -802,16 +794,16 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			function->RegisterLocal(ii.second, CValue(function->root->LookupType(ii.first)->GetPointerType(), val));
 		}
 
+		//branch to the continue point
 		auto br = function->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 		auto loc = function->root->builder.CreateLoad(br);
 		auto ibr = function->root->builder.CreateIndirectBr(loc, 10);
 		function->function->ibr = ibr;
 
 		//add new bb
-		yieldbb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "yield");
-		function->function->ibr->addDestination(yieldbb);
+		yieldbb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "yield", function->function->f);
+		ibr->addDestination(yieldbb);
 
-		function->f->getBasicBlockList().push_back(yieldbb);
 		function->root->builder.SetInsertPoint(yieldbb);
 	}
 
@@ -819,129 +811,108 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	//check for return, and insert one or error if there isnt one
 	if (function->function->is_generator)
-		function->root->builder.CreateRet(function->root->builder.getInt1(false));
-	else if (function->f->getBasicBlockList().back().getTerminator() == 0)
+		function->root->builder.CreateRet(function->root->builder.getInt1(false));//signal we are gone generating values
+	else if (function->function->f->getBasicBlockList().back().getTerminator() == 0)
 		if (this->ret_type.text == "void")
 			function->Return(CValue());
 		else
 			context->root->Error("Function must return a value!", token);
 
+	if (this->is_generator)
+	{
+		//compile the other function necessary for an iterator
+		auto func = context->AddFunction(this->GetRealName(), 0, { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);
+
+		auto str = func->function->return_type;
+
+		context->root->current_function = func;
+		func->function->Load(context->root);
+
+		//alloca the new context
+		auto alloc = context->root->builder.CreateAlloca(str->GetLLVMType());
+
+		//set the branch location to the start
+		auto ptr = context->root->builder.CreateGEP(alloc, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+		auto val = llvm::BlockAddress::get(yieldbb);
+		context->root->builder.CreateStore(val, ptr);
+
+		//store arguments into context
+		if (argsv.size() > 1)
+		{
+			auto AI = func->function->f->arg_begin();
+			for (int i = 1; i < argsv.size(); i++)
+			{
+				auto ptr = context->root->builder.CreateGEP(alloc, { context->root->builder.getInt32(0), context->root->builder.getInt32(2 + i - 1) });
+				context->root->builder.CreateStore(AI++, ptr);
+			}
+		}
+
+		//then return the newly created iterator object
+		context->root->builder.CreateRet(context->root->builder.CreateLoad(alloc));
+
+		//now compile reset function
+		{
+			auto reset = context->AddFunction("yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+	
+			context->root->current_function = reset;
+			reset->function->Load(context->root);
+
+			auto self = reset->function->f->arg_begin();
+			//set the branch location back to start
+			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+			auto val = llvm::BlockAddress::get(yieldbb);
+			context->root->builder.CreateStore(val, ptr);
+
+			context->root->builder.CreateRetVoid();
+
+			auto& x = str->data->functions.find("Reset");
+			x->second = reset->function;
+		}
+
+		//compile current function
+		{
+			auto current = context->AddFunction("yield_current", context->root->LookupType(this->ret_type.text), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+
+			//add a return and shizzle
+			context->root->current_function = current;
+			current->function->Load(context->root);
+
+			//return the current value
+			auto self = current->function->f->arg_begin();
+			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+			context->root->builder.CreateRet(context->root->builder.CreateLoad(ptr));
+
+			auto& x = str->data->functions.find("Current");
+			x->second = current->function;
+		}
+
+		//Set the generator function as MoveNext
+		auto& x = str->data->functions.find("MoveNext");
+		x->second = function->function;
+	}
+
+	//reset insertion point to where it was before (for lambdas and template compilation)
 	context->root->builder.SetCurrentDebugLocation(dp);
 	if (rp)
 		context->root->builder.SetInsertPoint(rp);
-
 	context->root->current_function = context;
 
+	//store the lambda value
 	if (lambda)
 	{
 		function->WriteCaptures(lambda);
 
 		auto ptr = context->root->builder.CreateGEP(lambda, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) }, "name");
 
-		ptr = context->root->builder.CreatePointerCast(ptr, function->f->getType()->getPointerTo());
-		context->root->builder.CreateStore(function->f, ptr);
-	}
-
-	if (this->is_generator)
-	{
-		//compile the rest yo
-		auto func = context->AddFunction(this->GetRealName(), 0, {argsv.front()}, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
-		//add junk
-
-		auto str = func->function->return_type;
-
-		auto rp = context->root->builder.GetInsertBlock();
-		auto dp = context->root->builder.getCurrentDebugLocation();
-
-		//add a return and shizzle
-		context->root->current_function = func;
-		func->function->context = func;
-		func->function->Load(context->root);
-
-		//alloca the thing;
-		auto alloc = context->root->builder.CreateAlloca(str->GetLLVMType());
-		//initialize stuff
-		auto ptr = context->root->builder.CreateGEP(alloc, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
-		auto val = llvm::BlockAddress::get(yieldbb);
-		context->root->builder.CreateStore(val, ptr);
-
-		//store arguments
-		if (argsv.size() > 1)
-		{
-			auto AI = func->f->arg_begin();
-			AI->dump();
-			for (int i = 1; i < argsv.size(); i++)
-			{
-				auto ptr = context->root->builder.CreateGEP(alloc, { context->root->builder.getInt32(0), context->root->builder.getInt32(2 + i - 1) });
-				auto val = AI++;
-				val->dump();
-				ptr->dump();
-				context->root->builder.CreateStore(val, ptr);
-			}
-		}
-		//then return;
-		context->root->builder.CreateRet(context->root->builder.CreateLoad(alloc));
-
-		//now compile reset
-		{
-			auto reset = context->AddFunction("yield_reset", context->root->LookupType("void"), {argsv.front()}, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
-			//add junk
-
-			//add a return and shizzle
-			context->root->current_function = reset;
-			reset->function->context = reset;
-			reset->function->Load(context->root);
-
-			//alloca the thing;
-			auto self = reset->f->arg_begin();;// reset->Load("_context");
-			//initialize stuff
-			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
-			auto val = llvm::BlockAddress::get(yieldbb);
-			context->root->builder.CreateStore(val, ptr);
-			//then return;
-			context->root->builder.CreateRetVoid();
-
-			auto& x = str->data->functions.find("Reset");
-			x->second = reset->function;// function;
-		}
-
-		{
-			auto current = context->AddFunction("yield_current", context->root->LookupType(this->ret_type.text), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
-			//add junk
-
-			//add a return and shizzle
-			context->root->current_function = current;
-			current->function->context = current;
-			current->function->Load(context->root);
-
-			//alloca the thing;
-			auto self = current->f->arg_begin();;// reset->Load("_context");
-			//initialize stuff
-			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
-
-			//then return;
-			context->root->builder.CreateRet(context->root->builder.CreateLoad(ptr));
-
-			auto& x = str->data->functions.find("Current");
-			x->second = current->function;// function;
-		}
-		context->root->builder.SetCurrentDebugLocation(dp);
-		if (rp)
-			context->root->builder.SetInsertPoint(rp);
-
-		//func->function->f->dump();
-
-		//set movenext
-		auto& x = str->data->functions.find("MoveNext");
-		x->second = function->function;// function;
-		//x->second->f->dump();
+		ptr = context->root->builder.CreatePointerCast(ptr, function->function->f->getType()->getPointerTo());
+		context->root->builder.CreateStore(function->function->f, ptr);
 	}
 
 	context->CurrentToken(&this->token);
-	if (lambda)
+	if (lambda)//return the lambda if we are one
 		return CValue(lambda_type, context->root->builder.CreateLoad(lambda));
 	else
-		return CValue(function->function->GetType(context->root), function->f);
+		return CValue(function->function->GetType(context->root), function->function->f);
 }
 
 void FunctionExpression::CompileDeclarations(CompilerContext* context)
@@ -962,8 +933,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	bool is_trait = false;
 	if (str.length() > 0)
 	{
-		//ok, need to look up type without loading it....
-		auto type = context->root->LookupType(str, false);// AdvanceTypeLookup(str);
+		auto type = context->root->LookupType(str, false);
 		if (type->type == Types::Trait)
 		{
 			type->Load(context->root);
@@ -982,7 +952,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 
 	if (is_generator)
 	{
-		//build data about the struct
+		//build data about the generator context struct
 		Type* str = new Type;
 		context->root->ns->members.insert({ this->name.text, str });
 		str->name = "_yielder_context";
@@ -991,26 +961,24 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		str->data->name = str->name;
 		str->data->parent_struct = 0;
 
+		//add default iterator methods, will fill in function later
 		str->data->functions.insert({ "MoveNext", 0 });
 		str->data->functions.insert({ "Reset", 0 });
 		str->data->functions.insert({ "Current", 0 });
 
-		//register the templates as a type, so all the members end up with the same type
-		//int size = 2;
-		//str->data->struct_members.reserve(size);
+		//add the position and return variables to the context
 		str->data->struct_members.push_back({ "position", "char*", context->root->LookupType("char*") });
 		str->data->struct_members.push_back({ "return", this->ret_type.text, context->root->LookupType(this->ret_type.text) });
 
+		//add arguments to context
 		for (auto ii : *this->args)
-		{
 			str->data->struct_members.push_back({ ii.second, ii.first, context->root->LookupType(ii.first) });
-		}
+		
 		//str->data->struct_members.push_back
 		//add any arguments, todo
 
 
 		str->ns = context->root->ns;
-		//argsv.push_back({ str->GetPointerType(), "_context" });
 
 		//DO NOT LOAD THIS UNTIL COMPILATION, IN FACT DONT LOAD ANYTHING
 		//str->Load(context->root);
@@ -1019,30 +987,30 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	else if (is_trait)
 		fun->return_type = 0;
 	else if (advlookup)
-		/*fun->return_type = */context->root->AdvanceTypeLookup(&fun->return_type, this->ret_type.text, &this->ret_type);
+		context->root->AdvanceTypeLookup(&fun->return_type, this->ret_type.text, &this->ret_type);
 	else
 		fun->return_type = context->root->LookupType(this->ret_type.text, false);
 
 	fun->arguments.reserve(this->args->size() + (str.length() ? 1 : 0));
-	if (str.length() > 0)//im a member function
-	{
-		//insert first arg, which is me
-		Type* type = 0;
 
-		fun->arguments.push_back({ type, "this" });
+	//add the this pointer argument if this is a member function
+	if (str.length() > 0)
+	{
+		fun->arguments.push_back({ 0, "this" });
 		if (is_trait == false && advlookup)
 			context->root->AdvanceTypeLookup(&fun->arguments.back().first, str + "*", &this->token);
 		else if (is_trait == false)
 			fun->arguments.back().first = context->root->LookupType(str + "*", false);
 	}
 
+	//add templates to new function
 	if (this->templates)
 	{
 		for (auto ii : *this->templates)
 			fun->templates.push_back({ context->root->LookupType(ii.first.text), ii.second.text });
 	}
 
-
+	//add arguments to new function
 	for (auto ii : *this->args)
 	{
 		Type* type = 0;
@@ -1145,8 +1113,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				if (type->GetBaseType()->type == Types::Trait)
 					context->root->Error("Cannot instantiate trait", ii.second);
 
-				//auto ty = type->GetLLVMType();
-
 				Alloca = context->root->builder.CreateAlloca(type->GetLLVMType(), 0, aname);
 			}
 
@@ -1194,6 +1160,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		// Add arguments to variable symbol table.
 		if (context->function->is_generator)
 		{
+			context->root->Error("Local variables inside of generators not yet implemented.", this->token);
 			//find the already added type with the same name
 			auto ty = context->function->arguments[0].first->base;
 			/*std::vector<llvm::Type*> types;
@@ -1207,8 +1174,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			x->dump();
 
 			context->RegisterLocal(aname, CValue(type->GetPointerType(), x));
-			printf("hi");
-			//context->function->storage_type
 		}
 		else
 			context->RegisterLocal(aname, CValue(type->GetPointerType(), Alloca));
@@ -1267,15 +1232,15 @@ CValue StructExpression::Compile(CompilerContext* context)
 
 		return CValue();
 	}
-	//set the namespace
 
-
+	//compile function members
 	for (auto ii : this->members)
 	{
 		if (ii.type == StructMember::FunctionMember)
 			ii.function->Compile(context);
 	}
 
+	//add any missing constructors
 	this->AddConstructors(context);
 
 	return CValue();
@@ -1352,7 +1317,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				auto ret = context->root->LookupType("void");
 
 				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? true : false, false);// , this->varargs);
-				ii.second->f = function->f;
+				ii.second->f = function->function->f;
 
 				context->root->current_function = function;
 
@@ -1361,12 +1326,12 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				function->SetDebugLocation(this->token);
 
 				//alloc args
-				auto AI = function->f->arg_begin();
+				auto AI = function->function->f->arg_begin();
 				for (unsigned Idx = 0, e = argsv.size(); Idx != e; ++Idx, ++AI) {
 					// Create an alloca for this variable.
 					auto aname = argsv[Idx].second;
 
-					llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
+					llvm::IRBuilder<> TmpB(&function->function->f->getEntryBlock(), function->function->f->getEntryBlock().begin());
 					auto Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
 					// Store the initial value into the alloca.
 					function->root->builder.CreateStore(AI, Alloca);
@@ -1432,7 +1397,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				auto ret = context->root->LookupType("void");
 
 				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? true : false, false);// , this->varargs);
-				ii.second->f = function->f;
+				ii.second->f = function->function->f;
 
 				context->root->current_function = function;
 
@@ -1441,12 +1406,12 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				function->SetDebugLocation(this->token);
 
 				//alloc args
-				auto AI = function->f->arg_begin();
+				auto AI = function->function->f->arg_begin();
 				for (unsigned Idx = 0, e = argsv.size(); Idx != e; ++Idx, ++AI) {
 					// Create an alloca for this variable.
 					auto aname = argsv[Idx].second;
 
-					llvm::IRBuilder<> TmpB(&function->f->getEntryBlock(), function->f->getEntryBlock().begin());
+					llvm::IRBuilder<> TmpB(&function->function->f->getEntryBlock(), function->function->f->getEntryBlock().begin());
 					auto Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
 					// Store the initial value into the alloca.
 					function->root->builder.CreateStore(AI, Alloca);
@@ -1655,7 +1620,7 @@ CValue DefaultExpression::Compile(CompilerContext* context)
 		context->root->builder.CreateBr(sw->switch_end);
 
 	//start using our new block
-	context->f->getBasicBlockList().push_back(block);
+	context->function->f->getBasicBlockList().push_back(block);
 	context->root->builder.SetInsertPoint(block);
 	return CValue();
 }
@@ -1679,7 +1644,7 @@ CValue CaseExpression::Compile(CompilerContext* context)
 		context->root->builder.CreateBr(sw->switch_end);
 
 	//start using our new block
-	context->f->getBasicBlockList().push_back(block);
+	context->function->f->getBasicBlockList().push_back(block);
 	context->root->builder.SetInsertPoint(block);
 	return CValue();
 }
@@ -1730,13 +1695,13 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	if (no_def)
 	{
 		//insert and create a dummy default
-		context->f->getBasicBlockList().push_back(def);
+		context->function->f->getBasicBlockList().push_back(def);
 		context->root->builder.SetInsertPoint(def);
 		context->root->builder.CreateBr(this->switch_end);
 	}
 
 	//start using end
-	context->f->getBasicBlockList().push_back(this->switch_end);
+	context->function->f->getBasicBlockList().push_back(this->switch_end);
 	context->root->builder.SetInsertPoint(this->switch_end);
 
 	return CValue();
@@ -1838,9 +1803,9 @@ CValue NewExpression::Compile(CompilerContext* context)
 			llvm::Value* counter = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType(), 0, "newcounter");
 			context->root->builder.CreateStore(context->Integer(0).val, counter);
 
-			auto start = llvm::BasicBlock::Create(context->root->context, "start", context->root->current_function->f);
-			auto body = llvm::BasicBlock::Create(context->root->context, "body", context->root->current_function->f);
-			auto end = llvm::BasicBlock::Create(context->root->context, "end", context->root->current_function->f);
+			auto start = llvm::BasicBlock::Create(context->root->context, "start", context->root->current_function->function->f);
+			auto body = llvm::BasicBlock::Create(context->root->context, "body", context->root->current_function->function->f);
+			auto end = llvm::BasicBlock::Create(context->root->context, "end", context->root->current_function->function->f);
 
 			context->root->builder.CreateBr(start);
 			context->root->builder.SetInsertPoint(start);
@@ -1866,7 +1831,6 @@ CValue NewExpression::Compile(CompilerContext* context)
 
 Type* CallExpression::TypeCheck(CompilerContext* context)
 {
-	//throw 7;
 	Type* stru = 0;
 	std::string fname;
 	if (auto name = dynamic_cast<NameExpression*>(left))
@@ -1941,47 +1905,35 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 CValue YieldExpression::Compile(CompilerContext* context)
 {
 	//first make sure we are in a generator...
-	//todo
-
 	if (context->function->is_generator == false)
 		context->root->Error("Cannot use yield outside of a generator!", this->token);
 
-	//context->f->dump();
-
+	//create a new block for after the yield
 	auto bb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "yield");
-	context->f->getBasicBlockList().push_back(bb);
+	context->function->f->getBasicBlockList().push_back(bb);
 
+	//add the new block to the indirect branch list
 	context->function->ibr->addDestination(bb);
 
-
+	//compile the yielded value
 	auto value = right->Compile(context);
 
-	//store the result and current location into the struct
-	auto data = context->Load("_context");//basically "this"
+	//store the current location into the generator context
+	auto data = context->Load("_context");
 	auto br = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
-	//br->dump();
 	auto ba = llvm::BlockAddress::get(bb);
 	context->root->builder.CreateStore(ba, br);
 
 
-	//store result
+	//store result into the generator context
 	br = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 	context->root->builder.CreateStore(value.val, br);
 
+	//return 1 to say we are not finished yielding
+	context->root->builder.CreateRet(context->root->builder.getInt1(true));
 
-	context->root->builder.CreateRet(context->root->builder.getInt1(true));// CreateRet(context->root->builder.getInt1(true));
-
-
+	//start inserting in new block
 	context->root->builder.SetInsertPoint(bb);
 
-	//context->f->dump();
-	//if (right)
-	//right->Compile(context);
-	//else
-	//context->Null();
-
-	//check if type matches return type
-	//if so write result
-	//context->Yield();
 	return CValue();
 }

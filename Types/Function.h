@@ -58,10 +58,12 @@ namespace Jet
 		CompilerContext* context;
 
 		bool do_export;
-		bool is_lambda;
-	
+		
 		bool is_generator;//generator stuff
 		llvm::IndirectBrInst* ibr;
+
+		//lambda stuff
+		bool is_lambda;
 		llvm::StructType* storage_type;//for lambdas
 
 		llvm::Function* f;//not always used
