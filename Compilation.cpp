@@ -394,11 +394,16 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 					//ii->TypeCheck(global);
 					ii->Compile(global);
 				}
-				catch (...)
+				catch (int x)
 				{
 					compilation->ns = compilation->global;
 					errors++;
 				}
+				/*catch (...)
+				{
+					compilation->ns = compilation->global;
+					errors++;
+				}*/
 
 				compilation->ns = compilation->global;
 			}

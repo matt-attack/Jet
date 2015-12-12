@@ -480,6 +480,24 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 
 			parser->Error("Member function definition must have body!", token);
 		}
+		else if (parser->Match(TokenType::Generator))
+		{
+			parser->Error("Struct member generators not yet implemented!", token);
+
+			//parse the function
+			auto* expr = parser->ParseStatement(true);
+
+			if (auto fun = dynamic_cast<FunctionExpression*>(expr))
+			{
+				StructMember member;
+				member.type = StructMember::FunctionMember;
+				member.function = fun;
+				members.push_back(member);
+				continue;
+			}
+
+			parser->Error("Member function definition must have body!", token);
+		}
 
 		Token type = ::ParseType(parser);
 

@@ -2270,8 +2270,6 @@ namespace Jet
 			}
 
 			context->root->ns = old;
-			//then check members maybe?
-			//throw 7;
 
 			return 0;
 		}

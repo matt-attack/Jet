@@ -741,7 +741,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	CompilerContext* function;
 	if (this->is_generator)
 	{
-		function = context->AddFunction("gen_fun", ret, { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+		function = context->AddFunction(this->GetRealName()+"_generator", ret, { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
 		function->function->is_generator = true;
 	}
 	else
@@ -863,7 +863,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		//now compile reset function
 		{
-			auto reset = context->AddFunction("yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+			auto reset = context->AddFunction(this->GetRealName()+"yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
 
 			context->root->current_function = reset;
 			reset->function->Load(context->root);
@@ -882,7 +882,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		//compile current function
 		{
-			auto current = context->AddFunction("yield_current", context->root->LookupType(this->ret_type.text), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+			auto current = context->AddFunction(this->GetRealName() + "generator_current", context->root->LookupType(this->ret_type.text), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
 
 			//add a return and shizzle
 			context->root->current_function = current;
@@ -965,12 +965,13 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	{
 		//build data about the generator context struct
 		Type* str = new Type;
-		context->root->ns->members.insert({ this->name.text, str });
-		str->name = "_yielder_context";
+		str->name = this->GetRealName() + "_yielder_context";
 		str->type = Types::Struct;
 		str->data = new Jet::Struct;
 		str->data->name = str->name;
 		str->data->parent_struct = 0;
+		context->root->ns->members.insert({ str->name, str });
+
 
 		//add default iterator methods, will fill in function later
 		str->data->functions.insert({ "MoveNext", 0 });
@@ -1934,20 +1935,22 @@ CValue YieldExpression::Compile(CompilerContext* context)
 	//add the new block to the indirect branch list
 	context->function->ibr->addDestination(bb);
 
-	//compile the yielded value
-	auto value = right->Compile(context);
-
 	//store the current location into the generator context
 	auto data = context->Load("_context");
 	auto br = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 	auto ba = llvm::BlockAddress::get(bb);
 	context->root->builder.CreateStore(ba, br);
 
+	if (this->right)
+	{
+		//compile the yielded value
+		auto value = right->Compile(context);
 
-	//store result into the generator context
-	value = context->DoCast(data.type->base->data->struct_members[1].type, value);//cast to the correct type
-	br = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
-	context->root->builder.CreateStore(value.val, br);
+		//store result into the generator context
+		value = context->DoCast(data.type->base->data->struct_members[1].type, value);//cast to the correct type
+		br = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+		context->root->builder.CreateStore(value.val, br);
+	}
 
 	//return 1 to say we are not finished yielding
 	context->root->builder.CreateRet(context->root->builder.getInt1(true));
