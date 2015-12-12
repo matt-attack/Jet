@@ -2623,7 +2623,8 @@ namespace Jet
 
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
-			throw 7;
+			//todo
+			//throw 7;
 			//todo
 			return 0;
 		}

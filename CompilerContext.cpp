@@ -691,8 +691,14 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 
 		if (value.type->type == Types::Int && (t->type == Types::Char || t->type == Types::Short))
 		{
-			return CValue(t, root->builder.CreateTrunc(value.val, t->GetLLVMType()));
+			return CValue(t, root->builder.CreateTrunc(value.val, tt));
 		}
+		if (value.type->type == Types::Short && t->type == Types::Int)
+		{
+			return CValue(t, root->builder.CreateSExt(value.val, tt));	
+		}
+		if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
+			return CValue(t, root->builder.CreateSExtOrTrunc(value.val, tt));
 	}
 	if (value.type->type == Types::Pointer)
 	{

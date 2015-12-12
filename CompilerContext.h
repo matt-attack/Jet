@@ -113,8 +113,11 @@ namespace Jet
 			this->scope->named_values[name] = val;
 		}
 
+		std::function<void(const std::string& name, Type* ty)> local_reg_callback;
 		void TCRegisterLocal(const std::string& name, Type* ty)
 		{
+			if (local_reg_callback)
+				local_reg_callback(name, ty);
 			this->tscope->named_values[name] = ty;
 		}
 

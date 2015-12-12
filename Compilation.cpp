@@ -387,7 +387,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			{
 				//catch any exceptions
 				compilation->typecheck = true;
-				//ii->TypeCheck(global);
+				ii->TypeCheck(global);
 				compilation->typecheck = false;
 				try
 				{

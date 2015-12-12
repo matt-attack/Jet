@@ -8,6 +8,7 @@
 namespace llvm
 {
 	class Type;
+	class Value;
 	class Function;
 	class DISubprogram;
 	class StructType;
@@ -61,6 +62,8 @@ namespace Jet
 		
 		bool is_generator;//generator stuff
 		llvm::IndirectBrInst* ibr;
+		int var_num;
+		std::vector<llvm::Value*> variable_geps;//for generator variables
 
 		//lambda stuff
 		bool is_lambda;
@@ -82,6 +85,7 @@ namespace Jet
 			this->calling_convention = CallingConvention::Default;
 			this->do_export = true;
 			this->name = name;
+			this->var_num = 0;
 			context = 0;
 			f = 0;
 			this->is_lambda = is_lambda;

@@ -168,18 +168,22 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 	}
 	for (auto ii : *this->args)
 		nc->TCRegisterLocal(ii.second, context->root->LookupType(ii.first)->GetPointerType());
-	this->block->TypeCheck(nc);
 
 	if (this->is_generator)
 	{
-		//add variables types
-		//printf("registering variables yo");
-		//context->tscope->named_values
+		auto func = context->root->ns->GetFunction(this->GetRealName());
+		auto str = func->return_type;
+		nc->local_reg_callback = [&](const std::string& name, Type* ty)
+		{
+			str->data->struct_members.push_back({ name, ty->base->name, ty->base });
+		};
 	}
+	this->block->TypeCheck(nc);
+
+	nc->local_reg_callback = [&](const std::string& name, Type* ty){};
 
 	//add locals
 	delete nc;
-	//throw 7;
 
 	return 0;
 }
@@ -625,7 +629,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	//insert this argument if I am a member function
 	if (Struct.length() > 0)
-	{  
+	{
 		auto type = context->root->LookupType(Struct + "*");
 
 		argsv.push_back({ type, "this" });
@@ -754,7 +758,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	//alloc args
 	auto AI = function->function->f->arg_begin();
-	for (unsigned Idx = 0, e = argsv.size(); Idx != e; ++Idx, ++AI) 
+	for (unsigned Idx = 0, e = argsv.size(); Idx != e; ++Idx, ++AI)
 	{
 		// Create an alloca for this variable.
 		if (!(Idx > 0 && this->is_generator))
@@ -783,15 +787,22 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	if (this->is_generator)
 	{
 		//compile the start code for a generator function
-		auto data = function->Load("_context");//basically "this"
+		auto data = function->Load("_context");
 
-		//add local vars
+		//add arguments
 		int i = 0;
 		for (auto ii : *this->args)
 		{
 			auto ptr = data.val;
 			auto val = function->root->builder.CreateGEP(ptr, { function->root->builder.getInt32(0), function->root->builder.getInt32(2 + i++) });
 			function->RegisterLocal(ii.second, CValue(function->root->LookupType(ii.first)->GetPointerType(), val));
+		}
+
+		//add local vars
+		for (int i = 2 + this->args->size(); i < data.type->base->data->struct_members.size(); i++)
+		{
+			auto gep = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(i) });
+			function->function->variable_geps.push_back(gep);
 		}
 
 		//branch to the continue point
@@ -853,7 +864,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		//now compile reset function
 		{
 			auto reset = context->AddFunction("yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
-	
+
 			context->root->current_function = reset;
 			reset->function->Load(context->root);
 
@@ -973,7 +984,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		//add arguments to context
 		for (auto ii : *this->args)
 			str->data->struct_members.push_back({ ii.second, ii.first, context->root->LookupType(ii.first) });
-		
+
 		//str->data->struct_members.push_back
 		//add any arguments, todo
 
@@ -1160,20 +1171,28 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		// Add arguments to variable symbol table.
 		if (context->function->is_generator)
 		{
-			context->root->Error("Local variables inside of generators not yet implemented.", this->token);
+			//context->root->Error("Local variables inside of generators not yet implemented.", this->token);
 			//find the already added type with the same name
 			auto ty = context->function->arguments[0].first->base;
 			/*std::vector<llvm::Type*> types;
 			for (int i = 0; i < ty->data->type->getStructNumElements(); i++)
-				types.push_back(((llvm::StructType*)ty->data->type)->getElementType(i));
+			types.push_back(((llvm::StructType*)ty->data->type)->getElementType(i));
 			((llvm::StructType*)ty->data->type)->setBody(types);
 			ty->data->struct_members.push_back({ aname, "type", type });*/
+			//ok, almost this doesnt quite work right
+			auto var_ptr = context->function->variable_geps[context->function->var_num++];
+			//var_ptr->dump();
 
-			auto ctx = context->Load("_context");
-			auto x = context->root->builder.CreateGEP(ctx.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(3) });
-			x->dump();
+			if (this->_right)
+			{
+				auto val = (*this->_right)[i - 1]->Compile(context);
+				val = context->DoCast(type, val);
 
-			context->RegisterLocal(aname, CValue(type->GetPointerType(), x));
+				context->root->builder.CreateStore(val.val, var_ptr);
+			}
+
+			//still need to do store
+			context->RegisterLocal(aname, CValue(type->GetPointerType(), var_ptr));
 		}
 		else
 			context->RegisterLocal(aname, CValue(type->GetPointerType(), Alloca));
@@ -1926,6 +1945,7 @@ CValue YieldExpression::Compile(CompilerContext* context)
 
 
 	//store result into the generator context
+	value = context->DoCast(data.type->base->data->struct_members[1].type, value);//cast to the correct type
 	br = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 	context->root->builder.CreateStore(value.val, br);
 
