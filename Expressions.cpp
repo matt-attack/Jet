@@ -246,11 +246,8 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 				context->root->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->base->data->name + "' Not Found", this->member);
 
 			if (tc && lhs.type->base->base->data->struct_members[index].type == 0)
-			{
-				auto t = context->root->LookupType(lhs.type->base->base->data->struct_members[index].type_name);
-				//printf("");
-				return t;
-			}
+				return context->root->LookupType(lhs.type->base->base->data->struct_members[index].type_name);
+
 			return lhs.type->base->base->data->struct_members[index].type;
 		}
 		else if ((lhs.type->type == Types::Array || lhs.type->type == Types::Pointer) && string == 0)//or pointer!!(later)
@@ -473,10 +470,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 
 		std::vector<llvm::Value*> argts;
 		for (auto ii : *this->args)
-		{
-			auto val = ii->Compile(context);
-			argts.push_back(val.val);
-		}
+			argts.push_back(ii->Compile(context).val);
 		return CValue(lhs.type->function->return_type, context->root->builder.CreateCall(lhs.val, argts));
 	}
 
@@ -741,7 +735,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	CompilerContext* function;
 	if (this->is_generator)
 	{
-		function = context->AddFunction(this->GetRealName()+"_generator", ret, { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+		function = context->AddFunction(this->GetRealName() + "_generator", ret, { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
 		function->function->is_generator = true;
 	}
 	else
@@ -863,7 +857,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		//now compile reset function
 		{
-			auto reset = context->AddFunction(this->GetRealName()+"yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+			auto reset = context->AddFunction(this->GetRealName() + "yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
 
 			context->root->current_function = reset;
 			reset->function->Load(context->root);
@@ -1957,6 +1951,63 @@ CValue YieldExpression::Compile(CompilerContext* context)
 
 	//start inserting in new block
 	context->root->builder.SetInsertPoint(bb);
+
+	return CValue();
+}
+
+CValue MatchExpression::Compile(CompilerContext* context)
+{
+	CValue val;//first get pointer to union
+	auto i = dynamic_cast<NameExpression*>(var);
+	auto p = dynamic_cast<IndexExpression*>(var);
+	if (i)
+		val = context->GetVariable(i->GetName());
+	else if (p)
+		val = p->GetElementPointer(context);
+
+	auto endbb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "match.end");
+
+	//from val get the type
+	auto key = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+	auto sw = context->root->builder.CreateSwitch(context->root->builder.CreateLoad(key), endbb, this->cases.size());
+
+	for (auto ii : this->cases)
+	{
+		context->PushScope();
+
+		int pi = 0;//find what index it is
+		for (auto mem : val.type->base->_union->members)
+		{
+			if (mem->name == ii.type.text)
+				break;
+			pi++;
+		}
+
+		//add bb for case
+		auto bb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "match.case", context->function->f);
+		context->root->builder.SetInsertPoint(bb);
+		auto i = llvm::ConstantInt::get(llvm::getGlobalContext(), llvm::APInt(32, (uint64_t)pi));
+		sw->addCase(i, bb);
+
+		//add local
+		auto ptr = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+		ptr = context->root->builder.CreatePointerCast(ptr, val.type->base->_union->members[pi]->GetPointerType()->GetLLVMType());
+		context->RegisterLocal(ii.name.text, CValue(val.type->base->_union->members[pi]->GetPointerType(), ptr));
+
+		//build internal
+		ii.block->Compile(context);
+
+		//need to do this without destructing args
+		context->scope->named_values[ii.name.text] = CValue();
+		context->PopScope();
+
+		//branch to end
+		context->root->builder.CreateBr(endbb);
+	}
+
+	//start new basic block
+	context->function->f->getBasicBlockList().push_back(endbb);
+	context->root->builder.SetInsertPoint(endbb);
 
 	return CValue();
 }

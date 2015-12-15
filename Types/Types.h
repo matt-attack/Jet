@@ -46,6 +46,7 @@ namespace Jet
 		Bool,
 
 		Struct,//value type
+		Union,
 		Function,
 
 		Trait,//cant instantiate this!!
@@ -66,6 +67,7 @@ namespace Jet
 	struct FunctionType;
 	struct Function;
 	struct Namespace;
+	struct Union;
 	struct Token;
 	class Type
 	{
@@ -86,6 +88,7 @@ namespace Jet
 			Trait* trait;
 			FunctionType* function;
 			Token* _location;
+			Union* _union;
 		};
 		unsigned int size;//for arrays
 
@@ -123,6 +126,8 @@ namespace Jet
 			else
 				return this;
 		}
+
+		int GetSize();
 
 		//can it be instantiated? (no Traits as subtypes)
 		bool IsValid();
@@ -231,6 +236,12 @@ namespace Jet
 		}
 
 		void Load(Compilation* compiler);
+	};
+
+	struct Union
+	{
+		std::vector<Type*> members;
+		llvm::Type* type;
 	};
 }
 #endif

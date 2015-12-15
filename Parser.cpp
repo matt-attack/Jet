@@ -94,6 +94,10 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	this->Register(TokenType::Ret, new ReturnParselet());
 	this->Register(TokenType::For, new ForParselet());
 
+	this->Register(TokenType::Match, new MatchParselet());
+
+	this->Register(TokenType::Union, new UnionParselet());
+
 	this->Register(TokenType::Switch, new SwitchParselet());
 	this->Register(TokenType::Case, new CaseParselet());
 	this->Register(TokenType::Default, new DefaultParselet());

@@ -72,12 +72,12 @@ Token ParseType(Parser* parser, bool parse_arrays = true)
 
 		if (auto s = dynamic_cast<NumberExpression*>(size))
 		{
-			if (s->GetValue() <= 0)
+			if (s->GetIntValue() <= 0)
 			{
 				parser->Error("Cannot size array with a zero or negative size", tok);
 				//throw 7;
 			}
-			out += "[" + std::to_string((int)s->GetValue()) + "]";
+			out += "[" + std::to_string((int)s->GetIntValue()) + "]";
 		}
 		else
 		{
@@ -319,6 +319,58 @@ Expression* SwitchParselet::parse(Parser* parser, Token token)
 	return new SwitchExpression(token, var.Release(), block);
 }
 
+Expression* UnionParselet::parse(Parser* parser, Token token)
+{
+	Token name = parser->Consume(TokenType::Name);
+
+	parser->Consume(TokenType::Assign);
+
+	std::vector<Token> elements;
+	while (parser->LookAhead().type != TokenType::Semicolon)
+	{
+		//parse in each block
+		Token name = parser->Consume(TokenType::Name);
+
+		elements.push_back(name);
+
+		if (parser->MatchAndConsume(TokenType::BOr))
+			continue;
+
+		break;
+	}
+
+	return new UnionExpression(name, std::move(elements));
+	//return new SwitchExpression(token, var.Release(), block);
+}
+
+Expression* MatchParselet::parse(Parser* parser, Token token)
+{
+	parser->Consume(TokenType::LeftParen);
+	UniquePtr<Expression*> var = parser->ParseExpression();
+	parser->Consume(TokenType::RightParen);
+
+	parser->Consume(TokenType::LeftBrace);
+
+	std::vector<MatchCase> cases;
+	while (!parser->MatchAndConsume(TokenType::RightBrace))
+	{
+		//parse in each block
+		Token type = parser->Consume(TokenType::Name);
+
+		Token name = parser->Consume(TokenType::Name);
+
+		auto tok = parser->Consume(TokenType::Assign);
+		parser->Consume(TokenType::GreaterThan);
+
+		BlockExpression* block = parser->ParseBlock(true);
+
+		cases.push_back({ type, name, block });
+	}
+
+	return new MatchExpression(token, var.Release(), std::move(cases));
+	//return new SwitchExpression(token, var.Release(), block);
+}
+
 Expression* IfParselet::parse(Parser* parser, Token token)
 {
 	std::vector<Branch*> branches;
@@ -513,10 +565,10 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 
 			if (auto s = dynamic_cast<NumberExpression*>(size))
 			{
-				if (s->GetValue() <= 0)
+				if (s->GetIntValue() <= 0)
 					parser->Error("Cannot size array with a zero or negative size", token);
 
-				type.text += "[" + std::to_string((int)s->GetValue()) + "]";
+				type.text += "[" + std::to_string((int)s->GetIntValue()) + "]";
 			}
 			else
 			{
@@ -785,12 +837,12 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 
 			if (auto s = dynamic_cast<NumberExpression*>(size))
 			{
-				if (s->GetValue() <= 0)
+				if (s->GetIntValue() <= 0)
 				{
 					parser->Error("Cannot size array with a zero or negative size", token);
 					//throw 7;
 				}
-				type.text += "[" + std::to_string((int)s->GetValue()) + "]";
+				type.text += "[" + std::to_string((int)s->GetIntValue()) + "]";
 			}
 			else
 			{

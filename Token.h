@@ -75,6 +75,8 @@ namespace Jet
 		Yield,
 		Resume,
 
+		Match,
+
 		Switch,
 		Case,
 		Default,
@@ -84,6 +86,7 @@ namespace Jet
 		Struct,
 		Trait,
 		Namespace,
+		Union,
 
 		Generator,
 

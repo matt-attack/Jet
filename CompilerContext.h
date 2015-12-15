@@ -49,6 +49,7 @@ namespace Jet
 	class CompilerContext
 	{
 		friend class FunctionExpression;
+		friend class MatchExpression;
 		Scope* scope;
 		TCScope* tscope;
 
@@ -95,14 +96,11 @@ namespace Jet
 			auto FBloc = new llvm::GlobalVariable(*root->module, fname->getType(), true,
 				llvm::GlobalValue::InternalLinkage, fname,
 				"const_string");
-			auto const_inst32 = llvm::ConstantInt::get(llvm::getGlobalContext(), llvm::APInt(32, llvm::StringRef("0"), 10));
+			auto const_inst32 = llvm::ConstantInt::get(llvm::getGlobalContext(), llvm::APInt(32, 0, 10));
 			std::vector<llvm::Value*> const_ptr_7_indices = { const_inst32, const_inst32 };
-			auto type = FBloc->getType()->getElementType()->getArrayElementType()->getPointerTo();
-			//FBloc->getType()->getElementType()->getArrayElementType()->getPointerTo()->dump();
-
+			
 			auto res = this->root->builder.CreateGEP(FBloc, const_ptr_7_indices, "x");
-			//auto res = llvm::ConstantExpr::getGetElementPtr(FBloc, const_ptr_7_indices, "x");
-			//fname->get
+
 			return CValue(this->root->LookupType("char*"), res);
 		}
 

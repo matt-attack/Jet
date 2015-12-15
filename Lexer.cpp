@@ -108,13 +108,15 @@ public:
 		keywords["generator"] = TokenType::Generator;
 		keywords["resume"] = TokenType::Resume;
 
+		keywords["match"] = TokenType::Match;
+
 		keywords["switch"] = TokenType::Switch;
 		keywords["case"] = TokenType::Case;
 		keywords["default"] = TokenType::Default;
 
 		keywords["trait"] = TokenType::Trait;
 
-
+		keywords["union"] = TokenType::Union;
 		keywords["extern"] = TokenType::Extern;
 		keywords["struct"] = TokenType::Struct;
 		keywords["namespace"] = TokenType::Namespace;

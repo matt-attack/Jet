@@ -1,14 +1,4 @@
 
-/*#ifdef _DEBUG
-#ifndef DBG_NEW
-#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
-#define new DBG_NEW
-#endif
-
-#define _CRTDBG_MAP_ALLOC
-#include <crtdbg.h>
-#endif*/
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -78,6 +68,41 @@ int main(int argc, char* argv[])
 		if (command[i] && command[i+1])
 			args = (const char*)&command[i+1];
 		command[i] = 0;
+
+		if (strcmp(command, "runtests") == 0)
+		{
+			OptionParser parser;
+			parser.AddOption("o", "0");
+			parser.AddOption("f", "1");
+			parser.Parse(args);
+
+			CompilerOptions options;
+			options.optimization = parser.GetOption("o").GetInt();
+			options.force = parser.GetOption("f").GetString().length() == 0;
+			std::string config = "";
+			if (parser.commands.size())
+				config = parser.commands.front();
+
+			std::vector<char*> programs = { "tests/ExtensionMethods", "tests/Generators", "tests/IfStatements", "tests/Unions" };
+
+			for (auto ii : programs)
+			{
+				//add options to this later
+				auto project = JetProject::Load(ii);
+
+				DiagnosticBuilder b([](Diagnostic&) {});
+				auto compilation = Compilation::Make(project, &b);
+
+				if (b.GetErrors().size() > 0)
+				{
+					printf("Test '%s' failed\n", ii);
+				}
+
+				delete compilation;
+				delete project;
+			}
+			continue;
+		}
 
 		OptionParser parser;
 		parser.AddOption("o", "0");

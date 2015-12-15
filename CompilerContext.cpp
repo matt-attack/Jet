@@ -743,6 +743,29 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		if (t->type == Types::Function && t->function == value.type->function)
 			return value;
 	}
+	if (t->type == Types::Union && value.type->type == Types::Struct)
+	{
+		for (int i = 0; i < t->_union->members.size(); i++)
+		{
+			if (t->_union->members[i] == value.type)
+			{
+				//Alloca the type, then store values in it and load. This is dumb but will work.
+				auto alloc = this->root->builder.CreateAlloca(t->_union->type);
+
+				//store type
+				auto type = this->root->builder.CreateGEP(alloc, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) });
+				this->root->builder.CreateStore(this->root->builder.getInt32(i), type);
+
+				//store data
+				auto data = this->root->builder.CreateGEP(alloc, { this->root->builder.getInt32(0), this->root->builder.getInt32(1) });
+				data = this->root->builder.CreatePointerCast(data, value.type->GetPointerType()->GetLLVMType());
+				this->root->builder.CreateStore(value.val, data);
+
+				//return the new value
+				return CValue(t, this->root->builder.CreateLoad(alloc));
+			}
+		}
+	}
 
 	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 }

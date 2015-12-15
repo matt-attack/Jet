@@ -475,6 +475,28 @@ namespace Jet
 		Expression* parse(Parser* parser, Token token);
 	};
 
+	class MatchParselet : public StatementParselet
+	{
+	public:
+		MatchParselet()
+		{
+			this->TrailingSemicolon = false;
+		}
+
+		Expression* parse(Parser* parser, Token token);
+	};
+
+	class UnionParselet : public StatementParselet
+	{
+	public:
+		UnionParselet()
+		{
+			this->TrailingSemicolon = true;
+		}
+
+		Expression* parse(Parser* parser, Token token);
+	};
+
 	class LocalParselet: public StatementParselet
 	{
 	public:

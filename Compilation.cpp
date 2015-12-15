@@ -7,7 +7,7 @@
 
 #include <direct.h>
 
-#include <llvm-c\Core.h>
+#include <llvm-c/Core.h>
 #include <llvm/ADT/Triple.h>
 #include <llvm/Support/Host.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
@@ -359,11 +359,6 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		goto error;
 	}
 
-	//load all types
-	//for (auto ii : this->types)
-	//if (!(ii.second->type == Types::Struct && ii.second->data->templates.size()))
-	//	ii.second->Load(this);
-
 	{
 		StackTime timer("Final Compiler Pass");
 
@@ -452,7 +447,6 @@ char* ReadDependenciesFromSymbols(const char* path, int& size)
 
 void Compilation::Assemble(int olevel)
 {
-	//printf("HI \n\n\n\n\n\n");
 	//this->module->dump();
 	if (this->diagnostics->GetErrors().size() > 0)
 		return;

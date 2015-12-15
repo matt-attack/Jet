@@ -60,20 +60,20 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		for (auto type : this->data->struct_members)
 		{
 			assert(type.type->loaded);
-			//fixme later?
-
 			ftypes.push_back(type.type->GetDebugType(compiler));
 		}
 
 		llvm::DIType* typ = 0;
-		auto file = compiler->debug->createFile(this->data->name,
-			compiler->debug_info.cu->getDirectory());
 
 		int line = 0;
 		if (this->data->expression)
 			line = this->data->expression->token.line;
-		//compiler->debug_info.file->dump();
+
 		this->debug_type = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 4, 0, typ, compiler->debug->getOrCreateArray(ftypes));
+	}
+	else if (this->type == Types::Union)
+	{
+		this->debug_type = compiler->debug->createUnionType(compiler->debug_info.file, this->name, compiler->debug_info.file, 0, 512, 8, 0, {});
 	}
 	else if (this->type == Types::Function)
 	{
@@ -90,7 +90,8 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 
 	if (this->debug_type)
 		return this->debug_type;
-	printf("oops");
+	
+	throw 7;
 }
 
 llvm::Type* Type::GetLLVMType()
@@ -128,6 +129,9 @@ llvm::Type* Type::GetLLVMType()
 
 		return llvm::FunctionType::get(this->function->return_type->GetLLVMType(), args, false)->getPointerTo();
 	}
+	case Types::Union:
+		assert(this->loaded);
+		return this->_union->type;
 	case Types::Trait:
 		return 0;
 	}
@@ -201,6 +205,23 @@ void Type::Load(Compilation* compiler)
 	if (type == Types::Struct)
 	{
 		data->Load(compiler);
+	}
+	else if (type == Types::Union)
+	{
+		//build the type
+		int size = 0;
+		for (auto ii : this->_union->members)
+		{
+			int s = ii->GetSize();
+			if (s > size)
+				size = s;
+		}
+
+		//allocate a struct type with the right size
+		auto char_t = llvm::IntegerType::get(compiler->context, 8);
+		auto id_t = llvm::IntegerType::get(compiler->context, 32);
+		auto base = llvm::ArrayType::get(char_t, size);
+		this->_union->type = llvm::StructType::get(compiler->context, { id_t, base }, true);
 	}
 	else if (type == Types::Invalid)
 	{
@@ -606,6 +627,8 @@ std::string Type::ToString()
 		return this->trait->name;
 	case Types::Long:
 		return "long";
+	case Types::Union:
+		return this->name;
 	case Types::Function:
 		std::string out = this->function->return_type->ToString() + "(";
 		bool first = true;
@@ -628,7 +651,6 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 	if (this->type == Types::Trait)
 	{
 		//only for typechecking, should never hit this during compilation
-		//printf("hi");
 		//look in this->trait->functions and this->trait->extension_methods
 		//todo
 		Function* fun = 0;
@@ -950,4 +972,16 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 			ii.second.ns->OutputMetadata(data, compilation);
 		}
 	}
+}
+
+int Type::GetSize()
+{
+	if (this->type == Types::Struct)
+	{
+		int size = 0;
+		for (int i = 0; i < this->data->struct_members.size(); i++)
+			size += this->data->struct_members[i].type->GetSize();
+		return size;
+	}
+	return 4;//todo
 }

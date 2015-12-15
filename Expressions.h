@@ -349,6 +349,106 @@ namespace Jet
 			}
 		}
 	};
+	
+
+	class UnionExpression : public Expression
+	{
+		Token name;
+		std::vector<Token> elements;
+	public:
+
+		UnionExpression(Token& name, std::vector<Token>&& elements)
+		{
+			this->elements = elements;
+			this->name = name;
+		}
+
+		CValue Compile(CompilerContext* context)
+		{
+			return CValue();
+		}
+
+		void CompileDeclarations(CompilerContext* context) 
+		{
+			//define it
+			Type* ty = new Type(this->name.text, Types::Union);
+			ty->_union = new Union;
+			ty->_union->members.resize(this->elements.size());
+			for (int i = 0; i < this->elements.size(); i++)
+				context->root->AdvanceTypeLookup(&ty->_union->members[i], this->elements[i].text, &this->elements[i]);
+
+			context->root->ns->members.insert({ this->name.text, ty });
+		};
+
+		void Print(std::string& output, Source* source)
+		{
+			throw 7;
+			//token.Print(output, source);
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//get the type and finish it
+			//context->root->LookupType(this->name.text, false);
+
+			//lookup all the members and add them
+
+			//get the type fixme later
+			return 0;
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
+	};
+
+	struct MatchCase
+	{
+		Token type, name;
+		BlockExpression* block;
+	};
+	class MatchExpression : public Expression
+	{
+		Token token;
+		Expression* var;
+
+		std::vector<MatchCase> cases;
+	public:
+
+		MatchExpression(Token token, Expression* thing, std::vector<MatchCase>&& elements)
+		{
+			this->token = token;
+			this->cases = elements;
+			this->var = thing;
+		}
+
+		CValue Compile(CompilerContext* context);
+
+		void CompileDeclarations(CompilerContext* context)
+		{
+
+		};
+
+		void Print(std::string& output, Source* source)
+		{
+			throw 7;
+			//token.Print(output, source);
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//build the type
+				//get the type fixme later
+				return 0;
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+		//	visitor->Visit(this);
+		}
+	};
+
 
 	class NumberExpression : public Expression
 	{
@@ -357,6 +457,40 @@ namespace Jet
 		NumberExpression(Token token)
 		{
 			this->token = token;
+		}
+
+		int GetIntValue()
+		{
+			bool isint = true;
+			bool ishex = false;
+			for (int i = 0; i < this->token.text.length(); i++)
+			{
+				if (this->token.text[i] == '.')
+					isint = false;
+			}
+
+			if (token.text.length() >= 3)
+			{
+				std::string substr = token.text.substr(2);
+				if (token.text[1] == 'x')
+				{
+					unsigned long long num = std::stoull(substr, nullptr, 16);
+					return num;
+				}
+				else if (token.text[1] == 'b')
+				{
+					unsigned long long num = std::stoull(substr, nullptr, 2);
+					return num;
+				}
+			}
+
+			//ok, lets get the type from what kind of constant it is
+			//get type from the constant
+			//this is pretty terrible, come back later
+			if (isint)
+				return std::stoi(this->token.text);
+			else
+				return ::atof(token.text.c_str());
 		}
 
 		double GetValue()
@@ -596,8 +730,9 @@ namespace Jet
 			if (tl == tr)
 				return tl;
 
-			throw 7;
-			return 0;
+			//todo: make this error
+			//throw 7;
+			return tr;
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)

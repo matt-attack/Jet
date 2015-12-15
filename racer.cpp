@@ -136,7 +136,8 @@ extern "C"
 		if (project == 0)
 			return "";//project didnt load, just return 0
 
-		auto compilation = Compilation::Make(project);
+		DiagnosticBuilder b([](Diagnostic&){});
+		auto compilation = Compilation::Make(project, &b);
 
 		//lets just check types for now
 		auto res = compilation->TryLookupType(symbol);
@@ -234,7 +235,8 @@ extern "C"
 		if (project == 0)
 			return "";//project didnt load, just return 0
 
-		auto compilation = Compilation::Make(project);
+		DiagnosticBuilder b([](Diagnostic&){});
+		auto compilation = Compilation::Make(project, &b);
 
 		std::string out;
 		for (auto ii : compilation->ns->members)
