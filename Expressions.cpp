@@ -1904,7 +1904,8 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 	if (fun->arguments.size() == arg.size() + 1)
 	{
 		//its a constructor or something
-		throw 7;
+		return fun->arguments[0].first->base;
+		//throw 7;
 	}
 
 	//keep working on this, dont forget constructors
@@ -1965,6 +1966,9 @@ CValue MatchExpression::Compile(CompilerContext* context)
 	else if (p)
 		val = p->GetElementPointer(context);
 
+	if (val.type->base->type != Types::Union)
+		context->root->Error("Cannot match with a non-union", token);
+
 	auto endbb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "match.end");
 
 	//from val get the type
@@ -1975,6 +1979,21 @@ CValue MatchExpression::Compile(CompilerContext* context)
 	{
 		context->PushScope();
 
+		if (ii.type.type == TokenType::Default)
+		{
+			//add bb for case
+			auto bb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "match.case", context->function->f);
+			context->root->builder.SetInsertPoint(bb);
+			sw->setDefaultDest(bb);
+
+			//build internal
+			ii.block->Compile(context);
+
+			//branch to end
+			context->root->builder.CreateBr(endbb);
+			break;
+		}
+
 		int pi = 0;//find what index it is
 		for (auto mem : val.type->base->_union->members)
 		{
@@ -1982,6 +2001,9 @@ CValue MatchExpression::Compile(CompilerContext* context)
 				break;
 			pi++;
 		}
+
+		if (pi >= val.type->base->_union->members.size())
+			context->root->Error("Type '"+ii.type.text+"' not in union, cannot match to it.", ii.type);
 
 		//add bb for case
 		auto bb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "match.case", context->function->f);

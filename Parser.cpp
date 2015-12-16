@@ -147,7 +147,6 @@ Expression* Parser::ParseExpression(int precedence)
 	if (prefix == 0)
 	{
 		std::string str = "No Parser Found for: " + token.text;
-		
 		this->Error(str, token);
 		return 0;
 	}

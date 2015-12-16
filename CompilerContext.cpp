@@ -324,7 +324,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 
 					//fun->Load(this->parent);
 
-					return 0;// fun;// CValue(type->second, this->root->builder.CreateLoad(Alloca));
+					return fun;// CValue(type->second, this->root->builder.CreateLoad(Alloca));
 				}
 			}
 		}

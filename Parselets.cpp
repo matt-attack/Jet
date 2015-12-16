@@ -355,6 +355,21 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 	while (!parser->MatchAndConsume(TokenType::RightBrace))
 	{
 		//parse in each block
+		if (parser->LookAhead().type == TokenType::Default)
+		{
+			Token def = parser->Consume();
+
+			auto tok = parser->Consume(TokenType::Assign);
+			parser->Consume(TokenType::GreaterThan);
+
+			BlockExpression* block = parser->ParseBlock(true);
+
+			cases.push_back({ def, def, block });
+
+			parser->Consume(TokenType::RightBrace);
+			break;
+		}
+
 		Token type = parser->Consume(TokenType::Name);
 
 		Token name = parser->Consume(TokenType::Name);
