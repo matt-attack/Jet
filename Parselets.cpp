@@ -298,9 +298,27 @@ Expression* ForParselet::parse(Parser* parser, Token token)
 	}
 	}*/
 
-	UniquePtr<Expression*> initial = parser->ParseStatement(true);
-	UniquePtr<Expression*> condition = parser->ParseStatement(true);
-	UniquePtr<Expression*> increment = parser->ParseExpression();
+
+	/*UniquePtr<Expression*> initial = 0;
+	//if (!parser->MatchAndConsume(TokenType::Semicolon))
+	initial = parser->ParseStatement(true);
+	UniquePtr<Expression*> condition = 0;
+	//if (!parser->MatchAndConsume(TokenType::Semicolon))
+	condition = parser->ParseStatement(true);
+	UniquePtr<Expression*> increment = 0;
+	//if (!parser->MatchAndConsume(TokenType::Semicolon))
+	increment = parser->ParseExpression();*/
+
+
+	UniquePtr<Expression*> initial = 0;
+	if (!parser->MatchAndConsume(TokenType::Semicolon))
+		initial = parser->ParseStatement(true);
+	UniquePtr<Expression*> condition = 0;
+	if (!parser->MatchAndConsume(TokenType::Semicolon))
+		condition = parser->ParseStatement(true);
+	UniquePtr<Expression*> increment = 0;
+	if (!parser->Match(TokenType::RightParen))
+		increment = parser->ParseExpression();
 
 	parser->Consume(TokenType::RightParen);
 

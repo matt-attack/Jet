@@ -349,7 +349,7 @@ namespace Jet
 			}
 		}
 	};
-	
+
 
 	class UnionExpression : public Expression
 	{
@@ -368,7 +368,7 @@ namespace Jet
 			return CValue();
 		}
 
-		void CompileDeclarations(CompilerContext* context) 
+		void CompileDeclarations(CompilerContext* context)
 		{
 			//define it
 			Type* ty = new Type(this->name.text, Types::Union);
@@ -439,13 +439,13 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			//build the type
-				//get the type fixme later
-				return 0;
+			//get the type fixme later
+			return 0;
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
-		//	visitor->Visit(this);
+			//	visitor->Visit(this);
 		}
 	};
 
@@ -1051,7 +1051,7 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			auto left = this->left->TypeCheck(context);
-			throw 7;
+			//throw 7;
 			return 0;
 		}
 
@@ -1413,18 +1413,23 @@ namespace Jet
 		{
 			this->Parent = parent;
 			block->SetParent(this);
-			incr->SetParent(block);
-			condition->SetParent(this);
-			initial->SetParent(block);
+			if (incr)
+				incr->SetParent(block);
+			if (condition)
+				condition->SetParent(this);
+			if (initial)
+				initial->SetParent(block);
 		}
 
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			//check type of middle to be bool or nothing
 			//then just check others
-			initial->TypeCheck(context);
+			if (initial)
+				initial->TypeCheck(context);
 
-			auto ty = condition->TypeCheck(context);
+			if (condition)
+				auto ty = condition->TypeCheck(context);
 			//if (ty && cant convert to bool)
 			//error
 			//incr->TypeCheck(context);
@@ -1438,7 +1443,10 @@ namespace Jet
 		{
 			context->CurrentToken(&token);
 
-			this->initial->Compile(context);
+			context->PushScope();
+
+			if (this->initial)
+				this->initial->Compile(context);
 
 			llvm::BasicBlock *start = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forstart");
 			llvm::BasicBlock *body = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forbody");
@@ -1450,10 +1458,17 @@ namespace Jet
 			context->function->f->getBasicBlockList().push_back(start);
 			context->root->builder.SetInsertPoint(start);
 
-			auto cond = this->condition->Compile(context);
-			cond = context->DoCast(context->root->BoolType, cond);
+			if (this->condition)
+			{
+				auto cond = this->condition->Compile(context);
+				cond = context->DoCast(context->root->BoolType, cond);
 
-			context->root->builder.CreateCondBr(cond.val, body, end);
+				context->root->builder.CreateCondBr(cond.val, body, end);
+			}
+			else
+			{
+				context->root->builder.CreateBr(body);
+			}
 
 			context->function->f->getBasicBlockList().push_back(body);
 			context->root->builder.SetInsertPoint(body);
@@ -1468,12 +1483,15 @@ namespace Jet
 			context->function->f->getBasicBlockList().push_back(cont);
 			context->root->builder.SetInsertPoint(cont);
 
-			this->incr->Compile(context);
+			if (incr)
+				this->incr->Compile(context);
 
 			context->root->builder.CreateBr(start);
 
 			context->function->f->getBasicBlockList().push_back(end);
 			context->root->builder.SetInsertPoint(end);
+
+			context->PopScope();
 
 			return CValue();
 		}

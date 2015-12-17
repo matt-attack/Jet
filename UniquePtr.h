@@ -42,7 +42,7 @@ namespace Jet
 		inline UniquePtr<T> operator = (const T p)
 		{
 			ptr = p;
-			return p;
+			return 0;
 		}
 
 		//returns the pointer and gets done with this
