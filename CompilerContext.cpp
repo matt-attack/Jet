@@ -436,7 +436,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		arsgs.push_back(ii.type);
 	Function* fun = this->GetMethod(name, arsgs, Struct);
 	this->current_token = old_tok;
-
+	//ok, having issues with constructors, need way to tell if they are one
 	if (fun == 0 && Struct == 0)
 	{
 		//global function?
@@ -523,19 +523,37 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 			return CValue(var.type->function->return_type, this->root->builder.CreateCall(var.val, argsv));
 		}
-		this->root->Error("Function '" + name + "' is not defined", *this->current_token);
+		this->root->Error("Function '" + name + "' with "+std::to_string(args.size()) +" arguments is not defined", *this->current_token);
 	}
-	else
+	else if (fun == 0)
 	{
-		//im a struct yo
-		if (fun == 0)
-			this->root->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+		this->root->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
 	}
 
 	fun->Load(this->root);
 
 	if (args.size() != fun->f->arg_size())
-		this->root->Error("No function '"+name+" found which takes "+std::to_string(args.size())+" arguments.", *this->current_token);//todo: add better checks later
+	{
+		//ok, we allocate, call then 
+		//allocate thing
+		auto type = fun->arguments[0].first->base;
+		type->Load(this->root);
+		auto Alloca = this->root->builder.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
+
+		std::vector<llvm::Value*> argsv;
+		int i = 1;
+
+		//add struct
+		argsv.push_back(Alloca);
+		for (auto ii : args)
+			argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
+
+		fun->Load(this->root);
+
+		this->root->builder.CreateCall(fun->f, argsv);
+
+		return CValue(type, this->root->builder.CreateLoad(Alloca));
+	}
 
 	std::vector<llvm::Value*> argsv;
 	for (int i = 0; i < args.size(); i++)
@@ -592,7 +610,7 @@ CValue CompilerContext::GetVariable(const std::string& name)
 			std::vector<llvm::Type*> types;
 			for (int i = 0; i < this->captures.size(); i++)
 				types.push_back(storage_t->getContainedType(i));
-		
+
 			types.push_back(var.type->base->GetLLVMType());
 			storage_t = this->function->storage_type = storage_t->create(types);
 
@@ -675,7 +693,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 
 		//remove me later float to bool
 		//if (t->type == Types::Bool)
-			//return CValue(t, root->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
+		//return CValue(t, root->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
 	}
 	if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
 	{
@@ -691,11 +709,11 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 
 		/*if (value.type->type == Types::Int && (t->type == Types::Char || t->type == Types::Short))
 		{
-			return CValue(t, root->builder.CreateTrunc(value.val, tt));
+		return CValue(t, root->builder.CreateTrunc(value.val, tt));
 		}
 		if (value.type->type == Types::Short && t->type == Types::Int)
 		{
-			return CValue(t, root->builder.CreateSExt(value.val, tt));	
+		return CValue(t, root->builder.CreateSExt(value.val, tt));
 		}*/
 		if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
 			return CValue(t, root->builder.CreateSExtOrTrunc(value.val, tt));

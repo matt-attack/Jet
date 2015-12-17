@@ -112,10 +112,13 @@ int main(int argc, char* argv[])
 					compilation->Assemble(0);
 
 					//
-					std::string cmd = "tests/" + std::string(ii) + "/build/" + std::string(ii) + ".exe";
+					std::string cmd = "tests\\" + std::string(ii) + "\\build\\" + std::string(ii) + ".exe";
 					auto res = exec(cmd.c_str());
-					need to figure out why nothing is being printed
-					_asm int 3;
+					printf("%s\n", res.c_str());
+
+					if (res.find("fail") != -1)
+						printf("Test '%s' failed\n", ii);
+					//need to figure out why nothing is being printed
 				}
 
 				printf("\n");

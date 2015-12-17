@@ -1,0 +1,32 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+
+struct B
+{
+	int b_val;
+	
+	fun void T()
+	{
+	
+	}
+}
+
+fun void B::Extension()
+{
+	printf("pass", 0);
+}
+
+fun int main() 
+{ 
+	local x = B();
+	
+	x.Extension();
+	
+	return 0;
+}
+
+		

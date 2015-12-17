@@ -1,0 +1,81 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+trait IEnumerator<TT>
+{
+	fun TT Current();
+	
+	fun void Reset();
+	fun int MoveNext();
+}
+
+trait IEnumerable<T>
+{
+	fun IEnumerator<T> GetEnumerator();
+}
+
+fun void IEnumerable::Print()
+{
+	local enum = this->GetEnumerator();
+	while (enum.MoveNext() == 1)
+	{
+		puts("Got one!");
+	}
+}
+
+generator int test(char qp)
+{
+	local short y = 7;
+	for (local q = 10; q < 15; q++)
+	{
+		yield q;
+	}
+		
+	//puts("one");
+	yield y;
+	//puts("two");
+	yield qp;
+	//puts("three");
+	yield 3;
+}
+
+generator int power(int number, int exponent)
+{
+	local result = 1;
+	for (local i = 0; i < exponent; i++)
+	{
+		result = result * number;
+		yield result;
+	}
+}
+
+fun int main() 
+{ 
+	local x = power(2, 20);
+	local p = 0;
+	while (x.MoveNext())
+	{
+		p = x.Current();
+		//printf("%i\n", x.Current());
+	}
+	if (p != 1048576)
+		puts("fail");
+	else
+		puts("pass");
+		
+	local t = test(5);
+	while (t.MoveNext())
+	{
+		p = t.Current();
+		//printf("%i\n", t.Current());
+	}
+	if (p != 3)
+		puts("fail");
+	
+	return 0;
+}
+
+		
