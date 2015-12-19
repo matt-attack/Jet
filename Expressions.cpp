@@ -155,7 +155,8 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 	//add locals
 	//need to change context
 	CompilerContext* nc = new CompilerContext(context->root, context);// context->AddFunction(this->GetRealName(), ret, argsv, Struct.text.length() > 0 ? true : false, is_lambda);// , this->varargs);
-
+	if (this->name.text.length() == 0)
+		return 0;
 	if (auto str = dynamic_cast<StructExpression*>(this->Parent))
 	{
 		auto typ = context->root->LookupType(str->GetName(), false)->GetPointerType()->GetPointerType();
@@ -165,6 +166,15 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 	{
 		auto typ = context->root->LookupType(this->Struct.text, false)->GetPointerType()->GetPointerType();
 		nc->TCRegisterLocal("this", typ);
+
+		return 0;
+		//lets not typecheck these yet....
+		if (typ->base->base->type == Types::Trait)
+		{
+			context->root->ns = typ->base->base->trait;
+		}
+		else
+			context->root->ns = typ->base->base->data;
 	}
 	for (auto ii : *this->args)
 		nc->TCRegisterLocal(ii.second, context->root->LookupType(ii.first)->GetPointerType());
@@ -179,6 +189,9 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 		};
 	}
 	this->block->TypeCheck(nc);
+
+	if (this->Struct.text.length())
+		context->root->ns = context->root->ns->parent;
 
 	nc->local_reg_callback = [&](const std::string& name, Type* ty){};
 
@@ -243,10 +256,17 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 			}
 
 			if (index >= lhs.type->base->base->data->struct_members.size())
+			{
+				//check functions
+				for (auto ii : lhs.type->base->base->data->functions)
+				{
+					if (ii.first == this->member.text)
+						return ii.second->GetType(context->root);
+				}
 				context->root->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->base->data->name + "' Not Found", this->member);
-
+			}
 			if (tc && lhs.type->base->base->data->struct_members[index].type == 0)
-				return context->root->LookupType(lhs.type->base->base->data->struct_members[index].type_name);
+				return context->root->LookupType(lhs.type->base->base->data->struct_members[index].type_name, !tc);
 
 			return lhs.type->base->base->data->struct_members[index].type;
 		}
@@ -287,6 +307,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 				auto method = type->GetMethod(this->member.text, {}, context, true);
 				if (method == 0)
 					context->root->Error("Struct Member '" + this->member.text + "' of Struct '" + type->data->name + "' Not Found", this->member);
+				method->Load(context->root);
 				return CValue(method->GetType(context->root), method->f);
 			}
 
@@ -949,6 +970,9 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		{
 			type->data->functions.insert({ fname, fun });
 			advlookup = !type->data->template_args.size();
+
+			//if (type->data->templates.size())
+				//return;
 		}
 	}
 	else
@@ -1009,13 +1033,6 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			fun->arguments.back().first = context->root->LookupType(str + "*", false);
 	}
 
-	//add templates to new function
-	if (this->templates)
-	{
-		for (auto ii : *this->templates)
-			fun->templates.push_back({ context->root->LookupType(ii.first.text), ii.second.text });
-	}
-
 	//add arguments to new function
 	for (auto ii : *this->args)
 	{
@@ -1026,6 +1043,13 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		fun->arguments.push_back({ type, ii.second });
 		if (advlookup && is_trait == false)
 			context->root->AdvanceTypeLookup(&fun->arguments.back().first, ii.first, &this->token);
+	}
+
+	//add templates to new function
+	if (this->templates)
+	{
+		for (auto ii : *this->templates)
+			fun->templates.push_back({ context->root->LookupType(ii.first.text), ii.second.text });
 	}
 }
 
@@ -1049,12 +1073,8 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	}
 	context->root->AdvanceTypeLookup(&fun->return_type, this->ret_type.text, &this->ret_type);
 
-	fun->arguments.reserve(this->args->size());
-	for (auto ii : *this->args)
-	{
-		fun->arguments.push_back({ 0, ii.second });
-		context->root->AdvanceTypeLookup(&fun->arguments.back().first, ii.first, &this->token);
-	}
+	fun->arguments.reserve(this->args->size() + (Struct.length() > 0 ? 1 : 0));
+	
 
 	fun->f = 0;
 	if (Struct.length() > 0)
@@ -1076,10 +1096,18 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 
 			ii->data->functions.insert({ fname, fun });
 		}
+
+		fun->arguments.push_back({ ii->GetPointerType(), "this" });
 	}
 	else
 	{
 		context->root->ns->members.insert({ fname, fun });
+	}
+
+	for (auto ii : *this->args)
+	{
+		fun->arguments.push_back({ 0, ii.second });
+		context->root->AdvanceTypeLookup(&fun->arguments.back().first, ii.first, &this->token);
 	}
 }
 
@@ -1218,13 +1246,13 @@ CValue StructExpression::Compile(CompilerContext* context)
 				context->root->Error("Trait '" + ii.first.text + "' is not defined", ii.first);
 		}
 
-		auto myself = context->root->LookupType(this->name.text, false);
+		//auto myself = context->root->LookupType(this->name.text, false);
 
-		for (auto ii : *this->templates)
+		/*for (auto ii : *this->templates)
 		{
-			Type* type = context->root->LookupType(ii.first.text);
+		Type* type = context->root->LookupType(ii.first.text);
 
-			myself->data->members.insert({ ii.second.text, type });
+		myself->data->members.insert({ ii.second.text, type });
 		}
 
 		auto oldns = context->root->ns;
@@ -1232,8 +1260,8 @@ CValue StructExpression::Compile(CompilerContext* context)
 		myself->data->parent = oldns;
 		for (auto& ii : myself->data->struct_members)
 		{
-			if (ii.type == 0)
-				ii.type = context->root->LookupType(ii.type_name);
+		if (ii.type == 0)
+		ii.type = context->root->LookupType(ii.type_name);
 		}
 		context->root->ns = oldns;
 		//add in the type and tell it to not actually generate IR, just to check things
@@ -1242,7 +1270,7 @@ CValue StructExpression::Compile(CompilerContext* context)
 			//finish this
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->Compile(context);
-		}
+		}*/
 
 		return CValue();
 	}
@@ -1584,6 +1612,8 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		{
 			str->data->templates.push_back({ 0, ii.second.text });
 			context->root->AdvanceTypeLookup(&str->data->templates.back().first, ii.first.text, &ii.first);
+
+			context->root->AdvanceTypeLookup(&str->data->members.insert({ ii.second.text, Symbol((Type*)0) })->second.ty, ii.first.text, &ii.first);
 		}
 	}
 
@@ -1595,6 +1625,9 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 			size++;
 	}
 	str->data->struct_members.reserve(size);
+
+	str->data->parent = context->root->ns;
+	context->root->ns = str->data;
 	for (auto& ii : this->members)
 	{
 		if (ii.type == StructMember::VariableMember)
@@ -1605,10 +1638,11 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		}
 		else
 		{
-			if (this->templates == 0)
+			if (this->templates == 0)//todo need to get rid of this to fix things
 				ii.function->CompileDeclarations(context);
 		}
 	}
+	context->root->ns = context->root->ns->parent;
 
 	if (this->templates == 0)
 		this->AddConstructorDeclarations(str, context);
@@ -1763,7 +1797,7 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 			type->name = ii.second.text;
 			type->type = Types::Invalid;
 			type->ns = context->root->ns;
-			t->members.insert({ type->name, type });
+			t->members.insert({ ii.second.text, type });
 		}
 	}
 
@@ -1859,8 +1893,8 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 		//im a struct yo
 		fname = index->member.text;
 		stru = index->GetBaseType(context, true);
-		stru->Load(context->root);
-		assert(stru->loaded);
+		//stru->Load(context->root);
+		//assert(stru->loaded);
 		//llvm::Value* self = index->GetBaseElementPointer(context).val;
 		if (index->token.type == TokenType::Pointy)
 		{
@@ -1899,7 +1933,16 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 	}
 	auto fun = context->GetMethod(fname, arg, stru);
 	if (fun == 0)
+	{
+		//check variables
+		auto var = context->TCGetVariable(fname);
+		if (var->type == Types::Pointer && var->base->type == Types::Struct && var->base->data->template_base && var->base->data->template_base->name == "function")
+			return var->base->data->members.find("T")->second.ty->function->return_type;
+		else if (var->base->type == Types::Function)
+			return var->base->function->return_type;
+
 		context->root->Error("Cannot call method '" + fname + "'", this->token);
+	}
 
 	if (fun->arguments.size() == arg.size() + 1)
 	{
@@ -2003,7 +2046,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		}
 
 		if (pi >= val.type->base->_union->members.size())
-			context->root->Error("Type '"+ii.type.text+"' not in union, cannot match to it.", ii.type);
+			context->root->Error("Type '" + ii.type.text + "' not in union, cannot match to it.", ii.type);
 
 		//add bb for case
 		auto bb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "match.case", context->function->f);

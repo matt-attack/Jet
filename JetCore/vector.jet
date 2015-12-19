@@ -27,35 +27,7 @@ fun void apple(int y, int z)
 {
 	
 }
-/*struct Reference
-{
-	CallbackMachine x;
-}*/
 
-/*struct CallbackMachine
-{
-	int x;
-	vector<void(int,char*)> callbacks;
-	
-	fun void CallbackMachine()
-	{
-		puts("CallbackMachine constructor");
-	}
-	
-	fun void Add(void(int,char*) callback)
-	{
-		this->callbacks.push_back(callback);
-	}
-	
-	fun void Execute(char* str)
-	{
-		local enum = this->callbacks.GetEnumerator();
-		while (enum.MoveNext() == 1)
-		{
-			enum.Current()(1, str);
-		}
-	}
-}*/
 
 trait IEnumerator<TT>
 {
@@ -69,60 +41,6 @@ trait IEnumerable<T>
 {
 	fun IEnumerator<T> GetEnumerator();
 }
-
-
-/*fun int main()
-{
-	
-	//local doubletest<int, double> ttt;
-	local vector<int> x;
-	//local vector<VectorIterator<int> > test;
-	//local vector<int> x2;
-	x.push_back(5);
-	x.push_back(6);
-	x.push_back(7);
-	x.push_back(1);
-	x.push_back(2);
-	x.push_back(22);
-	
-	local p = new int;
-
-	//local string = "hello";
-	//string = x;
-	//local x3 = ttttt;
-	//x3();
-	//string = ttt;
-	//x.DoStuff();
-	//x.Print();
-	
-	//local res = x.Contains(1);
-	//res = 1;
-	//if (res)
-		//puts("x contains 5");
-	//local q = x.Where;
-	
-	//x.Where(TestWhere);
-	local num = 6;
-	local string = "helloooo roham";
-	local t = x.Where([num,string](x) { puts(string); return x > num; });
-	t.Print();
-	//t.Print();
-	//puts("next");
-	//local p = &x;
-	//p->Where([x] { return x < 2; });
-	//x2();
-	
-	//local CallbackMachine cb;
-	//local Reference ref;
-	//cb.Add([](x,y) { puts("try 1"); puts(y);});
-	//cb.Add([](x,y) { puts("try 2"); puts(y);});
-	//cb.Add([](x,y) { puts("try 3"); puts(y);});
-	
-	//cb.Execute("hello");
-	//getc();
-	//cb = *<CallbackMachine*>0;
-	return 0;
-}*/
 
 fun int IEnumerable::DoStuff()
 {
@@ -147,7 +65,7 @@ struct WhereIterable<Any T, IEnumerable Base>
 		
 	fun WhereIterator<T, VectorIterator<T> > GetEnumerator()
 	{
-		local WhereIterator<T, typeof(this->iterable->GetEnumerator()) > x;
+		local WhereIterator<T, VectorIterator<T>/*typeof(this->iterable->GetEnumerator())*/ > x;
 		x.iter = this->iterable->GetEnumerator();
 		x.fn = this->fn;
 		return x;

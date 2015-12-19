@@ -131,13 +131,23 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		case TokenType::Asterisk:
 			return CValue(value.type->base, this->root->builder.CreateLoad(value.val));
 		case TokenType::Increment:
-			return CValue(value.type->base, this->root->builder.CreateGEP(value.val, root->builder.getInt32(1)));
+			return CValue(value.type, this->root->builder.CreateGEP(value.val, root->builder.getInt32(1)));
 		case TokenType::Decrement:
-			return CValue(value.type->base, this->root->builder.CreateGEP(value.val, root->builder.getInt32(-1)));
+			return CValue(value.type, this->root->builder.CreateGEP(value.val, root->builder.getInt32(-1)));
 		default:
 			this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->base->ToString() + "'", *current_token);
 		}
 
+	}
+	else if (value.type->type == Types::Bool)
+	{
+		switch (operation)
+		{
+		case TokenType::Not:
+			return CValue(value.type, this->root->builder.CreateNot(value.val));
+		default:
+			break;
+		}
 	}
 	this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 }
@@ -335,7 +345,12 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 			auto base_name = name.substr(0, i);
 
 			//auto range = this->root->functions.equal_range(name);
+			auto type = this->root->LookupType(name);
 
+			if (type)
+			{
+				return type->data->functions.find(type->data->template_base->name)->second;
+			}
 			//instantiate here
 			this->root->Error("Not implemented", *this->current_token);
 
@@ -448,7 +463,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			auto range = type->data->functions.equal_range(name);
 			for (auto ii = range.first; ii != range.second; ii++)
 			{
-				if (ii->second->arguments.size() == args.size() + 1)
+				if (ii->second->arguments.size() == args.size())// + 1)
 					fun = ii->second;
 			}
 			if (fun)
@@ -760,6 +775,8 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	{
 		if (t->type == Types::Function && t->function == value.type->function)
 			return value;
+		else if (Explicit && t->type == Types::Function)
+			return CValue(t, this->root->builder.CreateBitOrPointerCast(value.val, tt));
 	}
 	if (t->type == Types::Union && value.type->type == Types::Struct)
 	{

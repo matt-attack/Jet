@@ -129,13 +129,14 @@ Token ParseTrait(Parser* parser)
 
 Expression* NameParselet::parse(Parser* parser, Token token)
 {
-	if (parser->Match(TokenType::LessThan))
+	if (parser->Match(TokenType::Not))
 	{
 		//check if the token after the next this is a , or a > if it is, then im a template
-		Token ahead = parser->LookAhead(2);
-		if (ahead.type != TokenType::Comma && ahead.type != TokenType::GreaterThan)
-			return new NameExpression(token);
+		//Token ahead = parser->LookAhead(1);
+		//if (ahead.type != TokenType::Not)//ahead.type != TokenType::Comma && ahead.type != TokenType::GreaterThan)
+			//return new NameExpression(token);
 
+		parser->Consume();
 		parser->Consume(TokenType::LessThan);
 
 		token.text += "<";

@@ -26,6 +26,7 @@ namespace Jet
 		BAnd,
 		Xor,
 		BNot,
+		Not,
 		LeftShift,
 		RightShift,
 

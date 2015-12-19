@@ -406,7 +406,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	}
 
 	//figure out how to get me working with multiple definitions
-	auto init = global->AddFunction("_jet_initializer", compilation->ns->members.find("int")->second.ty, {}, false, false);
+	/*auto init = global->AddFunction("_jet_initializer", compilation->ns->members.find("int")->second.ty, {}, false, false);
 	if (project->IsExecutable())
 	{
 		//this->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, init->function->scope.get()));
@@ -416,7 +416,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		if (project->IsExecutable())
 			init->Call("main", {});
 	}
-	init->Return(global->Integer(0));
+	init->Return(global->Integer(0));*/
 
 error:
 

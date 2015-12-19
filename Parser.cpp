@@ -46,6 +46,7 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	this->Register(TokenType::BNot, new PrefixOperatorParselet(Precedence::PREFIX));
 	this->Register(TokenType::BAnd, new PrefixOperatorParselet(Precedence::PREFIX));
 	this->Register(TokenType::Asterisk, new PrefixOperatorParselet(Precedence::PREFIX));
+	this->Register(TokenType::Not, new PrefixOperatorParselet(Precedence::PREFIX));
 	
 	//casting!
 	this->Register(TokenType::LessThan, new CastParselet());

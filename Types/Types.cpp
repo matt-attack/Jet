@@ -791,7 +791,11 @@ void Struct::Load(Compilation* compiler)
 		elementss.push_back(type->GetLLVMType());
 	}
 	if (elementss.size() == 0)
-		compiler->Error("Struct contains no elements!! Fix this not being ok!", *compiler->current_function->current_token);
+	{
+		//add dummy element
+		elementss.push_back(compiler->IntType->GetLLVMType());
+	}
+	//compiler->Error("Struct contains no elements!! Fix this not being ok!", *compiler->current_function->current_token);
 
 	this->type = llvm::StructType::create(elementss, this->name);
 

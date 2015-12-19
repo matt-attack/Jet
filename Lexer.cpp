@@ -26,6 +26,8 @@ public:
 		operators["&&"] = TokenType::And;
 		operators["||"] = TokenType::Or;
 
+		operators["!"] = TokenType::Not;
+
 		operators["|"] = TokenType::BOr;//or
 		operators["&"] = TokenType::BAnd;//and
 		operators["^"] = TokenType::Xor;//xor

@@ -1096,7 +1096,8 @@ namespace Jet
 		{
 			this->Parent = parent;
 			left->SetParent(this);
-			right->SetParent(this);
+			if (right)
+				right->SetParent(this);
 		}
 
 		virtual Type* TypeCheck(CompilerContext* context)
@@ -1324,9 +1325,9 @@ namespace Jet
 		{
 			//check that type of top can be converted to bool
 			auto ct = condition->TypeCheck(context);
-			if (ct->type != Types::Bool)
+			//if (ct->type != Types::Bool)
 			{
-				throw 7;//need to check if it can be converted
+				//throw 7;//need to check if it can be converted
 			}
 			block->TypeCheck(context);
 			return 0;
@@ -2415,6 +2416,8 @@ namespace Jet
 					//register the type
 					me->data->members.insert({ ii.second.text, context->root->LookupType(ii.first.text, false) });
 				}
+
+				return 0;//skip for now...
 			}
 			for (auto ii : this->members)
 			{

@@ -18,30 +18,41 @@ trait Any
 }
 
 [stdcall]
-extern fun int CreateThread(char* security_attributes, int stacksize, void() function, char* data, int flags, int* threadid);
+extern fun int CreateThread(char* security_attributes, int stacksize, void(char*) function, char* data, int flags, int* threadid);
 
 [stdcall]
 extern fun int WaitForSingleObject(int threadid, int time);
 
 struct Thread//<Any Function>
 {
-	function<void()> fn;
+	//function<void()> fn;
 	int thread_id;
 	
-	fun void Function(function<void()> fn)
+	//fun void Thread(function<void()> fn)
+	//{
+		//this->fn = fn;
+		//CreateThread(0, 0, <void(char*)>fn.ptr, &fn.data, 0, &this->thread_id);
+	//}
+	
+	fun void Thread(void(char*) fn, char* data)
 	{
-		this->fn = fn;
-		CreateThread(0, 0, fn.ptr, &fn.data, 0, &this->thread_id);
+		CreateThread(0, 0, fn, data, 0, &this->thread_id);  
 	}
 	
-	fun void Function()
+	fun void ~Thread()
 	{
 		this->Join();
 	}
 	
 	fun void Join()
 	{
-		WaitForSingleObject(this->thread_id, 0);
+		if (this->thread_id)
+			WaitForSingleObject(this->thread_id, 0);
+	}
+	
+	fun void Release()
+	{
+		this->thread_id = 0;
 	}
 }
 
