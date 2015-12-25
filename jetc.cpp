@@ -110,7 +110,10 @@ int main(int argc, char* argv[])
 
 					//check that they match!!!
 					if (strcmp(o.c_str(), compilation->sources[ii.first]->GetLinePointer(1)) != 0)
+					{
 						printf("Tree printing test failed, did not match original\n");
+						std::cout << o;
+					}
 
 					o.clear();
 				}

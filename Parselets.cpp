@@ -324,6 +324,7 @@ Expression* UnionParselet::parse(Parser* parser, Token token)
 		Token bor = parser->LookAhead();
 		if (bor.type == TokenType::BOr)
 		{
+			parser->Consume();
 			elements.push_back({ name, bor });
 			continue;
 		}
@@ -343,10 +344,10 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 	UniquePtr<Expression*> var = parser->ParseExpression();
 	Token close = parser->Consume(TokenType::RightParen);
 
-	parser->Consume(TokenType::LeftBrace);
+	Token ob = parser->Consume(TokenType::LeftBrace);
 
 	std::vector<MatchCase> cases;
-	while (!parser->MatchAndConsume(TokenType::RightBrace))
+	while (!parser->Match(TokenType::RightBrace))
 	{
 		//parse in each block
 		if (parser->LookAhead().type == TokenType::Default)
@@ -361,7 +362,7 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 
 			cases.push_back({ def, def, tok, block });
 
-			parser->Consume(TokenType::RightBrace);
+			//parser->Consume(TokenType::RightBrace);
 			break;
 		}
 
@@ -371,13 +372,15 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 
 		auto tok = parser->Consume(TokenType::Assign);
 		parser->Consume(TokenType::GreaterThan);
-
+		tok.text += ">";
 		BlockExpression* block = parser->ParseBlock(true);
 
 		cases.push_back({ type, name, tok, block });
 	}
 
-	return new MatchExpression(token, open, close, var.Release(), std::move(cases));
+	Token cb = parser->Consume();
+
+	return new MatchExpression(token, open, close, var.Release(), ob, std::move(cases), cb);
 	//return new SwitchExpression(token, var.Release(), block);
 }
 

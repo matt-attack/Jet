@@ -102,14 +102,16 @@ namespace Jet
 	};
 	class MatchExpression : public Expression
 	{
-		Token token, open, close;
+		Token token, open, close, open_brace, close_brace;
 		Expression* var;
 
 		std::vector<MatchCase> cases;
 	public:
 
-		MatchExpression(Token token, Token open, Token close, Expression* thing, std::vector<MatchCase>&& elements)
+		MatchExpression(Token token, Token open, Token close, Expression* thing, Token ob, std::vector<MatchCase>&& elements, Token cb)
 		{
+			this->open_brace = ob;
+			this->close_brace = cb;
 			this->open = open;
 			this->close = close;
 			this->token = token;
@@ -130,13 +132,17 @@ namespace Jet
 			open.Print(output, source);
 			var->Print(output, source);
 			close.Print(output, source);
+
+			open_brace.Print(output, source);
 			for (auto ii : cases)
 			{
-				ii.name.Print(output, source);
 				ii.type.Print(output, source);
+				if (ii.type.type != TokenType::Default)
+					ii.name.Print(output, source);
 				ii.pointy.Print(output, source);
 				ii.block->Print(output, source);
 			}
+			close_brace.Print(output, source);
 			//token.Print(output, source);
 		}
 
