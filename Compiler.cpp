@@ -73,7 +73,7 @@ public:
 			{
 				if (ii.type == StructMember::VariableMember)
 				{
-					ii.variable.second.text = newname;
+					ii.variable.name.text = newname;
 				}
 			}
 		}

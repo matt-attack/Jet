@@ -21,6 +21,8 @@ add_executable(Jet
 	Compiler.cpp
 	CompilerContext.cpp
 	Expressions.cpp
+	DeclarationExpressions.cpp
+	ControlExpressions.cpp
 	Parser.cpp
 	Parselets.cpp
 	Source.cpp

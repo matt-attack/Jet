@@ -3,6 +3,7 @@
 #include "Compiler.h"
 #include "CompilerContext.h"
 #include "Expressions.h"
+#include "DeclarationExpressions.h"
 #include "Lexer.h"
 
 using namespace Jet;

@@ -156,7 +156,7 @@ namespace Jet
 			this->column = column;
 		}
 
-		void Print(std::string& str, Source* source);
+		void Print(std::string& str, Source* source) const;
 
 		Source* GetSource(Compilation* compilation);
 	};

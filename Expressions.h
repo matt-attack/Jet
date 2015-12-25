@@ -11,18 +11,19 @@
 #include "Source.h"
 #include "Types\Function.h"
 
+
 namespace Jet
 {
 	class Source;
 	class Compiler;
 
-	class Expression
+	class Expression// : public SyntaxNode
 	{
 	public:
 		Token semicolon;
 		Expression()
 		{
-			Parent = 0;
+			parent = 0;
 		}
 
 		virtual ~Expression()
@@ -30,10 +31,10 @@ namespace Jet
 
 		}
 
-		Expression* Parent;
+		Expression* parent;
 		virtual void SetParent(Expression* parent)
 		{
-			this->Parent = parent;
+			this->parent = parent;
 		}
 
 		virtual CValue Compile(CompilerContext* context) = 0;
@@ -91,7 +92,10 @@ namespace Jet
 			//lookup type
 		}
 
-		void Print(std::string& output, Source* source) { token.Print(output, source); }
+		void Print(std::string& output, Source* source) 
+		{ 
+			token.Print(output, source); 
+		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
@@ -157,6 +161,7 @@ namespace Jet
 
 	public:
 		Token token, type;
+		Token open_bracket, close_bracket;
 		Expression* size;
 		NewExpression(Token tok, Token type, Expression* size)
 		{
@@ -183,9 +188,9 @@ namespace Jet
 
 			if (this->size)
 			{
-				output += '[';
+				open_bracket.Print(output, source);// output += '['; fix this
 				size->Print(output, source);
-				output += ']';
+				close_bracket.Print(output, source);// output += ']'; fix this
 			}
 			//right->Print(output, source);
 		}
@@ -259,196 +264,6 @@ namespace Jet
 
 	CValue Compile(CompilerContext* context);
 	};*/
-
-	class LocalExpression : public Expression
-	{
-		Token token;
-		std::vector<std::pair<Token, Token>>* _names;
-		std::vector<Expression*>* _right;
-	public:
-		LocalExpression(Token token, std::vector<std::pair<Token, Token>>* names, std::vector<Expression*>* right)
-		{
-			this->token = token;
-			this->_names = names;
-			this->_right = right;
-		}
-
-		~LocalExpression()
-		{
-			if (this->_right)
-				for (auto ii : *this->_right)
-					delete ii;
-
-			delete this->_right;
-			delete this->_names;
-		}
-
-		virtual void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			if (this->_right)
-				for (auto ii : *_right)
-					ii->SetParent(this);
-		}
-
-		CValue Compile(CompilerContext* context);
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			//register the local
-			int i = 0;
-			for (auto ii : *this->_names)
-			{
-				if (ii.first.text.length())
-					context->TCRegisterLocal(ii.second.text, context->root->LookupType(ii.first.text, false)->GetPointerType());
-				else
-				{
-					//type inference
-					auto ty = (*this->_right)[i]->TypeCheck(context);
-					context->TCRegisterLocal(ii.second.text, ty->GetPointerType());
-				}
-				i++;
-			}
-
-			return 0;
-		}
-
-
-		void Print(std::string& output, Source* source)
-		{
-			this->token.Print(output, source);
-
-			int i = 0;
-			for (auto ii : *_names)
-			{
-				//output += " " + ii.first;
-				if (ii.first.text.length() > 0)
-					ii.first.Print(output, source);
-				ii.second.Print(output, source);
-
-				if (_right && i < _right->size())
-				{
-					output += " =";
-					(*_right)[i++]->Print(output, source);
-				}
-			}
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-
-			if (this->_right)
-			{
-				for (auto ii : *this->_right)
-				{
-					ii->Visit(visitor);
-				}
-			}
-		}
-	};
-
-
-	class UnionExpression : public Expression
-	{
-		Token name;
-		std::vector<Token> elements;
-	public:
-
-		UnionExpression(Token& name, std::vector<Token>&& elements)
-		{
-			this->elements = elements;
-			this->name = name;
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			return CValue();
-		}
-
-		void CompileDeclarations(CompilerContext* context)
-		{
-			//define it
-			Type* ty = new Type(this->name.text, Types::Union);
-			ty->_union = new Union;
-			ty->_union->members.resize(this->elements.size());
-			for (int i = 0; i < this->elements.size(); i++)
-				context->root->AdvanceTypeLookup(&ty->_union->members[i], this->elements[i].text, &this->elements[i]);
-
-			context->root->ns->members.insert({ this->name.text, ty });
-		};
-
-		void Print(std::string& output, Source* source)
-		{
-			throw 7;
-			//token.Print(output, source);
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			//get the type and finish it
-			//context->root->LookupType(this->name.text, false);
-
-			//lookup all the members and add them
-
-			//get the type fixme later
-			return 0;
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-		}
-	};
-
-	struct MatchCase
-	{
-		Token type, name;
-		BlockExpression* block;
-	};
-	class MatchExpression : public Expression
-	{
-		Token token;
-		Expression* var;
-
-		std::vector<MatchCase> cases;
-	public:
-
-		MatchExpression(Token token, Expression* thing, std::vector<MatchCase>&& elements)
-		{
-			this->token = token;
-			this->cases = elements;
-			this->var = thing;
-		}
-
-		CValue Compile(CompilerContext* context);
-
-		void CompileDeclarations(CompilerContext* context)
-		{
-
-		};
-
-		void Print(std::string& output, Source* source)
-		{
-			throw 7;
-			//token.Print(output, source);
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			//build the type
-			//get the type fixme later
-			return 0;
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			//	visitor->Visit(this);
-		}
-	};
-
 
 	class NumberExpression : public Expression
 	{
@@ -585,6 +400,11 @@ namespace Jet
 
 		void Print(std::string& output, Source* source)
 		{
+			auto code = token.text_ptr;
+			auto trivia = token.text_ptr - token.trivia_length;
+			for (int i = 0; i < token.trivia_length; i++)
+				output += trivia[i];
+
 			output += "\"";
 			//fixme!
 			auto cur = &source->GetLinePointer(token.line)[token.column]/* token.text_ptr*/ + 1;
@@ -616,12 +436,13 @@ namespace Jet
 		Token member;
 		Expression* index;
 		Expression* left;
-		Token token;
-		IndexExpression(Expression* left, Expression* index, Token t)
+		Token token, close_bracket;
+		IndexExpression(Expression* left, Expression* index, Token t, Token cb)
 		{
 			this->token = t;
 			this->left = left;
 			this->index = index;
+			this->close_bracket = cb;
 		}
 
 		IndexExpression(Expression* left, Token index, Token t)
@@ -660,7 +481,7 @@ namespace Jet
 			else if (token.type == TokenType::LeftBracket)
 			{
 				index->Print(output, source);
-				output += ']';
+				close_bracket.Print(output, source);// output += ']'; fix me!
 			}
 		}
 
@@ -705,7 +526,7 @@ namespace Jet
 
 		virtual void SetParent(Expression* parent)
 		{
-			this->Parent = parent;
+			this->parent = parent;
 			right->SetParent(this);
 			left->SetParent(this);
 		}
@@ -764,9 +585,9 @@ namespace Jet
 			delete this->left;
 		}
 
-		void SetParent(Expression* parent)
+		virtual void SetParent(Expression* parent)
 		{
-			this->Parent = parent;
+			this->parent = parent;
 			right->SetParent(this);
 			left->SetParent(this);
 		}
@@ -780,14 +601,14 @@ namespace Jet
 			return 0;
 		}
 
-		void CompileDeclarations(CompilerContext* context) {};
-
 		void Print(std::string& output, Source* source)
 		{
 			left->Print(output, source);
 			token.Print(output, source);
 			right->Print(output, source);
 		}
+
+		void CompileDeclarations(CompilerContext* context) {};
 
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
@@ -845,7 +666,7 @@ namespace Jet
 
 		void SetParent(Expression* parent)
 		{
-			this->Parent = parent;
+			this->parent = parent;
 			right->SetParent(this);
 		}
 
@@ -901,7 +722,7 @@ namespace Jet
 
 		void SetParent(Expression* parent)
 		{
-			this->Parent = parent;
+			this->parent = parent;
 			right->SetParent(this);
 		}
 
@@ -1044,7 +865,7 @@ namespace Jet
 
 		void SetParent(Expression* parent)
 		{
-			this->Parent = parent;
+			this->parent = parent;
 			left->SetParent(this);
 		}
 
@@ -1094,7 +915,7 @@ namespace Jet
 
 		void SetParent(Expression* parent)
 		{
-			this->Parent = parent;
+			this->parent = parent;
 			left->SetParent(this);
 			if (right)
 				right->SetParent(this);
@@ -1179,7 +1000,7 @@ namespace Jet
 
 		void SetParent(Expression* parent)
 		{
-			this->Parent = parent;
+			this->parent = parent;
 			for (auto ii : statements)
 				ii->SetParent(this);
 		}
@@ -1294,236 +1115,6 @@ namespace Jet
 		}
 	};
 
-	class WhileExpression : public Expression
-	{
-		Expression* condition;
-		ScopeExpression* block;
-		Token token;
-	public:
-
-		WhileExpression(Token token, Expression* cond, ScopeExpression* block)
-		{
-			this->condition = cond;
-			this->block = block;
-			this->token = token;
-		}
-
-		~WhileExpression()
-		{
-			delete condition;
-			delete block;
-		}
-
-		virtual void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			block->SetParent(this);
-			condition->SetParent(this);
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			//check that type of top can be converted to bool
-			auto ct = condition->TypeCheck(context);
-			//if (ct->type != Types::Bool)
-			{
-				//throw 7;//need to check if it can be converted
-			}
-			block->TypeCheck(context);
-			return 0;
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			context->CurrentToken(&token);
-
-			llvm::BasicBlock *start = llvm::BasicBlock::Create(llvm::getGlobalContext(), "whilestart");
-			llvm::BasicBlock *body = llvm::BasicBlock::Create(llvm::getGlobalContext(), "whilebody");
-			llvm::BasicBlock *end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "whileend");
-
-
-			context->root->builder.CreateBr(start);
-			context->function->f->getBasicBlockList().push_back(start);
-			context->root->builder.SetInsertPoint(start);
-
-			auto cond = this->condition->Compile(context);
-			cond = context->DoCast(context->root->BoolType, cond);
-			context->root->builder.CreateCondBr(cond.val, body, end);
-
-
-			context->function->f->getBasicBlockList().push_back(body);
-			context->root->builder.SetInsertPoint(body);
-
-			context->PushLoop(end, start);
-			this->block->Compile(context);
-			context->PopLoop();
-
-			context->root->builder.CreateBr(start);
-
-			context->function->f->getBasicBlockList().push_back(end);
-			context->root->builder.SetInsertPoint(end);
-
-			return CValue();
-		}
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		void Print(std::string& output, Source* source)
-		{
-			//add tokens for the ( )
-			token.Print(output, source);
-			output += "(";
-			this->condition->Print(output, source);
-			output += ")";
-
-			this->block->Print(output, source);
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-			condition->Visit(visitor);
-			block->Visit(visitor);
-		}
-	};
-
-	class ForExpression : public Expression
-	{
-		Expression* condition, *initial, *incr;
-		ScopeExpression* block;
-		Token token;
-	public:
-		ForExpression(Token token, Expression* init, Expression* cond, Expression* incr, ScopeExpression* block)
-		{
-			this->condition = cond;
-			this->block = block;
-			this->incr = incr;
-			this->initial = init;
-			this->token = token;
-		}
-
-		~ForExpression()
-		{
-			delete this->condition;
-			delete this->block;
-			delete this->incr;
-			delete this->initial;
-		}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			block->SetParent(this);
-			if (incr)
-				incr->SetParent(block);
-			if (condition)
-				condition->SetParent(this);
-			if (initial)
-				initial->SetParent(block);
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			//check type of middle to be bool or nothing
-			//then just check others
-			if (initial)
-				initial->TypeCheck(context);
-
-			if (condition)
-				auto ty = condition->TypeCheck(context);
-			//if (ty && cant convert to bool)
-			//error
-			//incr->TypeCheck(context);
-			block->TypeCheck(context);
-			//now crashing here
-			//throw 7;
-			return 0;
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			context->CurrentToken(&token);
-
-			context->PushScope();
-
-			if (this->initial)
-				this->initial->Compile(context);
-
-			llvm::BasicBlock *start = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forstart");
-			llvm::BasicBlock *body = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forbody");
-			llvm::BasicBlock *end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forend");
-			llvm::BasicBlock *cont = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forcontinue");
-
-			//insert stupid branch
-			context->root->builder.CreateBr(start);
-			context->function->f->getBasicBlockList().push_back(start);
-			context->root->builder.SetInsertPoint(start);
-
-			if (this->condition)
-			{
-				auto cond = this->condition->Compile(context);
-				cond = context->DoCast(context->root->BoolType, cond);
-
-				context->root->builder.CreateCondBr(cond.val, body, end);
-			}
-			else
-			{
-				context->root->builder.CreateBr(body);
-			}
-
-			context->function->f->getBasicBlockList().push_back(body);
-			context->root->builder.SetInsertPoint(body);
-
-			context->PushLoop(end, cont);
-			this->block->Compile(context);
-			context->PopLoop();
-
-			context->root->builder.CreateBr(cont);
-
-			//insert continue branch here
-			context->function->f->getBasicBlockList().push_back(cont);
-			context->root->builder.SetInsertPoint(cont);
-
-			if (incr)
-				this->incr->Compile(context);
-
-			context->root->builder.CreateBr(start);
-
-			context->function->f->getBasicBlockList().push_back(end);
-			context->root->builder.SetInsertPoint(end);
-
-			context->PopScope();
-
-			return CValue();
-		}
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		void Print(std::string& output, Source* source)
-		{
-			//add tokens for the ( )
-			token.Print(output, source);
-			output += "(";
-			this->initial->Print(output, source);
-			output += ";";
-			this->condition->Print(output, source);
-			output += ";";
-			this->incr->Print(output, source);
-			output += ")";
-
-			this->block->Print(output, source);
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-			initial->Visit(visitor);
-			condition->Visit(visitor);
-			incr->Visit(visitor);
-			block->Visit(visitor);
-		}
-	};
-
 	/*class ForEachExpression: public Expression
 	{
 	Token name;
@@ -1597,332 +1188,6 @@ namespace Jet
 	}
 	};*/
 
-	class CaseExpression : public Expression
-	{
-		Token token;
-	public:
-		int value;
-		CaseExpression(Token token, int value)
-		{
-			this->value = value;
-			this->token = token;
-		}
-
-		~CaseExpression()
-		{
-		}
-
-		virtual void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-		}
-
-		CValue Compile(CompilerContext* context);
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		void Print(std::string& output, Source* source)
-		{
-			//add tokens for the ( )
-			token.Print(output, source);
-
-			throw 7; //todo
-		}
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			throw 7;
-
-			return 0;
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-		}
-	};
-
-	class DefaultExpression : public Expression
-	{
-		Token token;
-	public:
-		DefaultExpression(Token token)
-		{
-			this->token = token;
-		}
-
-		~DefaultExpression()
-		{
-		}
-
-		virtual void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-		}
-
-		CValue Compile(CompilerContext* context);
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			throw 7;
-
-			return 0;
-		}
-
-		void Print(std::string& output, Source* source)
-		{
-			//add tokens for the ( )
-			token.Print(output, source);
-
-			throw 7; //todo
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-		}
-	};
-
-	class SwitchExpression : public Expression
-	{
-		Expression* var;
-		BlockExpression* block;
-		Token token;
-		llvm::SwitchInst* sw;
-	public:
-
-		llvm::BasicBlock* def;
-		llvm::BasicBlock* switch_end;
-
-		bool first_case;
-		SwitchExpression(Token token, Expression* var, BlockExpression* block)
-		{
-			this->first_case = true;
-			this->var = var;
-			this->block = block;
-			this->token = token;
-			this->def = 0;
-		}
-
-		~SwitchExpression()
-		{
-			delete block;
-		}
-
-		bool AddCase(llvm::ConstantInt* value, llvm::BasicBlock* dest)
-		{
-			bool tmp = this->first_case;
-			this->first_case = false;
-			this->sw->addCase(value, dest);
-			return tmp;
-		}
-
-		bool AddDefault(llvm::BasicBlock* dest)
-		{
-			bool tmp = this->first_case;
-			this->first_case = false;
-			this->def = dest;
-			return tmp;
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			throw 7;
-
-			return 0;
-		}
-
-		virtual void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			this->var->SetParent(this);
-			this->block->SetParent(this);
-		}
-
-		CValue Compile(CompilerContext* context);
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		void Print(std::string& output, Source* source)
-		{
-			//add tokens for the ( )
-			token.Print(output, source);
-			output += "(";
-			var->Print(output, source);
-			output += ")";
-
-			this->block->Print(output, source);
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-			var->Visit(visitor);
-			block->Visit(visitor);
-		}
-	};
-
-
-
-	struct Branch
-	{
-		Token token;
-		BlockExpression* block;
-		Expression* condition;
-
-		Branch(Token token, BlockExpression* block, Expression* condition)
-		{
-			this->token = token;
-			this->block = block;
-			this->condition = condition;
-		}
-
-		Branch(Branch&& other)
-		{
-			this->block = other.block;
-			this->condition = other.condition;
-			other.block = 0;
-			other.condition = 0;
-		}
-		~Branch()
-		{
-			delete condition;
-			delete block;
-		}
-	};
-	class IfExpression : public Expression
-	{
-		std::vector<Branch*> branches;
-		Branch* Else;
-		Token token;
-	public:
-		IfExpression(Token token, std::vector<Branch*>&& branches, Branch* elseBranch)
-		{
-			this->branches = branches;
-			this->Else = elseBranch;
-			this->token = token;
-		}
-
-		~IfExpression()
-		{
-			delete Else;
-			for (auto ii : this->branches)
-				delete ii;
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			for (auto ii : this->branches)
-			{
-				auto ct = ii->condition->TypeCheck(context);
-				//make sure this is a bool
-				ii->block->TypeCheck(context);
-			}
-
-			if (this->Else)
-				this->Else->block->TypeCheck(context);
-			return 0;
-		}
-
-		virtual void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			if (this->Else)
-				this->Else->block->SetParent(this);
-			for (auto& ii : branches)
-			{
-				ii->block->SetParent(this);
-				ii->condition->SetParent(this);
-			}
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			context->CurrentToken(&token);
-
-			int pos = 0;
-			bool hasElse = this->Else ? this->Else->block->statements.size() > 0 : false;
-			llvm::BasicBlock *EndBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "endif");
-			llvm::BasicBlock *ElseBB = 0;
-			if (hasElse)
-				ElseBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "else");
-
-			llvm::BasicBlock *NextBB = 0;
-			for (auto& ii : this->branches)
-			{
-				if (NextBB)
-					context->root->builder.SetInsertPoint(NextBB);
-
-				auto cond = ii->condition->Compile(context);
-				cond = context->DoCast(context->root->BoolType, cond);//try and cast to bool
-
-				llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "then", context->function->f);
-				NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(llvm::getGlobalContext(), "elseif", context->function->f);
-
-				context->root->builder.CreateCondBr(cond.val, ThenBB, NextBB);
-
-				//statement body
-				context->root->builder.SetInsertPoint(ThenBB);
-				ii->block->Compile(context);
-				if (context->root->builder.GetInsertBlock()->getTerminator() == 0)
-					context->root->builder.CreateBr(EndBB);//branch to end
-
-				pos++;
-			}
-
-			if (hasElse)
-			{
-				context->function->f->getBasicBlockList().push_back(ElseBB);
-				context->root->builder.SetInsertPoint(ElseBB);
-
-				this->Else->block->Compile(context);
-				context->root->builder.CreateBr(EndBB);
-			}
-			context->function->f->getBasicBlockList().push_back(EndBB);
-			context->root->builder.SetInsertPoint(EndBB);
-
-			return CValue();
-		}
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		void Print(std::string& output, Source* source)
-		{
-			//this->token.Print(output, source);
-
-			for (auto ii : this->branches)
-			{
-				ii->token.Print(output, source);
-				output += " (";
-				ii->condition->Print(output, source);
-				output += ")";
-				ii->block->Print(output, source);
-			}
-			if (this->Else)
-			{
-				this->Else->token.Print(output, source);
-
-				this->Else->block->Print(output, source);
-			}
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-
-			for (auto ii : this->branches)
-			{
-				ii->condition->Visit(visitor);
-				ii->block->Visit(visitor);
-			}
-			if (this->Else)
-			{
-				this->Else->block->Visit(visitor);
-			}
-		}
-	};
-
 	class SizeofExpression : public Expression
 	{
 		Token begin, end;
@@ -1939,7 +1204,7 @@ namespace Jet
 
 		void SetParent(Expression* parent)
 		{
-			this->Parent = parent;
+			this->parent = parent;
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -1962,847 +1227,6 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			return 0;
-		}
-	};
-
-	class NamespaceExpression : public Expression
-	{
-		Token name;
-		Token token;
-		BlockExpression* block;
-	public:
-		NamespaceExpression(Token token, Token name, BlockExpression* block)
-		{
-			this->name = name;
-			this->token = token;
-			this->block = block;
-		}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			this->block->SetParent(this);
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			context->SetNamespace(this->name.text);
-
-			this->block->Compile(context);
-
-			context->PopNamespace();
-
-			return CValue();
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			//push namespace
-			context->SetNamespace(this->name.text);
-			this->block->CompileDeclarations(context);
-			context->PopNamespace();
-
-			return 0;
-		}
-
-		void CompileDeclarations(CompilerContext* context)
-		{
-			context->SetNamespace(this->name.text);
-
-			this->block->CompileDeclarations(context);
-
-			context->PopNamespace();
-		}
-
-		void Print(std::string& output, Source* source)
-		{
-			token.Print(output, source);
-			name.Print(output, source);
-			block->Print(output, source);
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-		}
-	};
-
-	class CallExpression : public Expression
-	{
-		Token token;
-
-	public:
-		Expression* left;
-		std::vector<Expression*>* args;
-		friend class FunctionParselet;
-		CallExpression(Token token, Expression* left, std::vector<Expression*>* args)
-		{
-			this->token = token;
-			this->left = left;
-			this->args = args;
-		}
-
-		~CallExpression()
-		{
-			delete this->left;
-			if (args)
-			{
-				for (auto ii : *args)
-					delete ii;
-
-				delete args;
-			}
-		}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			left->SetParent(this);
-			for (auto ii : *args)
-				ii->SetParent(this);
-		}
-
-		Function* call; //store the function being called here so we dont have to look up again (if we know it
-		virtual Type* TypeCheck(CompilerContext* context);
-
-		CValue Compile(CompilerContext* context);
-
-		Type* GetReturnType()
-		{
-			return 0;
-		}
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		void Print(std::string& output, Source* source)
-		{
-			//add tokens for the ( )
-			this->left->Print(output, source);
-
-			token.Print(output, source);
-			int i = 0;
-			for (auto ii : *this->args)
-			{
-				ii->Print(output, source);
-
-				if (i != args->size() - 1)
-					output += ",";
-				i++;
-			}
-			output += ")";
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-			left->Visit(visitor);
-			if (this->args)
-			{
-				for (auto ii : *this->args)
-					ii->Visit(visitor);
-			}
-		}
-	};
-
-	class FunctionExpression : public Expression
-	{
-		friend class Namespace;
-		friend class Compiler;
-		friend class CompilerContext;
-		friend class Type;
-		friend class Function;
-		friend struct Struct;
-		Token name;
-		std::vector<std::pair<std::string, std::string>>* args;
-		std::vector<Token>* captures;
-		ScopeExpression* block;
-		Token token;
-
-		Token Struct;
-
-		Token ret_type;
-		NameExpression* varargs;
-
-		bool is_generator;
-		std::vector<std::pair<Token, Token>>* templates;
-	public:
-
-		ScopeExpression* GetBlock()
-		{
-			return block;
-		}
-
-		FunctionExpression(Token token, Token name, Token ret_type, bool generator, std::vector<std::pair<std::string, std::string>>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures = 0)
-		{
-			this->is_generator = generator;
-			this->ret_type = ret_type;
-			this->args = args;
-			this->block = block;
-			this->name = name;
-			this->token = token;
-			this->varargs = 0;// varargs;
-			this->Struct = Struct;
-			this->templates = templates;
-			this->captures = captures;
-		}
-
-		~FunctionExpression()
-		{
-			delete block;
-			delete varargs;
-			delete args;
-			delete captures;
-		}
-
-		std::string GetRealName();
-
-		std::string GetName()
-		{
-			return this->name.text;
-		}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			block->SetParent(this);
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context);
-
-		CValue Compile(CompilerContext* context);
-		void CompileDeclarations(CompilerContext* context);
-
-		void Print(std::string& output, Source* source)
-		{
-			//add tokens for the ( )
-			token.Print(output, source);
-
-			ret_type.Print(output, source);
-
-			name.Print(output, source);
-
-			output += "(";
-			int i = 0;
-			for (auto ii : *this->args)
-			{
-				output += ii.first + " " + ii.second;
-				if (i != args->size() - 1)
-					output += ", ";
-				//ii->Print(output, source);
-				i++;
-			}
-			//this->condition->Print(output, source);
-			output += ")";
-
-			this->block->Print(output, source);
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-			block->Visit(visitor);
-		}
-
-		CValue FunctionExpression::DoCompile(CompilerContext* context);//call this to do real compilation
-	};
-
-	class ExternExpression : public Expression
-	{
-		Token name;
-		std::string Struct;
-		std::vector<std::pair<std::string, std::string>>* args;
-		Token token;
-		Token ret_type;
-	public:
-
-		ExternExpression(Token token, Token name, Token ret_type, std::vector<std::pair<std::string, std::string>>* args, std::string str = "")
-		{
-			this->args = args;
-			this->name = name;
-			this->token = token;
-			this->ret_type = ret_type;
-			this->Struct = str;
-		}
-
-		~ExternExpression()
-		{
-			delete args;
-		}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-		}
-
-		CValue Compile(CompilerContext* context);
-
-		void CompileDeclarations(CompilerContext* context);
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			return 0;
-		}
-
-		void Print(std::string& output, Source* source)
-		{
-			//add tokens for the ( )
-			token.Print(output, source);
-
-			output += " fun";
-			ret_type.Print(output, source);
-
-			name.Print(output, source);
-
-			output += "(";
-			int i = 0;
-			for (auto ii : *this->args)
-			{
-				output += ii.first + " " + ii.second;
-				if (i != args->size() - 1)
-					output += ", ";
-				//ii->Print(output, source);
-				i++;
-			}
-			output += ")";
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-		}
-	};
-
-	struct TraitFunction
-	{
-		Token name;
-		Token ret_type;
-
-		std::vector<Token> args;
-	};
-
-	class TraitExpression : public Expression
-	{
-		Token token;
-		Token name;
-		std::vector<TraitFunction> funcs;
-		std::vector<std::pair<Token, Token>>* templates;
-	public:
-
-		TraitExpression(Token token, Token name, std::vector<TraitFunction>&& funcs, std::vector<std::pair<Token, Token>>* templates)
-		{
-			this->token = token;
-			this->name = name;
-			this->funcs = funcs;
-			this->templates = templates;
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			return CValue();
-		}
-
-		void CompileDeclarations(CompilerContext* context);
-
-		void Print(std::string& output, Source* source)
-		{
-			token.Print(output, source);
-			name.Print(output, source);
-
-			output += "{";
-
-			for (auto fun : this->funcs)
-			{
-				output += " fun ";
-				fun.ret_type.Print(output, source);
-				output += " ";
-				fun.name.Print(output, source);
-				output += "(";
-				bool first = false;
-				for (auto arg : fun.args)
-				{
-					if (first)
-						output += ", ";
-					else
-						first = true;
-
-					arg.Print(output, source);
-					//output += arg.first->ToString() + " " + arg.second;
-				}
-				output += ");";
-			}
-			output += "}";
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			return 0;
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-		}
-	};
-
-	struct StructMember
-	{
-		enum MemberType
-		{
-			FunctionMember,
-			VariableMember,
-		};
-		MemberType type;
-
-		FunctionExpression* function;
-		std::pair<Token, Token> variable;
-	};
-	class StructExpression : public Expression
-	{
-		friend class Compiler;
-		friend class Type;
-
-		Token token;
-		Token name;
-
-
-		Token start;
-		Token end;
-
-		Token base_type;
-
-		void AddConstructorDeclarations(Type* str, CompilerContext* context);
-		void AddConstructors(CompilerContext* context);
-	public:
-
-		std::vector<std::pair<Token, Token>>* templates;
-
-		std::vector<StructMember> members;
-
-		StructExpression(Token token, Token name, Token start, Token end, std::vector<StructMember>&& members, /*std::vector<std::pair<std::string, std::string>>* elements, std::vector<FunctionExpression*>* functions,*/ std::vector<std::pair<Token, Token>>* templates, Token base_type)
-		{
-			this->templates = templates;
-			this->members = members;
-			this->base_type = base_type;
-			this->name = name;
-			this->token = token;
-			this->start = start;
-			this->end = end;
-		}
-
-		~StructExpression()
-		{
-			for (auto ii : members)
-				if (ii.type == StructMember::FunctionMember)
-					delete ii.function;
-		}
-
-		std::string GetName()
-		{
-			return this->name.text;
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			//push the namespace then define these types
-			auto me = context->root->LookupType(this->name.text, false);
-			auto old = context->root->ns;
-			me->data->parent = old;
-			context->root->ns = me->data;
-			//define template types
-			if (this->templates)
-			{
-				for (auto ii : *this->templates)
-				{
-					//register the type
-					me->data->members.insert({ ii.second.text, context->root->LookupType(ii.first.text, false) });
-				}
-
-				return 0;//skip for now...
-			}
-			for (auto ii : this->members)
-			{
-				if (ii.type == StructMember::FunctionMember)
-					ii.function->TypeCheck(context);
-			}
-
-			context->root->ns = old;
-
-			return 0;
-		}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			for (auto ii : this->members)
-			{
-				if (ii.type == StructMember::FunctionMember)
-					ii.function->SetParent(this);
-			}
-		}
-
-		CValue Compile(CompilerContext* context);
-
-		void CompileDeclarations(CompilerContext* context);
-
-		void Print(std::string& output, Source* source)
-		{
-			//add tokens for the ( )
-			token.Print(output, source);
-
-			name.Print(output, source);
-			//output templates
-			if (this->templates && this->templates->size() > 0)
-			{
-				output += "<";
-
-				int i = 0;
-				for (auto ii : *this->templates)
-				{
-					ii.first.Print(output, source);
-					ii.second.Print(output, source);
-					if (i != this->templates->size() - 1)
-						output += ",";
-					i++;
-				}
-				output += ">";
-			}
-			this->start.Print(output, source);
-
-			for (auto ii : this->members)
-			{
-				if (ii.type == StructMember::FunctionMember)
-					ii.function->Print(output, source);
-				else
-				{
-					ii.variable.first.Print(output, source);
-					ii.variable.second.Print(output, source);
-					output += ";";
-				}
-			}
-
-			this->end.Print(output, source);
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-
-			for (auto ii : members)
-			{
-				if (ii.type == StructMember::FunctionMember)
-					ii.function->Visit(visitor);
-			}
-		}
-	};
-
-	class ReturnExpression : public Expression
-	{
-		Token token;
-		Expression* right;
-	public:
-
-		ReturnExpression(Token token, Expression* right)
-		{
-			this->token = token;
-			this->right = right;
-		}
-
-		~ReturnExpression()
-		{
-			delete this->right;
-		}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			if (right)
-				this->right->SetParent(this);
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			context->CurrentToken(&token);
-			context->SetDebugLocation(token);
-
-			if (right)
-				context->Return(right->Compile(context));
-			else
-				context->root->builder.CreateRetVoid();
-
-			return CValue();
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			//check that return type matches return type of the function
-			if (right)
-				right->TypeCheck(context);
-
-			//throw 7;
-			return 0;
-		}
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		void Print(std::string& output, Source* source)
-		{
-			token.Print(output, source);
-			if (right)
-				right->Print(output, source);
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-			if (right)
-				right->Visit(visitor);
-		}
-	};
-
-	class BreakExpression : public Expression
-	{
-		Token token;
-	public:
-		BreakExpression(Token token) : token(token) {}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			context->CurrentToken(&token);
-			context->SetDebugLocation(token);
-			context->Break();
-
-			return CValue();
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			return 0;
-		}
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		void Print(std::string& output, Source* source)
-		{
-			token.Print(output, source);
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-		}
-	};
-
-	class ContinueExpression : public Expression
-	{
-		Token token;
-	public:
-		ContinueExpression(Token token) : token(token) {}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			context->CurrentToken(&token);
-			context->SetDebugLocation(token);
-			context->Continue();
-
-			return CValue();
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			return 0;
-		}
-
-		void CompileDeclarations(CompilerContext* context) {};
-
-		void Print(std::string& output, Source* source)
-		{
-			token.Print(output, source);
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-		}
-	};
-
-	class AttributeExpression : public Expression
-	{
-		Token token;
-		Expression* next;
-	public:
-
-		Token name;
-		AttributeExpression(Token token, Token name, Expression* next) : token(token), name(name), next(next)
-		{
-
-		}
-
-		~AttributeExpression()
-		{
-			delete next;
-		}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			this->next->Parent = this;
-		}
-
-		void Print(std::string& output, Source* source)
-		{
-			output += '[';
-			token.Print(output, source);
-			name.Print(output, source);
-			output += "]\n";
-			next->Print(output, source);
-		}
-
-		void CompileDeclarations(CompilerContext* context)
-		{
-			next->CompileDeclarations(context);
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			//just need to make sure the attribute exists
-			//throw 7;
-			next->TypeCheck(context);
-			return 0;
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-			next->Visit(visitor);
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			return next->Compile(context);
-		}
-	};
-
-	class TypedefExpression : public Expression
-	{
-		Token token;
-		Token new_type;
-		Token equals;
-		Token other_type;
-	public:
-		TypedefExpression(Token token, Token new_type, Token equals, Token other_type) : token(token), new_type(new_type),
-			equals(equals), other_type(other_type) {}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-		}
-
-		CValue Compile(CompilerContext* context)
-		{
-			if (this->Parent->Parent != 0)
-				context->root->Error("Cannot use typedef outside of global scope", token);
-
-			return CValue();
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			return 0;
-		}
-
-		void CompileDeclarations(CompilerContext* context)
-		{
-			if (this->Parent->Parent != 0)
-				context->root->Error("Cannot use typedef outside of global scope", token);
-
-			context->root->ns->members.insert({ this->new_type.text, context->root->LookupType(this->other_type.text) });
-			//context->root->Error("Typedef not implemented atm", token);
-
-			/*context->CurrentToken(&other_type);
-			auto type = context->root->AdvanceTypeLookup(other_type.text);
-
-			//this can be fixed by adding a third pass over the typedefs
-			auto iter = context->root->types.find(new_type.text);
-			if (iter != context->root->types.end())
-			{
-			if (iter->second->type == Types::Invalid)
-			context->root->Error("Please place the typedef before it is used, after is not yet handled properly.", new_type);
-			else
-			context->root->Error("Type '" + new_type.text + "' already defined!", new_type);
-			}
-			context->root->types[new_type.text] = type;*/
-		};
-
-		void Print(std::string& output, Source* source)
-		{
-			token.Print(output, source);
-			new_type.Print(output, source);
-			equals.Print(output, source);
-			other_type.Print(output, source);
-		}
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			visitor->Visit(this);
-		}
-	};
-
-	class YieldExpression : public Expression
-	{
-		Token token;
-		Expression* right;
-	public:
-		YieldExpression(Token t, Expression* right)
-		{
-			this->token = t;
-			this->right = right;
-		}
-
-		void SetParent(Expression* parent)
-		{
-			this->Parent = parent;
-			if (right)
-				right->SetParent(this);
-		}
-
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			//todo
-			//throw 7;
-			//todo
-			return 0;
-		}
-
-		void Print(std::string& output, Source* source)
-		{
-			token.Print(output, source);
-			//new_type.Print(output, source);
-			//equals.Print(output, source);
-			//other_type.Print(output, source);
-		}
-
-		void CompileDeclarations(CompilerContext* context)
-		{
-
-		}
-
-		CValue Compile(CompilerContext* context);
-
-		virtual void Visit(ExpressionVisitor* visitor)
-		{
-			throw 7;//todo
-			//visitor->Visit(this);
-			right->Visit(visitor);
 		}
 	};
 }

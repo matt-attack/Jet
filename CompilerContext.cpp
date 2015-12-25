@@ -4,6 +4,7 @@
 
 #include "Lexer.h"
 #include "Expressions.h"
+#include "DeclarationExpressions.h"
 
 using namespace Jet;
 

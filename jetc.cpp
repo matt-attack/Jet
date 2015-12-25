@@ -102,6 +102,19 @@ int main(int argc, char* argv[])
 				DiagnosticBuilder b([](Diagnostic& x) {x.Print(); });
 				auto compilation = Compilation::Make(project, &b);
 
+				std::string o;
+				for (auto ii : compilation->asts)
+				{
+					ii.second->Print(o, compilation->sources[ii.first]);
+					//std::cout << o;
+
+					//check that they match!!!
+					if (strcmp(o.c_str(), compilation->sources[ii.first]->GetLinePointer(1)) != 0)
+						printf("Tree printing test failed, did not match original\n");
+
+					o.clear();
+				}
+
 				if (b.GetErrors().size() > 0)
 				{
 					printf("Test '%s' failed\n", ii);

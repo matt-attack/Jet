@@ -2,6 +2,8 @@
 #include "Project.h"
 #include "Source.h"
 #include "Expressions.h"
+#include "DeclarationExpressions.h"
+#include "ControlExpressions.h"
 #include "Lexer.h"
 #include "Types/Function.h"
 
@@ -167,17 +169,17 @@ public:
 
 	virtual void Visit(CallExpression* expr)
 	{
-		auto fun = dynamic_cast<FunctionExpression*>(expr->Parent->Parent);
+		auto fun = dynamic_cast<FunctionExpression*>(expr->parent->parent);
 		if (fun == 0)
 			return;
 		
 		if (auto index = dynamic_cast<IndexExpression*>(expr->left))
 		{
-			if (auto str = dynamic_cast<StructExpression*>(fun->Parent))
+			if (auto str = dynamic_cast<StructExpression*>(fun->parent))
 			{
 				if (str->templates)
 				{
-					auto trait = compiler->LookupType(str->templates->front().first.text);
+					auto trait = compiler->LookupType(str->templates->front().type.text);
 					//check if the call fits the trait
 					//auto out = index->GetBaseType(this->compiler);
 					//printf("hi");
@@ -382,7 +384,14 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			{
 				//catch any exceptions
 				compilation->typecheck = true;
-				ii->TypeCheck(global);
+				try
+				{
+					ii->TypeCheck(global);
+				}
+				catch (int x)
+				{
+
+				}
 				compilation->typecheck = false;
 				try
 				{

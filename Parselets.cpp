@@ -134,7 +134,7 @@ Expression* NameParselet::parse(Parser* parser, Token token)
 		//check if the token after the next this is a , or a > if it is, then im a template
 		//Token ahead = parser->LookAhead(1);
 		//if (ahead.type != TokenType::Not)//ahead.type != TokenType::Comma && ahead.type != TokenType::GreaterThan)
-			//return new NameExpression(token);
+		//return new NameExpression(token);
 
 		parser->Consume();
 		parser->Consume(TokenType::LessThan);
@@ -250,123 +250,98 @@ Expression* GroupParselet::parse(Parser* parser, Token token)
 
 Expression* WhileParselet::parse(Parser* parser, Token token)
 {
-	parser->Consume(TokenType::LeftParen);
+	auto ob = parser->Consume(TokenType::LeftParen);
 
 	UniquePtr<Expression*> condition = parser->ParseExpression();
 
-	parser->Consume(TokenType::RightParen);
+	auto cb = parser->Consume(TokenType::RightParen);
 
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new WhileExpression(token, condition.Release(), block);
+	return new WhileExpression(token, ob, condition.Release(), cb, block);
 }
 
 Expression* CaseParselet::parse(Parser* parser, Token token)
 {
-	int number = std::stol(parser->Consume(TokenType::Number).text);
+	Token number = parser->Consume(TokenType::Number);
 
-	parser->Consume(TokenType::Colon);
+	Token colon = parser->Consume(TokenType::Colon);
 
-	return new CaseExpression(token, number);
+	return new CaseExpression(token, number, colon);
 }
 
 Expression* DefaultParselet::parse(Parser* parser, Token token)
 {
-	parser->Consume(TokenType::Colon);
+	auto colon = parser->Consume(TokenType::Colon);
 
-	return new DefaultExpression(token);
+	return new DefaultExpression(token, colon);
 }
 
 Expression* ForParselet::parse(Parser* parser, Token token)
 {
-	parser->Consume(TokenType::LeftParen);
-	/*if (parser->LookAhead().type == TokenType::Local)
-	{
-	if (parser->LookAhead(1).type == TokenType::Name)
-	{
-	Token n = parser->LookAhead(2);
-	if (n.type == TokenType::Name && n.text == "in")
-	{
-	//ok its a foreach loop
-	parser->Consume();
-	auto name = parser->Consume();
-	parser->Consume();
-	UniquePtr<Expression*> container = parser->ParseExpression();
-	parser->Consume(TokenType::RightParen);
-	throw 7;
-	auto block = new ScopeExpression(parser->ParseBlock());
-	//return new ForEachExpression(name, container.Release(), block);
-	}
-	}
-	}*/
-
-
-	/*UniquePtr<Expression*> initial = 0;
-	//if (!parser->MatchAndConsume(TokenType::Semicolon))
-	initial = parser->ParseStatement(true);
-	UniquePtr<Expression*> condition = 0;
-	//if (!parser->MatchAndConsume(TokenType::Semicolon))
-	condition = parser->ParseStatement(true);
-	UniquePtr<Expression*> increment = 0;
-	//if (!parser->MatchAndConsume(TokenType::Semicolon))
-	increment = parser->ParseExpression();*/
-
+	auto ob = parser->Consume(TokenType::LeftParen);
 
 	UniquePtr<Expression*> initial = 0;
-	if (!parser->MatchAndConsume(TokenType::Semicolon))
-		initial = parser->ParseStatement(true);
+	if (!parser->Match(TokenType::Semicolon))
+		initial = parser->ParseStatement(false);
+	auto s1 = parser->Consume();
 	UniquePtr<Expression*> condition = 0;
-	if (!parser->MatchAndConsume(TokenType::Semicolon))
-		condition = parser->ParseStatement(true);
+	if (!parser->Match(TokenType::Semicolon))
+		condition = parser->ParseStatement(false);
+	auto s2 = parser->Consume();
 	UniquePtr<Expression*> increment = 0;
 	if (!parser->Match(TokenType::RightParen))
 		increment = parser->ParseExpression();
 
-	parser->Consume(TokenType::RightParen);
+	auto cb = parser->Consume(TokenType::RightParen);
 
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new ForExpression(token, initial.Release(), condition.Release(), increment.Release(), block);
+	return new ForExpression(token, ob, initial.Release(), s1, condition.Release(), s2, increment.Release(), cb, block);
 }
 
 Expression* SwitchParselet::parse(Parser* parser, Token token)
 {
-	parser->Consume(TokenType::LeftParen);
+	auto ob = parser->Consume(TokenType::LeftParen);
 	UniquePtr<Expression*> var = parser->ParseExpression();
-	parser->Consume(TokenType::RightParen);
+	auto cb = parser->Consume(TokenType::RightParen);
 
 	BlockExpression* block = parser->ParseBlock(false);
 
-	return new SwitchExpression(token, var.Release(), block);
+	return new SwitchExpression(token, ob, var.Release(), cb, block);
 }
 
 Expression* UnionParselet::parse(Parser* parser, Token token)
 {
 	Token name = parser->Consume(TokenType::Name);
 
-	parser->Consume(TokenType::Assign);
+	Token equals = parser->Consume(TokenType::Assign);
 
-	std::vector<Token> elements;
+	std::vector<std::pair<Token, Token>> elements;
 	while (parser->LookAhead().type != TokenType::Semicolon)
 	{
 		//parse in each block
 		Token name = parser->Consume(TokenType::Name);
 
-		elements.push_back(name);
-
-		if (parser->MatchAndConsume(TokenType::BOr))
+		Token bor = parser->LookAhead();
+		if (bor.type == TokenType::BOr)
+		{
+			elements.push_back({ name, bor });
 			continue;
+		}
+
+		elements.push_back({ name, Token() });
 
 		break;
 	}
 
-	return new UnionExpression(name, std::move(elements));
+	return new UnionExpression(token, name, equals, std::move(elements));
 	//return new SwitchExpression(token, var.Release(), block);
 }
 
 Expression* MatchParselet::parse(Parser* parser, Token token)
 {
-	parser->Consume(TokenType::LeftParen);
+	Token open = parser->Consume(TokenType::LeftParen);
 	UniquePtr<Expression*> var = parser->ParseExpression();
-	parser->Consume(TokenType::RightParen);
+	Token close = parser->Consume(TokenType::RightParen);
 
 	parser->Consume(TokenType::LeftBrace);
 
@@ -378,12 +353,13 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 		{
 			Token def = parser->Consume();
 
-			auto tok = parser->Consume(TokenType::Assign);
+			auto tok = parser->Consume(TokenType::Assign);//fix this not being one token
 			parser->Consume(TokenType::GreaterThan);
+			tok.text += ">";
 
 			BlockExpression* block = parser->ParseBlock(true);
 
-			cases.push_back({ def, def, block });
+			cases.push_back({ def, def, tok, block });
 
 			parser->Consume(TokenType::RightBrace);
 			break;
@@ -398,10 +374,10 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 
 		BlockExpression* block = parser->ParseBlock(true);
 
-		cases.push_back({ type, name, block });
+		cases.push_back({ type, name, tok, block });
 	}
 
-	return new MatchExpression(token, var.Release(), std::move(cases));
+	return new MatchExpression(token, open, close, var.Release(), std::move(cases));
 	//return new SwitchExpression(token, var.Release(), block);
 }
 
@@ -409,13 +385,13 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 {
 	std::vector<Branch*> branches;
 	//take parens
-	parser->Consume(TokenType::LeftParen);
+	auto ob = parser->Consume(TokenType::LeftParen);
 	UniquePtr<Expression*> ifcondition = parser->ParseExpression();
-	parser->Consume(TokenType::RightParen);
+	auto cb = parser->Consume(TokenType::RightParen);
 
 	BlockExpression* ifblock = parser->ParseBlock(true);
 
-	branches.push_back(new Branch(token, ifblock, ifcondition.Release()));
+	branches.push_back(new Branch(token, ob, cb, ifblock, ifcondition.Release()));
 
 	Branch* Else = 0;
 	while (true)
@@ -427,13 +403,13 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 			parser->Consume();
 
 			//keep going
-			parser->Consume(TokenType::LeftParen);
+			auto ob = parser->Consume(TokenType::LeftParen);
 			UniquePtr<Expression*> condition = parser->ParseExpression();
-			parser->Consume(TokenType::RightParen);
+			auto cb = parser->Consume(TokenType::RightParen);
 
 			BlockExpression* block = parser->ParseBlock(true);
 
-			branches.push_back(new Branch(t, block, condition.Release()));
+			branches.push_back(new Branch(t, ob, cb, block, condition.Release()));
 		}
 		else if (t.type == TokenType::Else)
 		{
@@ -442,7 +418,7 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 			//its an else
 			BlockExpression* block = parser->ParseBlock(true);
 
-			Else = new Branch(t, block, 0);
+			Else = new Branch(t, Token(), Token(), block, 0);
 			break;
 		}
 		else
@@ -456,80 +432,99 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 {
 	Token name = parser->Consume(TokenType::Name);
 
+	Token tcb, tob;
 	//parse templates
-	std::vector<std::pair<Token, Token>>* templated = 0;
-	if (parser->MatchAndConsume(TokenType::LessThan))
+	std::vector<TraitTemplate>* templated = 0;
+	if (parser->Match(TokenType::LessThan))
 	{
-		templated = new std::vector < std::pair<Token, Token> > ;
+		tob = parser->Consume();
+		templated = new std::vector < TraitTemplate > ;
 		//parse types and stuff
 		do
 		{
 			Token ttname = parser->Consume(TokenType::Name);
 			Token tname = parser->LookAhead();
-			if (tname.type == TokenType::Name)
-				parser->Consume(TokenType::Name);
+			if (tname.type == TokenType::Comma)
+			{
+				parser->Consume();
+				templated->push_back({ ttname, tname });
+			}
 			else
 			{
-				tname = ttname;
-				ttname = Token();
+				templated->push_back({ ttname, Token() });
+				break;
 			}
 
-			templated->push_back({ ttname, tname });
-		} while (parser->MatchAndConsume(TokenType::Comma));
-		parser->Consume(TokenType::GreaterThan);
+			//templated->push_back({ ttname, tname });
+		} while (true);//parser->MatchAndConsume(TokenType::Comma));
+		tcb = parser->Consume(TokenType::GreaterThan);
 	}
 
-	parser->Consume(TokenType::LeftBrace);
+	auto ob = parser->Consume(TokenType::LeftBrace);
 
 	std::vector<TraitFunction> functions;
-	while (parser->MatchAndConsume(TokenType::RightBrace) == false)
+	while (parser->Match(TokenType::RightBrace) == false)
 	{
 		TraitFunction func;
 		Token tfunc = parser->Consume(TokenType::Function);
 		func.ret_type = ::ParseType(parser);
 		func.name = parser->Consume(TokenType::Name);
-
-		parser->Consume(TokenType::LeftParen);
+		func.func_token = tfunc;
+		func.open_brace = parser->Consume(TokenType::LeftParen);
 
 		bool first = true;
-		while (parser->MatchAndConsume(TokenType::RightParen) == false)
+		while (parser->Match(TokenType::RightParen) == false)
 		{
 			if (first)
+			{
 				first = false;
+				//parse args
+				auto type = ::ParseType(parser);
+				func.args.push_back({ type, parser->Consume(TokenType::Name), Token() });
+			}
 			else
-				parser->Consume(TokenType::Comma);
-
-			//parse args
-			func.args.push_back(::ParseType(parser));
-			Token arg = parser->Consume(TokenType::Name);
+			{
+				auto comma = parser->Consume(TokenType::Comma);
+				//parse args
+				auto type = ::ParseType(parser);
+				func.args.push_back({ type, parser->Consume(TokenType::Name), comma });
+			}
 		}
 
+		func.close_brace = parser->Consume();
+		func.semicolon = parser->Consume(TokenType::Semicolon);
 		functions.push_back(func);
-
-		parser->Consume(TokenType::Semicolon);
 	}
+	auto cb = parser->Consume();
 
-	return new TraitExpression(token, name, std::move(functions), templated);
+	return new TraitExpression(token, name, tob, tcb, ob, std::move(functions), templated, cb);
 }
 
 Expression* StructParselet::parse(Parser* parser, Token token)
 {
 	Token name = parser->Consume(TokenType::Name);
-
+	Token ob, cb;
 	//parse templates
-	std::vector<std::pair<Token, Token>>* templated = 0;
-	if (parser->MatchAndConsume(TokenType::LessThan))
+	std::vector<StructTemplate>* templated = 0;
+	if (parser->Match(TokenType::LessThan))
 	{
-		templated = new std::vector < std::pair<Token, Token> > ;
+		ob = parser->Consume();
+		templated = new std::vector < StructTemplate > ;
 		//parse types and stuff
 		do
 		{
 			Token ttname = ParseTrait(parser);
 			Token tname = parser->Consume(TokenType::Name);
-
-			templated->push_back({ ttname, tname });
-		} while (parser->MatchAndConsume(TokenType::Comma));
-		parser->Consume(TokenType::GreaterThan);
+			Token comma = parser->LookAhead();
+			if (comma.type == TokenType::Comma)
+				templated->push_back({ ttname, tname, comma });
+			else
+			{
+				templated->push_back({ ttname, tname, Token() });
+				break;
+			}
+		} while (true);// parser->MatchAndConsume(TokenType::Comma));
+		cb = parser->Consume(TokenType::GreaterThan);
 	}
 
 	//parse base type
@@ -610,15 +605,15 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 			}
 		}
 
-		parser->Consume(TokenType::Semicolon);
+		Token semicolon = parser->Consume(TokenType::Semicolon);
 
 		StructMember member;
 		member.type = StructMember::VariableMember;
-		member.variable = { type, name };
+		member.variable = { type, name, semicolon };
 		members.push_back(member);
 	}
 
-	return new StructExpression(token, name, start, end, std::move(members), /*elements, functions,*/ templated, base_name);
+	return new StructExpression(token, name, start, end, ob, std::move(members), /*elements, functions,*/ templated, cb, base_name);
 }
 
 Expression* FunctionParselet::parse(Parser* parser, Token token)
@@ -630,11 +625,12 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	Token name = parser->Consume(TokenType::Name);
 	if (destructor)
 		name.text = "~" + name.text;
-	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
+	auto arguments = new std::vector < FunctionArg > ;
 
-	Token stru;
-	if (parser->MatchAndConsume(TokenType::Scope))
+	Token stru, colons;
+	if (parser->Match(TokenType::Scope))
 	{
+		colons = parser->Consume();
 		//its a struct definition
 		stru = name;
 		name = parser->Consume(TokenType::Name);//parse the real function name
@@ -657,18 +653,22 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	}
 
 	NameExpression* varargs = 0;
-	parser->Consume(TokenType::LeftParen);
+	Token ob = parser->Consume(TokenType::LeftParen);
 
-	if (!parser->MatchAndConsume(TokenType::RightParen))
+	if (!parser->Match(TokenType::RightParen))
 	{
 		do
 		{
 			Token type = ::ParseType(parser);
 
 			Token name = parser->Consume();
+			Token comma = parser->LookAhead();
 			if (name.type == TokenType::Name)
 			{
-				arguments->push_back({ type.text, name.text });
+				if (comma.type == TokenType::Comma)
+					arguments->push_back({ type, name, comma });
+				else
+					arguments->push_back({ type, name, Token() });
 			}
 			else
 			{
@@ -677,16 +677,17 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
 
-		parser->Consume(TokenType::RightParen);
+		//parser->Consume(TokenType::RightParen);
 	}
+	Token cb = parser->Consume(TokenType::RightParen);
 
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, name, ret_type, token.type == TokenType::Generator, arguments, block, /*varargs,*/ stru, templated);
+	return new FunctionExpression(token, name, ret_type, token.type == TokenType::Generator, arguments, block, /*varargs,*/ stru, colons, templated, 0, ob, cb);
 }
 
 Expression* ExternParselet::parse(Parser* parser, Token token)
 {
-	parser->Consume(TokenType::Function);
+	auto fun = parser->Consume(TokenType::Function);
 
 	Token ret_type = ::ParseType(parser);
 
@@ -694,7 +695,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	//if (parser->LookAhead()
 
 	Token name = parser->Consume(TokenType::Name);
-	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
+	auto arguments = new std::vector < ExternArg > ;
 
 	std::string stru;
 	if (parser->MatchAndConsume(TokenType::Scope))
@@ -708,9 +709,10 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	}
 
 	NameExpression* varargs = 0;
-	parser->Consume(TokenType::LeftParen);
+	auto ob = parser->Consume(TokenType::LeftParen);
 
-	if (!parser->MatchAndConsume(TokenType::RightParen))
+	Token cb;
+	if (!parser->Match(TokenType::RightParen))
 	{
 		do
 		{
@@ -718,7 +720,11 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 			Token name = parser->Consume(TokenType::Name);
 			if (name.type == TokenType::Name)
 			{
-				arguments->push_back({ type.text, name.text });
+				auto comma = parser->LookAhead();
+				if (comma.type == TokenType::Comma)
+					arguments->push_back({ type, name, comma });
+				else
+					arguments->push_back({ type, name, Token() });
 			}
 			/*else if (name.type == TokenType::Ellipses)
 			{
@@ -733,10 +739,14 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
 
-		parser->Consume(TokenType::RightParen);
+		cb = parser->Consume(TokenType::RightParen);
+	}
+	else
+	{
+		cb = parser->Consume();
 	}
 
-	return new ExternExpression(token, name, ret_type, arguments, stru);
+	return new ExternExpression(token, fun, name, ret_type, ob, arguments, cb, stru);
 }
 
 
@@ -754,7 +764,7 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 			//handle arguments for the attribute
 		}
 
-		parser->Consume(TokenType::RightBracket);
+		auto cb = parser->Consume(TokenType::RightBracket);
 
 		//parse the next thing
 
@@ -762,7 +772,7 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 
 		//ok, add the attribute to the list ok, we need an attribute expression
 
-		auto attr = new AttributeExpression(token, attribute, thing);
+		auto attr = new AttributeExpression(token, attribute, cb, thing);
 
 		if (dynamic_cast<ExternExpression*>(thing))
 			return attr;
@@ -791,9 +801,9 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 
 	parser->Consume(TokenType::RightBracket);
 
-	parser->Consume(TokenType::LeftParen);
+	Token ob = parser->Consume(TokenType::LeftParen);
 
-	auto arguments = new std::vector < std::pair<std::string, std::string> > ;
+	auto arguments = new std::vector < FunctionArg > ;
 	if (parser->LookAhead().type != TokenType::RightParen)
 	{
 		do
@@ -803,41 +813,55 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 				type = ::ParseType(parser);
 
 			Token name = parser->Consume();
+			Token comma = parser->LookAhead();
 			if (name.type == TokenType::Name)
 			{
-				arguments->push_back({ type.text, name.text });
+				if (comma.type == TokenType::Comma)
+					arguments->push_back({ type, name, comma });
+				else
+				{
+					arguments->push_back({ type, name, Token() });
+					break;
+				}
 			}
 			else
 			{
 				std::string str = "Token not as expected! Expected name got: " + name.text;
 				parser->Error(str, token);
 			}
-		} while (parser->MatchAndConsume(TokenType::Comma));
+		} while (true);// parser->MatchAndConsume(TokenType::Comma));
 	}
 
-	parser->Consume(TokenType::RightParen);
+	auto cb = parser->Consume(TokenType::RightParen);
 	Token ret_type;
 	if (parser->MatchAndConsume(TokenType::Pointy))
 		ret_type = ::ParseType(parser);
 
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, Token(), ret_type, false, arguments, block, Token(), 0, captures);
+	return new FunctionExpression(token, Token(), ret_type, false, arguments, block, Token(), Token(), 0, captures, ob, cb);
 }
 
 Expression* CallParselet::parse(Parser* parser, Expression* left, Token token)
 {
-	UniquePtr<std::vector<Expression*>*> arguments = new std::vector < Expression* > ;
-
-	if (!parser->MatchAndConsume(TokenType::RightParen))
+	UniquePtr<std::vector<std::pair<Expression*, Token>>*> arguments = new std::vector < std::pair<Expression*, Token> > ;
+	if (!parser->Match(TokenType::RightParen))
 	{
 		do
 		{
-			arguments->push_back(parser->ParseExpression(Precedence::ASSIGNMENT));
+			auto expr = parser->ParseExpression(Precedence::ASSIGNMENT);
+			auto comma = parser->LookAhead();
+			if (comma.type == TokenType::Comma)
+				arguments->push_back({ expr, comma });
+			else
+			{
+				arguments->push_back({ expr, Token() });
+			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
 
-		parser->Consume(TokenType::RightParen);
+		//cb = parser->Consume(TokenType::RightParen);
 	}
-	return new CallExpression(token, left, arguments.Release());
+	Token cb = parser->Consume(TokenType::RightParen);
+	return new CallExpression(token, cb, left, arguments.Release());
 }
 
 Expression* ReturnParselet::parse(Parser* parser, Token token)
@@ -872,36 +896,37 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 			if (auto s = dynamic_cast<NumberExpression*>(size))
 			{
 				if (s->GetIntValue() <= 0)
-				{
 					parser->Error("Cannot size array with a zero or negative size", token);
-					//throw 7;
-				}
+
 				type.text += "[" + std::to_string((int)s->GetIntValue()) + "]";
 			}
 			else
 			{
 				parser->Error("Cannot size array with a non constant size", token);
-				//throw 7;
 			}
 		}
 		names->push_back({ type, name });
 	} while (parser->MatchAndConsume(TokenType::Comma));
 
 	if (parser->Match(TokenType::Semicolon))
-		return new LocalExpression(token, names.Release(), 0);
+		return new LocalExpression(token, Token(), names.Release(), 0);
 
-	parser->Consume(TokenType::Assign);//its possible this wont be here and it may just be a mentioning, but no assignment
+	Token equals = parser->Consume(TokenType::Assign);//its possible this wont be here and it may just be a mentioning, but no assignment
 
 	//handle multiple comma expressions
-	UniquePtr<std::vector<Expression*>*> rights = new std::vector < Expression* > ;
+	UniquePtr<std::vector<std::pair<Token, Expression*>>*> rights = new std::vector < std::pair<Token, Expression*> > ;
 	do
 	{
 		Expression* right = parser->ParseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
 
-		rights->push_back(right);
+		auto tok = parser->LookAhead();
+		if (tok.type == TokenType::Comma)
+			rights->push_back({ tok, right });
+		else
+			rights->push_back({ Token(), right });
 	} while (parser->MatchAndConsume(TokenType::Comma));
 
-	return new LocalExpression(token, names.Release(), rights.Release());
+	return new LocalExpression(token, equals, names.Release(), rights.Release());
 }
 
 Expression* ConstParselet::parse(Parser* parser, Token token)
@@ -909,10 +934,10 @@ Expression* ConstParselet::parse(Parser* parser, Token token)
 	parser->Error("Not Implemented", token);
 
 	auto names = new std::vector < std::pair<Token, Token> > ;
-	do
+	/*do
 	{
-		Token name = parser->Consume(TokenType::Name);
-		//names->push_back(name);
+	Token name = parser->Consume(TokenType::Name);
+	//names->push_back(name);
 	} while (parser->MatchAndConsume(TokenType::Comma));
 
 	parser->Consume(TokenType::Assign);//its possible this wont be here and it may just be a mentioning, but no assignment
@@ -921,16 +946,16 @@ Expression* ConstParselet::parse(Parser* parser, Token token)
 	std::vector<Expression*>* rights = new std::vector < Expression* > ;
 	do
 	{
-		Expression* right = parser->ParseExpression(Precedence::ASSIGNMENT - 1/*assignment prcedence -1 */);
+	Expression* right = parser->ParseExpression(Precedence::ASSIGNMENT - 1);
 
-		rights->push_back(right);
+	rights->push_back(right);
 	} while (parser->MatchAndConsume(TokenType::Comma));
 
-	parser->Consume(TokenType::Semicolon);
+	parser->Consume(TokenType::Semicolon);*/
 	//do stuff with this and store and what not
 	//need to add this variable to this's block expression
 
-	return new LocalExpression(token, names, rights);
+	return 0;// new LocalExpression(token, names, rights);
 }
 
 /*Expression* ArrayParselet::parse(Parser* parser, Token token)
@@ -952,9 +977,9 @@ return new ArrayExpression(std::move(inits));
 Expression* IndexParselet::parse(Parser* parser, Expression* left, Token token)
 {
 	UniquePtr<Expression*> index = parser->ParseExpression();
-	parser->Consume(TokenType::RightBracket);
+	auto cb = parser->Consume(TokenType::RightBracket);
 
-	return new IndexExpression(left, index.Release(), token);
+	return new IndexExpression(left, index.Release(), token, cb);
 }
 
 Expression* MemberParselet::parse(Parser* parser, Expression* left, Token token)
@@ -1070,12 +1095,18 @@ Expression* NewParselet::parse(Parser* parser, Token token)
 	auto type = ::ParseType(parser, false);
 
 	//try and parse size expression
-	Expression* size = 0;
-	if (auto tok = parser->MatchAndConsume(TokenType::LeftBracket))
+	if (parser->LookAhead().type == TokenType::LeftBracket)//auto tok = parser->MatchAndConsume(TokenType::LeftBracket))
 	{
-		size = parser->ParseExpression(Precedence::ASSIGNMENT);
+		auto ob = parser->Consume();
 
-		parser->Consume(TokenType::RightBracket);
+		Expression* size = parser->ParseExpression(Precedence::ASSIGNMENT);
+
+		auto cb = parser->Consume(TokenType::RightBracket);
+
+		auto x = new NewExpression(token, type, size);
+		x->open_bracket = ob;
+		x->close_bracket = cb;
+		return x;
 	}
-	return new NewExpression(token, type, size);
+	return new NewExpression(token, type, 0);
 }

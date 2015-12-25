@@ -19,6 +19,8 @@
 #include "Project.h"
 #include "Compiler.h"
 #include "Expressions.h"
+#include "DeclarationExpressions.h"
+#include "ControlExpressions.h"
 #include "Types\Function.h"
 
 #include <iostream>

@@ -2,6 +2,7 @@
 #include "Compiler.h"
 #include "CompilerContext.h"
 #include "Expressions.h"
+#include "DeclarationExpressions.h"
 #include "Lexer.h"
 #include "Function.h"
 
@@ -488,9 +489,9 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	{
 		if (ii.type == StructMember::VariableMember)
 		{
-			auto type = compiler->LookupType(ii.variable.first.text, false);
+			auto type = compiler->LookupType(ii.variable.type.text, false);
 
-			str->struct_members.push_back({ ii.variable.second.text, ii.variable.first.text, type });
+			str->struct_members.push_back({ ii.variable.name.text, ii.variable.type.text, type });
 		}
 	}
 
@@ -959,7 +960,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 					int i = 0;
 					for (auto ii : *fun.second->expression->args)
 					{
-						data += ii.first + " " + ii.second;
+						data += ii.type.text + " " + ii.name.text;
 						if (i != fun.second->expression->args->size() - 1)
 							data += ", ";
 						//ii->Print(output, source);

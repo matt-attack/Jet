@@ -4,7 +4,7 @@
 
 using namespace Jet;
 
-void Token::Print(std::string& str, Source* source)
+void Token::Print(std::string& str, Source* source) const
 {
 	//output trivia
 	auto code = this->text_ptr;
