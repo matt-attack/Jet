@@ -223,6 +223,7 @@ BlockExpression* Parser::ParseAll()
 	}
 	auto n = new BlockExpression(std::move(statements));
 	n->SetParent(0);//go through and setup parents
+	n->eof = this->Consume();
 	return n;
 }
 

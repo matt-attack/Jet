@@ -58,4 +58,7 @@ fun int main()
 		puts("pass");
 	
 	return 0;
-}
+}/*comment*/
+
+
+  

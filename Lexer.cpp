@@ -246,7 +246,7 @@ Token Lexer::Next()
 			else if (toktype == TokenType::CommentBegin)
 			{
 				int startline = src->linenumber;
-				
+
 				while (true)
 				{
 					char c = src->ConsumeChar();
@@ -530,8 +530,12 @@ Token Lexer::Next()
 			}
 		}
 	}
+	
+	int trivia_length = src->GetIndex() - this->last_index;
+	const char* trivia = src->GetLinePointer(1) + src->GetLength() - trivia_length;
+
 	this->last_index = src->GetIndex();
 
-	return Token(0, 0, src->linenumber, src->column, TokenType::EoF, "EOF");
+	return Token(src->GetLinePointer(1) + src->GetLength(), trivia_length, src->linenumber, src->column, TokenType::EoF, "");
 }
 

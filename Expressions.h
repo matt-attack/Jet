@@ -975,7 +975,7 @@ namespace Jet
 		bool no_brackets;
 
 	public:
-		Token start, end;
+		Token start, end, eof;
 
 		std::vector<Expression*> statements;
 		BlockExpression(Token start_bracket, Token end_bracket, std::vector<Expression*>&& statements) : statements(statements)
@@ -1056,6 +1056,9 @@ namespace Jet
 			}
 			if (!no_brackets)
 				this->end.Print(output, source);
+
+			if (this->eof.trivia_length)
+				this->eof.Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)

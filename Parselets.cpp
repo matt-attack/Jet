@@ -335,7 +335,6 @@ Expression* UnionParselet::parse(Parser* parser, Token token)
 	}
 
 	return new UnionExpression(token, name, equals, std::move(elements));
-	//return new SwitchExpression(token, var.Release(), block);
 }
 
 Expression* MatchParselet::parse(Parser* parser, Token token)
@@ -362,7 +361,6 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 
 			cases.push_back({ def, def, tok, block });
 
-			//parser->Consume(TokenType::RightBrace);
 			break;
 		}
 
