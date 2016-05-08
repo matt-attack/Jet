@@ -563,7 +563,12 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->CompileDeclarations(compiler->current_function);
+		
+		//it needs dummy constructors too
+		expr->AddConstructorDeclarations(t, compiler->current_function);
 
+		compiler->unfinished_templates.push_back(t);
+		
 		expr->name = oldname;
 	}
 
@@ -571,6 +576,45 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	compiler->ns = oldns;
 
 	return t;
+}
+
+void Type::FinishCompilingTemplate(Compilation* compiler)
+{
+	if (this->type != Types::Struct)
+		throw 7;
+
+	this->Load(compiler);
+	//fixme, if im typechecking no functions get filled in
+
+	StructExpression* expr = dynamic_cast<StructExpression*>(this->data->expression);
+	auto oldname = expr->name;
+	expr->name.text = this->data->name;
+
+	int start = compiler->types.size();
+
+	//store then restore insertion point
+	auto rp = compiler->builder.GetInsertBlock();
+	auto dp = compiler->builder.getCurrentDebugLocation();
+
+	//for (auto ii : this->data->expression->members)
+	//	if (ii.type == StructMember::FunctionMember)
+	//		ii.function->CompileDeclarations(compiler->current_function);
+
+	//expr->AddConstructorDeclarations(this, compiler->current_function);
+
+	//fixme later, compiler->types should have a size of 0 and this should be unnecesary
+	assert(start == compiler->types.size());
+
+	for (auto ii : this->data->expression->members)
+		if (ii.type == StructMember::FunctionMember)
+			ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
+
+	expr->AddConstructors(compiler->current_function);
+
+	compiler->builder.SetCurrentDebugLocation(dp);
+	if (rp)
+		compiler->builder.SetInsertPoint(rp);
+	expr->name = oldname;
 }
 
 bool Type::IsValid()

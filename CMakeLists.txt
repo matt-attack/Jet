@@ -44,6 +44,8 @@ add_library(Racer
 	Compiler.cpp
 	CompilerContext.cpp
 	Expressions.cpp
+	ControlExpressions.cpp
+	DeclarationExpressions.cpp
 	Parser.cpp
 	Parselets.cpp
 	Source.cpp

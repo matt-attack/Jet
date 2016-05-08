@@ -88,6 +88,9 @@ namespace Jet
 		std::map<std::string, Trait*> traits;//a list of all traits
 		std::vector<Function*> functions;//a list of all functions to be able to optimize and shizzle
 
+		//list of not fully compiled templates to finish before completion
+		std::vector<Type*> unfinished_templates;
+
 		std::map<int, Type*> function_types;
 
 		//std::vector<Diagnostic> errors;

@@ -7,6 +7,7 @@ namespace Jet
 	class LocalExpression;
 	class NumberExpression;
 	class StringExpression;
+	class GroupExpression;
 	class IndexExpression;
 	class AssignExpression;
 	class OperatorAssignExpression;
@@ -96,6 +97,8 @@ namespace Jet
 		virtual void Visit(AttributeExpression* exp) {};
 
 		virtual void Visit(UnionExpression* exp) {};
+
+		virtual void Visit(GroupExpression* exp) {};
 	};
 }
 

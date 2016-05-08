@@ -726,91 +726,7 @@ namespace Jet
 			right->SetParent(this);
 		}
 
-		virtual Type* TypeCheck(CompilerContext* context)
-		{
-			auto type = this->right->TypeCheck(context);
-			//prefix
-			context->CurrentToken(&this->_operator);
-
-			if (this->_operator.type == TokenType::BAnd)
-			{
-				auto i = dynamic_cast<NameExpression*>(right);
-				auto p = dynamic_cast<IndexExpression*>(right);
-				if (i)
-				{
-					auto var = context->TCGetVariable(i->GetName());
-					return var;// CValue(var.type, var.val);
-				}
-				else if (p)
-				{
-					auto var = p->GetType(context, true);// GetElementPointer(context);
-					return var;// CValue(var.type, var.val);
-				}
-				context->root->Error("Not Implemented", this->_operator);
-			}
-
-			//auto rhs = right->Compile(context);
-
-			//auto res = context->UnaryOperation(this->_operator.type, rhs);
-
-			///llvm::Value* res = 0;
-
-			if (type->type == Types::Float || type->type == Types::Double)
-			{
-				switch (this->_operator.type)
-				{
-				case TokenType::Minus:
-					//res = root->builder.CreateFNeg(value.val);// root->builder.CreateFMul(left.val, right.val);
-					break;
-				default:
-					context->root->Error("Invalid Unary Operation '" /*+ TokenToString[this->_operator.type] + "' On Type '"*/ + type->ToString() + "'", *context->current_token);
-					break;
-				}
-
-				return type;// CValue(value.type, res);
-			}
-			else if (type->type == Types::Int || type->type == Types::Short || type->type == Types::Char)
-			{
-				//integer probably
-				switch (this->_operator.type)
-				{
-				case TokenType::Increment:
-					//res = root->builder.CreateAdd(value.val, root->builder.getInt32(1));
-					break;
-				case TokenType::Decrement:
-					//res = root->builder.CreateSub(value.val, root->builder.getInt32(1));
-					break;
-				case TokenType::Minus:
-					//res = root->builder.CreateNeg(value.val);
-					break;
-				case TokenType::BNot:
-					//res = root->builder.CreateNot(value.val);
-					break;
-				default:
-					context->root->Error("Invalid Unary Operation '" /*+ TokenToString[this->_operator.type] + "' On Type '"*/ + type->ToString() + "'", *context->current_token);
-					break;
-				}
-
-				return type;
-			}
-			else if (type->type == Types::Pointer)
-			{
-				switch (this->_operator.type)
-				{
-				case TokenType::Asterisk:
-				case TokenType::Increment:
-				case TokenType::Decrement:
-					return type->base;
-				default:
-					;
-				}
-
-			}
-			context->root->Error("Invalid Unary Operation '" /*+ TokenToString[this->_operator.type] + "' On Type '"*/ + type->ToString() + "'", *context->current_token);
-			//store here
-			//only do this for ++and--
-			return type;
-		}
+		virtual Type* TypeCheck(CompilerContext* context);
 
 		void CompileStore(CompilerContext* context, CValue right)
 		{
@@ -1230,6 +1146,49 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			return 0;
+		}
+	};
+
+	class GroupExpression : public Expression
+	{
+		Token begin, end;
+		Expression* expr;
+	public:
+		GroupExpression(Token begin, Expression* expr, Token end)
+		{
+			this->begin = begin;
+			this->expr = expr;
+			this->end = end;
+		}
+
+		void SetParent(Expression* parent)
+		{
+			this->parent = parent;
+			this->expr->parent = this;
+		}
+
+		CValue Compile(CompilerContext* context)
+		{
+			return this->expr->Compile(context);
+		}
+
+		void CompileDeclarations(CompilerContext* context) { this->expr->Compile(context); };
+
+		void Print(std::string& output, Source* source)
+		{
+			begin.Print(output, source);
+			expr->Print(output, source);
+			end.Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return this->expr->TypeCheck(context);
 		}
 	};
 }

@@ -75,6 +75,12 @@ Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), 
 	this->BoolType = new Type("bool", Types::Bool);
 	ns->members.insert({ "bool", this->BoolType });
 	ns->members.insert({ "void", new Type("void", Types::Void) });
+	
+	for (auto ii : ns->members)
+	{
+		if (ii.second.type == SymbolType::Type)
+			ii.second.ty->ns = ns;
+	}
 }
 
 Compilation::~Compilation()
@@ -410,6 +416,12 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 				}*/
 
 				compilation->ns = compilation->global;
+			}
+
+			//compile any templates that were missed
+			for (auto temp : compilation->unfinished_templates)
+			{
+				temp->FinishCompilingTemplate(compilation);
 			}
 		}
 	}
@@ -826,6 +838,126 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 		res = curns->members.find(name);
 
 	auto type = (curns != 0 && res != curns->members.end() && res->second.type == SymbolType::Type) ? res->second.ty : 0;
+
+	if (type == 0)
+	{
+		//time to handle pointers yo
+		if (name.length() == 0)
+		{
+			//Error("Missing type specifier, could not infer type", *this->current_function->current_token);
+		}
+		/*else if (name[name.length() - 1] == '*')
+		{
+			//its a pointer
+			auto t = this->LookupType(name.substr(0, name.length() - 1), load);
+
+			if (t->pointer_type)
+				return t->pointer_type;
+
+			type = new Type;
+			type->name = name;
+			type->base = t;
+			type->type = Types::Pointer;
+			t->pointer_type = type;
+			if (load)
+				type->Load(this);
+			else
+				type->ns = type->base->ns;
+			type->base->ns->members.insert({ name, type });
+		}
+		else if (name[name.length() - 1] == ']')
+		{
+			//its an array
+			int p = name.find_first_of('[');
+
+			auto len = name.substr(p + 1, name.length() - p - 2);
+
+			auto tname = name.substr(0, p);
+			auto t = this->LookupType(tname, load);
+
+			type = new Type;
+			type->name = name;
+			type->base = t;
+			type->type = Types::Array;
+			type->size = std::stoi(len);//cheat for now
+			curns->members.insert({ name, type });
+		}*/
+		else if (name[name.length() - 1] == '>')
+		{
+			//its a template
+			//get first bit, then we can instatiate it
+			int p = name.find_first_of('<');
+
+			std::string base = name.substr(0, p);
+
+			//parse types
+			std::vector<Type*> types;
+			p++;
+			do
+			{
+				//lets cheat for the moment ok
+				std::string subtype = ParseType(name.c_str(), p);
+
+				Type* t = this->LookupType(subtype, false);
+				types.push_back(t);
+			} while (name[p++] != '>');
+
+			//look up the base, and lets instantiate it
+			auto t = this->LookupType(base, false);
+
+			type = t->Instantiate(this, types);
+		}
+		/*else if (name[name.length() - 1] == ')')
+		{
+			//work from back to start
+			int p = 0;
+			int sl = 0;
+			int bl = 0;
+			for (p = name.length() - 1; p >= 0; p--)
+			{
+				switch (name[p])
+				{
+				case '(':
+					bl++;
+					break;
+				case ')':
+					bl--;
+					break;
+				case '<':
+					sl--;
+					break;
+				case '>':
+					sl++;
+					break;
+				}
+				if (sl == 0 && bl == 0)
+					break;
+			}
+
+			std::string ret_type = name.substr(0, p);
+			auto rtype = this->LookupType(ret_type, load);
+
+			std::vector<Type*> args;
+			//parse types
+			p++;
+			while (name[p] != ')')
+			{
+				//lets cheat for the moment ok
+				std::string subtype = ParseType(name.c_str(), p);
+
+				Type* t = this->LookupType(subtype, load);
+				args.push_back(t);
+				if (name[p] == ',')
+					p++;
+			}
+			curns = global;
+			type = this->GetFunctionType(rtype, args);
+		}
+		else
+		{
+			Error("Reference To Undefined Type '" + name + "'", *this->current_function->current_token);
+		}*/
+	}
 	return type;
 }
 

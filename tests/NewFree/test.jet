@@ -1,0 +1,14 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+fun int main() 
+{
+	local x = new int[50];
+	
+	//free x;
+	
+	return 0;
+}

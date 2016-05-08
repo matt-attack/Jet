@@ -15,6 +15,9 @@ fun Jet::Compilation* MakeCompilation(char* project)
 	LLVMAddFunction(c->module, "test", funtype);
 	LLVMPrintModuleToFile(c->module, "out.txt", 0);
 	LLVMDumpModule(c->module);
+	
+	local int int = 5;
+	int = 7;
 	return c;
 }
 

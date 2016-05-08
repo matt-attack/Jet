@@ -105,6 +105,7 @@ namespace Jet
 		void Load(Compilation* compiler);
 
 		Type* Instantiate(Compilation* compiler, const std::vector<Type*>& types);
+		void FinishCompilingTemplate(Compilation* compiler);
 
 		std::string ToString();
 

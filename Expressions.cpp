@@ -94,10 +94,8 @@ Type* IndexExpression::GetBaseType(CompilerContext* context, bool tc)
 		return i->GetType(context, tc);
 	else if (auto c = dynamic_cast<CallExpression*>(left))
 	{
-		//fix this
 		//have function call expression get data during typechecking
-		context->root->Error("Chaining function calls not yet implemented", token);
-		//return c->Compile(context).type;
+		return c->TypeCheck(context);// ->GetPointerType();
 	}
 	context->root->Error("wat", token);
 }
@@ -146,8 +144,38 @@ CValue IndexExpression::GetBaseElementPointer(CompilerContext* context)
 		return context->GetVariable(p->GetName());
 	else if (i)
 		return i->GetElementPointer(context);
+	else if (auto q = dynamic_cast<CallExpression*>(left))
+	{
+		//store the value then return the pointer to it
+		auto val = q->Compile(context);
+		auto alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType());
+	
+		return CValue(val.type->GetPointerType(), alloca);
+	}
+	context->root->Error("Could not handle Get Base Element Pointer", token);
+}
 
-	context->root->Error("wat", token);
+Type* GetMemberType(CompilerContext* context, Type* type, const std::string& name, const Token& token)
+{
+	int index = 0;
+	for (; index < type->data->struct_members.size(); index++)
+	{
+		if (type->data->struct_members[index].name == name)//string->GetValue())
+			break;
+	}
+	if (index >= type->data->struct_members.size())
+	{
+		//check methods
+		auto method = type->GetMethod(name, {}, context, true);
+		if (method == 0)
+			context->root->Error("Struct Member '" + name + "' of Struct '" + type->data->name + "' Not Found", token);
+		return method->GetType(context->root);
+	}
+
+	if (index >= type->data->struct_members.size())
+		context->root->Error("Struct Member '" + name + "' of Struct '" + type->data->name + "' Not Found", token);
+
+	return type->data->struct_members[index].type;
 }
 
 Type* IndexExpression::GetType(CompilerContext* context, bool tc)
@@ -169,21 +197,11 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 
 		if (string && lhs.type->type == Types::Struct)
 		{
-			int index = 0;
-			for (; index < lhs.type->data->struct_members.size(); index++)
-			{
-				if (lhs.type->data->struct_members[index].name == string->GetValue())
-					break;
-			}
-
-			if (index >= lhs.type->data->struct_members.size())
-				context->root->Error("Struct Member '" + string->GetValue() + "' of Struct '" + lhs.type->data->name + "' Not Found", this->token);
-
-			return lhs.type->data->struct_members[index].type;
+			return GetMemberType(context, lhs.type, string->GetValue(), this->token);// data->struct_members[index].type;
 		}
 		else if (this->token.type == TokenType::Dot && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
 		{
-			int index = 0;
+			/*int index = 0;
 			for (; index < lhs.type->base->data->struct_members.size(); index++)
 			{
 				if (lhs.type->base->data->struct_members[index].name == this->member.text)
@@ -191,9 +209,9 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 			}
 
 			if (index >= lhs.type->base->data->struct_members.size())
-				context->root->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->data->name + "' Not Found", this->member);
+				context->root->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->data->name + "' Not Found", this->member);*/
 
-			return lhs.type->base->data->struct_members[index].type;
+			return GetMemberType(context, lhs.type->base, this->member.text, this->token);// Gelhs.type->base->data->struct_members[index].type;
 		}
 		else if (this->token.type == TokenType::Pointy && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && lhs.type->base->base->type == Types::Struct)
 		{
@@ -226,6 +244,29 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 	}
 }
 
+CValue GetStructElement(CompilerContext* context, const std::string& name, const Token& token, Type* type, llvm::Value* lhs)
+{
+	int index = 0;
+	for (; index < type->data->struct_members.size(); index++)
+	{
+		if (type->data->struct_members[index].name == name)
+			break;
+	}
+	if (index >= type->data->struct_members.size())
+	{
+		//check methods
+		auto method = type->GetMethod(name, {}, context, true);
+		if (method == 0)
+			context->root->Error("Struct Member '" + name + "' of Struct '" + type->data->name + "' Not Found", token);
+		method->Load(context->root);
+		return CValue(method->GetType(context->root), method->f);
+	}
+	std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->root->builder.getInt32(index) };
+
+	auto loc = context->root->builder.CreateGEP(lhs, iindex, "index");
+	return CValue(type->data->struct_members[index].type->GetPointerType(), loc);
+}
+
 CValue IndexExpression::GetElementPointer(CompilerContext* context)
 {
 	auto p = dynamic_cast<NameExpression*>(left);
@@ -243,7 +284,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		{
 			lhs.val = context->root->builder.CreateLoad(lhs.val);
 
-			auto type = lhs.type->base->base;
+			/*auto type = lhs.type->base->base;
 			int index = 0;
 			for (; index < type->data->struct_members.size(); index++)
 			{
@@ -263,7 +304,8 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->root->builder.getInt32(index) };
 
 			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
-			return CValue(type->data->struct_members[index].type->GetPointerType(), loc);
+			return CValue(type->data->struct_members[index].type->GetPointerType(), loc);*/
+			return GetStructElement(context, this->member.text, this->member, lhs.type->base->base, lhs.val);
 		}
 
 		context->root->Error("unimplemented!", this->token);
@@ -278,32 +320,14 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 
 		if (this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
 		{
-			int index = 0;
-			for (; index < lhs.type->base->data->struct_members.size(); index++)
-			{
-				if (lhs.type->base->data->struct_members[index].name == this->member.text)
-					break;
-			}
-			if (index >= lhs.type->base->data->struct_members.size())
-			{
-				//check methods
-				auto method = lhs.type->base->GetMethod(this->member.text, {}, context, true);
-				if (method == 0)
-					context->root->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->data->name + "' Not Found", this->member);
-				return CValue(method->GetType(context->root), method->f);
-			}
-			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->root->builder.getInt32(index) };
-
-			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
-			return CValue(lhs.type->base->data->struct_members[index].type->GetPointerType(), loc);
+			return GetStructElement(context, this->member.text, this->member, lhs.type->base, lhs.val);
 		}
 		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
 		{
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
-
 			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
 
-			return CValue(lhs.type/*->base*/, loc);
+			return CValue(lhs.type, loc);
 		}
 		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
 		{
@@ -488,11 +512,15 @@ CValue NewExpression::Compile(CompilerContext* context)
 	auto size = context->GetSizeof(ty);
 	auto arr_size = this->size ? this->size->Compile(context).val : 0;
 	if (this->size)
-	{
 		size.val = context->root->builder.CreateMul(size.val, arr_size);
-	}
+
 	CValue val = context->Call("malloc", { size });
 
+	//build the array type struct, which is just an int followed by a pointer to the underlying data
+	//auto array_t = llvm::StructType::get(llvm::IntegerType::get(context->root->context, 32), ty->GetPointerType()->GetLLVMType());
+	//auto array_data = context->root->builder.CreateAlloca(array_t);
+	//context->root->builder.CreateStructGEP(array_t, array_data, 0);
+		//add free
 	auto ptr = context->DoCast(ty->GetPointerType(), val, true);
 
 	//run constructors
@@ -537,4 +565,94 @@ CValue NewExpression::Compile(CompilerContext* context)
 	}
 
 	return ptr;
+}
+
+Type* PrefixExpression::TypeCheck(CompilerContext* context)
+{
+	auto type = this->right->TypeCheck(context);
+	//prefix
+	context->CurrentToken(&this->_operator);
+
+	if (this->_operator.type == TokenType::BAnd)
+	{
+		auto i = dynamic_cast<NameExpression*>(right);
+		auto p = dynamic_cast<IndexExpression*>(right);
+		if (i)
+			return context->TCGetVariable(i->GetName());
+		else if (p)
+			return p->GetType(context, true);
+		context->root->Error("Not Implemented", this->_operator);
+	}
+
+	//auto rhs = right->Compile(context);
+
+	//auto res = context->UnaryOperation(this->_operator.type, rhs);
+
+	///llvm::Value* res = 0;
+
+	if (type->type == Types::Float || type->type == Types::Double)
+	{
+		switch (this->_operator.type)
+		{
+		case TokenType::Minus:
+			//res = root->builder.CreateFNeg(value.val);// root->builder.CreateFMul(left.val, right.val);
+			break;
+		default:
+			context->root->Error("Invalid Unary Operation '" + TokenToString[this->_operator.type] + "' On Type '" + type->ToString() + "'", *context->current_token);
+			break;
+		}
+
+		return type;// CValue(value.type, res);
+	}
+	else if (type->type == Types::Int || type->type == Types::Short || type->type == Types::Char)
+	{
+		//integer probably
+		switch (this->_operator.type)
+		{
+		case TokenType::Increment:
+			//res = root->builder.CreateAdd(value.val, root->builder.getInt32(1));
+			break;
+		case TokenType::Decrement:
+			//res = root->builder.CreateSub(value.val, root->builder.getInt32(1));
+			break;
+		case TokenType::Minus:
+			//res = root->builder.CreateNeg(value.val);
+			break;
+		case TokenType::BNot:
+			//res = root->builder.CreateNot(value.val);
+			break;
+		default:
+			context->root->Error("Invalid Unary Operation '" + TokenToString[this->_operator.type] + "' On Type '" + type->ToString() + "'", *context->current_token);
+			break;
+		}
+
+		return type;
+	}
+	else if (type->type == Types::Pointer)
+	{
+		switch (this->_operator.type)
+		{
+		case TokenType::Asterisk:
+		case TokenType::Increment:
+		case TokenType::Decrement:
+			return type->base;
+		default:
+			;
+		}
+
+	}
+	else if (type->type == Types::Bool)
+	{
+		switch (this->_operator.type)
+		{
+		case TokenType::Not:
+			return type;
+		default:
+			break;
+		}
+	}
+	context->root->Error("Invalid Unary Operation '" + TokenToString[this->_operator.type] + "' On Type '" + type->ToString() + "'", *context->current_token);
+	//store here
+	//only do this for ++and--
+	return type;
 }

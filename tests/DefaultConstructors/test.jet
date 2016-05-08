@@ -1,0 +1,13 @@
+struct Action {}
+struct Task<Any T>{}
+
+trait Any
+{
+
+}
+
+fun void main()
+{
+	local q = Action(); 
+	local p = Task!<int>();
+}

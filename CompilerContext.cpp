@@ -321,7 +321,11 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 			{
 				type->Load(this->root);
 				//look for a constructor
-				auto range = type->data->functions.equal_range(name);
+				//if we are template, remove the templated part
+				auto tmp_name = name;
+				if (name.back() == '>')
+					tmp_name = name.substr(0, name.find_first_of('<'));
+				auto range = type->data->functions.equal_range(tmp_name);
 				for (auto ii = range.first; ii != range.second; ii++)
 				{
 					if (ii->second->arguments.size() == args.size() + 1)
@@ -587,6 +591,10 @@ void CompilerContext::SetDebugLocation(const Token& t)
 
 CValue CompilerContext::GetVariable(const std::string& name)
 {
+	if (name.back() == '>')
+	{
+		printf("hi");
+	}
 	auto cur = this->scope;
 	CValue value;
 	do

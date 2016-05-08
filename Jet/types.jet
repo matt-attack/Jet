@@ -19,15 +19,15 @@ namespace Jet
 		
 		char* name;
 		
-		fun void Type()
-		{
+		//fun void Type()
+		//{
 		
-		}
+		//}
 		
-		fun void Type(char* name)
-		{
+		//fun void Type(char* name)
+		//{
 		
-		}
+		//}
 		
 		fun char* ToString()
 		{

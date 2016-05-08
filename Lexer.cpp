@@ -532,8 +532,6 @@ Token Lexer::Next()
 	}
 	
 	int trivia_length = src->GetIndex() - this->last_index;
-	const char* trivia = src->GetLinePointer(1) + src->GetLength() - trivia_length;
-
 	this->last_index = src->GetIndex();
 
 	return Token(src->GetLinePointer(1) + src->GetLength(), trivia_length, src->linenumber, src->column, TokenType::EoF, "");

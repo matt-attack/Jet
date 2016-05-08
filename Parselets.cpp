@@ -244,8 +244,8 @@ Expression* BinaryOperatorParselet::parse(Parser* parser, Expression* left, Toke
 Expression* GroupParselet::parse(Parser* parser, Token token)
 {
 	UniquePtr<Expression*> exp = parser->ParseExpression();
-	parser->Consume(TokenType::RightParen);
-	return exp.Release();
+	auto end = parser->Consume(TokenType::RightParen);
+	return new GroupExpression(token, exp.Release(), end);
 }
 
 Expression* WhileParselet::parse(Parser* parser, Token token)
@@ -379,7 +379,6 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 	Token cb = parser->Consume();
 
 	return new MatchExpression(token, open, close, var.Release(), ob, std::move(cases), cb);
-	//return new SwitchExpression(token, var.Release(), block);
 }
 
 Expression* IfParselet::parse(Parser* parser, Token token)
@@ -518,7 +517,10 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 			Token tname = parser->Consume(TokenType::Name);
 			Token comma = parser->LookAhead();
 			if (comma.type == TokenType::Comma)
+			{
 				templated->push_back({ ttname, tname, comma });
+				parser->Consume();
+			}
 			else
 			{
 				templated->push_back({ ttname, tname, Token() });
@@ -691,9 +693,6 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	auto fun = parser->Consume(TokenType::Function);
 
 	Token ret_type = ::ParseType(parser);
-
-	//add calling convention setting here
-	//if (parser->LookAhead()
 
 	Token name = parser->Consume(TokenType::Name);
 	auto arguments = new std::vector < ExternArg > ;
