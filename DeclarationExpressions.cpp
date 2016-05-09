@@ -622,9 +622,12 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		llvm::AllocaInst* Alloca = 0;
 		if (ii.first.text.length() > 0)//type was specified
 		{
+			context->CurrentToken(&ii.first);
 			type = context->root->LookupType(ii.first.text);
 
-			if (type->type == Types::Array)
+			if (type->type == Types::Struct && type->data->templates.size() > 0)
+				context->root->Error("Missing template arguments for type '" + type->ToString() + "'", ii.first);
+			else if (type->type == Types::Array)
 				Alloca = context->root->builder.CreateAlloca(type->GetLLVMType(), context->root->builder.getInt32(type->size), aname);
 			else
 			{

@@ -728,6 +728,11 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 			return CValue(t, root->builder.CreateIsNotNull(value.val));
 		if (t->type == Types::Pointer)
 		{
+			//auto ty1 = value.val->getType()->getContainedType(0);
+			llvm::ConstantInt* ty = llvm::dyn_cast<llvm::ConstantInt>(value.val);
+			if (ty && Explicit == false && ty->getSExtValue() != 0)
+					root->Error("Cannot cast a non-zero integer value to pointer implicitly.", *this->current_token);
+			
 			return CValue(t, root->builder.CreateIntToPtr(value.val, t->GetLLVMType()));
 		}
 

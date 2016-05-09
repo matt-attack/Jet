@@ -703,8 +703,6 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 
 	std::error_code ec;
 	llvm::raw_fd_ostream strr("build/" + project_name + ".o", ec, llvm::sys::fs::OpenFlags::F_None);
-	llvm::formatted_raw_ostream oo(strr);
-	llvm::AssemblyAnnotationWriter writer;
 
 	//add pass to emit the object file
 	target->addPassesToEmitFile(MPM, strr, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
@@ -713,7 +711,7 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 	//llvm::raw_fd_ostream strrr("build/" + project_name + ".s", ecc, llvm::sys::fs::OpenFlags::F_None);
 	//llvm::formatted_raw_ostream oo2(strrr);
 
-	//Target->addPassesToEmitFile(MPM, oo2, llvm::TargetMachine::CodeGenFileType::CGFT_AssemblyFile, false);
+	//target->addPassesToEmitFile(MPM, strrr, llvm::TargetMachine::CodeGenFileType::CGFT_AssemblyFile, false);
 
 	MPM.run(*module);
 

@@ -326,10 +326,12 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 
 void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 {
+	auto oldtok = context->current_token;
 	context->CurrentToken(&token);
 	context->SetDebugLocation(this->token);
 	auto loc = this->GetElementPointer(context);
 
+	context->CurrentToken(oldtok);
 	right = context->DoCast(loc.type->base, right);
 	context->root->builder.CreateStore(right.val, loc.val);
 }
@@ -383,6 +385,8 @@ CValue NumberExpression::Compile(CompilerContext* context)
 CValue AssignExpression::Compile(CompilerContext* context)
 {
 	context->SetDebugLocation(this->token);
+
+	context->CurrentToken(&this->token);
 
 	if (auto storable = dynamic_cast<IStorableExpression*>(this->left))
 		storable->CompileStore(context, right->Compile(context));
