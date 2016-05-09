@@ -1,9 +1,8 @@
 
-extern fun char* malloc(int x);
-
 fun Jet::Compilation* MakeCompilation(char* project)
 {
-	local c = new Jet::Compilation;
+	local Jet::Compilation q;
+	local c = &q;//new Jet::Compilation;
 	local ctx = LLVMContextCreate();
 	
 	c->module = LLVMModuleCreateWithNameInContext("test", ctx);
@@ -11,13 +10,45 @@ fun Jet::Compilation* MakeCompilation(char* project)
 	
 	local funtype = LLVMFunctionType(voidt, 0, 0, 0);
 	
+	local char* msg = 0;
 	LLVMDumpType(funtype);
-	LLVMAddFunction(c->module, "test", funtype);
-	LLVMPrintModuleToFile(c->module, "out.txt", 0);
+	local fn = LLVMAddFunction(c->module, "test", funtype);
+	
+	local entry = LLVMAppendBasicBlock(fn, "entry");
+
+	local builder = LLVMCreateBuilderInContext(ctx);
+	LLVMPositionBuilderAtEnd(builder, entry);
+	LLVMBuildRetVoid(builder);
+
+	LLVMPrintModuleToFile(c->module, "out.txt", &msg);
 	LLVMDumpModule(c->module);
 	
-	local int int = 5;
-	int = 7;
+	
+	//init stuff
+	LLVMInitializeX86TargetInfo();
+	LLVMInitializeX86Target();
+	LLVMInitializeX86TargetMC();
+	LLVMInitializeX86AsmPrinter();
+	
+	local char* error = 0;
+	local triple = LLVMGetDefaultTargetTriple();
+	local LLVMTargetRef target;
+	LLVMGetTargetFromTriple(triple, &target, &error);
+	
+	
+	local cpu = "haswell";
+	local mach = LLVMCreateTargetMachine(target, triple, cpu, "",
+		0/*level*/, 0/*reloc*/, 0/*codemodel*/);
+	
+	//local qq = LLVMGetTargetMachineData(mach);
+	
+	LLVMSetTarget(c->module, triple);
+	//LLVMSetDataLayout(c->module, triple);//qq);
+	
+	LLVMTargetMachineEmitToFile(mach, c->module, "test.o", 1/*codegen*/, 0);
+	
+	LLVMDisposeTargetMachine(mach);
+
 	return c;
 }
 
@@ -50,5 +81,4 @@ fun void main()
 	MakeCompilation("jetcore");
 	
 	c.Compile("jetcore");
-	puts("hello");
 }

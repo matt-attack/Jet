@@ -100,8 +100,8 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	if (project == 0)
 		return 0;
 
-	char olddir[500];
-	getcwd(olddir, 500);
+	char olddir[1000];
+	getcwd(olddir, 1000);
 	std::string path = projectdir;
 	path += '/';
 

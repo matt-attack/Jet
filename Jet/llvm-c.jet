@@ -7,10 +7,69 @@ typedef LLVMTypeRef = char*;
 typedef LLVMBasicBlockRef = char*;
 typedef LLVMBuilderRef = char*;
 typedef LLVMBool = int;
+typedef LLVMPassManagerRef = char*;
+typedef LLVMPassRegistryRef = char*;
+typedef LLVMTargetDataRef = char*;
+typedef LLVMTargetMachineRef = char*;
+typedef LLVMTargetRef = char*;
 
+extern fun void LLVMSetTarget(LLVMModuleRef m, char* triple);
+
+extern fun LLVMTargetDataRef LLVMGetTargetMachineData(LLVMTargetMachineRef T);
+
+extern fun void LLVMSetDataLayout(LLVMModuleRef M, char* Triple);
+						   
+extern fun char* LLVMGetDefaultTargetTriple();
+
+//use me!
+//oops, cant do pointers to typedefs :S
+extern fun LLVMBool LLVMGetTargetFromTriple (char* TripleStr, LLVMTargetRef* T, char** ErrorMessage);
+
+extern fun LLVMTargetMachineRef LLVMCreateTargetMachine(
+	LLVMTargetRef t,
+	char* triple, char* cpu, char* features,
+	int/*LLMVCodeGenOptLevel*/ level,
+	int/*LLVMRelocMode*/ reloc,
+	int/*LLVMCodeModel*/ codemodel
+);
+extern fun LLVMBool LLVMTargetMachineEmitToFile(
+	LLVMTargetMachineRef T,
+	LLVMModuleRef M,
+	char*   Filename,
+	int/*LLVMCodeGenFileType*/ codegen,
+	char**  ErrorMessage 
+);
+extern fun void LLVMDisposeTargetMachine(LLVMTargetMachineRef t);
 
 extern fun LLVMContextRef LLVMContextCreate();
 extern fun void LLVMContextDispose(LLVMContextRef C);
+
+//pass stuff
+extern fun LLVMPassRegistryRef LLVMGetGlobalPassRegistry();
+extern fun LLVMPassManagerRef LLVMCreatePassManager();
+extern fun LLVMPassManagerRef LLVMCreateFunctionPassManagerForModule(LLVMModuleRef m);
+extern fun LLVMBool LLVMRunPassManager(LLVMPassManagerRef pm, LLVMModuleRef mod);
+extern fun LLVMBool LLVMRunFunctionPassManager(LLVMPassManagerRef fpm, LLVMValueRef f);
+extern fun LLVMBool LLVMInitializeFunctionPassManager(LLVMPassManagerRef fpm);
+extern fun LLVMBool LLVMFinalizeFunctionPassManager(LLVMPassManagerRef fpm);
+
+//this stuff
+extern fun LLVMBool LLVMInitializeX86TargetInfo();
+extern fun LLVMBool LLVMInitializeX86Target();
+extern fun LLVMBool LLVMInitializeX86AsmPrinter();
+
+extern fun LLVMBool LLVMInitializeX86TargetMC();
+extern fun LLVMBool LLVMInitializeNativeTarget();
+extern fun LLVMBool LLVMInitializeAllTargetInfos();
+extern fun LLVMBool LLVMInitializeAllTargets();
+extern fun LLVMBool LLVMInitializeNativeASMPrinter();
+extern fun void LLVMInitializeCore(LLVMPassManagerRef r);
+extern fun void LLVMInitializeCodeGen(LLVMPassManagerRef r);
+extern fun void LLVMInitializeTarget(LLVMPassManagerRef r);
+
+extern fun LLVMTargetDataRef LLVMCreateTargetData(char* stringrep);
+extern fun void LLVMAddTargetData(LLVMTargetDataRef td, LLVMPassManagerRef ref);
+extern fun void LLVMDisposeTargetData(LLVMTargetDataRef td);
 
 extern fun LLVMModuleRef LLVMModuleCreateWithName(char* ModuleID);
 extern fun LLVMModuleRef LLVMModuleCreateWithNameInContext(char* ModuleID, LLVMContextRef C);
@@ -35,10 +94,14 @@ extern fun LLVMTypeRef LLVMFunctionType(LLVMTypeRef ReturnType,
 extern fun LLVMTypeRef LLVMStructType(LLVMTypeRef *ElementTypes, /*unsigned*/int ElementCount,
                            LLVMBool Packed);
 						   
+						   
 extern fun LLVMTypeRef LLVMPointerType(LLVMTypeRef ElementType, /*unsigned*/int AddressSpace);
 							 
 extern fun void LLVMDumpType(LLVMTypeRef Val);
 
+extern fun void LLVMPositionBuilderAtEnd(LLVMBuilderRef builder, LLVMBasicBlockRef block);
+
+extern fun LLVMBasicBlockRef LLVMAppendBasicBlock(LLVMValueRef fn, char* name);
 //types
 extern fun LLVMTypeRef LLVMVoidTypeInContext(LLVMContextRef C);
 extern fun LLVMTypeRef LLVMInt1TypeInContext(LLVMContextRef C);
@@ -138,3 +201,5 @@ extern fun LLVMValueRef LLVMBuildPointerCast(LLVMBuilderRef x, LLVMValueRef Val,
 extern fun LLVMValueRef LLVMBuildCall(LLVMBuilderRef x, LLVMValueRef Fn,
                            LLVMValueRef *Args, /*unsigned*/int NumArgs,
                            char *Name);
+						   
+						 

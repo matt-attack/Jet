@@ -160,7 +160,7 @@ Type* GetMemberType(CompilerContext* context, Type* type, const std::string& nam
 	int index = 0;
 	for (; index < type->data->struct_members.size(); index++)
 	{
-		if (type->data->struct_members[index].name == name)//string->GetValue())
+		if (type->data->struct_members[index].name == name)
 			break;
 	}
 	if (index >= type->data->struct_members.size())
@@ -193,25 +193,15 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 			else
 				lhs = context->GetVariable(p->GetName());
 		else if (i)
-			lhs.type = i->GetType(context, tc)->GetPointerType();// i->GetElementPointer(context);
+			lhs.type = i->GetType(context, tc)->GetPointerType();
 
 		if (string && lhs.type->type == Types::Struct)
 		{
-			return GetMemberType(context, lhs.type, string->GetValue(), this->token);// data->struct_members[index].type;
+			return GetMemberType(context, lhs.type, string->GetValue(), this->token);
 		}
 		else if (this->token.type == TokenType::Dot && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
 		{
-			/*int index = 0;
-			for (; index < lhs.type->base->data->struct_members.size(); index++)
-			{
-				if (lhs.type->base->data->struct_members[index].name == this->member.text)
-					break;
-			}
-
-			if (index >= lhs.type->base->data->struct_members.size())
-				context->root->Error("Struct Member '" + this->member.text + "' of Struct '" + lhs.type->base->data->name + "' Not Found", this->member);*/
-
-			return GetMemberType(context, lhs.type->base, this->member.text, this->token);// Gelhs.type->base->data->struct_members[index].type;
+			return GetMemberType(context, lhs.type->base, this->member.text, this->token);
 		}
 		else if (this->token.type == TokenType::Pointy && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && lhs.type->base->base->type == Types::Struct)
 		{
@@ -239,6 +229,9 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 		}
 		else if ((lhs.type->type == Types::Array || lhs.type->type == Types::Pointer) && string == 0)//or pointer!!(later)
 		{
+			if (lhs.type->base->base == 0 && this->member.text.length())
+				context->root->Error("Cannot access member '" + this->member.text + "' of type '" + lhs.type->base->ToString() + "'", this->member);
+
 			return lhs.type->base->base;
 		}
 	}
@@ -284,31 +277,11 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		{
 			lhs.val = context->root->builder.CreateLoad(lhs.val);
 
-			/*auto type = lhs.type->base->base;
-			int index = 0;
-			for (; index < type->data->struct_members.size(); index++)
-			{
-				if (type->data->struct_members[index].name == this->member.text)
-					break;
-			}
-			if (index >= type->data->struct_members.size())
-			{
-				//check methods
-				auto method = type->GetMethod(this->member.text, {}, context, true);
-				if (method == 0)
-					context->root->Error("Struct Member '" + this->member.text + "' of Struct '" + type->data->name + "' Not Found", this->member);
-				method->Load(context->root);
-				return CValue(method->GetType(context->root), method->f);
-			}
-
-			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->root->builder.getInt32(index) };
-
-			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
-			return CValue(type->data->struct_members[index].type->GetPointerType(), loc);*/
 			return GetStructElement(context, this->member.text, this->member, lhs.type->base->base, lhs.val);
 		}
 
-		context->root->Error("unimplemented!", this->token);
+		//todo: improve these error messages
+		context->root->Error("Cannot index type '" + lhs.type->base->name + "'", this->token);
 	}
 	else if (p || i)
 	{

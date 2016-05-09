@@ -210,7 +210,9 @@ public:
 	{
 		//push namespace
 		context->SetNamespace(this->name.text);
-		this->block->CompileDeclarations(context);
+
+		this->block->TypeCheck(context);
+
 		context->PopNamespace();
 
 		return 0;

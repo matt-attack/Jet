@@ -590,20 +590,9 @@ void Type::FinishCompilingTemplate(Compilation* compiler)
 	auto oldname = expr->name;
 	expr->name.text = this->data->name;
 
-	int start = compiler->types.size();
-
 	//store then restore insertion point
 	auto rp = compiler->builder.GetInsertBlock();
 	auto dp = compiler->builder.getCurrentDebugLocation();
-
-	//for (auto ii : this->data->expression->members)
-	//	if (ii.type == StructMember::FunctionMember)
-	//		ii.function->CompileDeclarations(compiler->current_function);
-
-	//expr->AddConstructorDeclarations(this, compiler->current_function);
-
-	//fixme later, compiler->types should have a size of 0 and this should be unnecesary
-	assert(start == compiler->types.size());
 
 	for (auto ii : this->data->expression->members)
 		if (ii.type == StructMember::FunctionMember)
@@ -688,7 +677,6 @@ std::string Type::ToString()
 		return out + ")";
 	}
 	assert(false && "Unhandled Type::ToString()");
-	//Error("Unhandled Type::ToString()", Token());
 }
 
 Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& args, CompilerContext* context, bool def)

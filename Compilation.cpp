@@ -521,7 +521,9 @@ void Compilation::Assemble(int olevel)
 		for (auto ii : project->libs)
 			cmd += " -l:\"" + ii + "\" ";
 #else
-		std::string cmd = "link.exe /DEBUG /INCREMENTAL:NO /NOLOGO ";///ENTRY:_jet_initializer
+		std::string cmd = "link.exe /DEBUG /INCREMENTAL:NO /NOLOGO ";
+		
+		//cmd += "/ENTRY:main ";// "/ENTRY:_jet_initializer ";
 
 		cmd += "build/" + project->project_name + ".o ";
 		cmd += "/OUT:build/" + project->project_name + ".exe ";

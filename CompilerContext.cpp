@@ -554,6 +554,10 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 	if (args.size() != fun->f->arg_size())
 	{
+		//todo: fixme this isnt a very reliable fix
+		if (fun->arguments[0].second != "this")//if we are not a constructor
+			this->root->Error("Function expected " + std::to_string(fun->f->arg_size()) + " arguments, got " + std::to_string(args.size()), *this->current_token);
+
 		//ok, we allocate, call then 
 		//allocate thing
 		auto type = fun->arguments[0].first->base;
@@ -591,10 +595,6 @@ void CompilerContext::SetDebugLocation(const Token& t)
 
 CValue CompilerContext::GetVariable(const std::string& name)
 {
-	if (name.back() == '>')
-	{
-		printf("hi");
-	}
 	auto cur = this->scope;
 	CValue value;
 	do
