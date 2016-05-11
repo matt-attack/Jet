@@ -80,6 +80,11 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 
 	this->block->TypeCheck(nc);
 
+	if (this->ret_type.text == "void")
+		;
+	else if (nc->function->has_return == false && this->is_generator == false)
+		context->root->Error("Function must return a value!", token);
+
 	if (this->Struct.text.length())
 		context->root->ns = context->root->ns->parent;
 
@@ -1168,8 +1173,17 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		}
 		else
 		{
-			if (this->templates == 0)//todo need to get rid of this to fix things
+			if (true)//this->templates == 0)//todo need to get rid of this to fix things
 				ii.function->CompileDeclarations(context);
+			else
+			{
+				auto func = new Function(ii.function->GetRealName(), false);
+				func->arguments.push_back({ 0, "this" });
+				for (int i = 0; i < ii.function->args->size(); i++)
+					func->arguments.push_back({ 0, ii.function->args->at(i).name.text });
+				
+				str->data->functions.insert({ ii.function->GetName(), func});
+			}
 		}
 	}
 	context->root->ns = context->root->ns->parent;

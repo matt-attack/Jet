@@ -406,8 +406,11 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 
 bool Type::MatchesTrait(Compilation* compiler, Trait* t)
 {
-	if (this->type == Types::Trait && this->trait == t)
+	if (compiler->typecheck && this->type == Types::Trait && this->trait == t)
 		return true;
+	
+	if (this->type == Types::Trait)
+		return false;
 
 	auto ttraits = this->GetTraits(compiler);
 	bool found = false;

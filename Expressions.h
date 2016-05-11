@@ -92,9 +92,9 @@ namespace Jet
 			//lookup type
 		}
 
-		void Print(std::string& output, Source* source) 
-		{ 
-			token.Print(output, source); 
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
@@ -955,7 +955,16 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			for (auto ii : this->statements)
-				ii->TypeCheck(context);
+			{
+				try
+				{
+					ii->TypeCheck(context);
+				}
+				catch (...)
+				{
+
+				}
+			}
 			return 0;
 		}
 

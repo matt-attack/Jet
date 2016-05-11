@@ -59,6 +59,7 @@ namespace Jet
 		CompilerContext* context;
 
 		bool do_export;
+		bool has_return = false;
 		
 		bool is_generator;//generator stuff
 		llvm::IndirectBrInst* ibr;

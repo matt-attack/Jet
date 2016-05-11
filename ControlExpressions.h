@@ -779,6 +779,8 @@ namespace Jet
 				context->CheckCast(type, context->function->return_type, false, true);
 			}
 
+			context->function->has_return = true;
+
 			return 0;
 		}
 

@@ -171,13 +171,13 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 		arg.push_back(stru->GetPointerType());
 
 	for (auto ii : *args)
-	{
 		arg.push_back(ii.first->TypeCheck(context));
-	}
+	
 	auto fun = context->GetMethod(fname, arg, stru);
 	if (fun == 0)
 	{
 		//check variables
+		context->CurrentToken(&this->open);
 		auto var = context->TCGetVariable(fname);
 		if (var->type == Types::Pointer && var->base->type == Types::Struct && var->base->data->template_base && var->base->data->template_base->name == "function")
 			return var->base->data->members.find("T")->second.ty->function->return_type;

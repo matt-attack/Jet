@@ -138,25 +138,25 @@ namespace Jet
 
 			if (value == 0)//value->type == Types::Void)
 			{
-				throw 7;
 				//ok, now search globals
-				/*auto global = this->root->globals.find(name);
+				auto global = this->root->globals.find(name);
 				if (global != this->root->globals.end())
-					return global->second;
+					return global->second.type;// ->second;
 
 				auto function = this->root->GetFunction(name);
 				if (function != 0)
 				{
 					function->Load(this->root);
-					return CValue(function->GetType(this->root), function->f);
+					return function->GetType(this->root);
 				}
 
 				if (this->function->is_lambda)
 				{
-					auto var = this->parent->GetVariable(name);
+					this->root->Error("Lambda checking like this unimplemented", *this->current_token);
+					//auto var = this->parent->GetVariable(name);
 
 					//look in locals above me
-					CValue location = this->Load("_capture_data");
+					/*CValue location = this->Load("_capture_data");
 					auto storage_t = this->function->storage_type;
 
 					//append the new type
@@ -181,10 +181,11 @@ namespace Jet
 					root->builder.CreateStore(root->builder.CreateLoad(val), value.val);
 					this->captures.push_back(name);
 
-					return value;
+					return value;*/
+					//return var.type;
 				}
 
-				this->root->Error("Undeclared identifier '" + name + "'", *current_token);*/
+				this->root->Error("Undeclared identifier '" + name + "'", *current_token);
 			}
 			return value;
 		}

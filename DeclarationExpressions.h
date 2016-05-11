@@ -246,6 +246,7 @@ struct FunctionArg
 };
 class FunctionExpression : public Expression
 {
+	friend class StructExpression;
 	friend class Namespace;
 	friend class Compiler;
 	friend class CompilerContext;
