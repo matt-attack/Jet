@@ -396,7 +396,11 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 				}
 				catch (int x)
 				{
+					compilation->ns = compilation->global;
+					errors++;
 
+					compilation->typecheck = false;
+					continue;
 				}
 				compilation->typecheck = false;
 				try

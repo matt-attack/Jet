@@ -546,14 +546,13 @@ namespace Jet
 		{
 			auto tl = left->TypeCheck(context);
 			auto tr = right->TypeCheck(context);
+
 			//return the type of the left
 			//check if can be assigned
-			if (tl == tr)
-				return tl;
+			context->CurrentToken(&this->token);
+			context->CheckCast(tr, tl, false, true);
 
-			//todo: make this error
-			//throw 7;
-			return tr;
+			return tl;
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
@@ -789,7 +788,7 @@ namespace Jet
 		{
 			auto left = this->left->TypeCheck(context);
 			//throw 7;
-			return 0;
+			return left;//this is OK for now
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -1145,7 +1144,7 @@ namespace Jet
 
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
-			return 0;
+			return context->root->IntType;
 		}
 	};
 

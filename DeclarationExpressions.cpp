@@ -14,11 +14,17 @@ using namespace Jet;
 
 Type* FunctionExpression::TypeCheck(CompilerContext* context)
 {
-	//add locals
+	bool is_lambda = name.text.length() == 0;
+
 	//need to change context
 	CompilerContext* nc = new CompilerContext(context->root, context);// context->AddFunction(this->GetRealName(), ret, argsv, Struct.text.length() > 0 ? true : false, is_lambda);// , this->varargs);
+	nc->function = new Function("um", is_lambda);
+	
 	if (this->name.text.length() == 0)
 	{
+		context->CurrentToken(&this->ret_type);
+		nc->function->return_type = context->root->LookupType(this->ret_type.text, false);
+
 		//ok return type, im a lambda
 		std::vector<std::pair<Type*, std::string>> argsv;
 		for (auto ii : *this->args)
@@ -31,9 +37,8 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 		auto ret = context->root->LookupType(this->ret_type.text, false);
 
 		return context->root->LookupType("function<" + context->root->GetFunctionType(ret, args)->ToString() + ">");
-
-		return 0;
 	}
+
 	if (auto str = dynamic_cast<StructExpression*>(this->parent))
 	{
 		auto typ = context->root->LookupType(str->GetName(), false)->GetPointerType()->GetPointerType();
@@ -41,18 +46,25 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 	}
 	else if (this->Struct.text.length())
 	{
-		auto typ = context->root->LookupType(this->Struct.text, false)->GetPointerType()->GetPointerType();
-		nc->TCRegisterLocal("this", typ);
+		auto typ = context->root->LookupType(this->Struct.text, false);// ->GetPointerType()->GetPointerType();
+		nc->TCRegisterLocal("this", typ->GetPointerType()->GetPointerType());
 
+		//check if im extending a trait, if so add any relevant templates
+
+		//todo: lets not typecheck this yet, its being troublesome
+		//the main issue is that the template parameters of the traits are invalid types
+		//not sure how to resolve this
 		return 0;
 		//lets not typecheck these yet....
 		if (typ->base->base->type == Types::Trait)
-		{
-			context->root->ns = typ->base->base->trait;
-		}
+			context->root->ns = typ->trait;
 		else
-			context->root->ns = typ->base->base->data;
+			context->root->ns = typ->data;
 	}
+
+	context->CurrentToken(&this->ret_type);
+	nc->function->return_type = context->root->LookupType(this->ret_type.text, false);
+
 	for (auto ii : *this->args)
 		nc->TCRegisterLocal(ii.name.text, context->root->LookupType(ii.type.text)->GetPointerType());
 
@@ -65,6 +77,7 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 			str->data->struct_members.push_back({ name, ty->base->name, ty->base });
 		};
 	}
+
 	this->block->TypeCheck(nc);
 
 	if (this->Struct.text.length())
@@ -72,7 +85,8 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 
 	nc->local_reg_callback = [&](const std::string& name, Type* ty){};
 
-	//add locals
+	//delete temporary things
+	delete nc->function;
 	delete nc;
 
 	return 0;
@@ -720,6 +734,35 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 	return CValue();
 }
+
+Type* StructExpression::TypeCheck(CompilerContext* context)
+{
+	//push the namespace then define these types
+	auto me = context->root->LookupType(this->name.text, false);
+	auto old = context->root->ns;
+	me->data->parent = old;
+	context->root->ns = me->data;
+	//define template types
+	if (this->templates)
+	{
+		//for (auto ii : *this->templates)
+		//{
+			//register the type
+		//	me->data->members.insert({ ii.name.text, context->root->LookupType(ii.type.text, false) });
+		//}
+	}
+
+	for (auto ii : this->members)
+	{
+		if (ii.type == StructMember::FunctionMember)
+			ii.function->TypeCheck(context);
+	}
+
+	context->root->ns = old;
+
+	return 0;
+}
+
 
 CValue StructExpression::Compile(CompilerContext* context)
 {

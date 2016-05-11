@@ -91,7 +91,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 
 	if (this->debug_type)
 		return this->debug_type;
-	
+
 	throw 7;
 }
 
@@ -406,6 +406,9 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 
 bool Type::MatchesTrait(Compilation* compiler, Trait* t)
 {
+	if (this->type == Types::Trait && this->trait == t)
+		return true;
+
 	auto ttraits = this->GetTraits(compiler);
 	bool found = false;
 	for (auto tr : ttraits)
@@ -563,12 +566,21 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
 				ii.function->CompileDeclarations(compiler->current_function);
-		
+
 		//it needs dummy constructors too
 		expr->AddConstructorDeclarations(t, compiler->current_function);
 
-		compiler->unfinished_templates.push_back(t);
-		
+		bool has_trait = false;
+		for (int i = 0; i < types.size(); i++)
+			if (types[i]->IsValid() == false)
+			{
+				has_trait = true;
+				break;
+			}
+
+		if (has_trait == false)
+			compiler->unfinished_templates.push_back(t);
+
 		expr->name = oldname;
 	}
 

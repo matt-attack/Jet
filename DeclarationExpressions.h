@@ -603,34 +603,7 @@ public:
 		return this->name.text;
 	}
 
-	virtual Type* TypeCheck(CompilerContext* context)
-	{
-		//push the namespace then define these types
-		auto me = context->root->LookupType(this->name.text, false);
-		auto old = context->root->ns;
-		me->data->parent = old;
-		context->root->ns = me->data;
-		//define template types
-		if (this->templates)
-		{
-			for (auto ii : *this->templates)
-			{
-				//register the type
-				me->data->members.insert({ ii.name.text, context->root->LookupType(ii.type.text, false) });
-			}
-
-			return 0;//skip for now...
-		}
-		for (auto ii : this->members)
-		{
-			if (ii.type == StructMember::FunctionMember)
-				ii.function->TypeCheck(context);
-		}
-
-		context->root->ns = old;
-
-		return 0;
-	}
+	virtual Type* TypeCheck(CompilerContext* context);
 
 	void SetParent(Expression* parent)
 	{

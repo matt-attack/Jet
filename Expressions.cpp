@@ -82,30 +82,22 @@ CValue IndexExpression::Compile(CompilerContext* context)
 //compiling will only emit instructions, it should do little actual work
 Type* IndexExpression::GetBaseType(CompilerContext* context, bool tc)
 {
-	auto p = dynamic_cast<NameExpression*>(left);
-	auto i = dynamic_cast<IndexExpression*>(left);
-
-	if (p)
+	if (auto name = dynamic_cast<NameExpression*>(left))
 		if (tc)
-			return context->TCGetVariable(p->GetName())->base;
+			return context->TCGetVariable(name->GetName())->base;
 		else
-			return context->GetVariable(p->GetName()).type->base;
-	else if (i)
-		return i->GetType(context, tc);
-	else if (auto c = dynamic_cast<CallExpression*>(left))
-	{
-		//have function call expression get data during typechecking
-		return c->TypeCheck(context);// ->GetPointerType();
-	}
-	context->root->Error("wat", token);
+			return context->GetVariable(name->GetName()).type->base;
+	else if (auto index = dynamic_cast<IndexExpression*>(left))
+		return index->GetType(context, tc);
+	else if (auto call = dynamic_cast<CallExpression*>(left))
+		return call->TypeCheck(context);//have function call expression get data during typechecking
+
+	context->root->Error("Unexpected error.", token);
 }
 
 Type* IndexExpression::GetBaseType(Compilation* compiler)
 {
-	auto p = dynamic_cast<NameExpression*>(left);
-	auto i = dynamic_cast<IndexExpression*>(left);
-
-	if (p)
+	if (auto p = dynamic_cast<NameExpression*>(left))
 	{
 		//look for neareast scope
 		auto current = this->parent;
@@ -126,10 +118,9 @@ Type* IndexExpression::GetBaseType(Compilation* compiler)
 			}
 		} while (current = current->parent);
 	}
-	//return context->GetVariable(p->GetName()).type;
-	else if (i)
+	else if (auto i = dynamic_cast<IndexExpression*>(left))
 	{
-		compiler->Error("todo", token);//return i->GetType(context);
+		compiler->Error("todo", token);
 	}
 
 	compiler->Error("wat", token);
@@ -137,17 +128,14 @@ Type* IndexExpression::GetBaseType(Compilation* compiler)
 
 CValue IndexExpression::GetBaseElementPointer(CompilerContext* context)
 {
-	auto p = dynamic_cast<NameExpression*>(left);
-	auto i = dynamic_cast<IndexExpression*>(left);
-
-	if (p)
-		return context->GetVariable(p->GetName());
-	else if (i)
-		return i->GetElementPointer(context);
-	else if (auto q = dynamic_cast<CallExpression*>(left))
+	if (auto name = dynamic_cast<NameExpression*>(left))
+		return context->GetVariable(name->GetName());
+	else if (auto index = dynamic_cast<IndexExpression*>(left))
+		return index->GetElementPointer(context);
+	else if (auto call = dynamic_cast<CallExpression*>(left))
 	{
 		//store the value then return the pointer to it
-		auto val = q->Compile(context);
+		auto val = call->Compile(context);
 		auto alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType());
 	
 		return CValue(val.type->GetPointerType(), alloca);

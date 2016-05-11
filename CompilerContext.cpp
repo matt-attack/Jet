@@ -819,6 +819,119 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 }
 
+
+bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
+{
+	CValue value;
+	value.type = src;
+	
+	if (value.type->type == t->type && value.type->data == t->data)
+		return true;
+
+	if (value.type->type == Types::Float && t->type == Types::Double)
+	{
+		//lets do this
+		return true;// CValue(t, root->builder.CreateFPExt(value.val, tt));
+	}
+	else if (value.type->type == Types::Double && t->type == Types::Float)
+	{
+		//lets do this
+		return true;// CValue(t, root->builder.CreateFPTrunc(value.val, tt));
+	}
+	else if (value.type->type == Types::Double || value.type->type == Types::Float)
+	{
+		//float to int
+		if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
+			return true;// CValue(t, root->builder.CreateFPToSI(value.val, tt));
+
+		//remove me later float to bool
+		//if (t->type == Types::Bool)
+		//return CValue(t, root->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
+	}
+	if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
+	{
+		//int to float
+		if (t->type == Types::Double || t->type == Types::Float)
+			return true;// CValue(t, root->builder.CreateSIToFP(value.val, tt));
+		if (t->type == Types::Bool)
+			return true;// CValue(t, root->builder.CreateIsNotNull(value.val));
+		if (t->type == Types::Pointer)
+		{
+			//auto ty1 = value.val->getType()->getContainedType(0);
+			//llvm::ConstantInt* ty = llvm::dyn_cast<llvm::ConstantInt>(value.val);
+			//if (ty && Explicit == false && ty->getSExtValue() != 0)
+			//	return false;// root->Error("Cannot cast a non-zero integer value to pointer implicitly.", *this->current_token);
+
+			return true;
+		}
+
+		/*if (value.type->type == Types::Int && (t->type == Types::Char || t->type == Types::Short))
+		{
+		return CValue(t, root->builder.CreateTrunc(value.val, tt));
+		}
+		if (value.type->type == Types::Short && t->type == Types::Int)
+		{
+		return CValue(t, root->builder.CreateSExt(value.val, tt));
+		}*/
+		if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
+			return true;
+	}
+	if (value.type->type == Types::Pointer)
+	{
+		//pointer to bool
+		if (t->type == Types::Bool)
+			return true;
+
+		if (t->type == Types::Pointer && value.type->base->type == Types::Array && value.type->base->base == t->base)
+			return true;
+
+		if (Explicit)
+		{
+			if (t->type == Types::Pointer)
+			{
+				//pointer to pointer cast;
+				return true;
+			}
+		}
+	}
+	if (value.type->type == Types::Function)
+	{
+		if (t->type == Types::Function && t->function == value.type->function)
+			return true;
+		else if (Explicit && t->type == Types::Function)
+			return true;
+	}
+	if (t->type == Types::Union && value.type->type == Types::Struct)
+	{
+		for (int i = 0; i < t->_union->members.size(); i++)
+		{
+			if (t->_union->members[i] == value.type)
+				return true;
+		}
+	}
+
+	//special check for traits
+	if (value.type->type == Types::Trait && this->root->typecheck)
+	{
+		//this is a bad hack that doesnt catch all cases, but better than nothing
+		auto traits = t->GetTraits(this->root);
+		for (int i = 0; i < traits.size(); i++)
+			if (traits[i].second->name == value.type->trait->name)// t->MatchesTrait(this->root, value.type->trait))
+				return true;
+	}
+
+	//its a template arg
+	if (this->root->typecheck && value.type->type == Types::Invalid)
+	{
+		return true;//once again, another hack that misses errors
+	}
+
+	if (Throw)
+		this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
+
+	return false;
+}
+
 Scope* CompilerContext::PushScope()
 {
 	auto temp = this->scope;

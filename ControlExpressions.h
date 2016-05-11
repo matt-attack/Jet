@@ -773,9 +773,12 @@ namespace Jet
 		{
 			//check that return type matches return type of the function
 			if (right)
-				right->TypeCheck(context);
+			{
+				auto type = right->TypeCheck(context); 
+				context->CurrentToken(&this->token);
+				context->CheckCast(type, context->function->return_type, false, true);
+			}
 
-			//throw 7;
 			return 0;
 		}
 

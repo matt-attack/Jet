@@ -329,6 +329,7 @@ namespace Jet
 		}
 
 		CValue DoCast(Type* t, CValue value, bool Explicit = false);
+		bool CheckCast(Type* src, Type* dest, bool Explicit = false, bool Throw = true);
 
 		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member, bool lambda);
 
