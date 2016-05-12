@@ -823,6 +823,8 @@ void Struct::Load(Compilation* compiler)
 		this->functions.clear();
 		for (auto ii : this->parent_struct->data->functions)
 			this->functions.insert(ii);
+		for (auto ii : oldfuncs)
+			this->functions.insert(ii);
 	}
 
 	//recursively load

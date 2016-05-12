@@ -214,7 +214,7 @@ CValue YieldExpression::Compile(CompilerContext* context)
 	context->function->f->getBasicBlockList().push_back(bb);
 
 	//add the new block to the indirect branch list
-	context->function->ibr->addDestination(bb);
+	context->function->generator.ibr->addDestination(bb);
 
 	//store the current location into the generator context
 	auto data = context->Load("_context");

@@ -801,6 +801,8 @@ void Compilation::AdvanceTypeLookup(Jet::Type** dest, const std::string& name, T
 	type->data = 0;
 	type->ns = this->ns;
 	type->_location = location;
+	if (this->typecheck)
+		type->pointer_type = (Type*)-7;
 	types.push_back({ this->ns, dest });
 
 	*dest = type;
@@ -1218,8 +1220,11 @@ void Compilation::ResolveTypes()
 			this->current_function->current_token = (*loc)->_location;
 			this->ns = types[i].first;
 
+			if ((*loc)->pointer_type == (Type*)-7)
+				this->typecheck = true;
 			auto res = this->LookupType((*loc)->name, false);
 
+			this->typecheck = false;
 			delete *loc;//free the temporary
 
 			*loc = res;

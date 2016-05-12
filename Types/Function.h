@@ -62,13 +62,19 @@ namespace Jet
 		bool has_return = false;
 		
 		bool is_generator;//generator stuff
-		llvm::IndirectBrInst* ibr;
-		int var_num;
-		std::vector<llvm::Value*> variable_geps;//for generator variables
+		struct generator_data
+		{
+			llvm::IndirectBrInst* ibr;
+			int var_num;
+			std::vector<llvm::Value*> variable_geps;//for generator variables
+		} generator;
 
 		//lambda stuff
 		bool is_lambda;
-		llvm::StructType* storage_type;//for lambdas
+		struct lambda_data
+		{
+			llvm::StructType* storage_type;//for lambdas
+		} lambda;
 
 		llvm::Function* f;//not always used
 		llvm::DISubprogram* scope;
@@ -86,7 +92,7 @@ namespace Jet
 			this->calling_convention = CallingConvention::Default;
 			this->do_export = true;
 			this->name = name;
-			this->var_num = 0;
+			this->generator.var_num = 0;
 			context = 0;
 			f = 0;
 			this->is_lambda = is_lambda;

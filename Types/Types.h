@@ -225,8 +225,6 @@ namespace Jet
 		std::vector<Type*> template_args;
 		StructExpression* expression;
 
-		//std::vector<std::pair<std::vector<Type*>, Type*>> instantiations;
-
 		Struct()
 		{
 			template_base = 0;

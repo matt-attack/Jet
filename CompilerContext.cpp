@@ -628,7 +628,7 @@ CValue CompilerContext::GetVariable(const std::string& name)
 
 			//look in locals above me
 			CValue location = this->Load("_capture_data");
-			auto storage_t = this->function->storage_type;
+			auto storage_t = this->function->lambda.storage_type;
 
 			//append the new type
 			std::vector<llvm::Type*> types;
@@ -636,7 +636,7 @@ CValue CompilerContext::GetVariable(const std::string& name)
 				types.push_back(storage_t->getContainedType(i));
 
 			types.push_back(var.type->base->GetLLVMType());
-			storage_t = this->function->storage_type = storage_t->create(types);
+			storage_t = this->function->lambda.storage_type = storage_t->create(types);
 
 			auto data = root->builder.CreatePointerCast(location.val, storage_t->getPointerTo());
 

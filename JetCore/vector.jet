@@ -198,7 +198,7 @@ struct vector<Any TT>
 	{
 		//todo
 		local ne = new TT[size];//<TT*>malloc(sizeof(TT)*size);
-		
+
 		puts("malloced");
 		//copy
 		for (local int i = 0; i < this->cur_size; i++)

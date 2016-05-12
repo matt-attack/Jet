@@ -1,0 +1,29 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+struct A
+{
+	int a_val;
+}
+
+struct B: A
+{
+	int b_val;
+}
+
+fun int main() 
+{
+	local B p;
+	p.a_val = 5;
+	p.b_val = 6;
+	
+	if (p.b_val != 6)
+		puts("fail\n");
+	if (p.a_val != 5)
+		puts("fail\n");
+	
+	return 0;
+}
