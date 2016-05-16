@@ -187,23 +187,21 @@ namespace Jet
 	};
 
 	class Function;
-	struct Trait: public Namespace
+	struct Trait : public Namespace
 	{
 		bool valid;
-		//std::string name;
 
 		std::multimap<std::string, Function*> functions;
 		std::multimap<std::string, Function*> extension_methods;
 
 		//template stuff
-		std::vector<std::pair<Type*,std::string>> templates;
+		std::vector<std::pair<Type*, std::string>> templates;
 		std::vector<Type*> template_args;
 	};
 
 	class StructExpression;
 	struct Struct : public Namespace
 	{
-		//std::string name;
 		llvm::Type* type;
 		Type* parent_struct;//when inheritance
 
@@ -214,13 +212,12 @@ namespace Jet
 			Type* type;
 		};
 		std::vector<StructMember> struct_members;//member variables
-
 		std::multimap<std::string, Function*> functions;//member functions
 
 		bool loaded;
 
-		//template stuff
-		Struct* template_base;
+		//template related stuff
+		Struct* template_base;//the uninstantiated function that I was generated from
 		std::vector<std::pair<Type*, std::string>> templates;
 		std::vector<Type*> template_args;
 		StructExpression* expression;
@@ -233,6 +230,8 @@ namespace Jet
 			parent_struct = 0;
 			loaded = false;
 		}
+
+		bool IsParent(Type* ty);
 
 		void Load(Compilation* compiler);
 	};

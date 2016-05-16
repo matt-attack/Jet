@@ -14,19 +14,14 @@ void Function::Load(Compilation* compiler)
 		return;
 
 	if (this->return_type->type == Types::Invalid)
-	{
 		this->return_type = compiler->LookupType(this->return_type->name);
-	}
-	//this->return_type->Load(compiler);
-
+	
 	std::vector<llvm::Type*> args;
 	std::vector<llvm::Metadata*> ftypes;
 	for (auto& type : this->arguments)
 	{
 		if (type.first->type == Types::Invalid)
-		{
 			type.first = compiler->LookupType(type.first->name);
-		}
 
 		type.first->Load(compiler);
 		args.push_back(type.first->GetLLVMType());
@@ -35,7 +30,7 @@ void Function::Load(Compilation* compiler)
 		ftypes.push_back(type.first->GetDebugType(compiler));
 	}
 
-	llvm::FunctionType *ft = llvm::FunctionType::get(this->return_type->GetLLVMType(), /*this->*/args, false);
+	llvm::FunctionType *ft = llvm::FunctionType::get(this->return_type->GetLLVMType(), args, false);
 
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
 	//need to add way to specify calling convention
@@ -43,6 +38,12 @@ void Function::Load(Compilation* compiler)
 	{
 	case CallingConvention::StdCall:
 		f->setCallingConv(llvm::CallingConv::X86_StdCall);
+		break;
+	case CallingConvention::FastCall:
+		f->setCallingConv(llvm::CallingConv::X86_FastCall);
+		break;
+	case CallingConvention::ThisCall:
+		f->setCallingConv(llvm::CallingConv::X86_ThisCall);
 		break;
 	}
 	
@@ -52,15 +53,9 @@ void Function::Load(Compilation* compiler)
 	int line = this->expression ? this->expression->token.line : 0;
 	llvm::DISubprogram* sp = compiler->debug->createFunction(unit, this->name, this->name, unit, line, functiontype, false, true, line, 0, false, f);
 
-	//FContext, Name, StringRef(), Unit, LineNo, 0, false, f);
-	//for some reason struct member functions derp
-	//CreateFunctionType(Args.size(), Unit), false /* internal linkage */,
-	//true /* definition */, ScopeLine, DINode::FlagPrototyped, false, F);
 	assert(sp->describes(f));
 	this->scope = sp;
 	compiler->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
-	//compiler->debug->finalize();
-	//compiler->module->dump();
 
 	//alloc args
 	auto AI = f->arg_begin();

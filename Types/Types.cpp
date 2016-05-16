@@ -599,8 +599,7 @@ void Type::FinishCompilingTemplate(Compilation* compiler)
 		throw 7;
 
 	this->Load(compiler);
-	//fixme, if im typechecking no functions get filled in
-
+	
 	StructExpression* expr = dynamic_cast<StructExpression*>(this->data->expression);
 	auto oldname = expr->name;
 	expr->name.text = this->data->name;
@@ -845,8 +844,7 @@ void Struct::Load(Compilation* compiler)
 		//add dummy element
 		elementss.push_back(compiler->IntType->GetLLVMType());
 	}
-	//compiler->Error("Struct contains no elements!! Fix this not being ok!", *compiler->current_function->current_token);
-
+	
 	this->type = llvm::StructType::create(elementss, this->name);
 
 	this->loaded = true;
@@ -1038,4 +1036,20 @@ int Type::GetSize()
 		return size;
 	}
 	return 4;//todo
+}
+
+
+bool Struct::IsParent(Type* ty)
+{
+	//ok this needs to check down the line
+
+	auto current = this->parent_struct;
+	while (current)
+	{
+		if (current == ty)
+			return true;
+		current = current->data->parent_struct;
+	}
+
+	return false;
 }

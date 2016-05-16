@@ -756,6 +756,13 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		if (t->type == Types::Pointer && value.type->base->type == Types::Array && value.type->base->base == t->base)
 			return CValue(t, root->builder.CreatePointerCast(value.val, t->GetLLVMType(), "arraycast"));
 
+		if (value.type->base->type == Types::Struct && t->type == Types::Pointer && t->base->type == Types::Struct)
+		{
+			if (value.type->base->data->IsParent(t->base))
+			{
+				return CValue(t, root->builder.CreatePointerCast(value.val, t->GetLLVMType(), "ptr2ptr"));
+			}
+		}
 		if (Explicit)
 		{
 			if (t->type == Types::Pointer)
@@ -885,6 +892,13 @@ bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
 		if (t->type == Types::Pointer && value.type->base->type == Types::Array && value.type->base->base == t->base)
 			return true;
 
+		if (value.type->base->type == Types::Struct && t->type == Types::Pointer && t->base->type == Types::Struct)
+		{
+			if (value.type->base->data->IsParent(t->base))
+			{
+				return true;
+			}
+		}
 		if (Explicit)
 		{
 			if (t->type == Types::Pointer)

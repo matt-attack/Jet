@@ -567,6 +567,7 @@ class StructExpression : public Expression
 	Token start;
 	Token end;
 
+	Token colon;
 	Token base_type;
 
 	void AddConstructorDeclarations(Type* str, CompilerContext* context);
@@ -579,7 +580,7 @@ public:
 
 	Token template_open, template_close;
 
-	StructExpression(Token token, Token name, Token start, Token end, Token ob, std::vector<StructMember>&& members, std::vector<StructTemplate>* templates, Token cb, Token base_type)
+	StructExpression(Token token, Token name, Token start, Token end, Token ob, std::vector<StructMember>&& members, std::vector<StructTemplate>* templates, Token cb, Token colon, Token base_type)
 	{
 		this->templates = templates;
 		this->members = members;
@@ -590,6 +591,7 @@ public:
 		this->template_open = ob;
 		this->template_close = cb;
 		this->end = end;
+		this->colon = colon;
 	}
 
 	~StructExpression()
@@ -640,6 +642,13 @@ public:
 			}
 			template_close.Print(output, source);// output += ">";
 		}
+
+		if (this->colon.text.length())
+		{
+			this->colon.Print(output, source);
+			this->base_type.Print(output, source);
+		}
+
 		this->start.Print(output, source);
 
 		for (auto ii : this->members)

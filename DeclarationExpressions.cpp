@@ -574,6 +574,10 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		//add the attribute to the fun here
 		if (attr->name.text == "stdcall")
 			fun->calling_convention = CallingConvention::StdCall;
+		else if (attr->name.text == "thiscall")
+			fun->calling_convention = CallingConvention::ThisCall;
+		else if (attr->name.text == "fastcall")
+			fun->calling_convention = CallingConvention::FastCall;
 		//add the attribute to the fun
 	}
 	context->root->AdvanceTypeLookup(&fun->return_type, this->ret_type.text, &this->ret_type);
@@ -597,7 +601,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		else
 		{
 			if (ii->type != Types::Struct)
-				context->root->Error("Cannot define a function for a type that is not a struct", token);
+				context->root->Error("Cannot define an extern function for a type that is not a struct", token);
 
 			ii->data->functions.insert({ fname, fun });
 		}
@@ -609,6 +613,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		context->root->ns->members.insert({ fname, fun });
 	}
 
+	//look up arg types
 	for (auto ii : *this->args)
 	{
 		fun->arguments.push_back({ 0, ii.name.text });
@@ -700,7 +705,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		// Add arguments to variable symbol table.
 		if (context->function->is_generator)
 		{
-			//context->root->Error("Local variables inside of generators not yet implemented.", this->token);
 			//find the already added type with the same name
 			auto ty = context->function->arguments[0].first->base;
 			/*std::vector<llvm::Type*> types;
@@ -710,8 +714,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			ty->data->struct_members.push_back({ aname, "type", type });*/
 			//ok, almost this doesnt quite work right
 			auto var_ptr = context->function->generator.variable_geps[context->function->generator.var_num++];
-			//var_ptr->dump();
-
+			
 			if (this->_right)
 			{
 				auto val = (*this->_right)[i - 1].second->Compile(context);
@@ -747,15 +750,6 @@ Type* StructExpression::TypeCheck(CompilerContext* context)
 	auto old = context->root->ns;
 	me->data->parent = old;
 	context->root->ns = me->data;
-	//define template types
-	if (this->templates)
-	{
-		//for (auto ii : *this->templates)
-		//{
-			//register the type
-		//	me->data->members.insert({ ii.name.text, context->root->LookupType(ii.type.text, false) });
-		//}
-	}
 
 	for (auto ii : this->members)
 	{
@@ -780,32 +774,6 @@ CValue StructExpression::Compile(CompilerContext* context)
 			if (iter == 0 || iter->type != Types::Trait)
 				context->root->Error("Trait '" + ii.type.text + "' is not defined", ii.type);
 		}
-
-		//auto myself = context->root->LookupType(this->name.text, false);
-
-		/*for (auto ii : *this->templates)
-		{
-		Type* type = context->root->LookupType(ii.first.text);
-
-		myself->data->members.insert({ ii.second.text, type });
-		}
-
-		auto oldns = context->root->ns;
-		context->root->ns = myself->data;
-		myself->data->parent = oldns;
-		for (auto& ii : myself->data->struct_members)
-		{
-		if (ii.type == 0)
-		ii.type = context->root->LookupType(ii.type_name);
-		}
-		context->root->ns = oldns;
-		//add in the type and tell it to not actually generate IR, just to check things
-		for (auto ii : this->members)
-		{
-			//finish this
-			if (ii.type == StructMember::FunctionMember)
-				ii.function->Compile(context);
-		}*/
 
 		return CValue();
 	}
@@ -844,8 +812,6 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 		auto fun = new Function("__" + str->data->name + "_" + strname, false);//
 		fun->return_type = &VoidType;
 		fun->arguments = { { context->root->LookupType(str->data->name + "*", false), "this" } };
-		//fun->arguments.push_back({ 0, "this" });// = { { context->root->AdvanceTypeLookup(str->data->name + "*"), "this" } };
-		//context->root->AdvanceTypeLookup(&fun->arguments.back().first, str->data->name + "*");
 		fun->f = 0;
 		fun->expression = 0;
 		fun->type = (FunctionType*)-1;
@@ -856,9 +822,6 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 		auto fun = new Function("__" + str->data->name + "_~" + strname, false);//
 		fun->return_type = &VoidType;
 		fun->arguments = { { context->root->LookupType(str->data->name + "*", false), "this" } };
-		//fun->arguments.push_back({ 0, "this" });// = { { context->root->AdvanceTypeLookup(str->data->name + "*"), "this" } };
-		//context->root->AdvanceTypeLookup(&fun->arguments.back().first, str->data->name + "*");
-		//fun->arguments = { { context->root->AdvanceTypeLookup(str->data->name + "*"), "this" } };
 		fun->f = 0;
 		fun->expression = 0;
 		fun->type = (FunctionType*)-1;
@@ -871,7 +834,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 {
 	auto Struct = this->GetName();
 
-	Type* str = context->root->LookupType(Struct);//todo get me
+	Type* str = context->root->LookupType(Struct);
 	std::string strname = str->data->template_base ? str->data->template_base->name : str->data->name;
 	//fix this we are sometimes getting too many destructors added
 	for (auto ii : str->data->functions)
@@ -970,7 +933,6 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				std::vector<std::pair<Type*, std::string>> argsv;
 				argsv.push_back({ context->root->LookupType(str->data->name + "*"), "this" });
 
-				//context->CurrentToken(&this->ret_type);
 				auto ret = context->root->LookupType("void");
 
 				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? true : false, false);// , this->varargs);
@@ -1222,13 +1184,7 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 
 		for (auto& ii : *this->templates)
 		{
-			//if (ii.first.text.length() == 0)
-				t->templates.push_back({ 0, ii.name.text });
-			//else
-			//{
-				//t->templates.push_back({ 0, ii.second.text });
-				//context->root->AdvanceTypeLookup(&t->templates.back().first, ii.first.text, &ii.first);
-			//}
+			t->templates.push_back({ 0, ii.name.text });
 
 			auto type = new Type;
 			type->name = ii.name.text;

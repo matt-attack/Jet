@@ -7,11 +7,23 @@ extern fun int puts(char* str);
 struct A
 {
 	int a_val;
+	
+	fun void PrintMe()
+	{
+		if (this->a_val != 5)
+			puts("fail\n");
+	}
 }
 
 struct B: A
 {
 	int b_val;
+	
+	fun void PrintMe2()
+	{
+		if (this->b_val != 6)
+			puts("fail\n");
+	}
 }
 
 fun int main() 
@@ -20,10 +32,20 @@ fun int main()
 	p.a_val = 5;
 	p.b_val = 6;
 	
+	local A* q = 0;
+	q = &p;
+	if (q->a_val != 5)
+		puts("fail\n");
+	
+	
 	if (p.b_val != 6)
 		puts("fail\n");
 	if (p.a_val != 5)
 		puts("fail\n");
+	else
+		puts("pass\n");
+	p.PrintMe();
+	p.PrintMe2();
 	
 	return 0;
 }

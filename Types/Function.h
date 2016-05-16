@@ -44,7 +44,9 @@ namespace Jet
 	enum class CallingConvention
 	{
 		Default,
-		StdCall
+		StdCall,
+		FastCall,
+		ThisCall
 	};
 	struct Function
 	{

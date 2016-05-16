@@ -531,9 +531,12 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 	}
 
 	//parse base type
-	Token base_name;
-	if (parser->MatchAndConsume(TokenType::Colon))
+	Token base_name, colon;
+	if (parser->Match(TokenType::Colon))
+	{
+		colon = parser->Consume();
 		base_name = parser->Consume(TokenType::Name);
+	}
 
 	auto start = parser->Consume(TokenType::LeftBrace);
 
@@ -616,7 +619,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		members.push_back(member);
 	}
 
-	return new StructExpression(token, name, start, end, ob, std::move(members), /*elements, functions,*/ templated, cb, base_name);
+	return new StructExpression(token, name, start, end, ob, std::move(members), /*elements, functions,*/ templated, cb, colon, base_name);
 }
 
 Expression* FunctionParselet::parse(Parser* parser, Token token)

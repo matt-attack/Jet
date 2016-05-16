@@ -88,6 +88,7 @@ namespace Jet
 
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
+			context->CurrentToken(&this->token);
 			return context->TCGetVariable(token.text)->base;
 			//lookup type
 		}
