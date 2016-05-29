@@ -543,7 +543,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 			return CValue(var.type->function->return_type, this->root->builder.CreateCall(var.val, argsv));
 		}
-		this->root->Error("Function '" + name + "' with "+std::to_string(args.size()) +" arguments is not defined", *this->current_token);
+		this->root->Error("Function '" + name + "' with " + std::to_string(args.size()) + " arguments is not defined", *this->current_token);
 	}
 	else if (fun == 0)
 	{
@@ -731,8 +731,8 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 			//auto ty1 = value.val->getType()->getContainedType(0);
 			llvm::ConstantInt* ty = llvm::dyn_cast<llvm::ConstantInt>(value.val);
 			if (ty && Explicit == false && ty->getSExtValue() != 0)
-					root->Error("Cannot cast a non-zero integer value to pointer implicitly.", *this->current_token);
-			
+				root->Error("Cannot cast a non-zero integer value to pointer implicitly.", *this->current_token);
+
 			return CValue(t, root->builder.CreateIntToPtr(value.val, t->GetLLVMType()));
 		}
 
@@ -831,7 +831,7 @@ bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
 {
 	CValue value;
 	value.type = src;
-	
+
 	if (value.type->type == t->type && value.type->data == t->data)
 		return true;
 
@@ -956,6 +956,36 @@ Scope* CompilerContext::PushScope()
 	return this->scope;
 }
 
+
+void CompilerContext::PopScope()
+{
+	//call destructors
+	if (this->scope->prev != 0 && this->scope->prev->prev != 0)
+	{
+		for (auto ii : this->scope->named_values)
+		{
+			if (ii.second.type->type == Types::Struct)
+			{
+				//look for destructor
+				auto name = "~" + (ii.second.type->data->template_base ? ii.second.type->data->template_base->name : ii.second.type->data->name);
+				auto destructor = ii.second.type->data->functions.find(name);
+				if (destructor != ii.second.type->data->functions.end())
+				{
+					//call it
+					this->Call(name, { CValue(this->root->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
+				}
+			}
+			else if (ii.second.type->type == Types::Array && ii.second.type->base->type == Types::Struct)
+			{
+				printf("ok");
+			}
+		}
+	}
+
+	auto temp = this->scope;
+	this->scope = this->scope->prev;
+}
+
 void CompilerContext::WriteCaptures(llvm::Value* lambda)
 {
 	if (this->captures.size())
@@ -986,4 +1016,70 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 		}
 	}
 	this->captures.clear();
+}
+
+CValue CompilerContext::Load(const std::string& name)
+{
+	CValue value = GetVariable(name);
+	if (value.type->type == Types::Function)
+		return value;
+	else if (value.type->type == Types::Pointer && value.type->base->type == Types::Array)//load it as a pointer
+	{
+		auto type = value.type->base->GetPointerType();
+		auto loc = this->root->builder.CreatePointerCast(value.val, type->GetLLVMType());
+		return CValue(type, loc);
+	}
+	return CValue(value.type->base, root->builder.CreateLoad(value.val, name.c_str()));
+}
+
+void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
+{
+	if (pointer.type->base->type == Types::Struct)
+	{
+		Type* ty = pointer.type->base;
+		Function* fun = 0;
+		if (ty->data->template_base)
+			fun = ty->GetMethod(ty->data->template_base->name, { pointer.type }, this);
+		else
+			fun = ty->GetMethod(ty->data->name, { pointer.type }, this);
+		fun->Load(this->root);
+		if (arr_size == 0)//size == 0)
+		{//just one element, construct it
+			this->root->builder.CreateCall(fun->f, { pointer.val });
+		}
+		else
+		{//construct each child element
+			llvm::Value* counter = this->root->builder.CreateAlloca(this->root->IntType->GetLLVMType(), 0, "newcounter");
+			this->root->builder.CreateStore(this->Integer(0).val, counter);
+
+			auto start = llvm::BasicBlock::Create(this->root->context, "start", this->root->current_function->function->f);
+			auto body = llvm::BasicBlock::Create(this->root->context, "body", this->root->current_function->function->f);
+			auto end = llvm::BasicBlock::Create(this->root->context, "end", this->root->current_function->function->f);
+
+			this->root->builder.CreateBr(start);
+			this->root->builder.SetInsertPoint(start);
+			auto cval = this->root->builder.CreateLoad(counter, "curcount");
+			auto res = this->root->builder.CreateICmpUGE(cval, arr_size);
+			this->root->builder.CreateCondBr(res, end, body);
+
+			this->root->builder.SetInsertPoint(body);
+			if (pointer.type->type == Types::Array)
+			{
+				auto elementptr = this->root->builder.CreateGEP(pointer.val, { this->root->builder.getInt32(0), cval });
+				this->root->builder.CreateCall(fun->f, { elementptr });
+			}
+			else
+			{
+				auto elementptr = this->root->builder.CreateGEP(pointer.val, { cval });
+				this->root->builder.CreateCall(fun->f, { elementptr });
+			}
+
+			auto inc = this->root->builder.CreateAdd(cval, this->Integer(1).val);
+			this->root->builder.CreateStore(inc, counter);
+
+			this->root->builder.CreateBr(start);
+
+			this->root->builder.SetInsertPoint(end);
+		}
+	}
 }

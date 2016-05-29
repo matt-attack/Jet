@@ -181,12 +181,18 @@ class NamespaceExpression : public Expression
 	Token name;
 	Token token;
 	BlockExpression* block;
+	std::vector<std::pair<Token, Token>>* names;
 public:
-	NamespaceExpression(Token token, Token name, BlockExpression* block)
+	NamespaceExpression(Token token, std::vector<std::pair<Token, Token>>* names, BlockExpression* block)
 	{
-		this->name = name;
 		this->token = token;
 		this->block = block;
+		this->names = names;
+	}
+
+	~NamespaceExpression()
+	{
+		delete this->names;
 	}
 
 	void SetParent(Expression* parent)
@@ -197,11 +203,13 @@ public:
 
 	CValue Compile(CompilerContext* context)
 	{
-		context->SetNamespace(this->name.text);
+		for (int i = 0; i < this->names->size(); i++)
+			context->SetNamespace((*this->names)[i].first.text);
 
 		this->block->Compile(context);
 
-		context->PopNamespace();
+		for (int i = 0; i < this->names->size(); i++)
+			context->PopNamespace();
 
 		return CValue();
 	}
@@ -209,28 +217,38 @@ public:
 	virtual Type* TypeCheck(CompilerContext* context)
 	{
 		//push namespace
-		context->SetNamespace(this->name.text);
+		for (int i = 0; i < this->names->size(); i++)
+			context->SetNamespace((*this->names)[i].first.text);
 
 		this->block->TypeCheck(context);
 
-		context->PopNamespace();
+		for (int i = 0; i < this->names->size(); i++)
+			context->PopNamespace();
 
 		return 0;
 	}
 
 	void CompileDeclarations(CompilerContext* context)
 	{
-		context->SetNamespace(this->name.text);
+		for (int i = 0; i < this->names->size(); i++)
+			context->SetNamespace((*this->names)[i].first.text);
 
 		this->block->CompileDeclarations(context);
 
-		context->PopNamespace();
+		for (int i = 0; i < this->names->size(); i++)
+			context->PopNamespace();
 	}
 
 	void Print(std::string& output, Source* source)
 	{
 		token.Print(output, source);
-		name.Print(output, source);
+		for (int i = 0; i < this->names->size(); i++)
+		{
+			(*this->names)[i].first.Print(output, source);
+			
+			if ((*this->names)[i].second.text.length())
+				(*this->names)[i].second.Print(output, source);
+		}
 		block->Print(output, source);
 	}
 

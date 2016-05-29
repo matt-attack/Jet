@@ -365,10 +365,9 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 		}
 
 		Token type = parser->Consume(TokenType::Name);
-
 		Token name = parser->Consume(TokenType::Name);
+		Token tok = parser->Consume(TokenType::Assign);
 
-		auto tok = parser->Consume(TokenType::Assign);
 		parser->Consume(TokenType::GreaterThan);
 		tok.text += ">";
 		BlockExpression* block = parser->ParseBlock(true);
@@ -526,7 +525,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 				templated->push_back({ ttname, tname, Token() });
 				break;
 			}
-		} while (true);// parser->MatchAndConsume(TokenType::Comma));
+		} while (true);
 		cb = parser->Consume(TokenType::GreaterThan);
 	}
 
@@ -535,7 +534,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 	if (parser->Match(TokenType::Colon))
 	{
 		colon = parser->Consume();
-		base_name = parser->Consume(TokenType::Name);
+		base_name = ::ParseType(parser, false);
 	}
 
 	auto start = parser->Consume(TokenType::LeftBrace);
@@ -682,8 +681,6 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 				parser->Error(str, name);
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
-
-		//parser->Consume(TokenType::RightParen);
 	}
 	Token cb = parser->Consume(TokenType::RightParen);
 
@@ -697,7 +694,23 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 
 	Token ret_type = ::ParseType(parser);
 
-	Token name = parser->Consume(TokenType::Name);
+	//Token name = parser->Consume(TokenType::Name);
+	Token name = parser->Consume();// TokenType::Name);
+	if (name.type == TokenType::Free)
+	{
+		name.type == TokenType::Name;
+	}
+	else if (name.type != TokenType::Name)
+	{
+		std::string str = "Token Not As Expected! Expected: " + TokenToString[TokenType::Name] + " Got: " + name.text;
+
+		//it was probably forgotten, insert dummy
+		//fabricate a fake token
+		parser->Error(str, name);//need to make this throw again
+
+		//if (name.type != TokenType::Semicolon)
+		throw 7;
+	}
 	auto arguments = new std::vector < ExternArg > ;
 
 	std::string stru;
@@ -892,11 +905,11 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 		{
 			//its an array type
 			//read the number
-			auto size = parser->ParseExpression(Precedence::ASSIGNMENT);
+			UniquePtr<Expression*> size = parser->ParseExpression(Precedence::ASSIGNMENT);
 
 			parser->Consume(TokenType::RightBracket);
 
-			if (auto s = dynamic_cast<NumberExpression*>(size))
+			if (auto s = dynamic_cast<NumberExpression*>((Expression*)size))
 			{
 				if (s->GetIntValue() <= 0)
 					parser->Error("Cannot size array with a zero or negative size", token);
@@ -996,9 +1009,7 @@ Expression* MemberParselet::parse(Parser* parser, Expression* left, Token token)
 		parser->Error("Cannot access member name that is not a string", token);
 	}
 
-	auto ret = new IndexExpression(left, name->token, token);
-
-	return ret;
+	return new IndexExpression(left, name->token, token);
 }
 
 Expression* PointerMemberParselet::parse(Parser* parser, Expression* left, Token token)
@@ -1012,9 +1023,7 @@ Expression* PointerMemberParselet::parse(Parser* parser, Expression* left, Token
 		parser->Error("Cannot access member name that is not a string", token);
 	}
 
-	auto ret = new IndexExpression(left, name->token, token);
-
-	return ret;
+	return new IndexExpression(left, name->token, token);
 }
 
 /*Expression* ObjectParselet::parse(Parser* parser, Token token)
@@ -1086,11 +1095,25 @@ Expression* TypedefParselet::parse(Parser* parser, Token token)
 
 Expression* NamespaceParselet::parse(Parser* parser, Token token)
 {
-	Token name = parser->Consume(TokenType::Name);
+	UniquePtr<std::vector<std::pair<Token, Token>>*> names = new std::vector < std::pair<Token, Token> > ;
+
+	while (true)
+	{
+		Token name = parser->Consume(TokenType::Name);
+
+		if (parser->Match(TokenType::Scope) == false)
+		{
+			names->push_back({ name, Token() });
+			break;
+		}
+
+		Token colons = parser->Consume();
+		names->push_back({ name, colons });
+	}
 
 	auto block = parser->ParseBlock(false);
 
-	return new NamespaceExpression(token, name, block);
+	return new NamespaceExpression(token, names.Release(), block);
 }
 
 Expression* NewParselet::parse(Parser* parser, Token token)
@@ -1102,14 +1125,35 @@ Expression* NewParselet::parse(Parser* parser, Token token)
 	{
 		auto ob = parser->Consume();
 
-		Expression* size = parser->ParseExpression(Precedence::ASSIGNMENT);
+		UniquePtr<Expression*> size = parser->ParseExpression(Precedence::ASSIGNMENT);
 
 		auto cb = parser->Consume(TokenType::RightBracket);
 
-		auto x = new NewExpression(token, type, size);
+		auto x = new NewExpression(token, type, size.Release());
 		x->open_bracket = ob;
 		x->close_bracket = cb;
 		return x;
 	}
 	return new NewExpression(token, type, 0);
+}
+
+Expression* FreeParselet::parse(Parser* parser, Token token)
+{
+	//auto type = ::ParseType(parser, false);
+
+	//try and parse size expression
+	if (parser->LookAhead().type == TokenType::LeftBracket)//auto tok = parser->MatchAndConsume(TokenType::LeftBracket))
+	{
+		auto ob = parser->Consume();
+		auto cb = parser->Consume(TokenType::RightBracket);
+
+		UniquePtr<Expression*> pointer = parser->ParseExpression(Precedence::ASSIGNMENT);
+		
+		auto x = new FreeExpression(token, pointer.Release());
+		x->open_bracket = ob;
+		x->close_bracket = cb;
+		return x;
+	}
+
+	return new FreeExpression(token, parser->ParseExpression(Precedence::ASSIGNMENT));
 }

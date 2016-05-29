@@ -128,6 +128,7 @@ public:
 		keywords["offsetof"] = TokenType::OffsetOf;
 		keywords["typeof"] = TokenType::TypeOf;
 		keywords["new"] = TokenType::New;
+		keywords["free"] = TokenType::Free;
 
 		keywords["typedef"] = TokenType::Typedef;
 		//keywords["const"] = TokenType::Const;

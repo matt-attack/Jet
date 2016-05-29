@@ -114,6 +114,7 @@ namespace Jet
 		OffsetOf,
 		TypeOf,
 		New,
+		Free,
 
 		Typedef, 
 

@@ -165,6 +165,14 @@ namespace Jet
 
 		std::multimap<std::string, Symbol> members;
 
+		Namespace() {};
+
+		Namespace(const std::string& name, Namespace* parent)
+		{
+			this->name = name;
+			this->parent = parent;
+		}
+
 		~Namespace();
 
 		Function* GetFunction(const std::string& name)

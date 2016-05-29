@@ -84,7 +84,7 @@ int main(int argc, char* argv[])
 			if (parser.commands.size())
 				config = parser.commands.front();
 
-			std::vector<char*> programs = { "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors" };
+			std::vector<char*> programs = { "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors" };
 
 			for (auto ii : programs)
 			{

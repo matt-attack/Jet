@@ -652,7 +652,14 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			if (type->type == Types::Struct && type->data->templates.size() > 0)
 				context->root->Error("Missing template arguments for type '" + type->ToString() + "'", ii.first);
 			else if (type->type == Types::Array)
+			{
 				Alloca = context->root->builder.CreateAlloca(type->GetLLVMType(), context->root->builder.getInt32(type->size), aname);
+				//Alloca->dump();
+				//Alloca->getType()->dump();
+
+				//cast it to a pointer
+
+			}
 			else
 			{
 				if (type->GetBaseType()->type == Types::Trait)
@@ -730,13 +737,13 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			context->RegisterLocal(aname, CValue(type->GetPointerType(), Alloca));
 
 		//construct it!
-		if (this->_right == 0 && type->type == Types::Struct)
+		if (this->_right == 0)
 		{
-			//call default construct if it exists
-			const std::string& constructor_name = type->data->template_base ? type->data->template_base->name : type->data->name;
-			auto iter = type->data->functions.find(constructor_name);
-			if (iter != type->data->functions.end())
-				context->Call(constructor_name, { CValue(type->GetPointerType(), Alloca) }, type);
+			if (type->type == Types::Struct)
+				context->Construct(CValue(type->GetPointerType(), Alloca), 0);
+				
+			if (type->type == Types::Array && type->base->type == Types::Struct)
+				context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
 		}
 	}
 

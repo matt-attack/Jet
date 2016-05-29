@@ -479,6 +479,7 @@ CValue NewExpression::Compile(CompilerContext* context)
 	if (this->size)
 		size.val = context->root->builder.CreateMul(size.val, arr_size);
 
+	size.val = context->root->builder.CreateAdd(size.val, context->root->builder.getInt32(4));
 	CValue val = context->Call("malloc", { size });
 
 	//build the array type struct, which is just an int followed by a pointer to the underlying data
@@ -486,10 +487,19 @@ CValue NewExpression::Compile(CompilerContext* context)
 	//auto array_data = context->root->builder.CreateAlloca(array_t);
 	//context->root->builder.CreateStructGEP(array_t, array_data, 0);
 		//add free
+	//increment val to the right location and store array size
+	//context->root->builder.CreateStructGEP(context->root->)
+
+	auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
+	context->root->builder.CreateStore(arr_size, pointer);
+	val.val = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(4) });
+
 	auto ptr = context->DoCast(ty->GetPointerType(), val, true);
 
 	//run constructors
-	if (ty->type == Types::Struct)
+	context->Construct(ptr, arr_size);
+
+	/*if (ty->type == Types::Struct)
 	{
 		Function* fun = 0;
 		if (ty->data->template_base)
@@ -527,10 +537,89 @@ CValue NewExpression::Compile(CompilerContext* context)
 
 			context->root->builder.SetInsertPoint(end);
 		}
-	}
+	}*/
 
 	return ptr;
 }
+
+CValue FreeExpression::Compile(CompilerContext* context)
+{
+	context->CurrentToken(&this->token);
+
+	auto pointer = this->pointer->Compile(context);
+
+	if (pointer.type->type != Types::Pointer)
+		context->root->Error("Cannot free a non pointer type!", this->token);
+
+	//auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
+	//context->root->builder.CreateStore(arr_size, pointer);
+	//val.val = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(4) });
+
+	//pointer.val = context->root->builder.CreateSub(pointer.val, context->root->builder.getInt32(4));
+
+	//build the array type struct, which is just an int followed by a pointer to the underlying data
+	//auto array_t = llvm::StructType::get(llvm::IntegerType::get(context->root->context, 32), ty->GetPointerType()->GetLLVMType());
+	//auto array_data = context->root->builder.CreateAlloca(array_t);
+	//context->root->builder.CreateStructGEP(array_t, array_data, 0);
+	//add free
+	//increment val to the right location and store array size
+	//context->root->builder.CreateStructGEP(context->root->)
+	//auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
+	
+	auto charptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
+	auto rootptr = context->root->builder.CreateGEP(charptr, { context->root->builder.getInt32(-4) });
+	auto arr_size = context->root->builder.CreateLoad(context->root->builder.CreatePointerCast(rootptr, context->root->IntType->GetPointerType()->GetLLVMType()));
+
+
+	//auto ptr = context->DoCast(ty->GetPointerType(), val, true);
+
+	//run constructors
+	if (pointer.type->base->type == Types::Struct)
+	{
+		Type* ty = pointer.type->base;
+		Function* fun = 0;
+		if (ty->data->template_base)
+			fun = ty->GetMethod("~"+ty->data->template_base->name, { pointer.type }, context);
+		else
+			fun = ty->GetMethod("~"+ty->data->name, { pointer.type }, context);
+		fun->Load(context->root);
+		if (this->close_bracket.text.length() == 0)//size == 0)
+		{//just one element, construct it
+			context->root->builder.CreateCall(fun->f, { pointer.val });
+		}
+		else
+		{//construct each child element
+			llvm::Value* counter = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType(), 0, "newcounter");
+			context->root->builder.CreateStore(context->Integer(0).val, counter);
+
+			auto start = llvm::BasicBlock::Create(context->root->context, "start", context->root->current_function->function->f);
+			auto body = llvm::BasicBlock::Create(context->root->context, "body", context->root->current_function->function->f);
+			auto end = llvm::BasicBlock::Create(context->root->context, "end", context->root->current_function->function->f);
+
+			context->root->builder.CreateBr(start);
+			context->root->builder.SetInsertPoint(start);
+			auto cval = context->root->builder.CreateLoad(counter, "curcount");
+			auto res = context->root->builder.CreateICmpUGE(cval, arr_size);
+			context->root->builder.CreateCondBr(res, end, body);
+
+			context->root->builder.SetInsertPoint(body);
+			auto elementptr = context->root->builder.CreateGEP(pointer.val, { cval });
+			context->root->builder.CreateCall(fun->f, { elementptr });
+
+			auto inc = context->root->builder.CreateAdd(cval, context->Integer(1).val);
+			context->root->builder.CreateStore(inc, counter);
+
+			context->root->builder.CreateBr(start);
+
+			context->root->builder.SetInsertPoint(end);
+		}
+	}
+
+	context->Call("free", { CValue(context->root->LookupType("char*"), rootptr) });
+
+	return CValue();
+}
+
 
 Type* PrefixExpression::TypeCheck(CompilerContext* context)
 {

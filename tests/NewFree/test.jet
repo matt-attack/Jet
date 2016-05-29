@@ -1,14 +1,35 @@
 
 extern fun int printf(char* h, int h);
 extern fun char* malloc(int x);
+extern fun void free(char* x);
 
 extern fun int puts(char* str);
 
+struct t
+{
+	fun void t()
+	{
+		puts("created\n");
+	}
+	fun void ~t()
+	{
+		puts("killed\n");
+	}
+}
+
+fun void test(t* x)
+{
+
+}
 fun int main() 
 {
-	local x = new int[50];
-	
-	free x;
+	local x = new t[5];
+	//test(x);
+	local t q;
+	local t p[5];
+	test(p);
+	test(&p[0]);
+	//free[] x;
 	
 	return 0;
 }

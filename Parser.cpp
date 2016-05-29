@@ -117,6 +117,8 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	this->Register(TokenType::TypeOf, new TypeofParselet());
 	this->Register(TokenType::New, new NewParselet());
 
+	this->Register(TokenType::Free, new FreeParselet());
+
 	this->Register(TokenType::Typedef, new TypedefParselet());
 
 	//this->Register(TokenType::Const, new ConstParselet());

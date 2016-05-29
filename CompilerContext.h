@@ -1,25 +1,19 @@
 #ifndef JET_COMPILER_CONTEXT_HEADER
 #define JET_COMPILER_CONTEXT_HEADER
 
-//#include "Compiler.h"
-//#include "Parser.h"
-//#include "Lexer.h"
 #include "Compilation.h"
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
-//#include <string>
 #include <vector>
-//#include <map>
 
 #include "Types/Types.h"
 #include "Types/Function.h"
 #include "Token.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
-//#include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Analysis/Passes.h"
@@ -136,7 +130,7 @@ namespace Jet
 				cur = cur->prev;
 			} while (cur);
 
-			if (value == 0)//value->type == Types::Void)
+			if (value == 0)
 			{
 				//ok, now search globals
 				auto global = this->root->globals.find(name);
@@ -200,14 +194,7 @@ namespace Jet
 			return root->builder.CreateStore(val.val, value.val);
 		}
 
-		CValue Load(const std::string& name)
-		{
-			CValue value = GetVariable(name);
-			if (value.type->type == Types::Function)
-				return value;
-			
-			return CValue(value.type->base, root->builder.CreateLoad(value.val, name.c_str()));
-		}
+		CValue Load(const std::string& name);
 
 		void SetDebugLocation(const Token& t);
 
@@ -221,9 +208,7 @@ namespace Jet
 			}
 
 			//create new one
-			auto ns = new Namespace;
-			ns->name = name;
-			ns->parent = this->root->ns;
+			auto ns = new Namespace(name, this->root->ns);
 
 			this->root->ns->members.insert({ name, Symbol(ns) });
 			this->root->ns = ns;
@@ -304,30 +289,9 @@ namespace Jet
 
 		Scope* PushScope();
 
-		void PopScope()
-		{
-			//call destructors
-			if (this->scope->prev != 0 && this->scope->prev->prev != 0)
-			{
-				for (auto ii : this->scope->named_values)
-				{
-					if (ii.second.type->type == Types::Struct)
-					{
-						//look for destructor
-						auto name = "~" + (ii.second.type->data->template_base ? ii.second.type->data->template_base->name : ii.second.type->data->name);
-						auto destructor = ii.second.type->data->functions.find(name);
-						if (destructor != ii.second.type->data->functions.end())
-						{
-							//call it
-							this->Call(name, { CValue(this->root->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
-						}
-					}
-				}
-			}
+		void PopScope();
 
-			auto temp = this->scope;
-			this->scope = this->scope->prev;
-		}
+		void Construct(CValue value, llvm::Value* size);
 
 		CValue DoCast(Type* t, CValue value, bool Explicit = false);
 		bool CheckCast(Type* src, Type* dest, bool Explicit = false, bool Throw = true);

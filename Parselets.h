@@ -145,6 +145,19 @@ namespace Jet
 		}
 	};
 
+	class FreeParselet : public PrefixParselet
+	{
+
+	public:
+
+		Expression* parse(Parser* parser, Token token);
+
+		int GetPrecedence()
+		{
+			return Precedence::PREFIX;
+		}
+	};
+
 	class InfixParselet
 	{
 	public:

@@ -202,6 +202,47 @@ namespace Jet
 		}
 	};
 
+	class FreeExpression : public Expression
+	{
+
+	public:
+		Token token;
+		Token open_bracket, close_bracket;
+		Expression* pointer;
+
+		FreeExpression(Token tok, Expression* pointer)
+		{
+			this->token = tok;
+			this->pointer = pointer;
+		}
+
+		CValue Compile(CompilerContext* context);
+
+		void CompileDeclarations(CompilerContext* context) {};
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return 0;// context->root->ty->GetPointerType();
+		}
+
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+			
+			if (this->open_bracket.text.size())
+			{
+				open_bracket.Print(output, source);// output += '['; fix this
+				close_bracket.Print(output, source);// output += ']'; fix this
+			}
+			pointer->Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
+	};
+
 	/*class ArrayExpression: public Expression
 	{
 	std::vector<Expression*> initializers;
