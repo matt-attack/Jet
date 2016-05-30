@@ -1094,6 +1094,8 @@ void CompilerContext::Destruct(CValue pointer, llvm::Value* arr_size)
 			fun = ty->GetMethod("~"+ty->data->template_base->name, { pointer.type }, this);
 		else
 			fun = ty->GetMethod("~"+ty->data->name, { pointer.type }, this);
+		if (fun == 0)
+			return;
 		fun->Load(this->root);
 		if (arr_size == 0)//size == 0)
 		{//just one element, construct it

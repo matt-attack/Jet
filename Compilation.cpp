@@ -496,11 +496,11 @@ void Compilation::Assemble(int olevel)
 	if (olevel > 0)
 		this->Optimize(olevel);
 
-	//output the .o file for this package
-	this->OutputPackage(project->project_name, olevel);
-
 	//output the IR for debugging
 	this->OutputIR("build/output.ir");
+
+	//output the .o file for this package
+	this->OutputPackage(project->project_name, olevel);
 
 
 	//then, if and only if I am an executable, make the .exe
