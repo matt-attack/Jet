@@ -28,6 +28,8 @@ namespace Jet
 
 		std::vector<Scope*> next;
 		Scope* prev;
+
+		bool destructed = false;
 	};
 
 	struct TCScope
@@ -292,6 +294,7 @@ namespace Jet
 		void PopScope();
 
 		void Construct(CValue value, llvm::Value* size);
+		void Destruct(CValue pointer, llvm::Value* arr_size);
 
 		CValue DoCast(Type* t, CValue value, bool Explicit = false);
 		bool CheckCast(Type* src, Type* dest, bool Explicit = false, bool Throw = true);

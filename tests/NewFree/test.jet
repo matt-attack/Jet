@@ -7,28 +7,43 @@ extern fun int puts(char* str);
 
 struct t
 {
-	fun void t()
-	{
-		puts("created\n");
-	}
-	fun void ~t()
-	{
-		puts("killed\n");
-	}
+	//fun void t()
+	//{
+	//	puts("created\n");
+	//}
+	//fun void ~t()
+	//{
+	//	puts("killed\n");
+	//}
 }
 
-fun void test(t* x)
-{
+//fun void test(t* x)
+//{
 
-}
+//}
 fun int main() 
 {
-	local x = new t[5];
+	//local x = new t[5];
 	//test(x);
-	local t q;
-	local t p[5];
-	test(p);
-	test(&p[0]);
+	if (1)
+	{
+		local t q;
+		//local t p[5];
+		
+		//test(p);
+		//test(&p[0]);
+		return 0;
+		puts("hi");
+	}
+	if (1)
+	{
+		local t q;
+		//local t p[5];
+		
+		//test(p);
+		//test(&p[0]);
+		//return 0;
+	}
 	//free[] x;
 	
 	return 0;

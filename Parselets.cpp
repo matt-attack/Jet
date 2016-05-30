@@ -389,8 +389,7 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 	auto cb = parser->Consume(TokenType::RightParen);
 
 	BlockExpression* ifblock = parser->ParseBlock(true);
-
-	branches.push_back(new Branch(token, ob, cb, ifblock, ifcondition.Release()));
+	branches.push_back(new Branch(token, ob, cb, new ScopeExpression(ifblock), ifcondition.Release()));
 
 	Branch* Else = 0;
 	while (true)
@@ -408,7 +407,7 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 
 			BlockExpression* block = parser->ParseBlock(true);
 
-			branches.push_back(new Branch(t, ob, cb, block, condition.Release()));
+			branches.push_back(new Branch(t, ob, cb, new ScopeExpression(block), condition.Release()));
 		}
 		else if (t.type == TokenType::Else)
 		{
@@ -417,7 +416,7 @@ Expression* IfParselet::parse(Parser* parser, Token token)
 			//its an else
 			BlockExpression* block = parser->ParseBlock(true);
 
-			Else = new Branch(t, Token(), Token(), block, 0);
+			Else = new Branch(t, Token(), Token(), new ScopeExpression(block), 0);
 			break;
 		}
 		else

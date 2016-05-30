@@ -140,6 +140,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	return this->DoCompile(context);
 }
 
+#include <llvm\IR\BasicBlock.h>
 CValue FunctionExpression::DoCompile(CompilerContext* context)
 {
 	context->CurrentToken(&token);
@@ -353,6 +354,28 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		else
 			context->root->Error("Function must return a value!", token);
 
+	function->function->f->dump();
+	auto bbs = function->function->f->getBasicBlockList().begin();
+	for (auto ii = function->function->f->getBasicBlockList().begin(); ii != function->function->f->getBasicBlockList().end(); ii++)
+	{
+		auto terminator = ii->getTerminator();
+		ok, sometimes the blocks end up with too many terminators rather than none, idk how to handle this, search for a return in each maybe?
+		if (terminator)
+		{
+			printf("hi");
+			terminator->dump();
+			terminator->getParent()->dump();
+			printf("\n\n\n\n");
+		}
+		else
+		{
+			printf("found it");
+			ii->dump();
+		}
+	}
+
+	//fix having instructions after a return in a block
+	//so need to check every basic block for anything after a return
 	if (this->is_generator)
 	{
 		//compile the other function necessary for an iterator
