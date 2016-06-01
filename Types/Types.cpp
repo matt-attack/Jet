@@ -408,7 +408,7 @@ bool Type::MatchesTrait(Compilation* compiler, Trait* t)
 {
 	if (compiler->typecheck && this->type == Types::Trait && this->trait == t)
 		return true;
-	
+
 	if (this->type == Types::Trait)
 		return false;
 
@@ -599,7 +599,7 @@ void Type::FinishCompilingTemplate(Compilation* compiler)
 		throw 7;
 
 	this->Load(compiler);
-	
+
 	StructExpression* expr = dynamic_cast<StructExpression*>(this->data->expression);
 	auto oldname = expr->name;
 	expr->name.text = this->data->name;
@@ -844,7 +844,7 @@ void Struct::Load(Compilation* compiler)
 		//add dummy element
 		elementss.push_back(compiler->IntType->GetLLVMType());
 	}
-	
+
 	this->type = llvm::StructType::create(elementss, this->name);
 
 	this->loaded = true;
@@ -1052,4 +1052,33 @@ bool Struct::IsParent(Type* ty)
 	}
 
 	return false;
+}
+
+llvm::Constant* Type::GetDefaultValue(Compilation* compilation)
+{
+	llvm::Constant* initializer = 0;
+	if (this->type == Types::Int || this->type == Types::Short || this->type == Types::Char || this->type == Types::Long)
+		initializer = llvm::ConstantInt::get(compilation->context, llvm::APInt(32, 0, true));
+	else if (this->type == Types::Double)
+		initializer = llvm::ConstantFP::get(compilation->context, llvm::APFloat(0.0));
+	else if (this->type == Types::Float)
+		initializer = llvm::ConstantFP::get(compilation->context, llvm::APFloat(0.0f));
+	else if (this->type == Types::Pointer)
+		initializer = llvm::ConstantPointerNull::get(llvm::dyn_cast<llvm::PointerType>(this->GetLLVMType()));
+	else if (this->type == Types::Array)
+	{
+		std::vector<llvm::Constant*> arr;
+		arr.push_back(this->base->GetDefaultValue(compilation));
+		initializer = llvm::ConstantArray::get(llvm::dyn_cast<llvm::ArrayType>(this->GetLLVMType()),arr);
+	}
+	else if (this->type == Types::Struct)
+	{
+		std::vector<llvm::Constant*> arr;
+		for (auto ii : this->data->struct_members)
+			arr.push_back(ii.type->GetDefaultValue(compilation));
+		initializer = llvm::ConstantStruct::get(llvm::dyn_cast<llvm::StructType>(this->GetLLVMType()), arr);
+	}
+	else
+		throw 7;
+	return initializer;
 }

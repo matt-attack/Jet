@@ -1,0 +1,45 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+namespace Tests::Hello
+{
+	struct A
+	{
+		int a_val;
+	}
+
+	struct B: A
+	{
+		int b_val;
+	}
+}
+
+namespace Tests
+{
+	struct C: Hello::B
+	{
+		int c_val;
+		Apple apple;
+	}
+}
+
+struct Apple
+{
+	int seeds;
+	float size;
+}
+
+
+fun int main() 
+{
+	local Tests::C x;
+	local Tests::Hello::B y;
+	local Tests::Hello::A z;
+	x.a_val = 1;
+	x.b_val = 2;
+	x.c_val = 3;
+	return 0;
+}

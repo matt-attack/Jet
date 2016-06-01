@@ -206,7 +206,8 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	std::string path = project->path;
 	path += '/';
 
-	chdir(path.c_str());
+	if (path.length() > 1)
+		chdir(path.c_str());
 
 	std::vector<char*> lib_symbols;
 	int deps = project->dependencies.size();
@@ -472,7 +473,6 @@ char* ReadDependenciesFromSymbols(const char* path, int& size)
 
 void Compilation::Assemble(int olevel)
 {
-	//this->module->dump();
 	if (this->diagnostics->GetErrors().size() > 0)
 		return;
 
@@ -483,7 +483,8 @@ void Compilation::Assemble(int olevel)
 	std::string path = project->path;
 	path += '/';
 
-	chdir(path.c_str());
+	if (path.length() > 1)
+		chdir(path.c_str());
 
 	//make the output folder
 	mkdir("build/");
@@ -1155,10 +1156,10 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t)//, bool Ext
 	if (global != this->globals.end())
 		Error("Global variable '" + name + "' already exists", *this->current_function->current_token);
 
-	//auto cons = this->module->getOrInsertGlobal(name, GetType(value.type));
-	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, llvm::GlobalValue::LinkageTypes::ExternalLinkage, 0, name);
+	llvm::Constant* initializer = t->GetDefaultValue(this);
+	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, llvm::GlobalValue::LinkageTypes::CommonLinkage, initializer, name);
 
-	this->globals[name] = CValue(t, ng);
+	this->globals[name] = CValue(t->GetPointerType(), ng);
 	return CValue(t, ng);
 }
 

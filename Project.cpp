@@ -1,6 +1,8 @@
 #include "Project.h"
 #include "Source.h"
 
+#include <direct.h>
+
 using namespace Jet;
 
 std::string Jet::GetNameFromPath(const std::string& path)
@@ -157,7 +159,10 @@ void GetFilesInDirectory(std::vector<std::string> &out, const std::string &direc
 bool JetProject::_Load(const std::string& projectdir)
 {
 	//ok, lets parse the jp file
-	std::ifstream pf(std::string(projectdir) + "/project.jp", std::ios::in | std::ios::binary);
+	std::string name = projectdir;
+	if (projectdir.length() > 0 && projectdir.back() != '/')
+		name += '/';
+	std::ifstream pf(name + "project.jp", std::ios::in | std::ios::binary);
 	if (pf.is_open() == false)
 	{
 		printf("Error: Could not find project file %s/project.jp\n", projectdir.c_str());
@@ -166,9 +171,16 @@ bool JetProject::_Load(const std::string& projectdir)
 
 	this->path = projectdir;
 
-	is_executable = true;
+	char olddir[500];
+	getcwd(olddir, 500);
+
+	std::string realpath = olddir;
+	realpath += '\\';
+	realpath += projectdir;
+
+	this->is_executable = true;
 	int current_block = 0;
-	project_name = GetNameFromPath(projectdir);
+	this->project_name = GetNameFromPath(realpath);
 	auto doc = ParseConfig(pf);
 	auto root = doc->sections[""];
 	if (root->children.find("lib") != root->children.end())

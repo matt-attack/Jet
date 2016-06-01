@@ -5,46 +5,42 @@ extern fun void free(char* x);
 
 extern fun int puts(char* str);
 
+local int count;
 struct t
 {
-	//fun void t()
-	//{
-	//	puts("created\n");
-	//}
-	//fun void ~t()
-	//{
-	//	puts("killed\n");
-	//}
+	fun void t()
+	{
+		count++;
+		//puts("created\n");
+	}
+	fun void ~t()
+	{
+		count--;
+		//puts("killed\n");
+	}
 }
 
-//fun void test(t* x)
-//{
-
-//}
 fun int main() 
 {
-	//local x = new t[5];
+	local x = new t[5];
 	//test(x);
-	if (1)
+	if (0)
 	{
 		local t q;
-		//local t p[5];
 		
-		//test(p);
-		//test(&p[0]);
 		return 0;
 		puts("hi");
 	}
 	if (1)
 	{
 		local t q;
-		//local t p[5];
-		
-		//test(p);
-		//test(&p[0]);
-		//return 0;
+		local t p[5];
 	}
-	//free[] x;
+	
+	free[] x;
+	
+	if (count != 0)
+		puts("fail");
 	
 	return 0;
 }

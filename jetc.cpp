@@ -34,11 +34,19 @@ int main(int argc, char* argv[])
 		parser.AddOption("f", "0");
 		parser.Parse(argc, argv);
 
+		//add options to this later
+		CompilerOptions options;
+		options.optimization = parser.GetOption("o").GetInt();
+		options.force = parser.GetOption("f").GetString().length() == 0;
+		std::string config = "";
+		if (parser.commands.size())
+			config = parser.commands.front();
+
 		Jet::Compiler c;
-		if (strcmp(argv[1], "build") == 0)
-			c.Compile("");
+		if (strcmp(argv[1], "-build") == 0)
+			c.Compile("", &options, config, &parser);
 		else
-			c.Compile(argv[1]);
+			c.Compile(argv[1], &options, config, &parser);
 
 		return 0;
 	}
@@ -83,8 +91,8 @@ int main(int argc, char* argv[])
 			std::string config = "";
 			if (parser.commands.size())
 				config = parser.commands.front();
-
-			std::vector<char*> programs = { "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors" };
+			
+			std::vector<char*> programs = { "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors" };
 
 			for (auto ii : programs)
 			{

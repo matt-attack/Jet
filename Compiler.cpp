@@ -105,7 +105,8 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	std::string path = projectdir;
 	path += '/';
 
-	chdir(path.c_str());
+	if (path.length() > 1)
+		chdir(path.c_str());
 
 	//build each dependency
 	int deps = project->dependencies.size();

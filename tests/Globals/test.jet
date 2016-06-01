@@ -1,0 +1,32 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+extern fun void free(char* x);
+
+extern fun int puts(char* str);
+
+local int x;
+local double y;
+local float z;
+local float* q;
+local int p[200];
+struct xx
+{
+	int p;
+}
+local xx globalt;
+fun int main() 
+{
+	x = 5;
+	x++;
+	
+	local int qasd[200];
+	qasd[2] = 6;
+	
+	p[2] = 6;
+	
+	if (x != 6)
+		puts("fail");
+		
+	return 0;
+}

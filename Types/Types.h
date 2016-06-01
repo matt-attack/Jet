@@ -113,6 +113,7 @@ namespace Jet
 		llvm::DIType* GetDebugType(Compilation* compiler);
 		llvm::Type* GetLLVMType();
 
+		llvm::Constant* GetDefaultValue(Compilation* compilation);
 
 		Function* GetMethod(const std::string& name, const std::vector<Type*>& args, CompilerContext* context, bool def = false);
 

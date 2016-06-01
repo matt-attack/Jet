@@ -537,9 +537,6 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		for (auto ii : *this->args)
 			str->data->struct_members.push_back({ ii.name.text, ii.type.text, context->root->LookupType(ii.type.text) });
 
-		//str->data->struct_members.push_back
-		//add any arguments, todo
-
 		str->ns = context->root->ns;
 
 		//DO NOT LOAD THIS UNTIL COMPILATION, IN FACT DONT LOAD ANYTHING

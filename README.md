@@ -53,7 +53,7 @@ fun int main()
 
 ## Building
 In order to run your program, navigate your terminal to the directory in which your program resides.
-Then run the command "jet build".
+Then run the command "jet -build".
 
 Now, there will be an executable named "program.exe" in your project directory.
 This program, when executed, will output Hello World! to console.

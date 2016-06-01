@@ -287,8 +287,8 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		{
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
 			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
-
-			return CValue(lhs.type, loc);
+			auto typ = lhs.type->base->base->GetPointerType();
+			return CValue(typ, loc);
 		}
 		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
 		{
