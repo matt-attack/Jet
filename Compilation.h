@@ -131,7 +131,7 @@ namespace Jet
 		Type* TryLookupType(const std::string& name);
 
 		std::map<std::string, CValue> globals;
-		CValue AddGlobal(const std::string& name, Type* t);
+		CValue AddGlobal(const std::string& name, Type* t, llvm::Constant* init = 0);
 
 		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder);
 

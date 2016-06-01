@@ -265,7 +265,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	{
 		//do a rebuild compiler version is different
 	}
-	else if (jlib == 0 || output == 0)//check if .jlib or .o exists
+	else if ((project->IsExecutable() == false && jlib == 0) || output == 0)//check if .jlib or .o exists
 	{
 		//output file missing, do a rebuild
 	}

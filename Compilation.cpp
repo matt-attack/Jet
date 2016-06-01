@@ -1150,14 +1150,14 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 	return type;
 }
 
-CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t)//, bool Extern = false)
+CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Constant* init)//, bool Extern = false)
 {
 	auto global = this->globals.find(name);
 	if (global != this->globals.end())
 		Error("Global variable '" + name + "' already exists", *this->current_function->current_token);
 
-	llvm::Constant* initializer = t->GetDefaultValue(this);
-	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, llvm::GlobalValue::LinkageTypes::CommonLinkage, initializer, name);
+	llvm::Constant* initializer = init ? init : t->GetDefaultValue(this);
+	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, llvm::GlobalValue::LinkageTypes::ExternalLinkage, initializer, name);
 
 	this->globals[name] = CValue(t->GetPointerType(), ng);
 	return CValue(t, ng);

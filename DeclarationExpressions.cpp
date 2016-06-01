@@ -19,7 +19,7 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 	//need to change context
 	CompilerContext* nc = new CompilerContext(context->root, context);// context->AddFunction(this->GetRealName(), ret, argsv, Struct.text.length() > 0 ? true : false, is_lambda);// , this->varargs);
 	nc->function = new Function("um", is_lambda);
-	
+
 	if (this->name.text.length() == 0)
 	{
 		context->CurrentToken(&this->ret_type);
@@ -358,7 +358,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	for (auto ii = function->function->f->getBasicBlockList().begin(); ii != function->function->f->getBasicBlockList().end(); ii++)
 	{
 		bool returned = false;
-		for (auto inst = ii->begin(); inst != ii->end(); )
+		for (auto inst = ii->begin(); inst != ii->end();)
 		{
 			if (returned == true)
 			{
@@ -377,7 +377,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			}
 		}
 	}
-	
+
 	//fix having instructions after a return in a block
 	//so need to check every basic block for anything after a return
 	if (this->is_generator)
@@ -607,7 +607,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	context->root->AdvanceTypeLookup(&fun->return_type, this->ret_type.text, &this->ret_type);
 
 	fun->arguments.reserve(this->args->size() + (Struct.length() > 0 ? 1 : 0));
-	
+
 
 	fun->f = 0;
 	if (Struct.length() > 0)
@@ -653,11 +653,20 @@ CValue LocalExpression::Compile(CompilerContext* context)
 	{
 		//im in global scope
 		auto type = context->root->LookupType(this->_names->front().first.text);
-		auto global = context->root->AddGlobal(this->_names->front().second.text, type);
 
 		//should I add a constructor?
 		if (this->_right && this->_right->size() > 0)
-			context->root->Error("Initializing global variables not yet implemented", token);
+		{
+			auto val = this->_right->front().second->Compile(context);
+			auto cval = llvm::dyn_cast<llvm::Constant>(val.val);
+			if (cval == 0)
+				context->root->Error("Cannot instantiate global with non constant value", token);
+
+			auto global = context->root->AddGlobal(this->_names->front().second.text, type, cval);
+		}
+		else
+			auto global = context->root->AddGlobal(this->_names->front().second.text, type);
+
 
 		return CValue();
 	}
@@ -745,7 +754,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			ty->data->struct_members.push_back({ aname, "type", type });*/
 			//ok, almost this doesnt quite work right
 			auto var_ptr = context->function->generator.variable_geps[context->function->generator.var_num++];
-			
+
 			if (this->_right)
 			{
 				auto val = (*this->_right)[i - 1].second->Compile(context);
@@ -765,7 +774,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		{
 			if (type->type == Types::Struct)
 				context->Construct(CValue(type->GetPointerType(), Alloca), 0);
-				
+
 			if (type->type == Types::Array && type->base->type == Types::Struct)
 				context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
 		}
@@ -1175,9 +1184,9 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 				func->arguments.push_back({ 0, "this" });
 				for (int i = 0; i < ii.function->args->size(); i++)
 					func->arguments.push_back({ 0, ii.function->args->at(i).name.text });
-				
+
 				context->root->typecheck = false;
-				str->data->functions.insert({ ii.function->GetName(), func});
+				str->data->functions.insert({ ii.function->GetName(), func });
 			}
 		}
 	}

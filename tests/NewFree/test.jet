@@ -5,7 +5,7 @@ extern fun void free(char* x);
 
 extern fun int puts(char* str);
 
-local int count;
+local int count = 0; 
 struct t
 {
 	fun void t()
