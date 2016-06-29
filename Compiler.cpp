@@ -180,7 +180,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	}
 
 
-#ifdef _WIN32
+#if 0 //def _WIN32
 	std::vector<std::pair<int, int>> modifiedtimes;
 	auto file = CreateFileA("project.jp", GENERIC_READ, FILE_SHARE_READ, NULL,
 		OPEN_EXISTING, 0, NULL);
@@ -198,7 +198,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 
 	for (auto ii : project->files)
 	{
-#ifdef _WIN32
+#if 0 //_WIN32
 		auto file = CreateFileA(ii.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
 			OPEN_EXISTING, 0, NULL);
 		FILETIME create, modified, access;
