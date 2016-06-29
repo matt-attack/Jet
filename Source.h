@@ -4,6 +4,9 @@
 #include <string>
 #include <vector>
 
+#include <string.h>
+#include <stdio.h>
+
 namespace Jet
 {
 	class DiagnosticBuilder;

@@ -7,7 +7,12 @@
 #include "Lexer.h"
 #include "Types/Function.h"
 
+#ifdef _WIN32
 #include <direct.h>
+#else
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 #include <llvm-c/Core.h>
 #include <llvm/ADT/Triple.h>
@@ -41,8 +46,13 @@ Source* current_source = 0;
 #define USE_GCC
 #endif
 
+
 std::string Jet::exec(const char* cmd) {
+#ifdef _WIN32
 	FILE* pipe = _popen(cmd, "r");
+#else
+	FILE* pipe = popen(cmd, "r");
+#endif 
 	if (!pipe) return "ERROR";
 	char buffer[128];
 	std::string result = "";
@@ -50,7 +60,11 @@ std::string Jet::exec(const char* cmd) {
 		if (fgets(buffer, 128, pipe) != NULL)
 			result += buffer;
 	}
+#ifdef _WIN32
 	_pclose(pipe);
+#else
+	pclose(pipe);
+#endif 
 	return result;
 }
 
@@ -124,7 +138,16 @@ Compilation::~Compilation()
 	for (auto ii : this->traits)
 		delete ii.second;
 }
-
+#ifndef _WIN32
+int64_t gettime2()//returns time in microseconds
+{
+	static __time_t start;
+	timespec time;
+	//gettimeofday(&time, 0);
+	clock_gettime(CLOCK_MONOTONIC, &time);
+	return (int64_t)time.tv_sec*1000000 + time.tv_nsec/1000;
+}
+#endif
 class StackTime
 {
 public:
@@ -487,7 +510,11 @@ void Compilation::Assemble(int olevel)
 		chdir(path.c_str());
 
 	//make the output folder
+#ifndef _WIN32
+	mkdir("build/", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+#else
 	mkdir("build/");
+#endif
 
 	//set target
 	this->SetTarget();
@@ -616,7 +643,11 @@ void Compilation::Assemble(int olevel)
 
 		//delete temporary files
 		for (auto ii : temps)
+#ifndef _WIN32
+			remove(ii.c_str());
+#else
 			DeleteFile(ii.c_str());
+#endif
 	}
 
 	//restore working directory

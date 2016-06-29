@@ -97,32 +97,32 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 
 llvm::Type* Type::GetLLVMType()
 {
-	switch (this->type)
+	switch ((int)this->type)
 	{
-	case Types::Double:
+	case (int)Types::Double:
 		return llvm::Type::getDoubleTy(llvm::getGlobalContext());
-	case Types::Float:
+	case (int)Types::Float:
 		return llvm::Type::getFloatTy(llvm::getGlobalContext());
-	case Types::Int:
+	case (int)Types::Int:
 		return llvm::Type::getInt32Ty(llvm::getGlobalContext());
-	case Types::Long:
+	case (int)Types::Long:
 		return llvm::Type::getInt64Ty(llvm::getGlobalContext());
-	case Types::Void:
+	case (int)Types::Void:
 		return llvm::Type::getVoidTy(llvm::getGlobalContext());
-	case Types::Char:
+	case (int)Types::Char:
 		return llvm::Type::getInt8Ty(llvm::getGlobalContext());
-	case Types::Short:
+	case (int)Types::Short:
 		return llvm::Type::getInt16Ty(llvm::getGlobalContext());
-	case Types::Bool:
+	case (int)Types::Bool:
 		return llvm::Type::getInt1Ty(llvm::getGlobalContext());
-	case Types::Struct:
+	case (int)Types::Struct:
 		assert(this->loaded);
 		return this->data->type;
-	case Types::Array:
+	case (int)Types::Array:
 		return llvm::ArrayType::get(this->base->GetLLVMType(), this->size);
-	case Types::Pointer:
+	case (int)Types::Pointer:
 		return llvm::PointerType::get(this->base->GetLLVMType(), 0);//address space, wat?
-	case Types::Function:
+	case (int)Types::Function:
 	{
 		std::vector<llvm::Type*> args;
 		for (auto ii : this->function->args)
@@ -130,10 +130,10 @@ llvm::Type* Type::GetLLVMType()
 
 		return llvm::FunctionType::get(this->function->return_type->GetLLVMType(), args, false)->getPointerTo();
 	}
-	case Types::Union:
+	case (int)Types::Union:
 		assert(this->loaded);
 		return this->_union->type;
-	case Types::Trait:
+	case (int)Types::Trait:
 		return 0;
 	}
 }
@@ -647,37 +647,37 @@ bool Type::IsValid()
 
 std::string Type::ToString()
 {
-	switch (type)
+	switch ((int)type)
 	{
-	case Types::Struct:
+	case (int)Types::Struct:
 		return this->data->name;
-	case Types::Pointer:
+	case (int)Types::Pointer:
 		return this->base->ToString() + "*";
-	case Types::Array:
+	case (int)Types::Array:
 		return this->base->ToString() + "[" + std::to_string(this->size) + "]";
-	case Types::Bool:
+	case (int)Types::Bool:
 		return "bool";
-	case Types::Char:
+	case (int)Types::Char:
 		return "char";
-	case Types::Int:
+	case (int)Types::Int:
 		return "int";
-	case Types::Float:
+	case (int)Types::Float:
 		return "float";
-	case Types::Double:
+	case (int)Types::Double:
 		return "double";
-	case Types::Short:
+	case (int)Types::Short:
 		return "short";
-	case Types::Void:
+	case (int)Types::Void:
 		return "void";
-	case Types::Invalid:
+	case (int)Types::Invalid:
 		return "Undefined Type";
-	case Types::Trait:
+	case (int)Types::Trait:
 		return this->trait->name;
-	case Types::Long:
+	case (int)Types::Long:
 		return "long";
-	case Types::Union:
+	case (int)Types::Union:
 		return this->name;
-	case Types::Function:
+	case (int)Types::Function:
 		std::string out = this->function->return_type->ToString() + "(";
 		bool first = true;
 		int i = 0;

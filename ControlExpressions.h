@@ -9,7 +9,7 @@
 #include "CompilerContext.h"
 #include "ExpressionVisitor.h"
 #include "Source.h"
-#include "Types\Function.h"
+#include "Types/Function.h"
 #include "Expressions.h"
 
 namespace Jet

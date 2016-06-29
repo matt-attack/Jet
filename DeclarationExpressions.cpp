@@ -140,7 +140,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	return this->DoCompile(context);
 }
 
-#include <llvm\IR\BasicBlock.h>
+#include <llvm/IR/BasicBlock.h>
 CValue FunctionExpression::DoCompile(CompilerContext* context)
 {
 	context->CurrentToken(&token);
@@ -426,8 +426,9 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			context->root->builder.CreateStore(val, ptr);
 
 			context->root->builder.CreateRetVoid();
-
-			auto& x = str->data->functions.find("Reset");
+			
+			
+			auto x = str->data->functions.find("Reset");
 			x->second = reset->function;
 		}
 
@@ -444,12 +445,12 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 			context->root->builder.CreateRet(context->root->builder.CreateLoad(ptr));
 
-			auto& x = str->data->functions.find("Current");
+			auto x = str->data->functions.find("Current");
 			x->second = current->function;
 		}
 
 		//Set the generator function as MoveNext
-		auto& x = str->data->functions.find("MoveNext");
+		auto x = str->data->functions.find("MoveNext");
 		x->second = function->function;
 	}
 

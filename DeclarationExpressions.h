@@ -9,7 +9,7 @@
 #include "CompilerContext.h"
 #include "ExpressionVisitor.h"
 #include "Source.h"
-#include "Types\Function.h"
+#include "Types/Function.h"
 #include "Expressions.h"
 
 namespace Jet
@@ -374,7 +374,7 @@ public:
 		block->Visit(visitor);
 	}
 
-	CValue FunctionExpression::DoCompile(CompilerContext* context);//call this to do real compilation
+	CValue DoCompile(CompilerContext* context);//call this to do real compilation
 };
 
 struct ExternArg

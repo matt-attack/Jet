@@ -8,10 +8,14 @@
 #include "UniquePtr.h"
 #include "Project.h"
 
+#ifdef _WIN32
 #include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 #include <fstream>
-#include <filesystem>
+//#include <filesystem>
 
 
 using namespace Jet;
@@ -129,7 +133,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	printf("\nCompiling Project: %s\n", projectdir);
 
 	//read in buildtimes
-#ifdef false//_WIN32
+#if 0 //def false//_WIN32
 	std::vector<std::pair<int, int>> buildtimes;
 #else
 	std::vector<int> buildtimes;
@@ -145,7 +149,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 			std::getline(rebuild, line, '\n');
 			if (line.length() == 0)
 				break;
-#ifdef false//_WIN32
+#if 0 //def false//_WIN32
 			int hi, lo;
 			sscanf(line.c_str(), "%i,%i", &hi, &lo);
 
@@ -176,7 +180,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	}
 
 
-#ifdef false _WIN32
+#ifdef _WIN32
 	std::vector<std::pair<int, int>> modifiedtimes;
 	auto file = CreateFileA("project.jp", GENERIC_READ, FILE_SHARE_READ, NULL,
 		OPEN_EXISTING, 0, NULL);
@@ -194,7 +198,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 
 	for (auto ii : project->files)
 	{
-#ifdef false//_WIN32
+#ifdef _WIN32
 		auto file = CreateFileA(ii.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
 			OPEN_EXISTING, 0, NULL);
 		FILETIME create, modified, access;
@@ -273,11 +277,11 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	{
 		for (int i = 0; i < modifiedtimes.size(); i++)
 		{
-#ifdef false//_WIN32
-			if (modifiedtimes[i].first == buildtimes[i].first && modifiedtimes[i].second == buildtimes[i].second)
-#else
+//#if 0 //_WIN32
+			//if (modifiedtimes[i].first == buildtimes[i].first && modifiedtimes[i].second == buildtimes[i].second)
+//#else
 			if (modifiedtimes[i] == buildtimes[i])// && modifiedtimes[i].second == buildtimes[i].second)
-#endif
+//#endif
 			{
 				if (i == modifiedtimes.size() - 1)
 				{
@@ -329,7 +333,7 @@ error:
 		for (auto ii : modifiedtimes)
 		{
 			char str[150];
-#ifdef false //_WIN32
+#if 0 //_WIN32
 			int len = sprintf(str, "%i,%i\n", ii.first, ii.second);
 #else
 			int len = sprintf(str, "%i\n", ii);

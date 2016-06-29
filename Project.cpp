@@ -1,7 +1,14 @@
 #include "Project.h"
 #include "Source.h"
 
+#ifdef _WIN32
 #include <direct.h>
+#else
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#endif
 
 using namespace Jet;
 
@@ -134,7 +141,7 @@ void GetFilesInDirectory(std::vector<std::string> &out, const std::string &direc
 	class dirent *ent;
 	class stat st;
 
-	dir = opendir(directory);
+	dir = opendir(directory.c_str());
 	while ((ent = readdir(dir)) != NULL) {
 		const std::string file_name = ent->d_name;
 		const std::string full_file_name = directory + "/" + file_name;
