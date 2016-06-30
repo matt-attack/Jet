@@ -7,17 +7,17 @@ namespace Jet
 {
 	enum class TokenType
 	{
-		Name,
-		Number,
-		String,
-		BlockString,
-		Assign,
+		Name = 0,
+		Number = 1,
+		String = 2,
+		BlockString = 3,
+		Assign = 4,
 
-		Dot,
+		Dot = 5,
 
-		Minus,
-		Plus,
-		Asterisk,
+		Minus = 6,
+		Plus = 7,
+		Asterisk = 8,
 		Slash,
 		Modulo,
 		Or,

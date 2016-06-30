@@ -539,8 +539,11 @@ void Compilation::Assemble(int olevel)
 		std::string cmd = "gcc -L. -g ";//-e_jet_initializer
 
 		cmd += "build/" + project->project_name + ".o ";
+#ifdef _WIN32
 		cmd += "-o build/" + project->project_name + ".exe ";
-
+#else
+		cmd += "-o build/" + project->project_name;
+#endif
 		//need to link each dependency
 		for (auto ii : project->dependencies)
 		{

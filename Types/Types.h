@@ -36,11 +36,11 @@ namespace Jet
 
 	enum class Types
 	{
-		Void,
-		Double,
-		Float,
-		Long,
-		Int,
+		Void = 0,
+		Double = 1,
+		Float = 2,
+		Long = 3,
+		Int = 4,
 		Char,
 		Short,
 		Bool,
@@ -51,10 +51,10 @@ namespace Jet
 
 		Trait,//cant instantiate this!!
 
-		Pointer,
-		Array,//acts just like a pointer
+		Pointer = 12,
+		Array = 13,//acts just like a pointer
 
-		Invalid,//for unloaded types
+		Invalid = 14,//for unloaded types
 	};
 
 
@@ -79,7 +79,7 @@ namespace Jet
 		Type* pointer_type;
 	public:
 
-		Types type : 8;
+		Types type;
 		bool loaded : 8;
 		union
 		{
@@ -145,7 +145,7 @@ namespace Jet
 	};
 	struct Symbol
 	{
-		SymbolType type : 8;
+		SymbolType type;
 		union
 		{
 			Namespace* ns;

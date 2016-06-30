@@ -1023,8 +1023,8 @@ namespace Jet
 			if (!no_brackets)
 				this->end.Print(output, source);
 
-			if (this->eof.trivia_length)
-				this->eof.Print(output, source);
+			//if (this->eof.trivia_length)
+			//	this->eof.Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)

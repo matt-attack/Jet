@@ -136,7 +136,11 @@ int main(int argc, char* argv[])
 					compilation->Assemble(0);
 
 					//
-					std::string cmd = "tests\\" + std::string(ii) + "\\build\\" + std::string(ii) + ".exe";
+#ifdef _WIN32
+					std::string cmd = "tests/" + std::string(ii) + "/build/" + std::string(ii) + ".exe";
+#else
+					std::string cmd = "./tests/" + std::string(ii) + "/build/" + std::string(ii);// + ".exe";
+#endif
 					auto res = exec(cmd.c_str());
 					printf("%s\n", res.c_str());
 
