@@ -135,16 +135,35 @@ namespace Jet
 			if (value == 0)
 			{
 				//ok, now search globals
-				auto global = this->root->globals.find(name);
-				if (global != this->root->globals.end())
-					return global->second.type;// ->second;
+				auto sym = this->root->GetVariableOrFunction(name);
+				if (sym.type != SymbolType::Invalid)
+				{
+					if (sym.type == SymbolType::Function)// function != 0)
+					{
+						auto function = sym.fn;
+						function->Load(this->root);
+						return function->GetType(this->root);
+					}
+					else if (sym.type == SymbolType::Variable)
+					{
+						//variable
+						return sym.val->type;
+						throw 7;
+					}
+				}
+				//gotta figure out how to put constants here....
+				//throw 7;
+				//todo do this
+				//auto global = this->root->globals.find(name);
+				//if (global != this->root->globals.end())
+				//	return global->second.type;// ->second;
 
-				auto function = this->root->GetFunction(name);
+				/*auto function = this->root->GetFunction(name);
 				if (function != 0)
 				{
 					function->Load(this->root);
 					return function->GetType(this->root);
-				}
+				}*/
 
 				if (this->function->is_lambda)
 				{
@@ -299,7 +318,7 @@ namespace Jet
 		CValue DoCast(Type* t, CValue value, bool Explicit = false);
 		bool CheckCast(Type* src, Type* dest, bool Explicit = false, bool Throw = true);
 
-		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member, bool lambda);
+		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, Type* member, bool lambda);
 
 		Function* GetMethod(const std::string& name, const std::vector<Type*>& args, Type* Struct = 0);
 		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0);

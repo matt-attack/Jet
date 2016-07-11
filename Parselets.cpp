@@ -1147,7 +1147,7 @@ Expression* FreeParselet::parse(Parser* parser, Token token)
 		auto cb = parser->Consume(TokenType::RightBracket);
 
 		UniquePtr<Expression*> pointer = parser->ParseExpression(Precedence::ASSIGNMENT);
-		
+
 		auto x = new FreeExpression(token, pointer.Release());
 		x->open_bracket = ob;
 		x->close_bracket = cb;
@@ -1155,4 +1155,42 @@ Expression* FreeParselet::parse(Parser* parser, Token token)
 	}
 
 	return new FreeExpression(token, parser->ParseExpression(Precedence::ASSIGNMENT));
+}
+
+struct EnumValue
+{
+	Token name, equals, value;
+	Token comma;
+};
+
+Expression* EnumParselet::parse(Parser* parser, Token token)
+{
+	auto name = parser->Consume(TokenType::Name);
+
+	auto start = parser->Consume(TokenType::LeftBrace);
+
+	std::vector<EnumValue> values;
+	do
+	{
+		auto ename = parser->Consume(TokenType::Name);
+
+		Token equals, value;
+		if (parser->Match(TokenType::Assign))
+		{
+			equals = parser->Consume();
+			value = parser->Consume(TokenType::Number);
+		}
+
+		if (parser->LookAhead(0).type != TokenType::Comma)
+		{
+			values.push_back({ ename, equals, value, Token() });
+			break;
+		}
+		else
+			values.push_back({ ename, equals, value, parser->Consume() });
+	} while (true);
+
+	auto end = parser->Consume(TokenType::RightBrace);
+
+	return new EnumExpression(std::move(values));// 0;
 }

@@ -857,8 +857,11 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 	}
 
 	int i = 0;
-	while (IsLetter(name[i++])) {};
-	std::string base = name.substr(0, i - 1);
+	while (IsLetter(name[i]) || IsNumber(name[i]))
+	{
+		i++;
+	};
+	std::string base = name.substr(0, i);
 
 	//look through namespaces to find the base type
 	auto curns = this->ns;
@@ -1003,23 +1006,26 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 {
 	int i = 0;
-	while (IsLetter(name[i++])) {};
+	while (IsLetter(name[i]) || IsNumber(name[i]) )
+	{
+		i++;
+	};
 
-	if (name.length() > i + 1 && name[i - 1] == ':' && name[i] == ':')
+	if (name.length() > i && name[i] == ':' && name[i+1] == ':')
 	{
 		//navigate to correct namespace
-		std::string ns = name.substr(0, i - 1);
+		std::string ns = name.substr(0, i);
 		auto res = this->ns->members.find(ns);
 		if (res == this->ns->members.end())
 			this->Error("Namespace " + ns + " not found", *this->current_function->current_token);
 		auto old = this->ns;
 		this->ns = res->second.ns;
-		auto out = this->LookupType(name.substr(i - 1 + 2), load);
+		auto out = this->LookupType(name.substr(i + 2), load);
 		this->ns = old;
 
 		return out;
 	}
-	std::string base = name.substr(0, i - 1);
+	std::string base = name.substr(0, i);
 
 	//look through namespaces to find the base type
 	auto curns = this->ns;
@@ -1183,14 +1189,15 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 
 CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Constant* init)//, bool Extern = false)
 {
-	auto global = this->globals.find(name);
-	if (global != this->globals.end())
-		Error("Global variable '" + name + "' already exists", *this->current_function->current_token);
+	auto global = this->ns->members.find(name);// this->globals.find(name);
+	if (global != this->ns->members.end())
+		Error("Global variable '" + name + "' already exists in " + this->ns->name, *this->current_function->current_token);
 
 	llvm::Constant* initializer = init ? init : t->GetDefaultValue(this);
 	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, llvm::GlobalValue::LinkageTypes::ExternalLinkage, initializer, name);
 
-	this->globals[name] = CValue(t->GetPointerType(), ng);
+	this->ns->members.insert({ name, Symbol(new CValue(t->GetPointerType(), ng)) });
+	//this->globals[name] = 
 	return CValue(t, ng);
 }
 
@@ -1282,6 +1289,24 @@ Jet::Function* Compilation::GetFunction(const std::string& name)
 		next = next->parent;
 	}
 	return 0;
+}
+
+Jet::Symbol Compilation::GetVariableOrFunction(const std::string& name)
+{
+	auto r = this->ns->members.find(name);
+	if (r != this->ns->members.end() && (r->second.type == SymbolType::Function || r->second.type == SymbolType::Variable))
+		return r->second;
+	//try lower one
+	auto next = this->ns->parent;
+	while (next)
+	{
+		r = next->members.find(name);
+		if (r != next->members.end() && (r->second.type == SymbolType::Function || r->second.type == SymbolType::Variable))
+			return r->second;
+
+		next = next->parent;
+	}
+	return Symbol();
 }
 
 Jet::Function* Compilation::GetFunctionAtPoint(const char* file, int line)

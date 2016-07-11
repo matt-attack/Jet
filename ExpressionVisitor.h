@@ -39,6 +39,7 @@ namespace Jet
 	class AttributeExpression;
 	class UnionExpression;
 	class FreeExpression;
+	class EnumExpression;
 	class ExpressionVisitor
 	{
 	public:
@@ -99,6 +100,7 @@ namespace Jet
 		virtual void Visit(AttributeExpression* exp) {};
 
 		virtual void Visit(UnionExpression* exp) {};
+		virtual void Visit(EnumExpression* exp) {};
 
 		virtual void Visit(GroupExpression* exp) {};
 	};

@@ -8,23 +8,24 @@
 
 using namespace Jet;
 
-CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, bool member, bool lambda)
+CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, Type* member, bool lambda)
 {
 	auto iter = root->ns->GetFunction(fname);
 	Function* func = 0;
 	if (member)
 	{
-		std::string str;
-		int i = 2;
-		for (; i < fname.length(); i++)
-		{
-			if (fname[i] == '_')
-				break;
+		//std::string str;
+		//int i = 2;
+		//for (; i < fname.length(); i++)
+		//{
+		//	if (fname[i] == '_')
+		//		break;
 
-			str += fname[i];
-		}
-		auto type = this->root->LookupType(str);
-
+		//	str += fname[i];
+		//}
+		//ok, if member just pass the type so we dont have to do this crap
+		auto type = member;// this->root->LookupType(str);
+		int i = member->name.length() + 2;
 		std::string fname2 = fname.substr(++i, fname.length() - i);
 
 		auto range = type->data->functions.equal_range(fname2);
@@ -611,16 +612,34 @@ CValue CompilerContext::GetVariable(const std::string& name)
 	if (value.type->type == Types::Void)
 	{
 		//ok, now search globals
-		auto global = this->root->globals.find(name);
-		if (global != this->root->globals.end())
-			return global->second;
+		//auto global = this->root->globals.find(name);
+		//if (global != this->root->globals.end())
+		//	return global->second;
 
-		auto function = this->root->GetFunction(name);
+		auto sym = this->root->GetVariableOrFunction(name);
+		if (sym.type != SymbolType::Invalid)
+		{
+			if (sym.type == SymbolType::Function)// function != 0)
+			{
+				auto function = sym.fn;
+				function->Load(this->root);
+				return CValue(function->GetType(this->root), function->f);
+			}
+			else if (sym.type == SymbolType::Variable)
+			{
+				//variable
+				return *sym.val;
+				//throw 7;
+			}
+		}
+		//throw 7;
+
+		/*auto function = this->root->GetFunction(name);
 		if (function != 0)
 		{
 			function->Load(this->root);
 			return CValue(function->GetType(this->root), function->f);
-		}
+		}*/
 
 		if (this->function->is_lambda)
 		{
@@ -1028,6 +1047,11 @@ CValue CompilerContext::Load(const std::string& name)
 		auto type = value.type->base->GetPointerType();
 		auto loc = this->root->builder.CreatePointerCast(value.val, type->GetLLVMType());
 		return CValue(type, loc);
+	}
+	else if (value.type->type == Types::Int)
+	{
+		//its a constant
+		return value;
 	}
 	return CValue(value.type->base, root->builder.CreateLoad(value.val, name.c_str()));
 }

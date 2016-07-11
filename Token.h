@@ -88,6 +88,7 @@ namespace Jet
 		Trait,
 		Namespace,
 		Union,
+		Enum,
 
 		Generator,
 
@@ -118,7 +119,9 @@ namespace Jet
 
 		Typedef, 
 
-		EoF
+		EoF,
+
+		InvalidToken
 	};
 
 	struct Range
@@ -144,6 +147,8 @@ namespace Jet
 		Token()
 		{
 			line = 1;
+			type = TokenType::InvalidToken;
+			trivia_length = 0;
 		}
 
 		Token(const char* source, unsigned int trivia_length, unsigned int line, unsigned int column, TokenType type, std::string txt)

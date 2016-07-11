@@ -122,6 +122,7 @@ public:
 		keywords["extern"] = TokenType::Extern;
 		keywords["struct"] = TokenType::Struct;
 		keywords["namespace"] = TokenType::Namespace;
+		keywords["enum"] = TokenType::Enum;
 
 		//internal "functions"
 		keywords["sizeof"] = TokenType::SizeOf;
@@ -161,7 +162,7 @@ public:
 
 bool Jet::IsLetter(char c)
 {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
 bool Jet::IsNumber(char c)

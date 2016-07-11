@@ -135,13 +135,16 @@ namespace Jet
 		bool IsValid();
 	};
 
+
 	struct Namespace;
 	struct Function;
 	enum class SymbolType
 	{
+		Invalid,
 		Namespace,
 		Type,
-		Function
+		Function,
+		Variable,
 	};
 	struct Symbol
 	{
@@ -151,12 +154,14 @@ namespace Jet
 			Namespace* ns;
 			Type* ty;
 			Function* fn;
+			CValue* val;
 		};
 
-		Symbol() {}
+		Symbol() { this->type = SymbolType::Invalid; }
 		Symbol(Function* fn) : fn(fn) { this->type = SymbolType::Function; }
 		Symbol(Type* ty) : ty(ty) { this->type = SymbolType::Type; }
 		Symbol(Namespace* ns) : ns(ns) { this->type = SymbolType::Namespace; }
+		Symbol(CValue* val) : val(val) { this->type = SymbolType::Variable; }
 	};
 
 	struct Namespace

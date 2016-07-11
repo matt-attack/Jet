@@ -89,7 +89,11 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			context->CurrentToken(&this->token);
-			return context->TCGetVariable(token.text)->base;
+			//this implementation is wrong
+			auto var = context->TCGetVariable(token.text);
+			if (var->type != Types::Pointer)
+				return var;//probably not the right way to handle this, but oh well
+			return var->base;
 			//lookup type
 		}
 

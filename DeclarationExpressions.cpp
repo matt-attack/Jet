@@ -266,11 +266,11 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	CompilerContext* function;
 	if (this->is_generator)
 	{
-		function = context->AddFunction(this->GetRealName() + "_generator", ret, { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+		function = context->AddFunction(this->GetRealName() + "_generator", ret, { argsv.front() }, Struct.length() > 0 ? argsv[0].first->base : 0, is_lambda);// , this->varargs);
 		function->function->is_generator = true;
 	}
 	else
-		function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+		function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? argsv[0].first->base : 0, is_lambda);// , this->varargs);
 
 	function->function->lambda.storage_type = storage_t;
 	context->root->current_function = function;
@@ -383,7 +383,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	if (this->is_generator)
 	{
 		//compile the other function necessary for an iterator
-		auto func = context->AddFunction(this->GetRealName(), 0, { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);
+		auto func = context->AddFunction(this->GetRealName(), 0, { argsv.front() }, Struct.length() > 0 ? argsv[0].first : 0, is_lambda);
 
 		auto str = func->function->return_type;
 
@@ -414,7 +414,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		//now compile reset function
 		{
-			auto reset = context->AddFunction(this->GetRealName() + "yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+			auto reset = context->AddFunction(this->GetRealName() + "yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? argsv[0].first : 0, is_lambda);// , this->varargs);
 
 			context->root->current_function = reset;
 			reset->function->Load(context->root);
@@ -434,7 +434,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		//compile current function
 		{
-			auto current = context->AddFunction(this->GetRealName() + "generator_current", context->root->LookupType(this->ret_type.text), { argsv.front() }, Struct.length() > 0 ? true : false, is_lambda);// , this->varargs);
+			auto current = context->AddFunction(this->GetRealName() + "generator_current", context->root->LookupType(this->ret_type.text), { argsv.front() }, Struct.length() > 0 ? argsv[0].first : 0, is_lambda);// , this->varargs);
 
 			//add a return and shizzle
 			context->root->current_function = current;
@@ -897,7 +897,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				//context->CurrentToken(&this->ret_type);
 				auto ret = context->root->LookupType("void");
 
-				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? true : false, false);// , this->varargs);
+				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? str : 0, false);// , this->varargs);
 				ii.second->f = function->function->f;
 
 				context->root->current_function = function;
@@ -976,7 +976,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 
 				auto ret = context->root->LookupType("void");
 
-				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? true : false, false);// , this->varargs);
+				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? str : 0, false);// , this->varargs);
 				ii.second->f = function->function->f;
 
 				context->root->current_function = function;
