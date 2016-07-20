@@ -105,7 +105,7 @@ public:
 
 	void Parse(int argc, char ** args)
 	{
-		for (int i = 2; i < argc; i++)
+		for (int i = 1; i < argc; i++)
 		{
 			if (args[i][0] == '-')
 			{

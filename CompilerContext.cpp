@@ -102,7 +102,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 
 		return CValue(value.type, res);
 	}
-	else if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
+	else if (value.type->IsInteger())//value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
 	{
 		//integer probably
 		switch (operation)
@@ -218,7 +218,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 
 		return CValue(left.type, res);
 	}
-	else if (left.type->type == Types::Int || left.type->type == Types::Short || left.type->type == Types::Char)
+	else if (left.type->IsInteger())//left.type->type == Types::Int || left.type->type == Types::Short || left.type->type == Types::Char)
 	{
 		//integer probably
 		switch (op)
@@ -237,13 +237,13 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			break;
 		case TokenType::DivideAssign:
 		case TokenType::Slash:
-			if (true)//signed
+			if (left.type->IsSignedInteger())//signed
 				res = root->builder.CreateSDiv(left.val, right.val);
 			else//unsigned
 				res = root->builder.CreateUDiv(left.val, right.val);
 			break;
 		case TokenType::Modulo:
-			if (true)//signed
+			if (left.type->IsSignedInteger())//signed
 				res = root->builder.CreateSRem(left.val, right.val);
 			else//unsigned
 				res = root->builder.CreateURem(left.val, right.val);
@@ -251,19 +251,31 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			//todo add unsigned
 		case TokenType::LessThan:
 			//use U or S?
-			res = root->builder.CreateICmpSLT(left.val, right.val);
+			if (left.type->IsSignedInteger())
+				res = root->builder.CreateICmpSLT(left.val, right.val);
+			else
+				res = root->builder.CreateICmpULT(left.val, right.val);
 			return CValue(root->BoolType, res);
 			break;
 		case TokenType::LessThanEqual:
-			res = root->builder.CreateICmpSLE(left.val, right.val);
+			if (left.type->IsSignedInteger())
+				res = root->builder.CreateICmpSLE(left.val, right.val);
+			else
+				res = root->builder.CreateICmpULE(left.val, right.val);
 			return CValue(root->BoolType, res);
 			break;
 		case TokenType::GreaterThan:
-			res = root->builder.CreateICmpSGT(left.val, right.val);
+			if (left.type->IsSignedInteger())
+				res = root->builder.CreateICmpSGT(left.val, right.val);
+			else
+				res = root->builder.CreateICmpUGT(left.val, right.val);
 			return CValue(root->BoolType, res);
 			break;
 		case TokenType::GreaterThanEqual:
-			res = root->builder.CreateICmpSGE(left.val, right.val);
+			if (left.type->IsSignedInteger())
+				res = root->builder.CreateICmpSGE(left.val, right.val);
+			else
+				res = root->builder.CreateICmpUGE(left.val, right.val);
 			return CValue(root->BoolType, res);
 			break;
 		case TokenType::Equals:
@@ -637,8 +649,8 @@ CValue CompilerContext::GetVariable(const std::string& name)
 		/*auto function = this->root->GetFunction(name);
 		if (function != 0)
 		{
-			function->Load(this->root);
-			return CValue(function->GetType(this->root), function->f);
+		function->Load(this->root);
+		return CValue(function->GetType(this->root), function->f);
 		}*/
 
 		if (this->function->is_lambda)
@@ -695,7 +707,7 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 				if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
 					this->Destruct(ii.second, 0);
 				else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
-					this->Destruct(CValue(ii.second.type->base,ii.second.val), this->root->builder.getInt32(ii.second.type->base->size));
+					this->Destruct(CValue(ii.second.type->base, ii.second.val), this->root->builder.getInt32(ii.second.type->base->size));
 			}
 		cur->destructed = true;
 		cur = cur->prev;
@@ -725,18 +737,26 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	if (value.type->type == Types::Double || value.type->type == Types::Float)
 	{
 		//float to int
-		if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
+		//if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char || t->type == Types::Long)
+		//	return CValue(t, root->builder.CreateFPToSI(value.val, tt));
+		if (t->IsSignedInteger())
 			return CValue(t, root->builder.CreateFPToSI(value.val, tt));
+		else if (t->IsInteger());
+			return CValue(t, root->builder.CreateFPToUI(value.val, tt));
 
+		//todo: maybe do a warning if implicit from float->int or larger as it cant directly fit 1 to 1
 		//remove me later float to bool
 		//if (t->type == Types::Bool)
 		//return CValue(t, root->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
 	}
-	if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
+	if (value.type->IsInteger())//value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
 	{
 		//int to float
 		if (t->type == Types::Double || t->type == Types::Float)
-			return CValue(t, root->builder.CreateSIToFP(value.val, tt));
+			if (value.type->IsSignedInteger())
+				return CValue(t, root->builder.CreateSIToFP(value.val, tt));
+			else
+				return CValue(t, root->builder.CreateUIToFP(value.val, tt));
 		if (t->type == Types::Bool)
 			return CValue(t, root->builder.CreateIsNotNull(value.val));
 		if (t->type == Types::Pointer)
@@ -757,8 +777,10 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		{
 		return CValue(t, root->builder.CreateSExt(value.val, tt));
 		}*/
-		if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
+		if (t->IsSignedInteger())//t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
 			return CValue(t, root->builder.CreateSExtOrTrunc(value.val, tt));
+		else if (t->IsInteger())
+			return CValue(t, root->builder.CreateZExtOrTrunc(value.val, tt));
 	}
 	if (value.type->type == Types::Pointer)
 	{
@@ -783,6 +805,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 				//pointer to pointer cast;
 				return CValue(t, root->builder.CreatePointerCast(value.val, t->GetLLVMType(), "ptr2ptr"));
 			}
+			//todo: pointer to int
 		}
 	}
 	if (value.type->type == Types::Array)
@@ -861,14 +884,14 @@ bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
 	else if (value.type->type == Types::Double || value.type->type == Types::Float)
 	{
 		//float to int
-		if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
+		if (t->IsInteger())//t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
 			return true;// CValue(t, root->builder.CreateFPToSI(value.val, tt));
 
 		//remove me later float to bool
 		//if (t->type == Types::Bool)
 		//return CValue(t, root->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
 	}
-	if (value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
+	if (value.type->IsInteger())//value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
 	{
 		//int to float
 		if (t->type == Types::Double || t->type == Types::Float)
@@ -893,7 +916,7 @@ bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
 		{
 		return CValue(t, root->builder.CreateSExt(value.val, tt));
 		}*/
-		if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
+		if (t->IsInteger())//t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
 			return true;
 	}
 	if (value.type->type == Types::Pointer)
@@ -975,29 +998,29 @@ void CompilerContext::PopScope()
 	if (this->scope->prev != 0)// && this->scope->prev->prev != 0)
 	{
 		if (this->scope->destructed == false)
-		for (auto ii : this->scope->named_values)
-		{
-			/*if (ii.second.type->type == Types::Struct)
+			for (auto ii : this->scope->named_values)
 			{
+				/*if (ii.second.type->type == Types::Struct)
+				{
 				//look for destructor
 				auto name = "~" + (ii.second.type->data->template_base ? ii.second.type->data->template_base->name : ii.second.type->data->name);
 				auto destructor = ii.second.type->data->functions.find(name);
 				if (destructor != ii.second.type->data->functions.end())
 				{
-					//call it
-					this->Call(name, { CValue(this->root->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
+				//call it
+				this->Call(name, { CValue(this->root->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
 				}
-			}
-			else if (ii.second.type->type == Types::Array && ii.second.type->base->type == Types::Struct)
-			{
+				}
+				else if (ii.second.type->type == Types::Array && ii.second.type->base->type == Types::Struct)
+				{
 				printf("ok");
-			}*/
+				}*/
 
-			if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
-				this->Destruct(ii.second, 0);
-			else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
-				this->Destruct(CValue(ii.second.type->base, ii.second.val), this->root->builder.getInt32(ii.second.type->base->size));
-		}
+				if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
+					this->Destruct(ii.second, 0);
+				else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
+					this->Destruct(CValue(ii.second.type->base, ii.second.val), this->root->builder.getInt32(ii.second.type->base->size));
+			}
 		this->scope->destructed = true;
 	}
 
@@ -1115,9 +1138,9 @@ void CompilerContext::Destruct(CValue pointer, llvm::Value* arr_size)
 		Type* ty = pointer.type->base;
 		Function* fun = 0;
 		if (ty->data->template_base)
-			fun = ty->GetMethod("~"+ty->data->template_base->name, { pointer.type }, this);
+			fun = ty->GetMethod("~" + ty->data->template_base->name, { pointer.type }, this);
 		else
-			fun = ty->GetMethod("~"+ty->data->name, { pointer.type }, this);
+			fun = ty->GetMethod("~" + ty->data->name, { pointer.type }, this);
 		if (fun == 0)
 			return;
 		fun->Load(this->root);

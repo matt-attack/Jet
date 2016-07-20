@@ -134,7 +134,7 @@ std::string convert_type(CXType type)
 	}
 
 	auto tstr = clang_getCString(tname);
-	
+
 	if (strncmp(tstr, "struct ", 7) == 0)
 	{
 		//its a struct
@@ -216,7 +216,7 @@ std::string generate_jet_from_header(const char* header)
 	{
 		cl_data* data = (cl_data*)client_data;
 		std::string* out = data->out;
-		if (data->struct_stack.size() > 0 && clang_equalCursors(parent,data->struct_stack.top()) == 0)
+		if (data->struct_stack.size() > 0 && clang_equalCursors(parent, data->struct_stack.top()) == 0)
 		{
 			data->struct_stack.pop();
 
@@ -241,27 +241,27 @@ std::string generate_jet_from_header(const char* header)
 			//ok get rid of this and move it down
 			/*clang_visitChildren(c, [](CXCursor c, CXCursor parent, CXClientData client_data)
 			{
-				std::string* out = (std::string*)client_data;
+			std::string* out = (std::string*)client_data;
 
-				if (c.kind == CXCursor_FieldDecl)
-				{
-					CXString name = clang_getCursorSpelling(c);
-					auto str = clang_getCString(name);
-					//printf("    Field: %s ", str);
+			if (c.kind == CXCursor_FieldDecl)
+			{
+			CXString name = clang_getCursorSpelling(c);
+			auto str = clang_getCString(name);
+			//printf("    Field: %s ", str);
 
-					auto type = clang_getCursorType(c);
+			auto type = clang_getCursorType(c);
 
-					*out += convert_type(type);
-					*out += ' ';
-					*out += str;
-					*out += ";\n";
-					clang_disposeString(name);
+			*out += convert_type(type);
+			*out += ' ';
+			*out += str;
+			*out += ";\n";
+			clang_disposeString(name);
 
-					return CXChildVisit_Continue;
-				}
-				//oops, we can have struct and enum declarations in a struct todo
-				//	also there are "first attributes" whatever those are
-				return CXChildVisit_Continue;
+			return CXChildVisit_Continue;
+			}
+			//oops, we can have struct and enum declarations in a struct todo
+			//	also there are "first attributes" whatever those are
+			return CXChildVisit_Continue;
 			}, out);*/
 
 			//*out += "}\n";
@@ -310,7 +310,7 @@ std::string generate_jet_from_header(const char* header)
 					*out += str;// convert_type(type);
 					*out += " = ";
 					*out += std::to_string(value);
-					*out += ";\n";
+					*out += ",\n";
 					clang_disposeString(name);
 
 					return CXChildVisit_Continue;
@@ -319,7 +319,10 @@ std::string generate_jet_from_header(const char* header)
 				return CXChildVisit_Continue;
 			}, out);
 
-			*out += "}\n";
+			(*out).pop_back();
+			(*out).pop_back();
+
+			*out += "\n}\n";
 
 			return CXChildVisit_Continue;
 		}
@@ -411,81 +414,22 @@ std::string generate_jet_from_header(const char* header)
 	return out;
 }
 
-int main(int argc, char* argv[])
+void DoCommand(int argc, char* argv[])
 {
-	std::string str = generate_jet_from_header("windows.h");
-	//std::cout << str;
+	OptionParser parser;
+	parser.AddOption("o", "0");
+	parser.AddOption("f", "0");
+	parser.Parse(argc, argv);
 
-	std::ofstream o("windows.jet");
-	o << str;
-	o.close();
-
-	if (argc > 1)//if we get a command, just try and build the project at that path
+	std::string cmd = argc > 1 ? argv[1] : "";
+	if (cmd == "runtests")
 	{
-		/*std::ifstream infile(argv[1], std::ios_base::binary);
-		//ok, we are going to just try and parse a header file
-		std::string line;
-		while (std::getline(infile, line, ';'))
-		{
-		std::stringstream iss(line);
-		//ok, parse each statement
-		while (!iss.eof())
-		{
-		char cc = iss.get();
-		if (cc == ' ' || cc == '\t' || cc == '\n' || cc == '\r')
-		{
-		}
-		else if (cc == '#')
-		{
-		//throw out until end of line
-		while (!iss.eof() && iss.peek() != '\n')
-		iss.get();
-		}
-		else if (cc == '/')
-		{
-		char nc = iss.get();
-		if (nc == '/')
-		{
-		//throw out until end of line
-		while (!iss.eof() && iss.peek() != '\n')
-		iss.get();
-		}
-		else if (nc == '*')
-		{
-		//read until end of comment
-		//throw out until end of line
-		while (!iss.eof())
-		{
-		char c = iss.get();
-		if (c == '*' && iss.peek() == '/')
-		{
-		iss.get();
-		break;
-		}
-		}
-		}
-		}
-		else
-		{
-		//its an actual character
-		//std::cout << cc;
-		}
-		}
-		}*/
-
-		std::string str = generate_jet_from_header("stdio.h");
-		std::cout << str;
-
-		std::ofstream o("stdio.jet");
-		o << str;
-
-		return 0;
+		//finish tests
 		OptionParser parser;
 		parser.AddOption("o", "0");
-		parser.AddOption("f", "0");
+		parser.AddOption("f", "1");
 		parser.Parse(argc, argv);
 
-		//add options to this later
 		CompilerOptions options;
 		options.optimization = parser.GetOption("o").GetInt();
 		options.force = parser.GetOption("f").GetString().length() == 0;
@@ -493,11 +437,104 @@ int main(int argc, char* argv[])
 		if (parser.commands.size())
 			config = parser.commands.front();
 
-		Jet::Compiler c;
-		if (strcmp(argv[1], "-build") == 0)
-			c.Compile("", &options, config, &parser);
+		std::vector<char*> programs = { "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors", "Enums" };
+
+
+		for (auto ii : programs)
+		{
+			printf("Running test '%s'...\n", ii);
+
+			//add options to this later
+			auto project = JetProject::Load("tests/" + std::string(ii));
+
+			if (!project)
+			{
+				printf("Test project %s not found\n", ii);
+				continue;
+			}
+
+			DiagnosticBuilder b([](Diagnostic& x) {x.Print(); });
+			auto compilation = Compilation::Make(project, &b);
+
+			std::string o;
+			for (auto ii : compilation->asts)
+			{
+				ii.second->Print(o, compilation->sources[ii.first]);
+				//std::cout << o;
+
+				//check that they match!!!
+				if (strcmp(o.c_str(), compilation->sources[ii.first]->GetLinePointer(1)) != 0)
+				{
+					printf("Tree printing test failed, did not match original\n");
+					std::cout << o;
+				}
+
+				o.clear();
+			}
+
+			if (b.GetErrors().size() > 0)
+			{
+				printf("Test '%s' failed\n", ii);
+			}
+			else
+			{
+				//assemble and execute, look for pass or fail
+				compilation->Assemble(0);
+
+				//
+				std::string cmd = "tests\\" + std::string(ii) + "\\build\\" + std::string(ii) + ".exe";
+				auto res = exec(cmd.c_str());
+				printf("%s\n", res.c_str());
+
+				if (res.find("fail") != -1)
+					printf("Test '%s' failed\n", ii);
+				//need to figure out why nothing is being printed
+			}
+
+			printf("\n");
+
+			delete compilation;
+			delete project;
+		}
+		return;
+	}
+	else if (cmd == "convert")
+	{
+		std::string two = argv[2];
+		//fix conversion of attributes for calling convention and fix function pointers
+		std::string str = generate_jet_from_header(two.c_str());
+		if (str.length() == 0)
+			printf("No such file.");
 		else
-			c.Compile(argv[1], &options, config, &parser);
+		{
+			std::ofstream o(two+".jet");
+			o << str;
+			o.close();
+		}
+		return;
+	}
+
+	//add options to this later
+	CompilerOptions options;
+	options.optimization = parser.GetOption("o").GetInt();
+	options.force = parser.GetOption("f").GetString().length() == 0;
+	std::string config = "";
+	if (parser.commands.size())
+		config = parser.commands.front();
+
+	//todo, use command list from parser and get configurations working correctly
+	Jet::Compiler c;
+	if (strcmp(argv[1], "-build") == 0)
+		c.Compile("", &options, config, &parser);
+	else
+		c.Compile(argv[1], &options, config, &parser);
+}
+
+int main(int argc, char* argv[])
+{
+	if (argc > 1)//if we get a command, just try and build the project at that path
+	{
+		DoCommand(argc, argv);
 
 		return 0;
 	}
@@ -509,7 +546,47 @@ int main(int argc, char* argv[])
 		char command[800];
 		std::cin.getline(command, 800);
 
-		Jet::Compiler c2;
+		//split the string
+		{
+			
+			char* args[400] = {};
+			int numargs = 0;
+			int i = 0; bool inquotes = false;
+
+			//add a dummy arg with the current location
+			numargs = 1;
+			args[0] = "~ignore me~";
+
+			while (command[i])
+			{
+				if (command[i] == '"')
+				{
+					inquotes = !inquotes;
+					if (inquotes == false)
+						command[i] = 0;
+				}
+				else if (command[i] == ' ' && inquotes == false)
+				{
+					command[i] = 0;
+
+					numargs++;
+				}
+				else
+				{
+					if (args[numargs] == 0)
+						args[numargs] = &command[i];
+				}
+				i++;
+			}
+			if (args[numargs] != 0)
+				numargs++;
+
+			DoCommand(numargs, args);
+
+			continue;
+		}
+
+		//Jet::Compiler c2;
 
 		/*if (strncmp(command, "run ", 4) == 0)
 		{
@@ -519,16 +596,20 @@ int main(int argc, char* argv[])
 		command[len] = 0;
 		}*/
 
-		int i = 0;
+		/*int i = 0;
 		while (command[i] != ' ' && command[i] != 0)
 			i++;
 
 		std::string args;
 		if (command[i] && command[i + 1])
 			args = (const char*)&command[i + 1];
-		command[i] = 0;
+		//command[i] = 0;
 
-		if (strcmp(command, "runtests") == 0)
+
+		std::stringstream commands(command);
+		std::string cmd;
+		commands >> cmd;
+		if (cmd == "runtests")// strcmp(command, "runtests") == 0)
 		{
 			//finish tests
 			OptionParser parser;
@@ -543,7 +624,8 @@ int main(int argc, char* argv[])
 			if (parser.commands.size())
 				config = parser.commands.front();
 
-			std::vector<char*> programs = { "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors" };
+			std::vector<char*> programs = { "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors", "Enums" };
+
 
 			for (auto ii : programs)
 			{
@@ -603,6 +685,22 @@ int main(int argc, char* argv[])
 			}
 			continue;
 		}
+		else if (cmd == "convert")
+		{
+			std::stringstream commands(command);
+			std::string one, two;
+			commands >> one;
+			commands >> two;
+			std::string str = generate_jet_from_header(two.c_str());
+			if (str.length() == 0)
+				printf("No such file.");
+			else
+			{
+				std::ofstream o("windows.jet");
+				o << str;
+				o.close();
+			}
+		}
 
 		OptionParser parser;
 		parser.AddOption("o", "0");
@@ -616,7 +714,7 @@ int main(int argc, char* argv[])
 		std::string config = "";
 		if (parser.commands.size())
 			config = parser.commands.front();
-		c2.Compile(command, &options, config, &parser);
+		c2.Compile(cmd.c_str(), &options, config, &parser);*/
 	}
 
 	return 0;

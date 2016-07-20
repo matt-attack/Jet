@@ -19,8 +19,8 @@ trait IEnumerable<T>
 
 fun void IEnumerable::Print()
 {
-	local enum = this->GetEnumerator();
-	while (enum.MoveNext() == 1)
+	local enumer = this->GetEnumerator();
+	while (enumer.MoveNext() == 1)
 	{
 		puts("Got one!");
 	}

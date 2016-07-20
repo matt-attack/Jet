@@ -1,0 +1,16 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+enum Test
+{
+	EnumA = 1,
+	EnumB = 2
+}
+
+fun int main() 
+{
+	return EnumB;
+}

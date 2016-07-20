@@ -37,16 +37,22 @@ namespace Jet
 	enum class Types
 	{
 		Void,
-		Double,
-		Float,
-		Long,
-		Int,
-		Char,
-		Short,
-		Bool,
+		Double,//64 bit float
+		Float,//32 bit float
+
+		//integer types must alternate between signed and unsigned in this group, if not need to fix functions below
+		Long,//64 bit type signed
+		ULong,//64 bit type unsigned
+		Int,//32 bit type signed
+		UInt,//32 bit type unsigned
+		Char,//8 bit type signed
+		UChar,//8 bit type unsigned
+		Short,//16 bit type signed
+		UShort,//16 bit type unsigned
+		Bool,//1 bit integer type
 
 		Struct,//value type
-		Union,
+		Union,//tagged unions
 		Function,
 
 		Trait,//cant instantiate this!!
@@ -133,6 +139,18 @@ namespace Jet
 
 		//can it be instantiated? (no Traits as subtypes)
 		bool IsValid();
+
+		bool IsSignedInteger()
+		{
+			bool is_int = this->IsInteger();
+			bool is_signed = ((int)Types::Long % 2) == ((int)this->type%2);
+			return is_int && is_signed;
+		}
+
+		bool IsInteger()
+		{
+			return (this->type > Types::Long && this->type < Types::Bool);
+		}
 	};
 
 

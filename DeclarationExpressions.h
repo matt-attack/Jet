@@ -751,7 +751,7 @@ namespace Jet
 			return next->Compile(context);
 		}
 	};
-	
+
 	struct EnumValue
 	{
 		Token name, equals, value;
@@ -760,10 +760,15 @@ namespace Jet
 
 	class EnumExpression : public Expression
 	{
+		Token token, name, open, close;
 		std::vector<EnumValue> values;
 	public:
-		EnumExpression(std::vector<EnumValue>&& val)
+		EnumExpression(Token token, Token name, Token open, Token close, std::vector<EnumValue>&& val)
 		{
+			this->token = token;
+			this->name = name;
+			this->close = close;
+			this->open = open;
 			this->values = val;
 		}
 
@@ -785,15 +790,43 @@ namespace Jet
 
 		void CompileDeclarations(CompilerContext* context)
 		{
+			int last_value;//todo: use correct 64 bit type here
 			for (auto ii : this->values)
 			{
-				context->root->ns->members.insert({ ii.name.text, new CValue(context->Integer(std::atoi(ii.value.text.c_str()))) });
+				int cur_value;
+				if (ii.value.text.length())
+					cur_value = std::atoi(ii.value.text.c_str());//todo: fixme and use actual parsing
+				else
+				{
+					//set it to be one greater than the last
+					cur_value = last_value + 1;
+				}
+				context->root->ns->members.insert({ ii.name.text, new CValue(context->Integer(cur_value)) });
+				last_value = cur_value;
 			}
 		}
 
 		void Print(std::string& output, Source* source)
 		{
-			throw 7;//todo
+			this->token.Print(output, source);
+			this->name.Print(output, source);
+
+			this->open.Print(output, source);
+
+			for (auto ii : this->values)
+			{
+				ii.name.Print(output, source);
+
+				if (ii.equals.text.length())
+				{
+					ii.equals.Print(output, source);
+					ii.value.Print(output, source);
+				}
+				if (ii.comma.text.length())
+					ii.comma.Print(output, source);
+			}
+
+			this->close.Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)

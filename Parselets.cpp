@@ -1192,5 +1192,5 @@ Expression* EnumParselet::parse(Parser* parser, Token token)
 
 	auto end = parser->Consume(TokenType::RightBrace);
 
-	return new EnumExpression(std::move(values));// 0;
+	return new EnumExpression(token, name, start, end, std::move(values));// 0;
 }

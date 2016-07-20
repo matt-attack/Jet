@@ -659,14 +659,20 @@ std::string Type::ToString()
 		return "bool";
 	case (int)Types::Char:
 		return "char";
+	case (int)Types::UChar:
+		return "uchar";
 	case (int)Types::Int:
 		return "int";
+	case (int)Types::UInt:
+		return "uint";
 	case (int)Types::Float:
 		return "float";
 	case (int)Types::Double:
 		return "double";
 	case (int)Types::Short:
 		return "short";
+	case (int)Types::UShort:
+		return "ushort";
 	case (int)Types::Void:
 		return "void";
 	case (int)Types::Invalid:
@@ -675,6 +681,8 @@ std::string Type::ToString()
 		return this->trait->name;
 	case (int)Types::Long:
 		return "long";
+	case (int)Types::ULong:
+		return "ulong";
 	case (int)Types::Union:
 		return this->name;
 	case (int)Types::Function:

@@ -82,10 +82,14 @@ Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), 
 	this->DoubleType = new Type("double", Types::Double);
 	ns->members.insert({ "double", this->DoubleType });
 	ns->members.insert({ "long", new Type("long", Types::Long) });
+	ns->members.insert({ "ulong", new Type("ulong", Types::ULong) });
 	this->IntType = new Type("int", Types::Int);
 	ns->members.insert({ "int", this->IntType });
+	ns->members.insert({ "uint", new Type("uint", Types::UInt) });
 	ns->members.insert({ "short", new Type("short", Types::Short) });
+	ns->members.insert({ "ushort", new Type("ushort", Types::UShort) });
 	ns->members.insert({ "char", new Type("char", Types::Char) });
+	ns->members.insert({ "uchar", new Type("uchar", Types::UChar) });
 	this->BoolType = new Type("bool", Types::Bool);
 	ns->members.insert({ "bool", this->BoolType });
 	ns->members.insert({ "void", new Type("void", Types::Void) });

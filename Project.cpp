@@ -42,21 +42,12 @@ std::string Jet::GetNameFromPath(const std::string& path)
 	return name;
 }
 
-struct Element;
-struct Document
-{
-	std::map<std::string, Element*> sections;
-};
 
-struct Element
-{
-	std::map<std::string, std::vector<std::string>*> children;
-};
 
-Document* ParseConfig(std::ifstream& pf)
+JetProject::Document* ParseConfig(std::ifstream& pf)
 {
-	Document* e = new Document;
-	auto cur = new Element;
+	JetProject::Document* e = new JetProject::Document;
+	auto cur = new JetProject::Element;
 	//	use sections like
 	//	[debug]
 	//thing: a
@@ -91,7 +82,7 @@ Document* ParseConfig(std::ifstream& pf)
 		}
 		else if (file.front() == '[' && file.back() == ']')
 		{
-			cur = new Element;
+			cur = new JetProject::Element;
 			e->sections[file.substr(1, file.length() - 2)] = cur;
 		}
 		else

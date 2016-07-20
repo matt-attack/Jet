@@ -13,21 +13,41 @@ namespace Jet
 	class Source;
 	class JetProject
 	{
+	public:
+		struct Element;
+		struct Document
+		{
+			std::map<std::string, Element*> sections;
+		};
+
+		struct Element
+		{
+			std::map<std::string, std::vector<std::string>*> children;
+		};
+	private:
+
 		bool opened, is_executable;
 
 		JetProject()
 		{
+			document = 0;
 			opened = false;
 		}
 
 		bool _Load(const std::string& projectdir);
 
 	public:
+		Document* document;
 		std::string path;
 		std::string project_name;
 		std::vector<std::string> files;
 		std::vector<std::string> dependencies;
 		std::vector<std::string> libs;//libraries to link to
+		
+		~JetProject()
+		{
+			delete[] this->document;
+		}
 
 		struct BuildConfig
 		{
