@@ -475,8 +475,8 @@ CValue NewExpression::Compile(CompilerContext* context)
 
 	auto ty = context->root->LookupType(type.text);
 	auto size = context->GetSizeof(ty);
-	auto arr_size = this->size ? this->size->Compile(context).val : 0;
-	if (this->size)
+	auto arr_size = this->size ? this->size->Compile(context).val : context->root->builder.getInt32(1);
+	if (arr_size)//this->size)
 	{
 		size.val = context->root->builder.CreateMul(size.val, arr_size);
 		size.val = context->root->builder.CreateAdd(size.val, context->root->builder.getInt32(4));
@@ -492,7 +492,7 @@ CValue NewExpression::Compile(CompilerContext* context)
 	//context->root->builder.CreateStructGEP(context->root->)
 	//oops this is being run for individual news too, do I want to do this????
 	//	probably not but would remove the need for free[]
-	if (this->size)
+	if (arr_size)//this->size)
 	{
 		auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
 		context->root->builder.CreateStore(arr_size, pointer);
@@ -571,13 +571,9 @@ CValue FreeExpression::Compile(CompilerContext* context)
 	//context->root->builder.CreateStructGEP(context->root->)
 	//auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
 
-	auto charptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
-	auto rootptr = context->root->builder.CreateGEP(charptr, { context->root->builder.getInt32(-4) });
-	auto arr_size = context->root->builder.CreateLoad(context->root->builder.CreatePointerCast(rootptr, context->root->IntType->GetPointerType()->GetLLVMType()));
-
-
 	//auto ptr = context->DoCast(ty->GetPointerType(), val, true);
 
+	llvm::Value* rootptr;
 	//run constructors
 	if (pointer.type->base->type == Types::Struct)
 	{
@@ -588,12 +584,19 @@ CValue FreeExpression::Compile(CompilerContext* context)
 		else
 			fun = ty->GetMethod("~" + ty->data->name, { pointer.type }, context);
 		fun->Load(context->root);
-		if (this->close_bracket.text.length() == 0)//size == 0)
-		{//just one element, construct it
+		if (false)//this->close_bracket.text.length() == 0)//size == 0)
+		{//just one element, destruct it
+			rootptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
+
 			context->root->builder.CreateCall(fun->f, { pointer.val });
 		}
 		else
-		{//construct each child element
+		{
+			auto charptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
+			rootptr = context->root->builder.CreateGEP(charptr, { context->root->builder.getInt32(-4) });
+			auto arr_size = context->root->builder.CreateLoad(context->root->builder.CreatePointerCast(rootptr, context->root->IntType->GetPointerType()->GetLLVMType()));
+
+			//destruct each child element
 			llvm::Value* counter = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType(), 0, "newcounter");
 			context->root->builder.CreateStore(context->Integer(0).val, counter);
 

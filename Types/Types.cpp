@@ -26,7 +26,7 @@ Type* Type::GetPointerType()
 	this->pointer_type = type;
 
 	type->ns = type->base->ns;
-	type->base->ns->members.insert({ name, type });
+	type->base->ns->members.insert({ type->name, type });
 
 	return type;// tmp;
 }
@@ -43,10 +43,20 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		this->debug_type = compiler->debug->createBasicType("bool", 1, 8, llvm::dwarf::DW_ATE_boolean);
 	else if (this->type == Types::Int)
 		this->debug_type = compiler->debug->createBasicType("int", 32, 32, llvm::dwarf::DW_ATE_signed);
+	else if (this->type == Types::UInt)
+		this->debug_type = compiler->debug->createBasicType("uint", 32, 32, llvm::dwarf::DW_ATE_unsigned);
 	else if (this->type == Types::Short)
 		this->debug_type = compiler->debug->createBasicType("short", 16, 16, llvm::dwarf::DW_ATE_signed);
+	else if (this->type == Types::UShort)
+		this->debug_type = compiler->debug->createBasicType("ushort", 16, 16, llvm::dwarf::DW_ATE_unsigned);
 	else if (this->type == Types::Char)
 		this->debug_type = compiler->debug->createBasicType("char", 8, 8, llvm::dwarf::DW_ATE_signed_char);
+	else if (this->type == Types::UChar)
+		this->debug_type = compiler->debug->createBasicType("uchar", 8, 8, llvm::dwarf::DW_ATE_unsigned_char);
+	else if (this->type == Types::Long)
+		this->debug_type = compiler->debug->createBasicType("long", 64, 64, llvm::dwarf::DW_ATE_signed);
+	else if (this->type == Types::ULong)
+		this->debug_type = compiler->debug->createBasicType("ulong", 64, 64, llvm::dwarf::DW_ATE_unsigned);
 	else if (this->type == Types::Float)
 		this->debug_type = compiler->debug->createBasicType("float", 32, 32, llvm::dwarf::DW_ATE_float);
 	else if (this->type == Types::Double)

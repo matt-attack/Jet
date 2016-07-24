@@ -23,6 +23,7 @@ struct t
 fun int main() 
 {
 	local x = new t[5];
+	local qq = new t;
 	//test(x);
 	if (0)
 	{
@@ -37,7 +38,8 @@ fun int main()
 		local t p[5];
 	}
 	
-	free[] x;
+	free x;
+	free qq;
 	
 	if (count != 0)
 		puts("fail");

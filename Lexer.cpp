@@ -91,6 +91,8 @@ public:
 		//dereference member
 		operators["->"] = TokenType::Pointy;
 
+		operators["!<"] = TokenType::TemplateBegin;
+
 		//keywords
 		keywords["while"] = TokenType::While;
 		keywords["if"] = TokenType::If;

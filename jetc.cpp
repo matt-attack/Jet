@@ -1,4 +1,6 @@
 
+#define _CRTDBG_MAP_ALLOC
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -25,6 +27,13 @@ using namespace Jet;
 #include <clang-c/Index.h>
 
 #include "OptionParser.h"
+
+#ifdef _DEBUG
+#ifndef DBG_NEW
+#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
+#define new DBG_NEW
+#endif
+#endif  // _DEBUG
 
 /*  CXType_Void = 2,
 CXType_Bool = 3,
@@ -437,7 +446,7 @@ void DoCommand(int argc, char* argv[])
 		if (parser.commands.size())
 			config = parser.commands.front();
 
-		std::vector<char*> programs = { "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors", "Enums" };
+		std::vector<char*> programs = { "SmartPointerTest", "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors", "Enums" };
 
 
 		for (auto ii : programs)
@@ -532,6 +541,9 @@ void DoCommand(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
+#ifdef _WIN32
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
 	if (argc > 1)//if we get a command, just try and build the project at that path
 	{
 		DoCommand(argc, argv);
@@ -582,7 +594,9 @@ int main(int argc, char* argv[])
 				numargs++;
 
 			DoCommand(numargs, args);
-
+#ifdef _WIN32
+			_CrtDumpMemoryLeaks();
+#endif
 			continue;
 		}
 

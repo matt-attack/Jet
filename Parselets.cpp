@@ -7,6 +7,13 @@
 
 using namespace Jet;
 
+#ifdef _DEBUG
+#ifndef DBG_NEW
+#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
+#define new DBG_NEW
+#endif
+#endif  // _DEBUG
+
 
 Token ParseType(Parser* parser, bool parse_arrays = true)
 {
@@ -129,7 +136,7 @@ Token ParseTrait(Parser* parser)
 
 Expression* NameParselet::parse(Parser* parser, Token token)
 {
-	if (parser->Match(TokenType::Not))
+	if (parser->Match(TokenType::TemplateBegin))//TokenType::Not))
 	{
 		//check if the token after the next this is a , or a > if it is, then im a template
 		//Token ahead = parser->LookAhead(1);
@@ -137,25 +144,25 @@ Expression* NameParselet::parse(Parser* parser, Token token)
 		//return new NameExpression(token);
 
 		parser->Consume();
-		parser->Consume(TokenType::LessThan);
+		//parser->Consume(TokenType::LessThan);
 
-		token.text += "<";
+		//token.text += "<";
 		//parse it as if it is a template
 		std::vector<Token>* templates = new std::vector < Token >();
 		bool first = true;
 		do
 		{
-			if (first)
-				first = false;
-			else
-				token.text += ",";
+			//if (first)
+			//	first = false;
+			//else
+			//	token.text += ",";
 			Token tname = ::ParseType(parser);
-			token.text += tname.text;
+			//token.text += tname.text;
 			templates->push_back(tname);
 		} while (parser->MatchAndConsume(TokenType::Comma));
 		parser->Consume(TokenType::GreaterThan);
 
-		token.text += ">";
+		//token.text += ">";
 
 		//actually, just treat me as a nameexpression, that should work
 		//idk, but what to do with the template stuff

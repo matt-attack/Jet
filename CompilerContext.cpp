@@ -6,6 +6,14 @@
 #include "Expressions.h"
 #include "DeclarationExpressions.h"
 
+#ifdef _DEBUG
+#ifndef DBG_NEW
+#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
+#define new DBG_NEW
+#endif
+#endif  // _DEBUG
+
+
 using namespace Jet;
 
 CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, Type* member, bool lambda)
@@ -248,7 +256,6 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			else//unsigned
 				res = root->builder.CreateURem(left.val, right.val);
 			break;
-			//todo add unsigned
 		case TokenType::LessThan:
 			//use U or S?
 			if (left.type->IsSignedInteger())
@@ -299,11 +306,9 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			res = root->builder.CreateXor(left.val, right.val);
 			break;
 		case TokenType::LeftShift:
-			//todo
 			res = root->builder.CreateShl(left.val, right.val);
 			break;
 		case TokenType::RightShift:
-			//todo
 			res = root->builder.CreateLShr(left.val, right.val);
 			break;
 		default:
@@ -805,6 +810,10 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 				//pointer to pointer cast;
 				return CValue(t, root->builder.CreatePointerCast(value.val, t->GetLLVMType(), "ptr2ptr"));
 			}
+			else if (t->IsInteger())
+			{
+				return CValue(t, root->builder.CreatePtrToInt(value.val, t->GetLLVMType(), "ptr2int"));
+			}
 			//todo: pointer to int
 		}
 	}
@@ -942,6 +951,8 @@ bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
 				//pointer to pointer cast;
 				return true;
 			}
+			else if (t->IsInteger())
+				return true;
 		}
 	}
 	if (value.type->type == Types::Function)

@@ -34,6 +34,13 @@
 #include <Windows.h>
 #endif
 
+/*#ifdef _DEBUG
+#ifndef DBG_NEW
+#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
+#define new DBG_NEW
+#endif
+#endif  // _DEBUG*/
+
 using namespace Jet;
 
 //this is VERY TERRIBLE remove later
@@ -141,6 +148,11 @@ Compilation::~Compilation()
 	//free traits
 	for (auto ii : this->traits)
 		delete ii.second;
+
+	delete this->target;
+	//dont delete this->project we dont have ownership
+	delete this->debug;
+	delete this->module;
 }
 #ifndef _WIN32
 int64_t gettime2()//returns time in microseconds

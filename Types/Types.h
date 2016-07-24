@@ -149,7 +149,7 @@ namespace Jet
 
 		bool IsInteger()
 		{
-			return (this->type > Types::Long && this->type < Types::Bool);
+			return (this->type >= Types::Long && this->type < Types::Bool);
 		}
 	};
 

@@ -71,6 +71,26 @@ namespace Jet
 
 		std::string GetName()
 		{
+			if (this->templates)
+			{
+				std::string str = token.text;
+				str += "<";
+
+				bool first = true;
+				for (auto ii : *this->templates)
+				{
+					if (first)
+						first = false;
+					else
+					{
+						str += ',';
+					}
+					str += ii.text;
+				}
+				
+				str += ">";
+				return str;
+			}
 			return token.text;
 		}
 
@@ -100,6 +120,14 @@ namespace Jet
 		void Print(std::string& output, Source* source)
 		{
 			token.Print(output, source);
+			if (this->templates)
+			{
+				//todo: free memory
+				for (auto ii : *this->templates)
+				{
+					ii.Print(output, source);
+				}
+			}
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)

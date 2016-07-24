@@ -119,6 +119,9 @@ namespace Jet
 
 		Typedef, 
 
+		//special token for !<
+		TemplateBegin,
+
 		EoF,
 
 		InvalidToken
