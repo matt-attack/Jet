@@ -35,9 +35,9 @@ struct Apple
 
 fun int main() 
 {
-	local Tests::C x;
-	local Tests::Hello::B y;
-	local Tests::Hello::A z;
+	let Tests::C x;
+	let Tests::Hello::B y;
+	let Tests::Hello::A z;
 	x.a_val = 1;
 	x.b_val = 2;
 	x.c_val = 3;

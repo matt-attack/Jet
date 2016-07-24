@@ -6,7 +6,7 @@ extern fun int puts(char* str);
 
 fun int main() 
 {
-	local x = 5*2+3;
+	let x = 5*2+3;
 	if (x != (5*2)+3)
 		puts("fail\n");
 		
@@ -14,13 +14,15 @@ fun int main()
 	if (x != (6*2)&2)
 		puts("fail\n");
 		
-	local b = 5 == 2 || 5 == 5;
+	let b = 5 == 2 || 5 == 5;
 	if (!b)
 		puts("fail\n");
 	
 	b = 5 == 2 || 0;
 	if (b)
 		puts("fail\n");
+	
+	
 	
 	return 0;
 }

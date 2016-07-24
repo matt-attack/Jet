@@ -70,7 +70,7 @@ namespace Jet
 
 		Function,
 		For,
-		Local,
+		Let,
 		Break,
 		Continue,
 		Yield,

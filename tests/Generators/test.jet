@@ -19,7 +19,7 @@ trait IEnumerable<T>
 
 fun void IEnumerable::Print()
 {
-	local enumer = this->GetEnumerator();
+	let enumer = this->GetEnumerator();
 	while (enumer.MoveNext() == 1)
 	{
 		puts("Got one!");
@@ -28,8 +28,8 @@ fun void IEnumerable::Print()
 
 generator int test(char qp)
 {
-	local short y = 7;
-	for (local q = 10; q < 15; q++)
+	let short y = 7;
+	for (let q = 10; q < 15; q++)
 	{
 		yield q;
 	}
@@ -44,8 +44,8 @@ generator int test(char qp)
 
 generator int power(int number, int exponent)
 {
-	local result = 1;
-	for (local i = 0; i < exponent; i++)
+	let result = 1;
+	for (let i = 0; i < exponent; i++)
 	{
 		result = result * number;
 		yield result;
@@ -54,8 +54,8 @@ generator int power(int number, int exponent)
 
 fun int main() 
 { 
-	local x = power(2, 20);
-	local p = 0;
+	let x = power(2, 20);
+	let p = 0;
 	while (x.MoveNext())
 	{
 		p = x.Current();
@@ -66,7 +66,7 @@ fun int main()
 	else
 		puts("pass");
 		
-	local t = test(5);
+	let t = test(5);
 	while (t.MoveNext())
 	{
 		p = t.Current();

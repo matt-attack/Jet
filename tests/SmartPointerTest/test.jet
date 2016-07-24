@@ -5,7 +5,7 @@ extern fun void free(char* dat);
 
 extern fun int puts(char* str);
 
-local int count = 0;
+let int count = 0;
 
 trait Any
 {
@@ -14,10 +14,10 @@ trait Any
 
 fun void ExaminePointer(char* ptr)
 {
-	local long ptrl = <long>ptr;
+	let long ptrl = <long>ptr;
 	ptrl -= 4;
-	local int* nptr = <int*><char*>ptrl;
-	local int count = (*nptr);
+	let int* nptr = <int*><char*>ptrl;
+	let int count = (*nptr);
 	printf("Pointer: %x Count: %i", (<int>ptr), count);
 }
 
@@ -62,12 +62,12 @@ struct TesterClass
 
 fun int main() 
 {
-	local p = new TestClass;
+	let p = new TestClass;
 	//ExaminePointer(<char*>p);
 	free p;
 	if (1)
 	{
-		local TesterClass p;
+		let TesterClass p;
 		p.p.ptr = new TestClass;
 		//ExaminePointer(<char*>p.p.ptr);
 		//p.q.ptr = new TestClass;

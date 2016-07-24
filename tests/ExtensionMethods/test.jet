@@ -22,7 +22,7 @@ fun void B::Extension()
 
 fun int main() 
 { 
-	local x = B();
+	let x = B();
 	
 	x.Extension();
 	

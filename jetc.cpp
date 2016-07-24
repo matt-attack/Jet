@@ -428,6 +428,7 @@ void DoCommand(int argc, char* argv[])
 	OptionParser parser;
 	parser.AddOption("o", "0");
 	parser.AddOption("f", "0");
+	parser.AddOption("t", "0");
 	parser.Parse(argc, argv);
 
 	std::string cmd = argc > 1 ? argv[1] : "";
@@ -437,6 +438,7 @@ void DoCommand(int argc, char* argv[])
 		OptionParser parser;
 		parser.AddOption("o", "0");
 		parser.AddOption("f", "1");
+		parser.AddOption("t", "0");
 		parser.Parse(argc, argv);
 
 		CompilerOptions options;
@@ -465,6 +467,11 @@ void DoCommand(int argc, char* argv[])
 			DiagnosticBuilder b([](Diagnostic& x) {x.Print(); });
 			auto compilation = Compilation::Make(project, &b);
 
+			if (compilation == 0)
+			{
+				delete project;
+				return;
+			}
 			std::string o;
 			for (auto ii : compilation->asts)
 			{
@@ -533,7 +540,7 @@ void DoCommand(int argc, char* argv[])
 
 	//todo, use command list from parser and get configurations working correctly
 	Jet::Compiler c;
-	if (strcmp(argv[1], "-build") == 0)
+	if (argc == 1 || strcmp(argv[1], "-build") == 0)
 		c.Compile("", &options, config, &parser);
 	else
 		c.Compile(argv[1], &options, config, &parser);

@@ -102,7 +102,7 @@ public:
 		keywords["return"] = TokenType::Ret;
 		keywords["for"] = TokenType::For;
 
-		keywords["local"] = TokenType::Local;
+		keywords["let"] = TokenType::Let;
 		keywords["break"] = TokenType::Break;
 		keywords["continue"] = TokenType::Continue;
 

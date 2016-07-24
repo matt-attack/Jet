@@ -18,8 +18,8 @@ union C = A | B;
 
 fun int main() 
 {
-	local C p;
-	local B q;
+	let C p;
+	let B q;
 	p = q;
 	match (p)
 	{

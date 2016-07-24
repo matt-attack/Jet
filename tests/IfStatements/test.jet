@@ -6,7 +6,7 @@ extern fun int puts(char* str);
 
 fun int main() 
 { 
-	local x = 1;
+	let x = 1;
 	
 	if (x == 0)
 	{

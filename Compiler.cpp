@@ -309,7 +309,8 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	{
 		msg.Print();
 	});
-	Compilation* compilation = Compilation::Make(project, &diagnostics);
+	bool time = parser ? parser->GetOption("t").GetString().length() == 0 : false;
+	Compilation* compilation = Compilation::Make(project, &diagnostics, time);
 
 error:
 
@@ -323,7 +324,7 @@ error:
 	}
 	else
 	{
-		compilation->Assemble(options.optimization);
+		compilation->Assemble(options.optimization, time);
 
 		//output build times
 		std::ofstream rebuild("build/rebuild.txt");

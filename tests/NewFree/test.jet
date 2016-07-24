@@ -5,7 +5,7 @@ extern fun void free(char* x);
 
 extern fun int puts(char* str);
 
-local int count = 0; 
+let int count = 0; 
 struct t
 {
 	fun void t()
@@ -22,20 +22,20 @@ struct t
 
 fun int main() 
 {
-	local x = new t[5];
-	local qq = new t;
+	let x = new t[5];
+	let qq = new t;
 	//test(x);
 	if (0)
 	{
-		local t q;
+		let t q;
 		
 		return 0;
 		puts("hi");
 	}
 	if (1)
 	{
-		local t q;
-		local t p[5];
+		let t q;
+		let t p[5];
 	}
 	
 	free x;

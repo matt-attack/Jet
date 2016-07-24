@@ -51,8 +51,8 @@ fun int IEnumerable::DoStuff()
 
 fun void IEnumerable::Print()
 {
-	local enum = this->GetEnumerator();
-	while (enum.MoveNext() == 1)
+	let eenum = this->GetEnumerator();
+	while (eenum.MoveNext() == 1)
 	{
 		puts("Got one!");
 	}
@@ -65,7 +65,7 @@ struct WhereIterable<Any T, IEnumerable Base>
 		
 	fun WhereIterator<T, VectorIterator<T> > GetEnumerator()
 	{
-		local WhereIterator<T, VectorIterator<T>/*typeof(this->iterable->GetEnumerator())*/ > x;
+		let WhereIterator<T, VectorIterator<T>/*typeof(this->iterable->GetEnumerator())*/ > x;
 		x.iter = this->iterable->GetEnumerator();
 		x.fn = this->fn;
 		return x;
@@ -91,7 +91,7 @@ struct WhereIterator<Any T, IEnumerator Base>
 	{
 		while (this->iter.MoveNext())
 		{
-			local fn = this->fn;
+			let fn = this->fn;
 			if (fn(this->iter.Current()))
 				return 1;
 		}
@@ -102,7 +102,7 @@ struct WhereIterator<Any T, IEnumerator Base>
 
 fun WhereIterable<T, IEnumerable > IEnumerable::Where(function<bool(T)> fn)
 {
-	local WhereIterable<T, IEnumerable > x;
+	let WhereIterable<T, IEnumerable > x;
 	x.iterable = this;
 	x.fn = fn;
 	return x;
@@ -110,10 +110,10 @@ fun WhereIterable<T, IEnumerable > IEnumerable::Where(function<bool(T)> fn)
 
 fun int IEnumerable::Contains(T t)
 {
-	local enum = this->GetEnumerator();
-	while (enum.MoveNext() == 1)
+	let eenum = this->GetEnumerator();
+	while (eenum.MoveNext() == 1)
 	{
-		if (enum.Current() == t)
+		if (eenum.Current() == t)
 			return 1;
 	}
 	return 0;
@@ -138,7 +138,7 @@ struct VectorIterator<Any TTT>
 	fun int MoveNext()
 	{
 		this->position++;
-		local res = 0;
+		let res = 0;
 		if (this->position >= this->size)
 			res = 0;
 		else
@@ -170,7 +170,7 @@ struct vector<Any TT>
 	
 	fun VectorIterator<TT> GetEnumerator()
 	{
-		local VectorIterator<TT> iter;
+		let VectorIterator<TT> iter;
 		iter.position = -1;
 		iter.size = this->cur_size;
 		iter.data = this->data;
@@ -197,11 +197,11 @@ struct vector<Any TT>
 	fun void resize(int size)
 	{
 		//todo
-		local ne = new TT[size];//<TT*>malloc(sizeof(TT)*size);
+		let ne = new TT[size];//<TT*>malloc(sizeof(TT)*size);
 
 		puts("malloced");
 		//copy
-		for (local int i = 0; i < this->cur_size; i++)
+		for (let int i = 0; i < this->cur_size; i++)
 		{
 			ne[i] = this->data[i];
 		}

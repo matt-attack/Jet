@@ -8,6 +8,6 @@ trait Any
 
 fun void main()
 {
-	local q = Action(); 
-	local p = Task!<int>();
+	let q = Action(); 
+	let p = Task!<int>();
 }

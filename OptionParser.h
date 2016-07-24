@@ -2,7 +2,7 @@
 
 class OptionVar
 {
-	const char* name;
+	std::string name;
 	std::string value;
 public:
 	OptionVar()
@@ -88,6 +88,8 @@ public:
 				auto find = vars.find(option);
 				if (find != vars.end())
 					vars[option].SetValue(value);
+				else
+					vars[option] = OptionVar(option.c_str(), value.c_str());
 			}
 			else
 			{
@@ -123,6 +125,8 @@ public:
 				auto find = vars.find(option);
 				if (find != vars.end())
 					vars[option].SetValue(value);
+				else
+					vars[option] = OptionVar(option.c_str(), value.c_str());
 			}
 			else
 			{

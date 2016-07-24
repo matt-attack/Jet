@@ -132,7 +132,7 @@ namespace Jet
 
 		CValue AddGlobal(const std::string& name, Type* t, llvm::Constant* init = 0);
 
-		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder);
+		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder, bool time = false);
 
 		std::vector<Diagnostic>& GetErrors()
 		{
@@ -142,7 +142,7 @@ namespace Jet
 		void Error(const std::string& string, Token token);
 
 		//generates and outputs an exe or lib file
-		void Assemble(int olevel);
+		void Assemble(int olevel, bool time = false);
 
 
 		//racer stuff
@@ -171,7 +171,7 @@ namespace Jet
 		void Optimize(int level);
 
 		void OutputIR(const char* filename);
-		void OutputPackage(const std::string& project_name, int o_level);
+		void OutputPackage(const std::string& project_name, int o_level, bool time = false);
 
 		void Dump()
 		{

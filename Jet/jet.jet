@@ -1,22 +1,22 @@
 
 fun Jet::Compilation* MakeCompilation(char* project)
 {
-	local Jet::Compilation q;
-	local c = &q;//new Jet::Compilation;
-	local ctx = LLVMContextCreate();
+	let Jet::Compilation q;
+	let c = &q;//new Jet::Compilation;
+	let ctx = LLVMContextCreate();
 	
 	c->module = LLVMModuleCreateWithNameInContext("test", ctx);
-	local voidt = LLVMVoidTypeInContext(ctx);
+	let voidt = LLVMVoidTypeInContext(ctx);
 	
-	local funtype = LLVMFunctionType(voidt, 0, 0, 0);
+	let funtype = LLVMFunctionType(voidt, 0, 0, 0);
 	
-	local char* msg = 0;
+	let char* msg = 0;
 	LLVMDumpType(funtype);
-	local fn = LLVMAddFunction(c->module, "test", funtype);
+	let fn = LLVMAddFunction(c->module, "test", funtype);
 	
-	local entry = LLVMAppendBasicBlock(fn, "entry");
+	let entry = LLVMAppendBasicBlock(fn, "entry");
 
-	local builder = LLVMCreateBuilderInContext(ctx);
+	let builder = LLVMCreateBuilderInContext(ctx);
 	LLVMPositionBuilderAtEnd(builder, entry);
 	LLVMBuildRetVoid(builder);
 
@@ -30,14 +30,14 @@ fun Jet::Compilation* MakeCompilation(char* project)
 	LLVMInitializeX86TargetMC();
 	LLVMInitializeX86AsmPrinter();
 	
-	local char* error = 0;
-	local triple = LLVMGetDefaultTargetTriple();
-	local LLVMTargetRef target;
+	let char* error = 0;
+	let triple = LLVMGetDefaultTargetTriple();
+	let LLVMTargetRef target;
 	LLVMGetTargetFromTriple(triple, &target, &error);
 	
 	
-	local cpu = "haswell";
-	local mach = LLVMCreateTargetMachine(target, triple, cpu, "",
+	let cpu = "haswell";
+	let mach = LLVMCreateTargetMachine(target, triple, cpu, "",
 		0/*level*/, 0/*reloc*/, 0/*codemodel*/);
 	
 	//local qq = LLVMGetTargetMachineData(mach);
@@ -76,7 +76,7 @@ namespace Jet
 
 fun void main()
 {
-	local Jet::Compiler c;
+	let Jet::Compiler c;
 	
 	MakeCompilation("jetcore");
 	

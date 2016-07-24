@@ -574,6 +574,9 @@ CValue FreeExpression::Compile(CompilerContext* context)
 	//auto ptr = context->DoCast(ty->GetPointerType(), val, true);
 
 	llvm::Value* rootptr;
+	auto charptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
+	rootptr = context->root->builder.CreateGEP(charptr, { context->root->builder.getInt32(-4) });
+
 	//run constructors
 	if (pointer.type->base->type == Types::Struct)
 	{
@@ -592,8 +595,6 @@ CValue FreeExpression::Compile(CompilerContext* context)
 		}
 		else
 		{
-			auto charptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
-			rootptr = context->root->builder.CreateGEP(charptr, { context->root->builder.getInt32(-4) });
 			auto arr_size = context->root->builder.CreateLoad(context->root->builder.CreatePointerCast(rootptr, context->root->IntType->GetPointerType()->GetLLVMType()));
 
 			//destruct each child element

@@ -100,7 +100,7 @@ Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), 
 	this->BoolType = new Type("bool", Types::Bool);
 	ns->members.insert({ "bool", this->BoolType });
 	ns->members.insert({ "void", new Type("void", Types::Void) });
-	
+
 	for (auto ii : ns->members)
 	{
 		if (ii.second.type == SymbolType::Type)
@@ -166,19 +166,21 @@ int64_t gettime2()//returns time in microseconds
 #endif
 class StackTime
 {
+	bool enable;
 public:
 	long long start;
 	long long rate;
 	char* name;
 
-	StackTime(char* name);
+	StackTime(char* name, bool enable = true);
 
 	~StackTime();
 };
 
-StackTime::StackTime(char* name)
+StackTime::StackTime(char* name, bool time)
 {
 	this->name = name;
+	this->enable = time;
 
 #ifndef _WIN32
 	start = gettime2();
@@ -196,6 +198,9 @@ StackTime::~StackTime()
 #else
 	end = gettime2();
 #endif
+
+	if (this->enable == false)
+		return;
 
 	long long diff = end - start;
 	float dt = ((double)diff) / ((double)rate);
@@ -217,7 +222,7 @@ public:
 		auto fun = dynamic_cast<FunctionExpression*>(expr->parent->parent);
 		if (fun == 0)
 			return;
-		
+
 		if (auto index = dynamic_cast<IndexExpression*>(expr->left))
 		{
 			if (auto str = dynamic_cast<StructExpression*>(fun->parent))
@@ -235,7 +240,7 @@ public:
 };
 
 
-Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnostics)
+Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnostics, bool time)
 {
 	Compilation* compilation = new Compilation(project);
 	compilation->diagnostics = diagnostics;
@@ -291,7 +296,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	//first lets create the global context!!
 	//ok this will be the main entry point it initializes everything, then calls the program's entry point
 	int errors = 0;
-	auto global = new CompilerContext(compilation,0);
+	auto global = new CompilerContext(compilation, 0);
 	compilation->current_function = global;
 	compilation->sources = project->GetSources();
 
@@ -299,7 +304,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	std::vector<BlockExpression*> symbol_asts;
 	std::vector<Source*> symbol_sources;
 	{
-		StackTime timer("Reading Symbols");
+		StackTime timer("Reading Symbols", time);
 		for (auto buffer : lib_symbols)
 		{
 			Source* src = new Source(buffer, "symbols");
@@ -345,7 +350,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	//read in each file
 	//these two blocks could be multithreaded! theoretically
 	{
-		StackTime timer("Parsing Files and Compiling Declarations");
+		StackTime timer("Parsing Files and Compiling Declarations", time);
 
 		for (auto file : compilation->sources)
 		{
@@ -398,7 +403,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 
 	try
 	{
-		StackTime tt("Resolving Types");
+		StackTime tt("Resolving Types", time);
 		compilation->ResolveTypes();
 	}
 	catch (int x)
@@ -408,7 +413,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	}
 
 	{
-		StackTime timer("Final Compiler Pass");
+		StackTime timer("Final Compiler Pass", time);
 
 		for (auto result : compilation->asts)
 		{
@@ -455,8 +460,8 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 				}
 				/*catch (...)
 				{
-					compilation->ns = compilation->global;
-					errors++;
+				compilation->ns = compilation->global;
+				errors++;
 				}*/
 
 				compilation->ns = compilation->global;
@@ -474,12 +479,12 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	/*auto init = global->AddFunction("_jet_initializer", compilation->ns->members.find("int")->second.ty, {}, false, false);
 	if (project->IsExecutable())
 	{
-		//this->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, init->function->scope.get()));
-		//init->Call("puts", { init->String("hello from initializer") });
+	//this->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, init->function->scope.get()));
+	//init->Call("puts", { init->String("hello from initializer") });
 
-		//todo: put intializers here
-		if (project->IsExecutable())
-			init->Call("main", {});
+	//todo: put intializers here
+	if (project->IsExecutable())
+	init->Call("main", {});
 	}
 	init->Return(global->Integer(0));*/
 
@@ -510,12 +515,12 @@ char* ReadDependenciesFromSymbols(const char* path, int& size)
 	return 0;
 }
 
-void Compilation::Assemble(int olevel)
+void Compilation::Assemble(int olevel, bool time)
 {
 	if (this->diagnostics->GetErrors().size() > 0)
 		return;
-
-	StackTime timer("Assembling Output");
+	
+	StackTime timer("Assembling Output", time);
 
 	char olddir[500];
 	getcwd(olddir, 500);
@@ -544,7 +549,7 @@ void Compilation::Assemble(int olevel)
 	this->OutputIR("build/output.ir");
 
 	//output the .o file for this package
-	this->OutputPackage(project->project_name, olevel);
+	this->OutputPackage(project->project_name, olevel, time);
 
 
 	//then, if and only if I am an executable, make the .exe
@@ -570,7 +575,7 @@ void Compilation::Assemble(int olevel)
 			cmd += " -l:\"" + ii + "\" ";
 #else
 		std::string cmd = "link.exe /DEBUG /INCREMENTAL:NO /NOLOGO ";
-		
+
 		//cmd += "/ENTRY:main ";// "/ENTRY:_jet_initializer ";
 
 		cmd += "build/" + project->project_name + ".o ";
@@ -610,7 +615,7 @@ void Compilation::Assemble(int olevel)
 
 		auto res = exec(cmd.c_str());
 		printf(res.c_str());
-	}
+}
 	else
 	{
 		std::vector<std::string> temps;
@@ -749,7 +754,7 @@ void Compilation::SetTarget()
 	module->setDataLayout(*this->target->getDataLayout());
 }
 
-void Compilation::OutputPackage(const std::string& project_name, int o_level)
+void Compilation::OutputPackage(const std::string& project_name, int o_level, bool time)
 {
 	llvm::legacy::PassManager MPM;
 
@@ -776,8 +781,8 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level)
 
 	//add runtime option to switch between gcc and link
 	//build symbol table for export
-	printf("Building Symbol Table...\n");
-	StackTime timer("Writing Symbol Output");
+	//printf("Building Symbol Table...\n");
+	StackTime timer("Writing Symbol Output", time);
 
 	//write out symbol data
 	std::string function;
@@ -905,39 +910,39 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 		}
 		/*else if (name[name.length() - 1] == '*')
 		{
-			//its a pointer
-			auto t = this->LookupType(name.substr(0, name.length() - 1), load);
+		//its a pointer
+		auto t = this->LookupType(name.substr(0, name.length() - 1), load);
 
-			if (t->pointer_type)
-				return t->pointer_type;
+		if (t->pointer_type)
+		return t->pointer_type;
 
-			type = new Type;
-			type->name = name;
-			type->base = t;
-			type->type = Types::Pointer;
-			t->pointer_type = type;
-			if (load)
-				type->Load(this);
-			else
-				type->ns = type->base->ns;
-			type->base->ns->members.insert({ name, type });
+		type = new Type;
+		type->name = name;
+		type->base = t;
+		type->type = Types::Pointer;
+		t->pointer_type = type;
+		if (load)
+		type->Load(this);
+		else
+		type->ns = type->base->ns;
+		type->base->ns->members.insert({ name, type });
 		}
 		else if (name[name.length() - 1] == ']')
 		{
-			//its an array
-			int p = name.find_first_of('[');
+		//its an array
+		int p = name.find_first_of('[');
 
-			auto len = name.substr(p + 1, name.length() - p - 2);
+		auto len = name.substr(p + 1, name.length() - p - 2);
 
-			auto tname = name.substr(0, p);
-			auto t = this->LookupType(tname, load);
+		auto tname = name.substr(0, p);
+		auto t = this->LookupType(tname, load);
 
-			type = new Type;
-			type->name = name;
-			type->base = t;
-			type->type = Types::Array;
-			type->size = std::stoi(len);//cheat for now
-			curns->members.insert({ name, type });
+		type = new Type;
+		type->name = name;
+		type->base = t;
+		type->type = Types::Array;
+		type->size = std::stoi(len);//cheat for now
+		curns->members.insert({ name, type });
 		}*/
 		else if (name[name.length() - 1] == '>')
 		{
@@ -966,53 +971,53 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 		}
 		/*else if (name[name.length() - 1] == ')')
 		{
-			//work from back to start
-			int p = 0;
-			int sl = 0;
-			int bl = 0;
-			for (p = name.length() - 1; p >= 0; p--)
-			{
-				switch (name[p])
-				{
-				case '(':
-					bl++;
-					break;
-				case ')':
-					bl--;
-					break;
-				case '<':
-					sl--;
-					break;
-				case '>':
-					sl++;
-					break;
-				}
-				if (sl == 0 && bl == 0)
-					break;
-			}
+		//work from back to start
+		int p = 0;
+		int sl = 0;
+		int bl = 0;
+		for (p = name.length() - 1; p >= 0; p--)
+		{
+		switch (name[p])
+		{
+		case '(':
+		bl++;
+		break;
+		case ')':
+		bl--;
+		break;
+		case '<':
+		sl--;
+		break;
+		case '>':
+		sl++;
+		break;
+		}
+		if (sl == 0 && bl == 0)
+		break;
+		}
 
-			std::string ret_type = name.substr(0, p);
-			auto rtype = this->LookupType(ret_type, load);
+		std::string ret_type = name.substr(0, p);
+		auto rtype = this->LookupType(ret_type, load);
 
-			std::vector<Type*> args;
-			//parse types
-			p++;
-			while (name[p] != ')')
-			{
-				//lets cheat for the moment ok
-				std::string subtype = ParseType(name.c_str(), p);
+		std::vector<Type*> args;
+		//parse types
+		p++;
+		while (name[p] != ')')
+		{
+		//lets cheat for the moment ok
+		std::string subtype = ParseType(name.c_str(), p);
 
-				Type* t = this->LookupType(subtype, load);
-				args.push_back(t);
-				if (name[p] == ',')
-					p++;
-			}
-			curns = global;
-			type = this->GetFunctionType(rtype, args);
+		Type* t = this->LookupType(subtype, load);
+		args.push_back(t);
+		if (name[p] == ',')
+		p++;
+		}
+		curns = global;
+		type = this->GetFunctionType(rtype, args);
 		}
 		else
 		{
-			Error("Reference To Undefined Type '" + name + "'", *this->current_function->current_token);
+		Error("Reference To Undefined Type '" + name + "'", *this->current_function->current_token);
 		}*/
 	}
 	return type;
@@ -1022,12 +1027,12 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 {
 	int i = 0;
-	while (IsLetter(name[i]) || IsNumber(name[i]) )
+	while (IsLetter(name[i]) || IsNumber(name[i]))
 	{
 		i++;
 	};
 
-	if (name.length() > i && name[i] == ':' && name[i+1] == ':')
+	if (name.length() > i && name[i] == ':' && name[i + 1] == ':')
 	{
 		//navigate to correct namespace
 		std::string ns = name.substr(0, i);

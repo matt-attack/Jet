@@ -2,7 +2,7 @@
 extern fun int strlen(char* str);
 extern fun void strcpy(char* dest, char* src);
 
-local int v;// = 7;
+let int v;// = 7;
 struct string
 {
 	char* data;
@@ -48,10 +48,10 @@ struct string
 	
 	fun void resize(int size)
 	{
-		local neww = <char*>malloc(sizeof(char)*size);
+		let neww = <char*>malloc(sizeof(char)*size);
 		
 		//copy
-		for (local int i = 0; i < this->cur_size; i++)
+		for (let int i = 0; i < this->cur_size; i++)
 		{
 			neww[i] = this->data[i];
 		}

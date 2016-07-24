@@ -6,9 +6,9 @@ extern fun int puts(char* str);
 
 fun int main() 
 { 
-	local t = 1;
+	let t = 1;
 	
-	for (local x = 5; x < 25; x++)
+	for (let x = 5; x < 25; x++)
 	{
 		t = x;
 	}
@@ -18,7 +18,7 @@ fun int main()
 	else
 		puts("pass");
 	
-	for (local p = 0; p < 20; p++)
+	for (let p = 0; p < 20; p++)
 		t = p;
 		
 	if (t != 19)
@@ -26,7 +26,7 @@ fun int main()
 	else
 		puts("pass");
 		
-	for (local p = 0; p < 20;)
+	for (let p = 0; p < 20;)
 		t = p++;
 		
 	if (t != 19)
@@ -34,7 +34,7 @@ fun int main()
 	else
 		puts("pass");
 	
-	local p = 0;
+	let p = 0;
 	for (;p < 25;)
 	{
 		t = p++;

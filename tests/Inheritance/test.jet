@@ -28,11 +28,11 @@ struct B: A
 
 fun int main() 
 {
-	local B p;
+	let B p;
 	p.a_val = 5;
 	p.b_val = 6;
 	
-	local A* q = 0;
+	let A* q = 0;
 	q = &p;
 	if (q->a_val != 5)
 		puts("fail\n");
