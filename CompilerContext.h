@@ -243,7 +243,7 @@ namespace Jet
 
 		CValue UnaryOperation(TokenType operation, CValue value);
 
-		CValue BinaryOperation(Jet::TokenType op, CValue left, CValue right);
+		CValue BinaryOperation(Jet::TokenType op, CValue left, CValue lhsptr, CValue right);
 
 		void PushLoop(llvm::BasicBlock* Break, llvm::BasicBlock* Continue)
 		{

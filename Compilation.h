@@ -92,9 +92,8 @@ namespace Jet
 		//list of not fully compiled templates to finish before completion
 		std::vector<Type*> unfinished_templates;
 
-		std::map<int, Type*> function_types;
+		std::map<int, Type*> function_types;//a cache of function types
 
-		//std::vector<Diagnostic> errors;
 		DiagnosticBuilder* diagnostics;
 
 		CompilerContext* current_function;

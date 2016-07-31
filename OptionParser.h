@@ -48,7 +48,6 @@ public:
 
 class OptionParser
 {
-
 	std::map<std::string, OptionVar> vars;
 
 public:

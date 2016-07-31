@@ -1,0 +1,60 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+extern fun char getchar();
+
+struct A
+{
+	int a_val;
+}
+
+struct B
+{
+	int b_val;
+	
+	fun B operator +(int other)
+	{
+		let B res;
+		res.b_val = this->b_val+other;
+		return res;
+	}
+	
+	fun B operator -(int other)
+	{
+		let B res;
+		res.b_val = this->b_val-other;
+		return res;
+	}
+	
+	fun B operator*(int other)
+	{
+		let B res;
+		res.b_val = this->b_val*other;
+		return res;
+	}
+	
+	fun B operator/(int other)
+	{
+		let B res;
+		res.b_val = this->b_val/other;
+		return res;
+	}
+}
+
+union C = A | B;
+
+fun int main() 
+{
+	let B q;
+	q.b_val = 0;
+	q = q + 5;
+	q = q - 4;
+	q = q * 5;
+	q = q / 5;
+	puts("hello");
+	//getchar();
+	return 0;
+}

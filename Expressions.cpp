@@ -11,7 +11,22 @@ using namespace Jet;
 #include <llvm/IR/DIBuilder.h>
 #include <llvm/IR/DerivedTypes.h>
 
-
+CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
+{
+	auto i = dynamic_cast<NameExpression*>(right);
+	auto p = dynamic_cast<IndexExpression*>(right);
+	if (i)
+	{
+		auto var = context->GetVariable(i->GetName());
+		return CValue(var.type, var.val);
+	}
+	else if (p)
+	{
+		auto var = p->GetElementPointer(context);
+		return CValue(var.type, var.val);
+	}
+	context->root->Error("Not Implemented", *context->current_token);
+}
 
 CValue PrefixExpression::Compile(CompilerContext* context)
 {
@@ -19,19 +34,7 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 
 	if (this->_operator.type == TokenType::BAnd)
 	{
-		auto i = dynamic_cast<NameExpression*>(right);
-		auto p = dynamic_cast<IndexExpression*>(right);
-		if (i)
-		{
-			auto var = context->GetVariable(i->GetName());
-			return CValue(var.type, var.val);
-		}
-		else if (p)
-		{
-			auto var = p->GetElementPointer(context);
-			return CValue(var.type, var.val);
-		}
-		context->root->Error("Not Implemented", this->_operator);
+		return GetPtrToExprValue(context, right);
 	}
 
 	auto rhs = right->Compile(context);
@@ -72,6 +75,12 @@ CValue IndexExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&token);
 	context->SetDebugLocation(this->token);
+	auto type = this->GetBaseType(context);
+	if (this->index && type->type == Types::Pointer && type->base->type == Types::Struct)
+	{
+		//todo
+		printf("call operator");
+	}
 	auto loc = this->GetElementPointer(context);
 	if (loc.type->type == Types::Function)
 		return loc;
@@ -253,14 +262,14 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
 
+	CValue lhs;
+	if (p)
+		lhs = context->GetVariable(p->GetName());
+	else if (i)
+		lhs = i->GetElementPointer(context);
+
 	if (index == 0 && this->token.type == TokenType::Pointy)
 	{
-		CValue lhs;
-		if (p)
-			lhs = context->GetVariable(p->GetName());
-		else if (i)
-			lhs = i->GetElementPointer(context);
-
 		if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && lhs.type->base->base->type == Types::Struct)
 		{
 			lhs.val = context->root->builder.CreateLoad(lhs.val);
@@ -273,11 +282,11 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 	}
 	else if (p || i)
 	{
-		CValue lhs;
-		if (p)
-			lhs = context->GetVariable(p->GetName());
-		else if (i)
-			lhs = i->GetElementPointer(context);
+		//CValue lhs;
+		//if (p)
+		//	lhs = context->GetVariable(p->GetName());
+		//else if (i)
+		//	lhs = i->GetElementPointer(context);
 
 		if (this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
 		{
@@ -391,19 +400,25 @@ CValue NameExpression::Compile(CompilerContext* context)
 
 CValue OperatorAssignExpression::Compile(CompilerContext* context)
 {
-	//try and cast right side to left
-	auto lhs = this->left->Compile(context);
-	auto rhs = this->right->Compile(context);
-	rhs = context->DoCast(lhs.type, rhs);
-
 	context->CurrentToken(&token);
 	context->SetDebugLocation(token);
-	auto res = context->BinaryOperation(token.type, lhs, rhs);
+
+	//try and cast right side to left
+	auto lhs = this->left->Compile(context);
+	CValue lhsptr;
+	if (lhs.type->type == Types::Struct)
+		lhsptr = GetPtrToExprValue(context, left);
+	auto rhs = this->right->Compile(context);
+	//ok, lets have BinaryOperation try the cast, not me
+	//rhs = context->DoCast(lhs.type, rhs);
+
+	auto res = context->BinaryOperation(token.type, lhs, lhsptr, rhs);
 
 	//insert store here
 	if (auto storable = dynamic_cast<IStorableExpression*>(this->left))
 		storable->CompileStore(context, res);
-
+	else
+		context->root->Error("Cannot store into this type.", this->token);
 	return CValue();
 }
 
@@ -463,10 +478,14 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 	}
 
 	auto lhs = this->left->Compile(context);
-	auto rhs = this->right->Compile(context);
-	rhs = context->DoCast(lhs.type, rhs);
+	CValue lhsptr;
+	if (lhs.type->type == Types::Struct)
+		lhsptr = GetPtrToExprValue(context, left);
 
-	return context->BinaryOperation(this->_operator.type, lhs, rhs);
+	auto rhs = this->right->Compile(context);
+	//rhs = context->DoCast(lhs.type, rhs);
+
+	return context->BinaryOperation(this->_operator.type, lhs, lhsptr, rhs);
 }
 
 CValue NewExpression::Compile(CompilerContext* context)
@@ -476,11 +495,12 @@ CValue NewExpression::Compile(CompilerContext* context)
 	auto ty = context->root->LookupType(type.text);
 	auto size = context->GetSizeof(ty);
 	auto arr_size = this->size ? this->size->Compile(context).val : context->root->builder.getInt32(1);
-	if (arr_size)//this->size)
-	{
+	//if (arr_size)//this->size)
+	//{
+	if (this->size)
 		size.val = context->root->builder.CreateMul(size.val, arr_size);
-		size.val = context->root->builder.CreateAdd(size.val, context->root->builder.getInt32(4));
-	}
+	size.val = context->root->builder.CreateAdd(size.val, context->root->builder.getInt32(4));
+	//}
 	CValue val = context->Call("malloc", { size });
 
 	//build the array type struct, which is just an int followed by a pointer to the underlying data
@@ -492,57 +512,17 @@ CValue NewExpression::Compile(CompilerContext* context)
 	//context->root->builder.CreateStructGEP(context->root->)
 	//oops this is being run for individual news too, do I want to do this????
 	//	probably not but would remove the need for free[]
-	if (arr_size)//this->size)
-	{
-		auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
-		context->root->builder.CreateStore(arr_size, pointer);
-		val.val = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(4) });
-	}
+	//if (arr_size)//this->size)
+	//{
+	auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
+	context->root->builder.CreateStore(arr_size, pointer);
+	val.val = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(4) });
+	//}
 
 	auto ptr = context->DoCast(ty->GetPointerType(), val, true);
 
 	//run constructors
 	context->Construct(ptr, arr_size);
-
-	/*if (ty->type == Types::Struct)
-	{
-	Function* fun = 0;
-	if (ty->data->template_base)
-	fun = ty->GetMethod(ty->data->template_base->name, { ptr.type }, context);
-	else
-	fun = ty->GetMethod(ty->data->name, { ptr.type }, context);
-	fun->Load(context->root);
-	if (this->size == 0)
-	{//just one element, construct it
-	context->root->builder.CreateCall(fun->f, { ptr.val });
-	}
-	else
-	{//construct each child element
-	llvm::Value* counter = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType(), 0, "newcounter");
-	context->root->builder.CreateStore(context->Integer(0).val, counter);
-
-	auto start = llvm::BasicBlock::Create(context->root->context, "start", context->root->current_function->function->f);
-	auto body = llvm::BasicBlock::Create(context->root->context, "body", context->root->current_function->function->f);
-	auto end = llvm::BasicBlock::Create(context->root->context, "end", context->root->current_function->function->f);
-
-	context->root->builder.CreateBr(start);
-	context->root->builder.SetInsertPoint(start);
-	auto cval = context->root->builder.CreateLoad(counter, "curcount");
-	auto res = context->root->builder.CreateICmpUGE(cval, arr_size);
-	context->root->builder.CreateCondBr(res, end, body);
-
-	context->root->builder.SetInsertPoint(body);
-	auto elementptr = context->root->builder.CreateGEP(ptr.val, { cval });
-	context->root->builder.CreateCall(fun->f, { elementptr });
-
-	auto inc = context->root->builder.CreateAdd(cval, context->Integer(1).val);
-	context->root->builder.CreateStore(inc, counter);
-
-	context->root->builder.CreateBr(start);
-
-	context->root->builder.SetInsertPoint(end);
-	}
-	}*/
 
 	return ptr;
 }

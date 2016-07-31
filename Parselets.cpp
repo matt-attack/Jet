@@ -15,6 +15,7 @@ using namespace Jet;
 #endif  // _DEBUG
 
 
+//todo: fix this being a parser hack that drops potential tokens
 Token ParseType(Parser* parser, bool parse_arrays = true)
 {
 	Token name = parser->Consume(TokenType::Name);
@@ -80,16 +81,13 @@ Token ParseType(Parser* parser, bool parse_arrays = true)
 		if (auto s = dynamic_cast<NumberExpression*>(size))
 		{
 			if (s->GetIntValue() <= 0)
-			{
 				parser->Error("Cannot size array with a zero or negative size", tok);
-				//throw 7;
-			}
+
 			out += "[" + std::to_string((int)s->GetIntValue()) + "]";
 		}
 		else
 		{
 			parser->Error("Cannot size array with a non constant size", tok);
-			//throw 7;
 		}
 	}
 
@@ -627,25 +625,94 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 	return new StructExpression(token, name, start, end, ob, std::move(members), /*elements, functions,*/ templated, cb, colon, base_name);
 }
 
+
+bool IsValidFunctionNameToken(TokenType op)
+{
+	//todo: speed this up somehow
+	if (op == TokenType::Name)
+		return true;
+	else if (op == TokenType::Plus)
+		return true;
+	else if (op == TokenType::Minus)
+		return true;
+	else if (op == TokenType::Slash)
+		return true;
+	else if (op == TokenType::Asterisk)
+		return true;
+	else if (op == TokenType::LeftShift)
+		return true;
+	else if (op == TokenType::RightShift)
+		return true;
+	else if (op == TokenType::BOr)
+		return true;
+	else if (op == TokenType::BAnd)
+		return true;
+	else if (op == TokenType::Xor)
+		return true;
+	else if (op == TokenType::Modulo)
+		return true;
+	else if (op == TokenType::DoubleBracket)
+		return true;
+	else if (op == TokenType::LessThan)
+		return true;
+	else if (op == TokenType::GreaterThan)
+		return true;
+	else if (op == TokenType::GreaterThanEqual)
+		return true;
+	else if (op == TokenType::LessThanEqual)
+		return true;
+
+	return false;
+}
+
 Expression* FunctionParselet::parse(Parser* parser, Token token)
 {
 	//read in type
 	Token ret_type = ::ParseType(parser);
-
-	bool destructor = parser->MatchAndConsume(TokenType::BNot);
-	Token name = parser->Consume(TokenType::Name);
-	if (destructor)
-		name.text = "~" + name.text;
-	auto arguments = new std::vector < FunctionArg > ;
+	//fix it stealing the * as a pointer and []
+	//	probably need a keyword(or at least a fake one) to specify when theres an operator
+	//todo fix this not allowing binary not operator
+	Token name;
+	if (parser->Match(TokenType::BNot))
+	{
+		Token t = parser->Consume();
+		Token rname = parser->Consume(TokenType::Name);
+		if (rname.trivia_length > 0)
+			parser->Error("Cannot have whitespace between ~ and the classname in destructors", rname);
+		name = rname;
+		name.text = "~" + rname.text;
+		name.text_ptr -= 1;
+		name.trivia_length = t.trivia_length;
+	}
+	else
+		name = parser->Consume(TokenType::Name);
+	//bool destructor = parser->MatchAndConsume(TokenType::BNot);//todo: fix this parser hack
+	
+	auto arguments = new std::vector<FunctionArg>;
 
 	Token stru, colons;
 	if (parser->Match(TokenType::Scope))
 	{
+		//its a extension method definition
 		colons = parser->Consume();
-		//its a struct definition
 		stru = name;
 		name = parser->Consume(TokenType::Name);//parse the real function name
 	}
+
+	Token oper;
+	if (name.text == "operator")
+	{
+		//parse in the operator
+		oper = name;
+		name = parser->Consume();
+	}
+
+	//check that the name is ok
+	if (stru.text.length() && stru.type != TokenType::Name)
+		parser->Error("Invalid struct name", stru);
+	else if (!IsValidFunctionNameToken(name.type))
+		parser->Error("Not a valid operator overload", name);
+
 
 	//look for templates
 	std::vector<std::pair<Token, Token>>* templated = 0;
@@ -690,8 +757,34 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	}
 	Token cb = parser->Consume(TokenType::RightParen);
 
+	//check that there are a proper number of arguments if this is a operator overload
+	if (name.type != TokenType::Name)
+	{
+		//todo: fix unary minus
+		if ((name.type == TokenType::Decrement
+			|| name.type == TokenType::Increment
+			|| name.type == TokenType::BNot
+			/*|| name.type == TokenType::Minus*/) && arguments->size() != 0)
+		{
+			//todo put more unary ops here
+			parser->Error("Wrong number of arguments for operator overload '" + name.text + "' expected 0 got " + std::to_string(arguments->size()), (*arguments)[arguments->size() - 1].name);
+		}
+		else if (name.type == TokenType::DoubleBracket)//[] operator
+		{
+			if (arguments->size() != 1 && arguments->size() != 0)
+				parser->Error("Wrong number of arguments for operator overload '" + name.text + "' expected 1 or 0 got " + std::to_string(arguments->size()), (*arguments)[arguments->size() - 1].name);
+		}
+		//else if (name.type == TokenType::)
+		//todo: [] operator
+		else if (arguments->size() != 1)
+		{
+			//binary ops
+			parser->Error("Wrong number of arguments for operator overload '" + name.text + "' expected 1 got " + std::to_string(arguments->size()), (*arguments)[arguments->size() - 1].name);
+		}
+	}
+
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, name, ret_type, token.type == TokenType::Generator, arguments, block, /*varargs,*/ stru, colons, templated, 0, ob, cb);
+	return new FunctionExpression(token, name, ret_type, token.type == TokenType::Generator, arguments, block, /*varargs,*/ stru, colons, templated, 0, ob, cb, oper);
 }
 
 Expression* ExternParselet::parse(Parser* parser, Token token)
@@ -860,7 +953,7 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 		ret_type = ::ParseType(parser);
 
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, Token(), ret_type, false, arguments, block, Token(), Token(), 0, captures, ob, cb);
+	return new FunctionExpression(token, Token(), ret_type, false, arguments, block, Token(), Token(), 0, captures, ob, cb, Token());
 }
 
 Expression* CallParselet::parse(Parser* parser, Expression* left, Token token)

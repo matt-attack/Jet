@@ -55,6 +55,7 @@ namespace Jet
 
 		LeftBracket,
 		RightBracket,
+		DoubleBracket,
 
 		While,
 		If,

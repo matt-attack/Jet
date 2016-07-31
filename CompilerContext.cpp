@@ -162,14 +162,55 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 	this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 }
 
-CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue right)
+CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue lhsptr, CValue right)
 {
 	llvm::Value* res = 0;
 
-	//should this be a floating point calc?
+	if (left.type->type == Types::Pointer && right.type->IsInteger())
+	{
+		//ok, lets just do a GeP
+		if (op == TokenType::Plus)
+			return CValue(left.type, this->root->builder.CreateGEP(left.val, right.val));
+		else if (op == TokenType::Minus)
+			return CValue(left.type, this->root->builder.CreateGEP(left.val, this->root->builder.CreateNeg(right.val)));
+	}
+	else if (left.type->type == Types::Struct)
+	{
+		//operator overloads
+		const static std::map<Jet::TokenType, std::string> token_to_string = { 
+			{ TokenType::Plus, "+" }, 
+			{ TokenType::Minus, "-" }, 
+			{ TokenType::Slash, "/" }, 
+			{ TokenType::Asterisk, "*" },
+			{ TokenType::LeftShift, "<<" },
+			{ TokenType::RightShift, ">>" },
+			{ TokenType::BAnd, "&" },
+			{ TokenType::BOr, "|" },
+			{ TokenType::Xor, "^" },
+			{ TokenType::Modulo, "%" },
+			{ TokenType::LessThan, "<" },
+			{ TokenType::GreaterThan, ">" },
+			{ TokenType::LessThanEqual, "<=" },
+			{ TokenType::GreaterThanEqual, ">=" }
+		};
+		auto res = token_to_string.find(op);
+		if (res != token_to_string.end())
+		{
+			auto funiter = left.type->data->functions.find(res->second);
+			//todo: search through multimap to find one with the right number of args
+			if (funiter != left.type->data->functions.end() && funiter->second->arguments.size() == 2)
+			{
+				Function* fun = funiter->second;
+				return CValue(fun->return_type, this->root->builder.CreateCall(fun->f, { lhsptr.val, right.val }, "operator_overload"));
+			}
+		}
+	}
+
+	//try to do a cast
+	right = this->DoCast(left.type, right);
+
 	if (left.type->type != right.type->type)
 	{
-		//conversion time!!
 		root->Error("Cannot perform a binary operation between two incompatible types", *this->current_token);
 	}
 
@@ -747,7 +788,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		if (t->IsSignedInteger())
 			return CValue(t, root->builder.CreateFPToSI(value.val, tt));
 		else if (t->IsInteger());
-			return CValue(t, root->builder.CreateFPToUI(value.val, tt));
+		return CValue(t, root->builder.CreateFPToUI(value.val, tt));
 
 		//todo: maybe do a warning if implicit from float->int or larger as it cant directly fit 1 to 1
 		//remove me later float to bool

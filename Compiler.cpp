@@ -7,6 +7,7 @@
 #include "Expressions.h"
 #include "UniquePtr.h"
 #include "Project.h"
+#include "OptionParser.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -31,6 +32,21 @@ using namespace Jet;
 #include <unistd.h>
 #endif
 
+void Jet::SetupDefaultCommandOptions(OptionParser* parser)
+{
+	parser->AddOption("o", "0");
+	parser->AddOption("f", "0");
+	parser->AddOption("t", "0");
+	parser->AddOption("r", "0");
+}
+
+void CompilerOptions::ApplyOptions(OptionParser* parser)
+{
+	this->optimization = parser->GetOption("o").GetInt();
+	this->force = parser->GetOption("f").GetString().length() == 0;
+	this->time = parser->GetOption("t").GetString().length() == 0;
+	this->run = parser->GetOption("r").GetString().length() == 0;
+}
 
 extern Source* current_source;
 
@@ -96,8 +112,25 @@ public:
 	}
 };
 
-#include "OptionParser.h"
+#include <process.h>
+void ExecuteProject(JetProject* project, const char* projectdir)
+{
+	//now try running it if we are supposed to
+#ifdef _WIN32
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
 
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+
+	std::string path = "build\\" + project->project_name + ".exe ";
+	CreateProcess(path.c_str(), "", 0, 0, 0, CREATE_NEW_CONSOLE, 0, 0, &si, &pi);
+#endif
+	//system(path.c_str());
+	
+	//spawnl(P_NOWAIT, "cmd.exe", "cmd.exe", path.c_str(), 0);
+}
 bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std::string& confg_name, OptionParser* parser)
 {
 	JetProject* project = JetProject::Load(projectdir);
@@ -218,8 +251,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	std::string config_name = "";
 	if (parser)
 	{
-		parser->AddOption("o", "0");
-		parser->AddOption("f", "0");
+		SetupDefaultCommandOptions(parser);
 
 		if (parser->commands.size())
 			config_name = parser->commands.front();
@@ -244,24 +276,26 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	if (parser)
 	{
 		parser->Parse(configuration.options);
-		options.optimization = parser->GetOption("o").GetInt();
-		options.force = parser->GetOption("f").GetString().length() == 0;
+
+		options.ApplyOptions(parser);
+		//options.optimization = parser->GetOption("o").GetInt();
+		//options.force = parser->GetOption("f").GetString().length() == 0;
 	}
 	else
 	{
 		OptionParser p;
-		p.AddOption("o", "0");
-		p.AddOption("f", "0");
+		SetupDefaultCommandOptions(&p);
 		p.Parse(configuration.options);
 
-		options.optimization = p.GetOption("o").GetInt();
-		options.force = p.GetOption("f").GetString().length() == 0;
+		options.ApplyOptions(&p);
+		//options.optimization = p.GetOption("o").GetInt();
+		//options.force = p.GetOption("f").GetString().length() == 0;
 	}
 
 	//add options to this later
 	FILE* jlib = fopen("build/symbols.jlib", "rb");
 	FILE* output = fopen(("build/" + project->project_name + ".o").c_str(), "rb");
-	if (options.force)// && options->force)
+	if (options.force)
 	{
 		//the rebuild was forced
 	}
@@ -277,15 +311,18 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	{
 		for (int i = 0; i < modifiedtimes.size(); i++)
 		{
-//#if 0 //_WIN32
+			//#if 0 //_WIN32
 			//if (modifiedtimes[i].first == buildtimes[i].first && modifiedtimes[i].second == buildtimes[i].second)
-//#else
+			//#else
 			if (modifiedtimes[i] == buildtimes[i])// && modifiedtimes[i].second == buildtimes[i].second)
-//#endif
+				//#endif
 			{
 				if (i == modifiedtimes.size() - 1)
 				{
 					printf("No Changes Detected, Compiling Skipped\n");
+
+					if (options.run)
+						ExecuteProject(project, projectdir);
 
 					//restore working directory
 					chdir(olddir);
@@ -309,7 +346,6 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	{
 		msg.Print();
 	});
-	bool time = parser ? parser->GetOption("t").GetString().length() == 0 : false;
 	Compilation* compilation = Compilation::Make(project, &diagnostics, time);
 
 error:
@@ -324,7 +360,7 @@ error:
 	}
 	else
 	{
-		compilation->Assemble(options.optimization, time);
+		compilation->Assemble(options.optimization, options.time);
 
 		//output build times
 		std::ofstream rebuild("build/rebuild.txt");
@@ -347,6 +383,9 @@ error:
 		//running postbuild
 		if (configuration.postbuild.length() > 0)
 			printf("%s", exec(configuration.postbuild.c_str()).c_str());
+
+		if (options.run && project->IsExecutable())
+			ExecuteProject(project, projectdir);
 	}
 
 	delete compilation;

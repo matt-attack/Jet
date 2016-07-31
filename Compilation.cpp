@@ -519,7 +519,7 @@ void Compilation::Assemble(int olevel, bool time)
 {
 	if (this->diagnostics->GetErrors().size() > 0)
 		return;
-	
+
 	StackTime timer("Assembling Output", time);
 
 	char olddir[500];
@@ -550,8 +550,12 @@ void Compilation::Assemble(int olevel, bool time)
 
 	//output the .o file for this package
 	this->OutputPackage(project->project_name, olevel, time);
-
-
+	//add a trait test and template test
+	//figure out how to do[] operator
+	//	todo unary operators and comparisons
+	//and handling the arguments as well as function overloads, which is still a BIG problem
+	//need name mangling
+	
 	//then, if and only if I am an executable, make the .exe
 	if (project->IsExecutable())
 	{
@@ -615,7 +619,7 @@ void Compilation::Assemble(int olevel, bool time)
 
 		auto res = exec(cmd.c_str());
 		printf(res.c_str());
-}
+	}
 	else
 	{
 		std::vector<std::string> temps;

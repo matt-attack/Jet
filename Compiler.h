@@ -33,14 +33,17 @@ namespace Jet
 	struct CompilerOptions
 	{
 		int optimization;//from 0-3
-		bool force;
+		bool force, run = false, time = false;
 		CompilerOptions()
 		{
 			this->force = false;
 			this->optimization = 0;
 		}
+
+		void ApplyOptions(OptionParser* parser);
 	};
 
+	//todo: why is this a class?
 	class Compiler
 	{
 	public:
@@ -48,6 +51,9 @@ namespace Jet
 		//returns if was successful
 		bool Compile(const char* projectfile, CompilerOptions* options = 0, const std::string& config = "", OptionParser* parser = 0);
 	};
+
+
+	void SetupDefaultCommandOptions(OptionParser* parser);
 };
 
 #endif

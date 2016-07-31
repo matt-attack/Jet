@@ -426,29 +426,35 @@ std::string generate_jet_from_header(const char* header)
 void DoCommand(int argc, char* argv[])
 {
 	OptionParser parser;
-	parser.AddOption("o", "0");
-	parser.AddOption("f", "0");
-	parser.AddOption("t", "0");
+	SetupDefaultCommandOptions(&parser);
+	//parser.AddOption("o", "0");
+	//parser.AddOption("f", "0");
+	//parser.AddOption("t", "0");
+	//parser.AddOption("run", "0");
 	parser.Parse(argc, argv);
 
 	std::string cmd = argc > 1 ? argv[1] : "";
 	if (cmd == "runtests")
 	{
 		//finish tests
-		OptionParser parser;
-		parser.AddOption("o", "0");
-		parser.AddOption("f", "1");
-		parser.AddOption("t", "0");
-		parser.Parse(argc, argv);
+		parser.GetOption("f").SetValue("1");
+		//OptionParser parser;
+		//parser.AddOption("o", "0");
+		//parser.AddOption("f", "1");
+		//parser.AddOption("t", "0");
+		//parser.AddOption("run", "0");
+		//parser.Parse(argc, argv);
 
 		CompilerOptions options;
-		options.optimization = parser.GetOption("o").GetInt();
-		options.force = parser.GetOption("f").GetString().length() == 0;
+		options.ApplyOptions(&parser);
+		//options.optimization = parser.GetOption("o").GetInt();
+		//options.force = parser.GetOption("f").GetString().length() == 0;
+		
 		std::string config = "";
 		if (parser.commands.size())
 			config = parser.commands.front();
 
-		std::vector<char*> programs = { "SmartPointerTest", "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors", "Enums" };
+		std::vector<char*> programs = { "OperatorOverloads", "SmartPointerTest", "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors", "Enums" };
 
 
 		for (auto ii : programs)
@@ -532,8 +538,12 @@ void DoCommand(int argc, char* argv[])
 
 	//add options to this later
 	CompilerOptions options;
-	options.optimization = parser.GetOption("o").GetInt();
-	options.force = parser.GetOption("f").GetString().length() == 0;
+	options.ApplyOptions(&parser);
+	//options.optimization = parser.GetOption("o").GetInt();
+	//options.force = parser.GetOption("f").GetString().length() == 0;
+	//options.time = parser.GetOption("t").GetString().length() == 0;
+	//options.run = parser.GetOption("run").GetString().length() == 0;
+
 	std::string config = "";
 	if (parser.commands.size())
 		config = parser.commands.front();

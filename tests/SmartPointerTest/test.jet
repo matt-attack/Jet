@@ -14,9 +14,9 @@ trait Any
 
 fun void ExaminePointer(char* ptr)
 {
-	let long ptrl = <long>ptr;
-	ptrl -= 4;
-	let int* nptr = <int*><char*>ptrl;
+	//let long ptrl = <long>(ptr-4);
+	//ptrl -= 4;
+	let int* nptr = <int*>(ptr-4);
 	let int count = (*nptr);
 	printf("Pointer: %x Count: %i", (<int>ptr), count);
 }
@@ -32,7 +32,7 @@ struct SmartPointer<Any T>
 	fun void ~SmartPointer()
 	{
 		//puts("freeing smart pointer\n");
-		//ExaminePointer(<char*>this->ptr);
+		ExaminePointer(<char*>this->ptr);
 		free this->ptr;
 		//puts("done freeing smart pointer\n");
 	}
@@ -69,7 +69,7 @@ fun int main()
 	{
 		let TesterClass p;
 		p.p.ptr = new TestClass;
-		//ExaminePointer(<char*>p.p.ptr);
+		ExaminePointer(<char*>p.p.ptr);
 		//p.q.ptr = new TestClass;
 	
 	}

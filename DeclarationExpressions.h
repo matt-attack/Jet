@@ -285,6 +285,7 @@ namespace Jet
 		bool is_generator;
 		std::vector<std::pair<Token, Token>>* templates;
 		Token open_bracket, close_bracket;
+		Token oper;
 	public:
 
 		ScopeExpression* GetBlock()
@@ -292,8 +293,9 @@ namespace Jet
 			return block;
 		}
 
-		FunctionExpression(Token token, Token name, Token ret_type, bool generator, std::vector<FunctionArg>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, Token colons, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures, Token open_bracket, Token close_bracket)
+		FunctionExpression(Token token, Token name, Token ret_type, bool generator, std::vector<FunctionArg>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, Token colons, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures, Token open_bracket, Token close_bracket, Token oper)
 		{
+			this->oper = oper;
 			this->open_bracket = open_bracket;
 			this->close_bracket = close_bracket;
 			this->is_generator = generator;
@@ -352,6 +354,9 @@ namespace Jet
 			}
 
 			name.Print(output, source);
+
+			if (this->oper.text.length())
+				this->oper.Print(output, source);
 
 			open_bracket.Print(output, source);
 
