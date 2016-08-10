@@ -44,7 +44,7 @@ public:
 		//array stuff
 		operators["["] = TokenType::LeftBracket;
 		operators["]"] = TokenType::RightBracket;
-		operators["[]"] = TokenType::DoubleBracket;
+		//operators["[]"] = TokenType::DoubleBracket;
 
 		//object stuff
 		operators["."] = TokenType::Dot;

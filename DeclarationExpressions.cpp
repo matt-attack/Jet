@@ -426,8 +426,8 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			context->root->builder.CreateStore(val, ptr);
 
 			context->root->builder.CreateRetVoid();
-			
-			
+
+
 			auto x = str->data->functions.find("Reset");
 			x->second = reset->function;
 		}
@@ -1168,6 +1168,14 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	{
 		if (ii.type == StructMember::VariableMember)
 		{
+			//error if we already have the member
+			for (auto mem : str->data->struct_members)
+				if (mem.name == ii.variable.name.text)
+				{
+					//context->root->diagnostics->Error("", mem.);
+					//todo: show where first defintion is
+					context->root->Error("Duplicate member variable '" + ii.variable.name.text + "'", ii.variable.name);
+				}
 			str->data->struct_members.push_back({ ii.variable.name.text, ii.variable.type.text, 0 });
 			if (this->templates == 0)
 				context->root->AdvanceTypeLookup(&str->data->struct_members.back().type, ii.variable.type.text, &ii.variable.type);

@@ -651,7 +651,7 @@ bool IsValidFunctionNameToken(TokenType op)
 		return true;
 	else if (op == TokenType::Modulo)
 		return true;
-	else if (op == TokenType::DoubleBracket)
+	else if (op == TokenType::LeftBracket)
 		return true;
 	else if (op == TokenType::LessThan)
 		return true;
@@ -664,7 +664,10 @@ bool IsValidFunctionNameToken(TokenType op)
 
 	return false;
 }
-
+//maybe add a way to make non - nullable non - freeable pointers
+//add superconst to represent const int* const x;
+//still gotta solve operator problem with passing operands as pointers
+//ok, [] operator can be implemented by returning a pointer to the value
 Expression* FunctionParselet::parse(Parser* parser, Token token)
 {
 	//read in type
@@ -687,8 +690,8 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	else
 		name = parser->Consume(TokenType::Name);
 	//bool destructor = parser->MatchAndConsume(TokenType::BNot);//todo: fix this parser hack
-	
-	auto arguments = new std::vector<FunctionArg>;
+
+	auto arguments = new std::vector < FunctionArg > ;
 
 	Token stru, colons;
 	if (parser->Match(TokenType::Scope))
@@ -705,6 +708,11 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 		//parse in the operator
 		oper = name;
 		name = parser->Consume();
+		if (name.type == TokenType::LeftBracket)
+		{
+			auto name2 = parser->Consume(TokenType::RightBracket);
+			name.text += ']';
+		}
 	}
 
 	//check that the name is ok
@@ -769,13 +777,10 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 			//todo put more unary ops here
 			parser->Error("Wrong number of arguments for operator overload '" + name.text + "' expected 0 got " + std::to_string(arguments->size()), (*arguments)[arguments->size() - 1].name);
 		}
-		else if (name.type == TokenType::DoubleBracket)//[] operator
+		else if (name.text == "[]" && arguments->size() != 1 && arguments->size() != 0)//.type == TokenType::DoubleBracket)//[] operator
 		{
-			if (arguments->size() != 1 && arguments->size() != 0)
-				parser->Error("Wrong number of arguments for operator overload '" + name.text + "' expected 1 or 0 got " + std::to_string(arguments->size()), (*arguments)[arguments->size() - 1].name);
+			parser->Error("Wrong number of arguments for operator overload '" + name.text + "' expected 1 or 0 got " + std::to_string(arguments->size()), (*arguments)[arguments->size() - 1].name);
 		}
-		//else if (name.type == TokenType::)
-		//todo: [] operator
 		else if (arguments->size() != 1)
 		{
 			//binary ops

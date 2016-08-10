@@ -201,6 +201,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 			if (funiter != left.type->data->functions.end() && funiter->second->arguments.size() == 2)
 			{
 				Function* fun = funiter->second;
+				fun->Load(this->root);
 				return CValue(fun->return_type, this->root->builder.CreateCall(fun->f, { lhsptr.val, right.val }, "operator_overload"));
 			}
 		}

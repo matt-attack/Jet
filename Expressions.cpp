@@ -179,7 +179,7 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 {
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
-
+	//bad implementation
 	auto string = dynamic_cast<StringExpression*>(index);
 	if (p || i)
 	{
@@ -224,14 +224,29 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 
 			return lhs.type->base->base->data->struct_members[index].type;
 		}
-		else if ((lhs.type->type == Types::Array || lhs.type->type == Types::Pointer) && string == 0)//or pointer!!(later)
+		else if ((lhs.type->type == Types::Array || lhs.type->type == Types::Pointer) && (lhs.type->base->type == Types::Pointer || lhs.type->base->type == Types::Array) && string == 0)//or pointer!!(later)
 		{
 			if (lhs.type->base->base == 0 && this->member.text.length())
 				context->root->Error("Cannot access member '" + this->member.text + "' of type '" + lhs.type->base->ToString() + "'", this->member);
 
 			return lhs.type->base->base;
 		}
+		else
+		{
+			auto stru = lhs.type->base->data;
+
+			auto funiter = stru->functions.find("[]");
+			//todo: search through multimap to find one with the right number of args
+			if (funiter != stru->functions.end() && funiter->second->arguments.size() == 2)
+			{
+				Function* fun = funiter->second;
+				//CValue right = index->Compile(context);
+				//todo: casting
+				return fun->return_type->base;
+			}
+		}
 	}
+	throw 7;//error if we miss it
 }
 
 CValue GetStructElement(CompilerContext* context, const std::string& name, const Token& token, Type* type, llvm::Value* lhs)
@@ -282,12 +297,6 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 	}
 	else if (p || i)
 	{
-		//CValue lhs;
-		//if (p)
-		//	lhs = context->GetVariable(p->GetName());
-		//else if (i)
-		//	lhs = i->GetElementPointer(context);
-
 		if (this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
 		{
 			return GetStructElement(context, this->member.text, this->member, lhs.type->base, lhs.val);
@@ -310,9 +319,20 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 
 			return CValue(lhs.type->base, loc);
 		}
-		else if (lhs.type->type == Types::Struct && this->member.text.length() == 0)
+		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct && this->member.text.length() == 0)
 		{
-			context->root->Error("Indexing Structs Not Implemented", this->token);
+			auto stru = lhs.type->base->data;
+
+			auto funiter = stru->functions.find("[]");
+			//todo: search through multimap to find one with the right number of args
+			if (funiter != stru->functions.end() && funiter->second->arguments.size() == 2)
+			{
+				Function* fun = funiter->second;
+				fun->Load(context->root);
+				CValue right = index->Compile(context);
+				//todo: casting
+				return CValue(fun->return_type, context->root->builder.CreateCall(fun->f, { lhs.val, right.val }, "operator_overload"));
+			}
 		}
 		context->root->Error("Cannot index type '" + lhs.type->ToString() + "'", this->token);
 	}

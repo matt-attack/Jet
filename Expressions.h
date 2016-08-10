@@ -562,6 +562,7 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			//auto loc = this->GetElementPointer(context);
+			context->current_token = &this->token;
 			auto type = this->GetType(context, true);
 			if (type->type == Types::Function)
 				return type;
