@@ -57,12 +57,17 @@ union C = A | B;
 fun int main() 
 {
 	let B q;
-	q.b_val = 0;
+	//printf("vtable %i\n",<int>q.__vtable);
+	//printf("first entry %i\n", <int>q.__vtable[0]);
+	//printf("vtable global %i\n", <int>&__B_vtable);
+	//printf("first entry %i\n", <int>__B_vtable[0]);
+	
+	//q.b_val = 0;
 	q = q + 5;
-	q = q - 4;
-	q = q * 5;
-	q = q / 5;
-	puts("hello");
+	//q = q - 4;
+	//q = q * 5;
+	//q = q / 5;
+	//puts("hello");
 	
 	//let int arr[50];
 	//q.data = &arr[0];
@@ -74,6 +79,6 @@ fun int main()
 		puts("pass\n");
 	
 	printf("%i", q[5]);
-	//getchar();
+	getchar();
 	return 0;
 }

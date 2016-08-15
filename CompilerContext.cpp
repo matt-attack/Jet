@@ -162,6 +162,35 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 	this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 }
 
+CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::Value*>& argsv)
+{
+	//if we are a virtual call, do that
+	if (fun->is_virtual)
+	{
+		//ok, load the virtual table, then load the pointer to it
+		auto gep = context->root->builder.CreateGEP(argsv[0], { context->root->builder.getInt32(0), context->root->builder.getInt32(fun->virtual_table_location) }, "get_vtable");
+		
+		//then load it
+		llvm::Value* ptr = context->root->builder.CreateLoad(gep);
+		
+		//get the correct offset
+		ptr = context->root->builder.CreateGEP(ptr, { context->Integer(fun->virtual_offset).val }, "get_offset_in_vtable");
+		
+		//load it
+		ptr = context->root->builder.CreateLoad(ptr);
+
+		//then cast it to the correct function type
+		auto func = context->root->builder.CreatePointerCast(ptr, fun->GetType(context->root)->GetLLVMType());
+
+		//then call it
+		return CValue(fun->return_type, context->root->builder.CreateCall(func, argsv));
+	}
+	else
+	{
+		return CValue(fun->return_type, context->root->builder.CreateCall(fun->f, argsv));
+	}
+}
+
 CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue lhsptr, CValue right)
 {
 	llvm::Value* res = 0;
@@ -202,7 +231,10 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 			{
 				Function* fun = funiter->second;
 				fun->Load(this->root);
-				return CValue(fun->return_type, this->root->builder.CreateCall(fun->f, { lhsptr.val, right.val }, "operator_overload"));
+				std::vector<llvm::Value*> argsv = { lhsptr.val, right.val };
+				return CallFunction(this, fun, argsv);
+				//ok, need to use proper function call here to include virtuals
+				//return CValue(fun->return_type, this->root->builder.CreateCall(fun->f, { lhsptr.val, right.val }, "operator_overload"));
 			}
 		}
 	}
@@ -643,7 +675,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 	for (int i = 0; i < args.size(); i++)
 		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]).val);//try and cast to the correct type if we can
 
-	return CValue(fun->return_type, this->root->builder.CreateCall(fun->f, argsv));
+	return CallFunction(this, fun, argsv);
 }
 
 void CompilerContext::SetDebugLocation(const Token& t)

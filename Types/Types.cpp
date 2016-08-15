@@ -820,16 +820,20 @@ void Struct::Load(Compilation* compiler)
 		return;
 
 	//add on items from parent
+	bool needs_vtable = false;
+	int vtable_size = 0;
 	if (this->parent_struct)
 	{
 		this->parent_struct->Load(compiler);
-
+		//check parent for vtable
+		//	is just moving all the members ok, or do I need to compress vtables
 		if (this->parent_struct->type != Types::Struct)
 			compiler->Error("Struct's parent must be another Struct!", *compiler->current_function->current_token);
 
 		//add its members to me
 		auto oldmem = std::move(this->struct_members);
 		this->struct_members.clear();
+		//dont add constructors
 		for (auto ii : this->parent_struct->data->struct_members)
 			this->struct_members.push_back(ii);
 		for (auto ii : oldmem)
@@ -837,11 +841,68 @@ void Struct::Load(Compilation* compiler)
 
 		//add the functions too :D
 		auto oldfuncs = std::move(this->functions);
+
 		this->functions.clear();
 		for (auto ii : this->parent_struct->data->functions)
+		{
+			//setup vtable indices
 			this->functions.insert(ii);
+
+			//exclude any constructors, or missing functions
+			if (ii.first == this->parent_struct->data->name || ii.second == 0)
+				continue;
+
+			ii.second->virtual_offset = vtable_size++;
+		}
 		for (auto ii : oldfuncs)
+		{
+			bool duplicate = false; int dup_loc = 0;
+			std::string dupname = ii.first.find('~') != -1 ? "~"+ this->parent_struct->data->name : ii.first;
+			for (auto mem : this->parent_struct->data->functions)
+			{
+				if (mem.first == dupname)
+				{
+					duplicate = true;
+					dup_loc = mem.second->virtual_offset;
+
+					//lets just erase it
+					this->functions.erase(ii.first);
+					break;
+				}
+			}
+
+			//todo have it warn/info if no virtual is suggested
 			this->functions.insert(ii);
+
+			//exclude any constructors, or missing functions
+			if (ii.first == this->name || ii.second == 0)
+				continue;
+
+			//if (ii.second->is_virtual == false)
+			//	continue;
+			if (duplicate)
+				ii.second->virtual_offset = dup_loc;
+			else
+				ii.second->virtual_offset = vtable_size++;
+		}
+	}
+	else
+	{
+		//populate vtable with my own functions
+		for (auto ii : this->functions)
+		{
+			//exclude any constructors, or missing functions
+			if (ii.first == this->name || ii.second == 0)
+				continue;
+
+			ii.second->virtual_offset = vtable_size++;
+		}
+	}
+
+	needs_vtable = true;//lets do it always just because (need to only do it when im inherited from)
+	if (needs_vtable && this->parent_struct == 0)
+	{
+		this->struct_members.push_back({ "__vtable", "char*", compiler->LookupType("char**") });//add the member if we dont have it
 	}
 
 	//recursively load
@@ -866,6 +927,50 @@ void Struct::Load(Compilation* compiler)
 	this->type = llvm::StructType::create(elementss, this->name);
 
 	this->loaded = true;
+
+
+	//populate vtable
+	//vtables need to be indentical in layout!!!
+	if (needs_vtable)
+	{
+		std::vector<llvm::Constant*> ptrs;
+		ptrs.resize(vtable_size);
+
+		//find the vtable location
+		int vtable_loc = 0;
+		for (; vtable_loc < this->struct_members.size(); vtable_loc++)
+		{
+			if (this->struct_members[vtable_loc].name == "__vtable")
+				break;
+		}
+
+		//load the functions first, then add all the virtual ones
+		//first add all virtuals from the parent, then all of mine
+		for (auto ii : this->functions)
+		{
+			if (ii.second == 0 || ii.second->virtual_offset == -1)
+				continue;
+
+			ii.second->is_virtual = true;
+			ii.second->virtual_table_location = vtable_loc;//this->struct_members.size() - 1;
+
+			ii.second->Load(compiler);
+			auto ptr = ii.second->f;
+			auto charptr = llvm::ConstantExpr::getBitCast(ptr, compiler->LookupType("char*")->GetLLVMType());
+
+			ptrs[ii.second->virtual_offset] = charptr;// ptrs.push_back(charptr);
+		}
+
+		auto arr = llvm::ConstantArray::get(llvm::ArrayType::get(compiler->LookupType("char*")->GetLLVMType(), vtable_size), ptrs);
+
+		auto oldns = compiler->ns;
+
+		compiler->ns = this;
+		//then need to have function calls to virtual functions to go the lookup table
+		compiler->AddGlobal("__" + this->name + "_vtable", compiler->LookupType("char*[" + std::to_string(vtable_size) + "]"), arr);
+
+		compiler->ns = oldns;
+	}
 }
 
 Namespace::~Namespace()
@@ -1087,7 +1192,7 @@ llvm::Constant* Type::GetDefaultValue(Compilation* compilation)
 	{
 		std::vector<llvm::Constant*> arr;
 		arr.push_back(this->base->GetDefaultValue(compilation));
-		initializer = llvm::ConstantArray::get(llvm::dyn_cast<llvm::ArrayType>(this->GetLLVMType()),arr);
+		initializer = llvm::ConstantArray::get(llvm::dyn_cast<llvm::ArrayType>(this->GetLLVMType()), arr);
 	}
 	else if (this->type == Types::Struct)
 	{

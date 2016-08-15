@@ -672,8 +672,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 {
 	//read in type
 	Token ret_type = ::ParseType(parser);
-	//fix it stealing the * as a pointer and []
-	//	probably need a keyword(or at least a fake one) to specify when theres an operator
+	
 	//todo fix this not allowing binary not operator
 	Token name;
 	if (parser->Match(TokenType::BNot))

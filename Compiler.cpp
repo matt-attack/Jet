@@ -113,6 +113,7 @@ public:
 };
 
 #include <process.h>
+#include <thread>
 void ExecuteProject(JetProject* project, const char* projectdir)
 {
 	//now try running it if we are supposed to
@@ -122,10 +123,22 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 
 	ZeroMemory(&si, sizeof(si));
 	si.cb = sizeof(si);
+
 	ZeroMemory(&pi, sizeof(pi));
 
 	std::string path = "build\\" + project->project_name + ".exe ";
 	CreateProcess(path.c_str(), "", 0, 0, 0, CREATE_NEW_CONSOLE, 0, 0, &si, &pi);
+
+	//throw up a thread that closes the handle when its done
+	std::thread x([pi](){
+		// Wait until child process exits.
+		WaitForSingleObject(pi.hProcess, INFINITE);
+
+		// Close process and thread handles. 
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+	});
+	x.detach();
 #endif
 	//system(path.c_str());
 	

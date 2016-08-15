@@ -62,8 +62,9 @@ namespace Jet
 
 		bool do_export;
 		bool has_return = false;
-		
-		bool is_generator;//generator stuff
+
+		//generator stuff
+		bool is_generator;
 		struct generator_data
 		{
 			llvm::IndirectBrInst* ibr;
@@ -77,6 +78,11 @@ namespace Jet
 		{
 			llvm::StructType* storage_type;//for lambdas
 		} lambda;
+
+		//virtual stuff
+		bool is_virtual = false;
+		int virtual_offset = -1;
+		int virtual_table_location = -1;
 
 		llvm::Function* f;//not always used
 		llvm::DISubprogram* scope;
