@@ -67,20 +67,26 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		this->debug_type = compiler->debug->createBasicType("fun_pointer", 32, 32, llvm::dwarf::DW_ATE_address);
 	else if (this->type == Types::Struct)
 	{
-		std::vector<llvm::Metadata*> ftypes;
-		for (auto type : this->data->struct_members)
-		{
-			assert(type.type->loaded);
-			ftypes.push_back(type.type->GetDebugType(compiler));
-		}
 
 		llvm::DIType* typ = 0;
 
 		int line = 0;
 		if (this->data->expression)
 			line = this->data->expression->token.line;
+		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 4, 0, typ, 0);
+		this->debug_type = dt;
 
-		this->debug_type = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 4, 0, typ, compiler->debug->getOrCreateArray(ftypes));
+		//now build and set elements
+
+		std::vector<llvm::Metadata*> ftypes;
+		for (auto type : this->data->struct_members)
+		{
+			//assert(type.type->loaded);
+			type.type->Load(compiler);
+			ftypes.push_back(type.type->GetDebugType(compiler));
+		}
+		dt->replaceElements(compiler->debug->getOrCreateArray(ftypes));
+
 	}
 	else if (this->type == Types::Union)
 	{
@@ -929,19 +935,32 @@ void Struct::Load(Compilation* compiler)
 	{
 		this->struct_members.push_back({ "__vtable", "char*", compiler->LookupType("char**") });//add the member if we dont have it
 	}
-
+	
 	//recursively load
+	llvm::StructType* struct_type = 0;
 	std::vector<llvm::Type*> elementss;
 	for (auto ii : this->struct_members)
 	{
 		auto type = ii.type;
 
-		if (ii.type->type == Types::Struct && ii.type->data == this)
-			compiler->Error("Circular dependency", *compiler->current_function->current_token);
+		if (ii.type->type == Types::Struct && ii.type->data == this || ii.type->GetBaseType()->data == this)
+		{
+			if (ii.type->type == Types::Pointer)
+			{
+				//we are good, do a cheat load
+				if (struct_type == 0)
+					struct_type = llvm::StructType::create(compiler->context, this->name);
+				elementss.push_back(struct_type->getPointerTo());
+			}
+			else
+				compiler->Error("Circular dependency", *compiler->current_function->current_token);
+		}
+		else
+		{
+			ii.type->Load(compiler);
 
-		ii.type->Load(compiler);
-
-		elementss.push_back(type->GetLLVMType());
+			elementss.push_back(type->GetLLVMType());
+		}
 	}
 	if (elementss.size() == 0)
 	{
@@ -949,8 +968,14 @@ void Struct::Load(Compilation* compiler)
 		elementss.push_back(compiler->IntType->GetLLVMType());
 	}
 
-	this->type = llvm::StructType::create(elementss, this->name);
-
+	if (struct_type == 0)
+		this->type = llvm::StructType::create(elementss, this->name);
+	else
+	{
+		struct_type->setBody(elementss);
+		this->type = struct_type;
+	}
+	//this->type->dump();
 	this->loaded = true;
 
 

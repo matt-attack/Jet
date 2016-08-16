@@ -4,6 +4,7 @@
 namespace Jet
 {
 	class NameExpression;
+	class TypeofExpression;
 	class LocalExpression;
 	class NumberExpression;
 	class StringExpression;
@@ -103,6 +104,8 @@ namespace Jet
 		virtual void Visit(EnumExpression* exp) {};
 
 		virtual void Visit(GroupExpression* exp) {};
+
+		virtual void Visit(TypeofExpression* exp) {};
 	};
 }
 

@@ -222,7 +222,7 @@ Expression* TypeofParselet::parse(Parser* parser, Token token)
 	Token left = parser->Consume(TokenType::LeftParen);
 	auto x = parser->ParseExpression(0);
 	Token right = parser->Consume(TokenType::RightParen);
-	return 0;
+	return new TypeofExpression(token, left, x, right);
 }
 
 Expression* CastParselet::parse(Parser* parser, Token token)

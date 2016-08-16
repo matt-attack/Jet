@@ -1232,6 +1232,48 @@ namespace Jet
 		}
 	};
 
+	class TypeofExpression : public Expression
+	{
+		Token begin, end;
+		Expression* arg;
+		Token token;
+	public:
+		TypeofExpression(Token token, Token begin, Expression* arg, Token end)
+		{
+			this->arg = arg;
+			this->begin = begin;
+			this->token = token;
+			this->end = end;
+		}
+
+		void SetParent(Expression* parent)
+		{
+			this->parent = parent;
+		}
+
+		CValue Compile(CompilerContext* context);
+
+		void CompileDeclarations(CompilerContext* context) {};
+
+		void Print(std::string& output, Source* source)
+		{
+			token.Print(output, source);
+			begin.Print(output, source);
+			arg->Print(output, source);
+			end.Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			return context->root->IntType;
+		}
+	};
+
 	class GroupExpression : public Expression
 	{
 		Token begin, end;

@@ -56,6 +56,11 @@ CValue SizeofExpression::Compile(CompilerContext* context)
 	return context->GetSizeof(t);
 }
 
+CValue TypeofExpression::Compile(CompilerContext* context)
+{
+	return CValue(this->arg->TypeCheck(context),0);
+}
+
 CValue PostfixExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->_operator);
