@@ -797,8 +797,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 
 	Token ret_type = ::ParseType(parser);
 
-	//Token name = parser->Consume(TokenType::Name);
-	Token name = parser->Consume();// TokenType::Name);
+	Token name = parser->Consume();
 	if (name.type == TokenType::Free)
 	{
 		name.type == TokenType::Name;

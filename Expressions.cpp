@@ -91,6 +91,7 @@ CValue IndexExpression::Compile(CompilerContext* context)
 //compiling will only emit instructions, it should do little actual work
 Type* IndexExpression::GetBaseType(CompilerContext* context, bool tc)
 {
+	context->CurrentToken(&this->token);
 	if (auto name = dynamic_cast<NameExpression*>(left))
 		if (tc)
 			return context->TCGetVariable(name->GetName())->base;

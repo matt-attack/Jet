@@ -147,7 +147,7 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 			stru = stru->base;
 			//self = context->root->builder.CreateLoad(self);
 		}
-
+		
 		//push in the this pointer argument kay
 		//argsv.push_back(CValue(stru->GetPointerType(), self));
 	}
@@ -329,6 +329,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 
 	std::string fname;
 	Type* stru = 0;
+	bool devirtualize = false;
 	if (auto name = dynamic_cast<NameExpression*>(left))
 	{
 		//ok handle what to do if im an index expression
@@ -351,6 +352,8 @@ CValue CallExpression::Compile(CompilerContext* context)
 			stru = stru->base;
 			self = context->root->builder.CreateLoad(self);
 		}
+		else
+			devirtualize = true;//if we arent using -> we dont need a virtual call, right?
 
 		//push in the this pointer argument kay
 		argsv.push_back(CValue(stru->GetPointerType(), self));
@@ -372,6 +375,6 @@ CValue CallExpression::Compile(CompilerContext* context)
 		argsv.push_back(ii.first->Compile(context));
 
 	context->CurrentToken(&this->open);
-	return context->Call(fname, argsv, stru);
+	return context->Call(fname, argsv, stru, devirtualize);
 }
 

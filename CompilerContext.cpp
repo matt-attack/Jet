@@ -162,10 +162,12 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 	this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 }
 
-CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::Value*>& argsv)
+CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::Value*>& argsv, bool devirtualize)
 {
+	bool use_virtual = true;
+	//if we are the upper level of the inheritance tree, devirtualize
 	//if we are a virtual call, do that
-	if (fun->is_virtual)
+	if (fun->is_virtual && devirtualize == false)
 	{
 		//ok, load the virtual table, then load the pointer to it
 		auto gep = context->root->builder.CreateGEP(argsv[0], { context->root->builder.getInt32(0), context->root->builder.getInt32(fun->virtual_table_location) }, "get_vtable");
@@ -232,7 +234,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 				Function* fun = funiter->second;
 				fun->Load(this->root);
 				std::vector<llvm::Value*> argsv = { lhsptr.val, right.val };
-				return CallFunction(this, fun, argsv);
+				return CallFunction(this, fun, argsv, false);
 				//ok, need to use proper function call here to include virtuals
 				//return CValue(fun->return_type, this->root->builder.CreateCall(fun->f, { lhsptr.val, right.val }, "operator_overload"));
 			}
@@ -540,7 +542,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 	}
 }
 
-CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct)
+CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct, bool devirtualize)
 {
 	auto old_tok = this->current_token;
 	std::vector<Type*> arsgs;
@@ -675,7 +677,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 	for (int i = 0; i < args.size(); i++)
 		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]).val);//try and cast to the correct type if we can
 
-	return CallFunction(this, fun, argsv);
+	return CallFunction(this, fun, argsv, devirtualize);
 }
 
 void CompilerContext::SetDebugLocation(const Token& t)

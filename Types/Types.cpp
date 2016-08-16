@@ -814,6 +814,24 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 	return fun;
 }
 
+bool is_constructor(const std::string& name)
+{
+	std::string strname;
+	for (int i = 2; i < name.length(); i++)
+	{
+		if (name[i] == '_')
+			break;
+
+		strname.push_back( name[i]);
+	}
+
+	auto sub = name.substr(strname.length() + 3, name.length());
+	if (name.length() == strname.length() * 2 + 3 && sub == strname)
+		return true;
+	return false;
+	//if (name.find('~') != -1 && name.)
+}
+
 void Struct::Load(Compilation* compiler)
 {
 	if (this->loaded)
@@ -841,18 +859,25 @@ void Struct::Load(Compilation* compiler)
 
 		//add the functions too :D
 		auto oldfuncs = std::move(this->functions);
-
+		//ok, now remove extra destructors
 		this->functions.clear();
 		for (auto ii : this->parent_struct->data->functions)
 		{
 			//setup vtable indices
+			//if (ii.second->virtual_offset != -1)
+			//	continue;//dont add duplicate yo
+
 			this->functions.insert(ii);
 
 			//exclude any constructors, or missing functions
-			if (ii.first == this->parent_struct->data->name || ii.second == 0)
+			bool ic = is_constructor(ii.second->name);
+			if (ic || ii.first == this->parent_struct->data->name || ii.second == 0)
 				continue;
 
-			ii.second->virtual_offset = vtable_size++;
+			//ii.second->virtual_offset = 
+			if (ii.second->virtual_offset+1 > vtable_size)
+				vtable_size = ii.second->virtual_offset+1;
+			//vtable_size++;
 		}
 		for (auto ii : oldfuncs)
 		{
@@ -870,7 +895,7 @@ void Struct::Load(Compilation* compiler)
 					break;
 				}
 			}
-
+			
 			//todo have it warn/info if no virtual is suggested
 			this->functions.insert(ii);
 
@@ -878,8 +903,8 @@ void Struct::Load(Compilation* compiler)
 			if (ii.first == this->name || ii.second == 0)
 				continue;
 
-			//if (ii.second->is_virtual == false)
-			//	continue;
+			assert(ii.second->virtual_offset == -1);
+
 			if (duplicate)
 				ii.second->virtual_offset = dup_loc;
 			else
