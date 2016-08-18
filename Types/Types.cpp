@@ -67,7 +67,6 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		this->debug_type = compiler->debug->createBasicType("fun_pointer", 32, 32, llvm::dwarf::DW_ATE_address);
 	else if (this->type == Types::Struct)
 	{
-
 		llvm::DIType* typ = 0;
 
 		int line = 0;
@@ -86,7 +85,6 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 			ftypes.push_back(type.type->GetDebugType(compiler));
 		}
 		dt->replaceElements(compiler->debug->getOrCreateArray(ftypes));
-
 	}
 	else if (this->type == Types::Union)
 	{
@@ -346,7 +344,6 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 						break;//couldnt find it, doesnt match
 					}
 
-
 					if (range.first->second->return_type)
 					{
 						bool res = FindTemplates(compiler, types, range.first->second->return_type, fun.second->return_type, ii.second, fun.second->return_type->name);
@@ -518,7 +515,6 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	}
 
 	Type* t = new Type(str->name, Types::Struct, str);
-	//t->Load(compiler);
 	t->ns = this->ns;
 
 	//make sure the real thing is stored as this
@@ -1017,7 +1013,7 @@ void Struct::Load(Compilation* compiler)
 
 		compiler->ns = this;
 		//then need to have function calls to virtual functions to go the lookup table
-		compiler->AddGlobal("__" + this->name + "_vtable", compiler->LookupType("char*[" + std::to_string(vtable_size) + "]"), arr);
+		compiler->AddGlobal("__" + this->name + "_vtable", compiler->LookupType("char*[" + std::to_string(vtable_size) + "]"), arr, true);
 
 		compiler->ns = oldns;
 	}

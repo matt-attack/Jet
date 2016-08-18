@@ -110,6 +110,11 @@ namespace Jet
 			this->is_generator = false;
 		}
 
+		~Function()
+		{
+			delete this->context;
+		}
+
 		bool IsCompatible(Function* f)
 		{
 			if (f->return_type != this->return_type)

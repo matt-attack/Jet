@@ -429,7 +429,10 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		//now compile reset function
 		{
-			auto reset = context->AddFunction(this->GetRealName() + "yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? argsv[0].first : 0, is_lambda);// , this->varargs);
+			auto reset = argsv.front().first->base->data->functions.find("Reset")->second->context;
+			//context->AddFunction(this->GetRealName() + "yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? argsv[0].first : 0, is_lambda);// , this->varargs);
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", reset->function->f);
+			context->root->builder.SetInsertPoint(bb);
 
 			context->root->current_function = reset;
 			reset->function->Load(context->root);
@@ -443,12 +446,16 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			context->root->builder.CreateRetVoid();
 
 
-			auto x = str->data->functions.find("Reset");
-			x->second = reset->function;
+			//auto x = str->data->functions.find("Reset");
+			//x->second = reset->function;
 		}
 		//compile current function
 		{
-			auto current = context->AddFunction(this->GetRealName() + "generator_current", context->root->LookupType(this->ret_type.text), { argsv.front() }, Struct.length() > 0 ? argsv[0].first : 0, is_lambda);// , this->varargs);
+			auto current = argsv.front().first->base->data->functions.find("Current")->second->context;// context->AddFunction(this->GetRealName() + "generator_current", context->root->LookupType(this->ret_type.text), { argsv.front() }, Struct.length() > 0 ? argsv[0].first : 0, is_lambda);// , this->varargs);
+
+			//function = argsv.front().first->base->data->functions.find("MoveNext")->second->context;
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", current->function->f);
+			context->root->builder.SetInsertPoint(bb);
 
 			//add a return and shizzle
 			context->root->current_function = current;
@@ -459,8 +466,8 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 			context->root->builder.CreateRet(context->root->builder.CreateLoad(ptr));
 
-			auto x = str->data->functions.find("Current");
-			x->second = current->function;
+			//auto x = str->data->functions.find("Current");
+			//x->second = current->function;
 		}
 		//ok, need to fill in something so this works right in any declaration order
 		//Set the generator function as MoveNext
@@ -541,24 +548,49 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 
 
 		//add default iterator methods, will fill in function later
-		//auto mv = context->AddFunction(this->GetRealName() + "_generator", context->root->LookupType("bool"), { {str, "_context" }}, 0/*Struct.length() > 0 ? argsv[0].first->base : 0*/, name.text.length() == 0);// , this->varargs);
-		auto func = new Function(this->GetRealName() + "_generator", name.text.length() == 0);
-		func->return_type = context->root->LookupType("bool");
-		func->arguments = {{ 0, "_context" }};
-		func->arguments.resize(1);
-		context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name+"*", &this->ret_type);
+		{
+			auto func = new Function(this->GetRealName() + "_generator", name.text.length() == 0);
+			func->return_type = context->root->LookupType("bool");
+			func->arguments = { { 0, "_context" } };
+			func->arguments.resize(1);
+			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
 
-		auto n = new CompilerContext(context->root, context);
-		n->function = func;
-		func->context = n;
-		//func->Load(this->root);
+			auto n = new CompilerContext(context->root, context);
+			n->function = func;
+			func->context = n;
+			context->root->ns->members.insert({ func->name, func });
 
-		//if (member == false)
-			context->root->ns->members.insert({ fname, func });
+			str->data->functions.insert({ "MoveNext", func });
+		}
+		{
+			auto func = new Function(this->GetRealName() + "_yield_reset", name.text.length() == 0);
+			func->return_type = context->root->LookupType("void");
+			func->arguments = { { 0, "_context" } };
+			func->arguments.resize(1);
+			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
 
-		str->data->functions.insert({ "MoveNext", func });
-		str->data->functions.insert({ "Reset", 0 });
-		str->data->functions.insert({ "Current", 0 });
+			auto n = new CompilerContext(context->root, context);
+			n->function = func;
+			func->context = n;
+			context->root->ns->members.insert({ func->name, func });
+
+			str->data->functions.insert({ "Reset", func });
+		}
+		{
+			auto func = new Function(this->GetRealName() + "_generator_current", name.text.length() == 0);
+			func->return_type = context->root->LookupType("void");
+			context->root->AdvanceTypeLookup(&func->return_type, this->ret_type.text, &this->ret_type);
+
+			func->arguments = { { 0, "_context" } };
+			func->arguments.resize(1);
+			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
+
+			auto n = new CompilerContext(context->root, context);
+			n->function = func;
+			func->context = n;
+			context->root->ns->members.insert({ func->name, func });
+			str->data->functions.insert({ "Current", func });
+		}
 
 		//add the position and return variables to the context
 		str->data->struct_members.push_back({ "position", "char*", context->root->LookupType("char*") });
@@ -884,6 +916,9 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 				has_destructor = true;
 		}
 	}
+	//oops im adding extra destructors for imported compiled types :S
+	//	becuase im using extern to define them, but I generate destructors beforehand
+	//	need to disable this somehow when compiling symbols
 	if (has_constructor == false)
 	{
 		auto fun = new Function("__" + str->data->name + "_" + strname, false);//
@@ -1211,6 +1246,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	//build data about the struct
 	Type* str = new Type(this->name.text, Types::Struct, new Struct);
 	context->root->ns->members.insert({ this->name.text, str });
+	str->ns = context->root->ns;
 
 	str->data->name = this->name.text;
 	str->data->expression = this;
@@ -1277,7 +1313,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 	}
 	context->root->ns = context->root->ns->parent;
 
-	if (this->templates == 0)
+	if (this->templates == 0 && context->root->compiling_includes == false)
 		this->AddConstructorDeclarations(str, context);
 }
 

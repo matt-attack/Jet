@@ -28,6 +28,9 @@ Token ParseType(Parser* parser, bool parse_arrays = true)
 		out += parser->Consume(TokenType::Name).text;
 	}
 
+	while (parser->MatchAndConsume(TokenType::Asterisk))//parse pointers
+		out += '*';
+
 	if (parser->MatchAndConsume(TokenType::LessThan))//parse templates
 	{
 		out += "<";

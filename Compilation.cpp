@@ -113,10 +113,6 @@ Compilation::~Compilation()
 	//free global namespace
 	delete this->global;
 
-	//free functions
-	//for (auto ii : this->functions)
-	//	delete ii;
-
 	//free ASTs
 	for (auto ii : asts)
 	{
@@ -305,6 +301,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	std::vector<Source*> symbol_sources;
 	{
 		StackTime timer("Reading Symbols", time);
+		compilation->compiling_includes = true;
 		for (auto buffer : lib_symbols)
 		{
 			Source* src = new Source(buffer, "symbols");
@@ -345,6 +342,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 
 			compilation->ResolveTypes();
 		}
+		compilation->compiling_includes = false;
 	}
 
 	//read in each file
@@ -741,6 +739,7 @@ void Compilation::SetTarget()
 	// Get the target specific parser.
 	std::string Error;
 	const llvm::Target *TheTarget = llvm::TargetRegistry::lookupTarget(MArch, TheTriple, Error);
+	//for linux builds use i686-pc-linux-gnu
 
 	llvm::TargetOptions Options = InitTargetOptionsFromCodeGenFlags();
 	//Options.MCOption
@@ -1212,14 +1211,14 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 	return type;
 }
 
-CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Constant* init)//, bool Extern = false)
+CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Constant* init, bool intern)//, bool Extern = false)
 {
 	auto global = this->ns->members.find(name);// this->globals.find(name);
 	if (global != this->ns->members.end())
 		Error("Global variable '" + name + "' already exists in " + this->ns->name, *this->current_function->current_token);
 
 	llvm::Constant* initializer = init ? init : t->GetDefaultValue(this);
-	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, llvm::GlobalValue::LinkageTypes::ExternalLinkage, initializer, name);
+	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
 
 	this->ns->members.insert({ name, Symbol(new CValue(t->GetPointerType(), ng)) });
 	//this->globals[name] = 

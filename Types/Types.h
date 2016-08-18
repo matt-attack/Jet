@@ -154,8 +154,6 @@ namespace Jet
 	};
 
 
-	struct Namespace;
-	struct Function;
 	enum class SymbolType
 	{
 		Invalid,
@@ -197,7 +195,7 @@ namespace Jet
 			this->parent = parent;
 		}
 
-		~Namespace();
+		virtual ~Namespace();
 
 		Function* GetFunction(const std::string& name)
 		{

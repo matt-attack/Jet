@@ -103,6 +103,7 @@ namespace Jet
 		Compilation(JetProject* proj);
 	public:
 		bool typecheck;
+		bool compiling_includes = false;
 
 		//dont use these k
 		llvm::Module* module;
@@ -129,7 +130,7 @@ namespace Jet
 		Type* LookupType(const std::string& name, bool load = true);
 		Type* TryLookupType(const std::string& name);
 
-		CValue AddGlobal(const std::string& name, Type* t, llvm::Constant* init = 0);
+		CValue AddGlobal(const std::string& name, Type* t, llvm::Constant* init = 0, bool intern = false);
 
 		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder, bool time = false);
 
