@@ -46,7 +46,8 @@ void Function::Load(Compilation* compiler)
 		f->setCallingConv(llvm::CallingConv::X86_ThisCall);
 		break;
 	}
-	
+	//ok, calling convention setting doesnt seem to work right
+	//	winapi functions fail on return it seems :S
 	llvm::DIFile* unit = compiler->debug_info.file;
 
 	auto functiontype = compiler->debug->createSubroutineType(unit, compiler->debug->getOrCreateTypeArray(ftypes));

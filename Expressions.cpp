@@ -592,41 +592,45 @@ CValue FreeExpression::Compile(CompilerContext* context)
 			fun = ty->GetMethod("~" + ty->data->template_base->name, { pointer.type }, context);
 		else
 			fun = ty->GetMethod("~" + ty->data->name, { pointer.type }, context);
-		fun->Load(context->root);
-		if (false)//this->close_bracket.text.length() == 0)//size == 0)
-		{//just one element, destruct it
-			rootptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
 
-			context->root->builder.CreateCall(fun->f, { pointer.val });
-		}
-		else
+		if (fun)
 		{
-			auto arr_size = context->root->builder.CreateLoad(context->root->builder.CreatePointerCast(rootptr, context->root->IntType->GetPointerType()->GetLLVMType()));
+			fun->Load(context->root);
+			if (false)//this->close_bracket.text.length() == 0)//size == 0)
+			{//just one element, destruct it
+				rootptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
 
-			//destruct each child element
-			llvm::Value* counter = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType(), 0, "newcounter");
-			context->root->builder.CreateStore(context->Integer(0).val, counter);
+				context->root->builder.CreateCall(fun->f, { pointer.val });
+			}
+			else
+			{
+				auto arr_size = context->root->builder.CreateLoad(context->root->builder.CreatePointerCast(rootptr, context->root->IntType->GetPointerType()->GetLLVMType()));
 
-			auto start = llvm::BasicBlock::Create(context->root->context, "start", context->root->current_function->function->f);
-			auto body = llvm::BasicBlock::Create(context->root->context, "body", context->root->current_function->function->f);
-			auto end = llvm::BasicBlock::Create(context->root->context, "end", context->root->current_function->function->f);
+				//destruct each child element
+				llvm::Value* counter = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType(), 0, "newcounter");
+				context->root->builder.CreateStore(context->Integer(0).val, counter);
 
-			context->root->builder.CreateBr(start);
-			context->root->builder.SetInsertPoint(start);
-			auto cval = context->root->builder.CreateLoad(counter, "curcount");
-			auto res = context->root->builder.CreateICmpUGE(cval, arr_size);
-			context->root->builder.CreateCondBr(res, end, body);
+				auto start = llvm::BasicBlock::Create(context->root->context, "start", context->root->current_function->function->f);
+				auto body = llvm::BasicBlock::Create(context->root->context, "body", context->root->current_function->function->f);
+				auto end = llvm::BasicBlock::Create(context->root->context, "end", context->root->current_function->function->f);
 
-			context->root->builder.SetInsertPoint(body);
-			auto elementptr = context->root->builder.CreateGEP(pointer.val, { cval });
-			context->root->builder.CreateCall(fun->f, { elementptr });
+				context->root->builder.CreateBr(start);
+				context->root->builder.SetInsertPoint(start);
+				auto cval = context->root->builder.CreateLoad(counter, "curcount");
+				auto res = context->root->builder.CreateICmpUGE(cval, arr_size);
+				context->root->builder.CreateCondBr(res, end, body);
 
-			auto inc = context->root->builder.CreateAdd(cval, context->Integer(1).val);
-			context->root->builder.CreateStore(inc, counter);
+				context->root->builder.SetInsertPoint(body);
+				auto elementptr = context->root->builder.CreateGEP(pointer.val, { cval });
+				context->root->builder.CreateCall(fun->f, { elementptr });
 
-			context->root->builder.CreateBr(start);
+				auto inc = context->root->builder.CreateAdd(cval, context->Integer(1).val);
+				context->root->builder.CreateStore(inc, counter);
 
-			context->root->builder.SetInsertPoint(end);
+				context->root->builder.CreateBr(start);
+
+				context->root->builder.SetInsertPoint(end);
+			}
 		}
 	}
 

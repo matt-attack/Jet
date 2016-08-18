@@ -768,7 +768,7 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level, bo
 	target->addPassesToEmitFile(MPM, strr, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
 
 	//std::error_code ecc;
-	//llvm::raw_fd_ostream strrr("build/" + project_name + ".s", ecc, llvm::sys::fs::OpenFlags::F_None);
+	//llvm::raw_fd_ostream strrr("build/" + project_name + ".s", ecc, llvm::sys::fs::OpenFlags::F_RW);
 	//llvm::formatted_raw_ostream oo2(strrr);
 
 	//target->addPassesToEmitFile(MPM, strrr, llvm::TargetMachine::CodeGenFileType::CGFT_AssemblyFile, false);

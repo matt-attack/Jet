@@ -612,7 +612,7 @@ int main(int argc, char* argv[])
 
 			DoCommand(numargs, args);
 #ifdef _WIN32
-			_CrtDumpMemoryLeaks();
+			//_CrtDumpMemoryLeaks();
 #endif
 			continue;
 		}

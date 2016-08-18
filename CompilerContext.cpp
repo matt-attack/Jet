@@ -165,19 +165,25 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::Value*>& argsv, bool devirtualize)
 {
 	bool use_virtual = true;
+
+	//virtual function calls for generators fail, need to devirtualize them
+	if (fun->is_generator)//todo expand this to current and reset
+		devirtualize = true;
+
+	
 	//if we are the upper level of the inheritance tree, devirtualize
 	//if we are a virtual call, do that
 	if (fun->is_virtual && devirtualize == false)
 	{
 		//ok, load the virtual table, then load the pointer to it
 		auto gep = context->root->builder.CreateGEP(argsv[0], { context->root->builder.getInt32(0), context->root->builder.getInt32(fun->virtual_table_location) }, "get_vtable");
-		
+
 		//then load it
 		llvm::Value* ptr = context->root->builder.CreateLoad(gep);
-		
+
 		//get the correct offset
 		ptr = context->root->builder.CreateGEP(ptr, { context->Integer(fun->virtual_offset).val }, "get_offset_in_vtable");
-		
+
 		//load it
 		ptr = context->root->builder.CreateLoad(ptr);
 
@@ -185,11 +191,15 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::V
 		auto func = context->root->builder.CreatePointerCast(ptr, fun->GetType(context->root)->GetLLVMType());
 
 		//then call it
+		//auto call = context->root->builder.CreateCall(fun->f, argsv);
+		//call->setCallingConv(fun->f->getCallingConv());
 		return CValue(fun->return_type, context->root->builder.CreateCall(func, argsv));
 	}
 	else
 	{
-		return CValue(fun->return_type, context->root->builder.CreateCall(fun->f, argsv));
+		auto call = context->root->builder.CreateCall(fun->f, argsv);
+		call->setCallingConv(fun->f->getCallingConv());
+		return CValue(fun->return_type, call);
 	}
 }
 
@@ -208,10 +218,10 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 	else if (left.type->type == Types::Struct)
 	{
 		//operator overloads
-		const static std::map<Jet::TokenType, std::string> token_to_string = { 
-			{ TokenType::Plus, "+" }, 
-			{ TokenType::Minus, "-" }, 
-			{ TokenType::Slash, "/" }, 
+		const static std::map<Jet::TokenType, std::string> token_to_string = {
+			{ TokenType::Plus, "+" },
+			{ TokenType::Minus, "-" },
+			{ TokenType::Slash, "/" },
 			{ TokenType::Asterisk, "*" },
 			{ TokenType::LeftShift, "<<" },
 			{ TokenType::RightShift, ">>" },
@@ -599,6 +609,10 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 					auto function_ptr = this->root->builder.CreateGEP(var.val, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) }, "fptr");
 
 					auto type = var.type->base->data->members.find("T")->second.ty;
+
+					if (args.size() != type->function->args.size())
+						this->root->Error("Too many args in function call got " + std::to_string(args.size()) + " expected " + std::to_string(type->function->args.size()), *this->current_token);
+
 					std::vector<llvm::Value*> argsv;
 					for (int i = 0; i < args.size(); i++)
 						argsv.push_back(this->DoCast(type->function->args[i], args[i]).val);//try and cast to the correct type if we can
@@ -624,7 +638,6 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				else
 					this->root->Error("Cannot call non-function type", *this->current_token);
 			}
-
 			if (var.type->type == Types::Pointer && var.type->base->type == Types::Function)
 			{
 				var.val = this->root->builder.CreateLoad(var.val);

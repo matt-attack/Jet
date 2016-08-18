@@ -910,8 +910,9 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 	{
 		do
 		{
-			Token name = parser->Consume(TokenType::Name);
+			Token name = parser->Consume(TokenType::Number);
 			captures->push_back(name);
+			break;
 		} while (parser->MatchAndConsume(TokenType::Comma));
 	}
 	if (captures->size() == 0)

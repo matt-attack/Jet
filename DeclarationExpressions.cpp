@@ -15,6 +15,9 @@ using namespace Jet;
 Type* FunctionExpression::TypeCheck(CompilerContext* context)
 {
 	bool is_lambda = name.text.length() == 0;
+	if (this->captures)
+		is_lambda = false;
+	//if we have specifier we are not lambda, just inline function
 
 	//need to change context
 	CompilerContext* nc = new CompilerContext(context->root, context);// context->AddFunction(this->GetRealName(), ret, argsv, Struct.text.length() > 0 ? true : false, is_lambda);// , this->varargs);
@@ -36,7 +39,10 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 
 		auto ret = context->root->LookupType(this->ret_type.text, false);
 
-		return context->root->LookupType("function<" + context->root->GetFunctionType(ret, args)->ToString() + ">");
+		if (is_lambda == false)
+			return context->root->GetFunctionType(ret, args);
+		else
+			return context->root->LookupType("function<" + context->root->GetFunctionType(ret, args)->ToString() + ">");
 	}
 
 	if (auto str = dynamic_cast<StructExpression*>(this->parent))
@@ -157,6 +163,10 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	context->CurrentToken(&token);
 
 	bool is_lambda = name.text.length() == 0;
+	if (this->captures)
+		is_lambda = false;
+	//this->
+	//if we have specifier we are not lambda, just inline function
 
 	//build list of types of vars
 	std::vector<std::pair<Type*, std::string>> argsv;
@@ -512,6 +522,18 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	fun->expression = this;
 	context->root->functions.push_back(fun);
 	auto str = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
+
+	if (auto attr = dynamic_cast<AttributeExpression*>(this->parent))
+	{
+		//add the attribute to the fun here
+		if (attr->name.text == "stdcall")
+			fun->calling_convention = CallingConvention::StdCall;
+		else if (attr->name.text == "thiscall")
+			fun->calling_convention = CallingConvention::ThisCall;
+		else if (attr->name.text == "fastcall")
+			fun->calling_convention = CallingConvention::FastCall;
+		//add the attribute to the fun
+	}
 
 	fun->f = 0;
 	bool is_trait = false;
