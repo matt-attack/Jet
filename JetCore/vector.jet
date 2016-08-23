@@ -179,6 +179,7 @@ struct vector<Any TT>
 	
 	fun void push_back(TT v)
 	{
+		puts("pushed back");
 		if (this->cur_size >= this->max_size)
 		{
 			//resize
@@ -189,9 +190,14 @@ struct vector<Any TT>
 		this->data[this->cur_size++] = v;
 	}
 
-	fun TT get(int index)
+	//fun TT get(int index)
+	//{
+	//	return this->data[index];
+	//}
+	
+	fun TT* operator[](int index)
 	{
-		return this->data[index];
+		return &this->data[index];
 	}
 	
 	fun void resize(int size)

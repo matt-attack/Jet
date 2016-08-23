@@ -36,8 +36,10 @@ namespace Jet
 
 	class DiagnosticBuilder
 	{
+		friend class Compilation;
 		std::vector<Diagnostic> diagnostics;
 		std::function<void(Diagnostic&)> callback;
+		Compilation* compilation;
 	public:
 
 		DiagnosticBuilder(std::function<void(Diagnostic&)> callback) : callback(callback)
@@ -92,7 +94,7 @@ namespace Jet
 		//list of not fully compiled templates to finish before completion
 		std::vector<Type*> unfinished_templates;
 
-		std::map<int, Type*> function_types;//a cache of function types
+		std::multimap<int, Type*> function_types;//a cache of function types
 
 		DiagnosticBuilder* diagnostics;
 
@@ -179,7 +181,7 @@ namespace Jet
 				module->dump();
 		}
 
-		void SetTarget();//make this customizable later
+		void SetTarget(const std::string& triple);//make this customizable later
 	};
 
 }

@@ -353,11 +353,11 @@ namespace Jet
 				this->colons.Print(output, source);
 			}
 
-			name.Print(output, source);
-
 			if (this->oper.text.length())
 				this->oper.Print(output, source);
 
+			name.Print(output, source);
+			
 			open_bracket.Print(output, source);
 
 			for (auto ii : *this->args)

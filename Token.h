@@ -168,7 +168,7 @@ namespace Jet
 
 		void Print(std::string& str, Source* source) const;
 
-		Source* GetSource(Compilation* compilation);
+		Source* GetSource(Compilation* compilation) const;
 	};
 }
 

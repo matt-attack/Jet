@@ -170,7 +170,7 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::V
 	if (fun->is_generator)//todo expand this to current and reset
 		devirtualize = true;
 
-	
+
 	//if we are the upper level of the inheritance tree, devirtualize
 	//if we are a virtual call, do that
 	if (fun->is_virtual && devirtualize == false)
@@ -405,6 +405,21 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 
 		return CValue(left.type, res);
 	}
+	else if (left.type->type == Types::Pointer)
+	{
+		//com
+		switch (op)
+		{
+		case TokenType::Equals:
+			res = root->builder.CreateICmpEQ(left.val, right.val);
+			return CValue(root->BoolType, res);
+			break;
+		case TokenType::NotEqual:
+			res = root->builder.CreateICmpNE(left.val, right.val);
+			return CValue(root->BoolType, res);
+			break;
+		}
+	}
 
 	this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 }
@@ -485,13 +500,37 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 					int i2 = 0;
 					for (auto iii : fun->arguments)
 					{
-						if (iii.first->name == ii.second)
+						//get the name of the variable
+						int subl = 0;
+						for (; subl < iii.first->name.length(); subl++)
+						{
+							if (!IsLetter(iii.first->name[subl]))
+								break;
+						}
+						//check if it refers to same type
+						std::string sub = iii.first->name.substr(0, subl);
+						//check if it refers to this type
+						if (sub/*iii.first->name*/ == ii.second)
 						{
 							//found it
 							if (templates[i] != 0 && templates[i] != args[i2])
 								this->root->Error("Could not infer template type", *this->current_token);
 
-							templates[i] = args[i2];
+							//need to convert back to root type
+							Type* top_type = args[i2];
+							Type* cur_type = args[i2];
+							//work backwards to get to the type
+							int pos = iii.first->name.size() - 1;
+							while (pos >= 0)
+							{
+								char c = iii.first->name[pos];
+								if (c == '*' && cur_type->type == Types::Pointer)
+									cur_type = cur_type->base;
+								else if (!IsLetter(c))
+									this->root->Error("Could not infer template type", *this->current_token);
+								pos--;
+							}
+							templates[i] = cur_type;// args[i2];
 						}
 						i2++;
 					}
@@ -857,7 +896,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		{
 			//auto ty1 = value.val->getType()->getContainedType(0);
 			llvm::ConstantInt* ty = llvm::dyn_cast<llvm::ConstantInt>(value.val);
-			if (ty && Explicit == false && ty->getSExtValue() != 0)
+			if (Explicit == false && (ty == 0 || ty->getSExtValue() != 0))
 				root->Error("Cannot cast a non-zero integer value to pointer implicitly.", *this->current_token);
 
 			return CValue(t, root->builder.CreateIntToPtr(value.val, t->GetLLVMType()));

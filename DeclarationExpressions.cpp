@@ -655,7 +655,16 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			bool done = false;
 			for (auto temp : *this->templates)
 			{
-				if (temp.second.text == ii.type.text)
+				//get the name of the variable
+				int subl = 0;
+				for (; subl < ii.type.text.length(); subl++)
+				{
+					if (!IsLetter(ii.type.text[subl]))
+						break;
+				}
+				//check if it refers to same type
+				std::string sub = ii.type.text.substr(0, subl);
+				if (temp.second.text == sub)
 				{
 					//insert dummy types
 					fun->arguments.push_back({ new Type(ii.type.text,Types::Invalid), ii.name.text });

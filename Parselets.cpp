@@ -926,7 +926,7 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 	Token ob = parser->Consume(TokenType::LeftParen);
 
 	auto arguments = new std::vector < FunctionArg > ;
-	if (parser->LookAhead().type != TokenType::RightParen)
+	/*if (parser->LookAhead().type != TokenType::RightParen)
 	{
 		do
 		{
@@ -952,6 +952,29 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 				parser->Error(str, token);
 			}
 		} while (true);// parser->MatchAndConsume(TokenType::Comma));
+	}*/
+
+	if (!parser->Match(TokenType::RightParen))
+	{
+		do
+		{
+			Token type = ::ParseType(parser);
+
+			Token name = parser->Consume();
+			Token comma = parser->LookAhead();
+			if (name.type == TokenType::Name)
+			{
+				if (comma.type == TokenType::Comma)
+					arguments->push_back({ type, name, comma });
+				else
+					arguments->push_back({ type, name, Token() });
+			}
+			else
+			{
+				std::string str = "Token not as expected! Expected name or got: " + name.text;
+				parser->Error(str, name);
+			}
+		} while (parser->MatchAndConsume(TokenType::Comma));
 	}
 
 	auto cb = parser->Consume(TokenType::RightParen);

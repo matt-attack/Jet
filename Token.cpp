@@ -16,7 +16,7 @@ void Token::Print(std::string& str, Source* source) const
 }
 
 
-Source* Token::GetSource(Compilation* compilation)
+Source* Token::GetSource(Compilation* compilation) const 
 {
 	for (auto ii : compilation->sources)
 	{

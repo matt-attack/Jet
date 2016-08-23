@@ -240,7 +240,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 {
 	Compilation* compilation = new Compilation(project);
 	compilation->diagnostics = diagnostics;
-
+	diagnostics->compilation = compilation;
 	char olddir[500];
 	getcwd(olddir, 500);
 	std::string path = project->path;
@@ -536,7 +536,10 @@ void Compilation::Assemble(int olevel, bool time)
 #endif
 
 	//set target
-	this->SetTarget();
+	//add string
+	//linux i686-pc-linux-gnu
+	//raspbian arm-pc-linux-gnueabif"armv6-linux-gnueabihf"
+	this->SetTarget("");
 
 	debug->finalize();
 
@@ -553,13 +556,21 @@ void Compilation::Assemble(int olevel, bool time)
 	//	todo unary operators and comparisons
 	//and handling the arguments as well as function overloads, which is still a BIG problem
 	//need name mangling
-	
+
 	//then, if and only if I am an executable, make the .exe
 	if (project->IsExecutable())
 	{
 		printf("Compiling Executable...\n");
+		//working gcc command, use this
+		////C:\Users\Matthew\Desktop\VM\AsmVM2\AsmVM\async>ld build/async.o ../jetcore/build
+		// /jetcore.o -l:"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\lib\msvcrt
+		// .lib" -l:"C:\Program Files (x86)\Windows Kits\8.1\Lib\winv6.3\um\x86\kernel32.li
+		///  b" -o build/async_test.exe --entry _main
 #ifdef USE_GCC
-		std::string cmd = "gcc -L. -g ";//-e_jet_initializer
+		std::string cmd = "ld ";//"gcc -L. -g ";//-e_jet_initializer
+
+		//set entry
+		cmd += "--entry _main ";
 
 		cmd += "build/" + project->project_name + ".o ";
 		cmd += "-o build/" + project->project_name + ".exe ";
@@ -567,9 +578,33 @@ void Compilation::Assemble(int olevel, bool time)
 		//need to link each dependency
 		for (auto ii : project->dependencies)
 		{
-			cmd += "-L" + ii + "/build/ ";
+			cmd += ii + "/build/";//cmd += "-L" + ii + "/build/ ";
 
-			cmd += "-l" + GetNameFromPath(ii) + " ";
+			cmd += GetNameFromPath(ii) + ".o ";
+		}
+
+		//then for each dependency add libs that it needs to link
+		for (auto ii : project->dependencies)
+		{
+			//open up and read first part of the jlib file
+			int size;
+			char* data = ReadDependenciesFromSymbols((ii + "/build/symbols.jlib").c_str(), size);
+
+			if (data == 0)
+			{
+				//probably an error
+			}
+
+			int pos = 0;
+			while (pos < size)
+			{
+				const char* file = &data[pos];
+				if (file[0])
+					cmd += " -l:\"" + std::string(file) + "\"";
+
+				pos += strlen(&data[pos]) + 1;
+			}
+			delete[] data;
 		}
 
 		cmd += " -L.";
@@ -724,23 +759,39 @@ void Compilation::Optimize(int level)
 	}
 }
 
-void Compilation::SetTarget()
+#include <llvm\Support\ARMEHABI.h>
+void Compilation::SetTarget(const std::string& triple)
 {
 	llvm::InitializeNativeTarget();
 	llvm::InitializeNativeTargetAsmParser();
 	llvm::InitializeNativeTargetAsmPrinter();
+	LLVMInitializeARMTarget();
+	LLVMInitializeARMAsmPrinter();
+	LLVMInitializeARMTargetMC();
+	LLVMInitializeARMTargetInfo();
+	//llvm::initializeTarget()
 
 	auto MCPU = llvm::sys::getHostCPUName();
 
 	llvm::Triple TheTriple;
-	if (TheTriple.getTriple().empty())
-		TheTriple.setTriple(llvm::sys::getDefaultTargetTriple());
+	if (triple.length())
+	{
+		TheTriple.setTriple(triple);
+		MCPU = "";
+	}
+	else
+		if (TheTriple.getTriple().empty())
+			TheTriple.setTriple(llvm::sys::getDefaultTargetTriple());
 
+	//ok, now for linux builds...
+	//TheTriple = llvm::Triple("i686", "pc", "linux", "gnu");
 	// Get the target specific parser.
 	std::string Error;
 	const llvm::Target *TheTarget = llvm::TargetRegistry::lookupTarget(MArch, TheTriple, Error);
 	//for linux builds use i686-pc-linux-gnu
 
+	//TheTarget = llvm::TargetRegistry::lookupTarget()
+	//ok add linux builds
 	llvm::TargetOptions Options = InitTargetOptionsFromCodeGenFlags();
 	//Options.MCOption
 	//Options.DisableIntegratedAS = NoIntegratedAssembler;
@@ -763,7 +814,7 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level, bo
 
 	std::error_code ec;
 	llvm::raw_fd_ostream strr("build/" + project_name + ".o", ec, llvm::sys::fs::OpenFlags::F_None);
-
+	//ok, watch out for unsupported calling conventions, need way to specifiy code for windows/linux/cpu
 	//add pass to emit the object file
 	target->addPassesToEmitFile(MPM, strr, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
 
@@ -1244,8 +1295,32 @@ void Compilation::Error(const std::string& string, Token token)
 	for (auto arg : args)
 		key ^= (int)arg;
 
-	auto f = this->function_types.find(key);
-	if (f == this->function_types.end())
+	bool found = false;
+	Type* res = 0;
+	auto f = this->function_types.equal_range(key);
+
+	//search to see
+	for (auto it = f.first; it != f.second; it++)
+	{
+		if (it->second->function->return_type == return_type && it->second->function->args.size() == args.size())
+		{
+			found = true;
+			for (int i = 0; i < it->second->function->args.size(); i++)
+			{
+				if (it->second->function->args[i] != args[i])
+					found = false;
+			}
+			//match args now
+			if (found)
+			{
+				res = it->second;
+				break;
+			}
+		}
+	}
+
+	//then verify if it is correct
+	if (found == false)
 	{
 		auto t = new FunctionType;
 		t->args = args;
@@ -1265,10 +1340,11 @@ void Compilation::Error(const std::string& string, Token token)
 
 		global->members.insert({ type->name, type });
 
-		function_types[key] = type;
+		function_types.insert({ key, type });
+		//function_types[key] = type;
 		return type;
 	}
-	return f->second;
+	return res;// f->second;
 }
 
 void Compilation::ResolveTypes()
@@ -1401,6 +1477,11 @@ void DiagnosticBuilder::Error(const std::string& text, const Token& token)
 	Diagnostic error;
 	error.token = token;
 	error.message = text;
+
+	auto current_source = token.GetSource((Compilation*)compilation);
+
+	//um, wrong source :S
+	//	need to be able to convert from token text_ptr to source
 	error.line = current_source->GetLine(token.line);
 	error.file = current_source->filename;
 	error.severity = 0;

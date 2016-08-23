@@ -78,13 +78,13 @@ if(COMPILER_SUPPORTS_CXX11)
 elseif(COMPILER_SUPPORTS_CXX0X)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -g")
 else()
-        message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+    message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
 endif()
 
 # target_compile_features(Racer PRIVATE cxx_range_for)
 # target_compile_features(Jet PRIVATE cxx_range_for)
 
-llvm_map_components_to_libnames(llvm_libs support core mcjit native ipo)
+llvm_map_components_to_libnames(llvm_libs support core mcjit native ipo x86 arm armcodegen)
 
 # Link against LLVM libraries
 target_link_libraries(Jet ${llvm_libs} "C:/Users/Matthew/Desktop/cfe-3.7.1.src/Debug/lib/libclang.lib")
