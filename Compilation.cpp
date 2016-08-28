@@ -266,7 +266,8 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			for (auto ii : lib_symbols)
 				delete[] ii;
 
-			printf("Dependency compilation failed: could not find symbol file!\n");
+			diagnostics->Error("Dependency compilation '"+ii+"' failed: could not find symbol file!", "project.jp");
+			//printf("Dependency compilation failed: could not find symbol file!\n");
 			return 0;
 		}
 
@@ -300,7 +301,6 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	compilation->sources = project->GetSources();
 
 	//builder converted headers and add their source
-
 	for (auto hdr : project->headers)
 	{
 		std::string two = hdr;// argv[2];
@@ -313,9 +313,8 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			std::string str = generate_jet_from_header(two.c_str());
 			if (str.length() == 0)
 			{
-				printf("ERROR: Could not find header file '%s' to convert.\n", two.c_str());
+				diagnostics->Error("Could not find header file '" + two + "' to convert.\n", "project.jp");
 				errors++;
-				goto error;
 			}
 			else
 			{
@@ -404,7 +403,8 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		{
 			if (file.second == 0)
 			{
-				printf("Could not find file '%s'!\n", file.first.c_str());
+				diagnostics->Error("Could not find file '" + file.first + "'.", "project.jp");
+				//printf("Could not find file '%s'!\n", file.first.c_str());
 				errors = 1;
 				goto error;
 			}
@@ -1548,19 +1548,38 @@ void DiagnosticBuilder::Error(const std::string& text, const Token& token)
 	Diagnostic error;
 	error.token = token;
 	error.message = text;
+	
+	if (token.type != TokenType::InvalidToken)
+	{
+		auto current_source = token.GetSource((Compilation*)compilation);
 
-	auto current_source = token.GetSource((Compilation*)compilation);
-
-	//um, wrong source :S
-	//	need to be able to convert from token text_ptr to source
-	error.line = current_source->GetLine(token.line);
-	error.file = current_source->filename;
+		error.line = current_source->GetLine(token.line);
+		error.file = current_source->filename;
+	}
 	error.severity = 0;
 
 	if (this->callback)
 		this->callback(error);
 
 	//try and remove exceptions from build system
+	this->diagnostics.push_back(error);
+}
 
+
+void DiagnosticBuilder::Error(const std::string& text, const std::string& file, int line)
+{
+	Diagnostic error;
+	error.token = Token();
+	error.message = text;
+
+	error.line = line;// current_source->GetLine(token.line);
+	error.file = file;
+
+	error.severity = 0;
+
+	if (this->callback)
+		this->callback(error);
+
+	//try and remove exceptions from build system
 	this->diagnostics.push_back(error);
 }

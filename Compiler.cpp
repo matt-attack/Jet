@@ -56,21 +56,29 @@ void CompilerOptions::ApplyOptions(OptionParser* parser)
 
 void Jet::Diagnostic::Print()
 {
-	int startrow = token.column;
-	int endrow = token.column + token.text.length();
-
-	std::string code = this->line;
-	std::string underline = "";
-	for (int i = 0; i < code.length(); i++)
+	if (token.type != TokenType::InvalidToken)
 	{
-		if (code[i] == '\t')
-			underline += '\t';
-		else if (i >= startrow && i < endrow)
-			underline += '~';
-		else
-			underline += ' ';
+		int startrow = token.column;
+		int endrow = token.column + token.text.length();
+
+		std::string code = this->line;
+		std::string underline = "";
+		for (int i = 0; i < code.length(); i++)
+		{
+			if (code[i] == '\t')
+				underline += '\t';
+			else if (i >= startrow && i < endrow)
+				underline += '~';
+			else
+				underline += ' ';
+		}
+		printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", this->file.c_str(), token.line, startrow, token.line, endrow, message.c_str(), code.c_str(), underline.c_str());
 	}
-	printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", this->file.c_str(), token.line, startrow, token.line, endrow, message.c_str(), code.c_str(), underline.c_str());
+	else
+	{
+		//just print something out, it was probably a build system error, not one that occurred in the code
+		printf("[error] %s: %s\n", this->file.c_str(), message.c_str());
+	}
 }
 
 class MemberRenamer : public ExpressionVisitor

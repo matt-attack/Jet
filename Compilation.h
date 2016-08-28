@@ -48,6 +48,7 @@ namespace Jet
 		}
 
 		void Error(const std::string& text, const Token& token);
+		void Error(const std::string& text, const std::string& file, int line = -1);
 
 		std::vector<Diagnostic>& GetErrors()
 		{
