@@ -577,7 +577,6 @@ int main(int argc, char* argv[])
 
 		//split the string
 		{
-			
 			char* args[400] = {};
 			int numargs = 0;
 			int i = 0; bool inquotes = false;

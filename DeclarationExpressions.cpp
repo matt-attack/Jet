@@ -20,7 +20,7 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 	//if we have specifier we are not lambda, just inline function
 
 	//need to change context
-	CompilerContext* nc = new CompilerContext(context->root, context);// context->AddFunction(this->GetRealName(), ret, argsv, Struct.text.length() > 0 ? true : false, is_lambda);// , this->varargs);
+	CompilerContext* nc = new CompilerContext(context->root, context);
 	nc->function = new Function("um", is_lambda);
 
 	if (this->name.text.length() == 0)
@@ -290,8 +290,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		function = argsv.front().first->base->data->functions.find("MoveNext")->second->context; 
 		llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", function->function->f);
 		context->root->builder.SetInsertPoint(bb);
-		//func->loaded = true;
-		//function = context->AddFunction(this->GetRealName() + "_generator", ret, { argsv.front() }, Struct.length() > 0 ? argsv[0].first->base : 0, is_lambda);// , this->varargs);
+		
 		function->function->is_generator = true;
 	}
 	else
@@ -440,7 +439,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		//now compile reset function
 		{
 			auto reset = argsv.front().first->base->data->functions.find("Reset")->second->context;
-			//context->AddFunction(this->GetRealName() + "yield_reset", context->root->LookupType("void"), { argsv.front() }, Struct.length() > 0 ? argsv[0].first : 0, is_lambda);// , this->varargs);
+			
 			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", reset->function->f);
 			context->root->builder.SetInsertPoint(bb);
 
@@ -454,16 +453,11 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			context->root->builder.CreateStore(val, ptr);
 
 			context->root->builder.CreateRetVoid();
-
-
-			//auto x = str->data->functions.find("Reset");
-			//x->second = reset->function;
 		}
 		//compile current function
 		{
-			auto current = argsv.front().first->base->data->functions.find("Current")->second->context;// context->AddFunction(this->GetRealName() + "generator_current", context->root->LookupType(this->ret_type.text), { argsv.front() }, Struct.length() > 0 ? argsv[0].first : 0, is_lambda);// , this->varargs);
+			auto current = argsv.front().first->base->data->functions.find("Current")->second->context;
 
-			//function = argsv.front().first->base->data->functions.find("MoveNext")->second->context;
 			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", current->function->f);
 			context->root->builder.SetInsertPoint(bb);
 
@@ -475,14 +469,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			auto self = current->function->f->arg_begin();
 			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 			context->root->builder.CreateRet(context->root->builder.CreateLoad(ptr));
-
-			//auto x = str->data->functions.find("Current");
-			//x->second = current->function;
 		}
-		//ok, need to fill in something so this works right in any declaration order
-		//Set the generator function as MoveNext
-		//auto x = str->data->functions.find("MoveNext");
-		//x->second = function->function;
 	}
 
 	//reset insertion point to where it was before (for lambdas and template compilation)

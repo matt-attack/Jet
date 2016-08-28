@@ -435,9 +435,7 @@ CValue OperatorAssignExpression::Compile(CompilerContext* context)
 	if (lhs.type->type == Types::Struct)
 		lhsptr = GetPtrToExprValue(context, left);
 	auto rhs = this->right->Compile(context);
-	//ok, lets have BinaryOperation try the cast, not me
-	//rhs = context->DoCast(lhs.type, rhs);
-
+	
 	auto res = context->BinaryOperation(token.type, lhs, lhsptr, rhs);
 
 	//insert store here
@@ -509,8 +507,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		lhsptr = GetPtrToExprValue(context, left);
 
 	auto rhs = this->right->Compile(context);
-	//rhs = context->DoCast(lhs.type, rhs);
-
+	
 	return context->BinaryOperation(this->_operator.type, lhs, lhsptr, rhs);
 }
 

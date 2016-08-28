@@ -91,10 +91,10 @@ bool Source::IsAtEnd()
 
 
 
-extern Source* current_source;
+//extern Source* current_source;
 BlockExpression* Source::GetAST(DiagnosticBuilder* builder)
 {
-	current_source = this;
+	//current_source = this;
 
 	Lexer lexer(this, builder);
 	Parser parser(&lexer, builder);

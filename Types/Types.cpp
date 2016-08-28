@@ -353,7 +353,7 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 							break;
 						}
 
-						if (fun.second->return_type->type != Types::Trait  && fun.second->return_type->type != Types::Invalid && fun.second->return_type != range.first->second->return_type)
+						if (fun.second->return_type->type != Types::Trait && fun.second->return_type->type != Types::Invalid && fun.second->return_type != range.first->second->return_type)
 						{
 							match = false;
 							break;
@@ -719,7 +719,6 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 	{
 		//only for typechecking, should never hit this during compilation
 		//look in this->trait->functions and this->trait->extension_methods
-		//todo
 		Function* fun = 0;
 		auto range = this->trait->functions.equal_range(name);
 		for (auto ii = range.first; ii != range.second; ii++)
@@ -764,7 +763,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 
 	if (fun == 0)
 	{
-		//	check for trait extension methods
+		//check for trait extension methods
 		auto ttraits = this->GetTraits(context->root);
 		for (auto tr : ttraits)
 		{
@@ -824,14 +823,13 @@ bool is_constructor(const std::string& name)
 		if (name[i] == '_')
 			break;
 
-		strname.push_back( name[i]);
+		strname.push_back(name[i]);
 	}
 
 	auto sub = name.substr(strname.length() + 3, name.length());
 	if (name.length() == strname.length() * 2 + 3 && sub == strname)
 		return true;
 	return false;
-	//if (name.find('~') != -1 && name.)
 }
 
 void Struct::Load(Compilation* compiler)
@@ -866,9 +864,6 @@ void Struct::Load(Compilation* compiler)
 		for (auto ii : this->parent_struct->data->functions)
 		{
 			//setup vtable indices
-			//if (ii.second->virtual_offset != -1)
-			//	continue;//dont add duplicate yo
-
 			this->functions.insert(ii);
 
 			//exclude any constructors, or missing functions
@@ -876,15 +871,13 @@ void Struct::Load(Compilation* compiler)
 			if (ic || ii.first == this->parent_struct->data->name || ii.second == 0)
 				continue;
 
-			//ii.second->virtual_offset = 
-			if (ii.second->virtual_offset+1 > vtable_size)
-				vtable_size = ii.second->virtual_offset+1;
-			//vtable_size++;
+			if (ii.second->virtual_offset + 1 > vtable_size)
+				vtable_size = ii.second->virtual_offset + 1;
 		}
 		for (auto ii : oldfuncs)
 		{
 			bool duplicate = false; int dup_loc = 0;
-			std::string dupname = ii.first.find('~') != -1 ? "~"+ this->parent_struct->data->name : ii.first;
+			std::string dupname = ii.first.find('~') != -1 ? "~" + this->parent_struct->data->name : ii.first;
 			for (auto mem : this->parent_struct->data->functions)
 			{
 				if (mem.first == dupname)
@@ -897,7 +890,7 @@ void Struct::Load(Compilation* compiler)
 					break;
 				}
 			}
-			
+
 			//todo have it warn/info if no virtual is suggested
 			this->functions.insert(ii);
 
@@ -931,7 +924,7 @@ void Struct::Load(Compilation* compiler)
 	{
 		this->struct_members.push_back({ "__vtable", "char*", compiler->LookupType("char**") });//add the member if we dont have it
 	}
-	
+
 	//recursively load
 	llvm::StructType* struct_type = 0;
 	std::vector<llvm::Type*> elementss;
@@ -971,7 +964,6 @@ void Struct::Load(Compilation* compiler)
 		struct_type->setBody(elementss);
 		this->type = struct_type;
 	}
-	//this->type->dump();
 	this->loaded = true;
 
 
@@ -998,13 +990,13 @@ void Struct::Load(Compilation* compiler)
 				continue;
 
 			ii.second->is_virtual = true;
-			ii.second->virtual_table_location = vtable_loc;//this->struct_members.size() - 1;
+			ii.second->virtual_table_location = vtable_loc;
 
 			ii.second->Load(compiler);
 			auto ptr = ii.second->f;
 			auto charptr = llvm::ConstantExpr::getBitCast(ptr, compiler->LookupType("char*")->GetLLVMType());
 
-			ptrs[ii.second->virtual_offset] = charptr;// ptrs.push_back(charptr);
+			ptrs[ii.second->virtual_offset] = charptr;
 		}
 
 		auto arr = llvm::ConstantArray::get(llvm::ArrayType::get(compiler->LookupType("char*")->GetLLVMType(), vtable_size), ptrs);
@@ -1211,7 +1203,6 @@ int Type::GetSize()
 bool Struct::IsParent(Type* ty)
 {
 	//ok this needs to check down the line
-
 	auto current = this->parent_struct;
 	while (current)
 	{

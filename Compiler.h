@@ -34,6 +34,7 @@ namespace Jet
 	{
 		int optimization;//from 0-3
 		bool force, run = false, time = false;
+		std::string target, linker;
 		CompilerOptions()
 		{
 			this->force = false;
