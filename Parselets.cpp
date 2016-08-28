@@ -591,6 +591,28 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 
 			parser->Error("Member function definition must have body!", token);
 		}
+		else if (parser->Match(TokenType::Struct))
+		{
+			//parse the function
+			auto* expr = parser->ParseStatement(true);
+
+			if (auto fun = dynamic_cast<StructExpression*>(expr))
+			{
+				for (auto ii : fun->members)
+				{
+					if (ii.type == StructMember::FunctionMember)
+						parser->Error("Member struct definitions cannot have member functions!", token);
+				}
+				
+				StructMember member;
+				member.type = StructMember::DefinitionMember;
+				member.definition = fun;
+				members.push_back(member);
+				continue;
+			}
+
+			parser->Error("Member struct definition must have body!", token);
+		}
 
 		Token type = ::ParseType(parser);
 

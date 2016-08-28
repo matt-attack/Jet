@@ -44,7 +44,7 @@
 using namespace Jet;
 
 //this is VERY TERRIBLE remove later
-Source* current_source = 0;
+//Source* current_source = 0;
 
 //options for the linker
 #ifdef _WIN32
@@ -236,6 +236,7 @@ public:
 };
 
 
+extern std::string generate_jet_from_header(const char* header);
 Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnostics, bool time)
 {
 	Compilation* compilation = new Compilation(project);
@@ -254,6 +255,8 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	for (int i = 0; i < deps; i++)
 	{
 		auto ii = project->dependencies[i];
+
+		//todo: resolve dependencies here and check global library directory
 
 		//read in declarations for each dependency
 		std::string symbol_filepath = ii + "/build/symbols.jlib";
@@ -296,6 +299,52 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	compilation->current_function = global;
 	compilation->sources = project->GetSources();
 
+	//builder converted headers and add their source
+
+	for (auto hdr : project->headers)
+	{
+		std::string two = hdr;// argv[2];
+		std::string outfile = two + ".jet";
+		//if the header already exists, dont regenerate
+		FILE* hdr = fopen(outfile.c_str(), "r");
+		if (hdr == 0)//for now just run it every time
+		{
+			//fix conversion of attributes for calling convention and fix function pointers
+			std::string str = generate_jet_from_header(two.c_str());
+			if (str.length() == 0)
+			{
+				printf("ERROR: Could not find header file '%s' to convert.\n", two.c_str());
+				errors++;
+				goto error;
+			}
+			else
+			{
+				std::ofstream o(two + ".jet");
+				o << str;
+				o.close();
+			}
+		}
+		else
+		{
+			fclose(hdr);
+		}
+
+		//add the source
+		std::ifstream t(outfile, std::ios::in | std::ios::binary);
+		if (t)
+		{
+			t.seekg(0, std::ios::end);    // go to the end
+			std::streamoff length = t.tellg();           // report location (this is the length)
+			t.seekg(0, std::ios::beg);    // go back to the beginning
+			char* buffer = new char[length + 1];    // allocate memory for a buffer of appropriate dimension
+			t.read(buffer, length);       // read the whole file into the buffer
+			buffer[length] = 0;
+			t.close();
+
+			compilation->sources[outfile] = new Source(buffer, outfile);
+		}
+	}
+
 	//read in symbols from lib
 	std::vector<BlockExpression*> symbol_asts;
 	std::vector<Source*> symbol_sources;
@@ -305,6 +354,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		for (auto buffer : lib_symbols)
 		{
 			Source* src = new Source(buffer, "symbols");
+			compilation->sources["#symbols_" + std::to_string(symbol_asts.size() + 1)] = src;
 
 			BlockExpression* result = src->GetAST(diagnostics);
 			if (diagnostics->GetErrors().size())
@@ -334,7 +384,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			}
 
 			compilation->asts["#symbols_" + std::to_string(symbol_asts.size())] = result;
-			compilation->sources["#symbols_" + std::to_string(symbol_asts.size())] = src;
+			//compilation->sources["#symbols_" + std::to_string(symbol_asts.size()+1)] = src;
 
 			//this fixes some errors, need to resolve them later
 			compilation->debug_info.file = compilation->debug->createFile("temp",
@@ -418,7 +468,6 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			if (result.first[0] == '#')
 				continue;
 
-			current_source = compilation->sources[result.first];
 			compilation->current_function = global;
 
 			//ok, I only need one of these, fixme
@@ -448,7 +497,6 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 				compilation->typecheck = false;
 				try
 				{
-					//ii->TypeCheck(global);
 					ii->Compile(global);
 				}
 				catch (int x)
@@ -456,11 +504,6 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 					compilation->ns = compilation->global;
 					errors++;
 				}
-				/*catch (...)
-				{
-				compilation->ns = compilation->global;
-				errors++;
-				}*/
 
 				compilation->ns = compilation->global;
 			}
@@ -513,7 +556,7 @@ char* ReadDependenciesFromSymbols(const char* path, int& size)
 	return 0;
 }
 
-void Compilation::Assemble(int olevel, bool time)
+void Compilation::Assemble(const std::string& target, const std::string& linker, int olevel, bool time)
 {
 	if (this->diagnostics->GetErrors().size() > 0)
 		return;
@@ -539,7 +582,7 @@ void Compilation::Assemble(int olevel, bool time)
 	//add string
 	//linux i686-pc-linux-gnu
 	//raspbian arm-pc-linux-gnueabif"armv6-linux-gnueabihf"
-	this->SetTarget("");
+	this->SetTarget(target);
 
 	debug->finalize();
 
@@ -561,97 +604,114 @@ void Compilation::Assemble(int olevel, bool time)
 	if (project->IsExecutable())
 	{
 		printf("Compiling Executable...\n");
+
+		std::string used_linker = linker;
+#ifdef USE_GCC
+		if (linker == "")
+			used_linker = "ld";
+#else
+		if (linker == "")
+			used_linker = "link.exe";
+#endif
 		//working gcc command, use this
 		////C:\Users\Matthew\Desktop\VM\AsmVM2\AsmVM\async>ld build/async.o ../jetcore/build
 		// /jetcore.o -l:"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\lib\msvcrt
 		// .lib" -l:"C:\Program Files (x86)\Windows Kits\8.1\Lib\winv6.3\um\x86\kernel32.li
 		///  b" -o build/async_test.exe --entry _main
-#ifdef USE_GCC
-		std::string cmd = "ld ";//"gcc -L. -g ";//-e_jet_initializer
 
-		//set entry
-		cmd += "--entry _main ";
-
-		cmd += "build/" + project->project_name + ".o ";
-		cmd += "-o build/" + project->project_name + ".exe ";
-
-		//need to link each dependency
-		for (auto ii : project->dependencies)
+		if (used_linker.find("link.exe") == -1)
 		{
-			cmd += ii + "/build/";//cmd += "-L" + ii + "/build/ ";
+			std::string cmd = linker + " ";// "ld ";//"gcc -L. -g ";//-e_jet_initializer
 
-			cmd += GetNameFromPath(ii) + ".o ";
+			//set entry
+			cmd += "--entry _main ";
+
+			cmd += "build/" + project->project_name + ".o ";
+			cmd += "-o build/" + project->project_name + ".exe ";
+
+			//need to link each dependency
+			for (auto ii : project->dependencies)
+			{
+				cmd += ii + "/build/";//cmd += "-L" + ii + "/build/ ";
+
+				cmd += GetNameFromPath(ii) + ".o ";
+			}
+
+			//then for each dependency add libs that it needs to link
+			for (auto ii : project->dependencies)
+			{
+				//open up and read first part of the jlib file
+				int size;
+				char* data = ReadDependenciesFromSymbols((ii + "/build/symbols.jlib").c_str(), size);
+
+				if (data == 0)
+				{
+					//probably an error
+				}
+
+				int pos = 0;
+				while (pos < size)
+				{
+					const char* file = &data[pos];
+					if (file[0])
+						cmd += " -l:\"" + std::string(file) + "\"";
+
+					pos += strlen(&data[pos]) + 1;
+				}
+				delete[] data;
+			}
+
+			cmd += " -L.";
+			for (auto ii : project->libs)
+				cmd += " -l:\"" + ii + "\" ";
+
+			auto res = exec(cmd.c_str());
+			printf(res.c_str());
 		}
-
-		//then for each dependency add libs that it needs to link
-		for (auto ii : project->dependencies)
+		else
 		{
-			//open up and read first part of the jlib file
-			int size;
-			char* data = ReadDependenciesFromSymbols((ii + "/build/symbols.jlib").c_str(), size);
+			std::string cmd = "link.exe /DEBUG /INCREMENTAL:NO /NOLOGO ";
 
-			if (data == 0)
+			//cmd += "/ENTRY:main ";// "/ENTRY:_jet_initializer ";
+
+			cmd += "build/" + project->project_name + ".o ";
+			cmd += "/OUT:build/" + project->project_name + ".exe ";
+
+			//need to link each dependency
+			for (auto ii : project->dependencies)
+				cmd += ii + "/build/lib" + GetNameFromPath(ii) + ".a ";
+
+			//then for each dependency add libs that it needs to link
+			for (auto ii : project->dependencies)
 			{
-				//probably an error
+				//open up and read first part of the jlib file
+				int size;
+				char* data = ReadDependenciesFromSymbols((ii + "/build/symbols.jlib").c_str(), size);
+
+				if (data == 0)
+				{
+					//probably an error
+				}
+
+				int pos = 0;
+				while (pos < size)
+				{
+					const char* file = &data[pos];
+					if (file[0])
+						cmd += " \"" + std::string(file) + "\"";
+
+					pos += strlen(&data[pos]) + 1;
+				}
+				delete[] data;
 			}
 
-			int pos = 0;
-			while (pos < size)
-			{
-				const char* file = &data[pos];
-				if (file[0])
-					cmd += " -l:\"" + std::string(file) + "\"";
+			for (auto ii : project->libs)
+				cmd += " \"" + ii + "\"";
 
-				pos += strlen(&data[pos]) + 1;
-			}
-			delete[] data;
+
+			auto res = exec(cmd.c_str());
+			printf(res.c_str());
 		}
-
-		cmd += " -L.";
-		for (auto ii : project->libs)
-			cmd += " -l:\"" + ii + "\" ";
-#else
-		std::string cmd = "link.exe /DEBUG /INCREMENTAL:NO /NOLOGO ";
-
-		//cmd += "/ENTRY:main ";// "/ENTRY:_jet_initializer ";
-
-		cmd += "build/" + project->project_name + ".o ";
-		cmd += "/OUT:build/" + project->project_name + ".exe ";
-
-		//need to link each dependency
-		for (auto ii : project->dependencies)
-			cmd += ii + "/build/lib" + GetNameFromPath(ii) + ".a ";
-
-		//then for each dependency add libs that it needs to link
-		for (auto ii : project->dependencies)
-		{
-			//open up and read first part of the jlib file
-			int size;
-			char* data = ReadDependenciesFromSymbols((ii + "/build/symbols.jlib").c_str(), size);
-
-			if (data == 0)
-			{
-				//probably an error
-			}
-
-			int pos = 0;
-			while (pos < size)
-			{
-				const char* file = &data[pos];
-				if (file[0])
-					cmd += " \"" + std::string(file) + "\"";
-
-				pos += strlen(&data[pos]) + 1;
-			}
-			delete[] data;
-		}
-
-		for (auto ii : project->libs)
-			cmd += " \"" + ii + "\"";
-#endif
-
-		auto res = exec(cmd.c_str());
-		printf(res.c_str());
 	}
 	else
 	{
@@ -719,7 +779,7 @@ void Compilation::Optimize(int level)
 	if (level > 0)
 	{
 		MPM.add(llvm::createFunctionInliningPass(level, 3));
-		//	MPM.run(*module);
+		//MPM.run(*module);
 	}
 
 	llvm::legacy::FunctionPassManager OurFPM(module);
@@ -788,9 +848,21 @@ void Compilation::SetTarget(const std::string& triple)
 	// Get the target specific parser.
 	std::string Error;
 	const llvm::Target *TheTarget = llvm::TargetRegistry::lookupTarget(MArch, TheTriple, Error);
+
+	if (TheTarget == 0)
+	{
+		printf("ERROR: Invalid target string! Using system default.\n");
+
+		TheTriple.setTriple(llvm::sys::getDefaultTargetTriple());
+
+		//ok, now for linux builds...
+		//TheTriple = llvm::Triple("i686", "pc", "linux", "gnu");
+		// Get the target specific parser.
+		std::string Error;
+		TheTarget = llvm::TargetRegistry::lookupTarget(MArch, TheTriple, Error);
+	}
 	//for linux builds use i686-pc-linux-gnu
 
-	//TheTarget = llvm::TargetRegistry::lookupTarget()
 	//ok add linux builds
 	llvm::TargetOptions Options = InitTargetOptionsFromCodeGenFlags();
 	//Options.MCOption
@@ -1341,10 +1413,9 @@ void Compilation::Error(const std::string& string, Token token)
 		global->members.insert({ type->name, type });
 
 		function_types.insert({ key, type });
-		//function_types[key] = type;
 		return type;
 	}
-	return res;// f->second;
+	return res;
 }
 
 void Compilation::ResolveTypes()

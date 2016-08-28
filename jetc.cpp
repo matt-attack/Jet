@@ -62,14 +62,14 @@ const char* type_conversion[] =
 	"", "",
 	"void",//2
 	"int",
-	"char",
-	"char",//5
-	"char",
-	"char",
-	"short",//ushort
-	"int",//unint
-	"long",//10 ulong
-	"long",//uint128
+	"uchar",
+	"uchar",//5
+	"short",//char16
+	"int",//char32
+	"ushort",//ushort
+	"uint",//unint
+	"ulong",//10 ulong
+	"ulong",//uint128
 	"",
 	"char",//char_s
 	"char",
@@ -171,8 +171,20 @@ std::string convert_type(CXType type)
 
 		return out;
 	}
-
+	//if it makes it here its probably a function pointer 
 	out = tstr;
+
+	//also handle[] as a *
+	int pos = 0;
+	while ((pos = out.find("const ")) != -1)
+		out.erase(pos, 6);
+
+	//int pos = 0;
+	while ((pos = out.find("[]")) != -1)
+		out.replace(pos, 2, "*");
+
+	//look for a const in the name and remove it
+
 
 	clang_disposeString(tname);
 
@@ -405,7 +417,7 @@ std::string generate_jet_from_header(const char* header)
 		{
 			CXString name = clang_getCursorSpelling(c);
 			auto str = clang_getCString(name);
-			printf("Var: %s\n", str);
+			printf("Warning: exporting variables such as '%s' not yet supported\n", str);
 			clang_disposeString(name);
 
 			auto type = clang_getCursorType(c);
@@ -415,6 +427,14 @@ std::string generate_jet_from_header(const char* header)
 		}
 		return CXChildVisit_Continue;
 	}, &data);
+
+	while (data.struct_stack.size() > 0)
+	{
+		data.struct_stack.pop();
+
+		//print out last part of structure 
+		out += "}\n";
+	}
 
 	if (tu)
 		clang_disposeTranslationUnit(tu);
@@ -427,10 +447,6 @@ void DoCommand(int argc, char* argv[])
 {
 	OptionParser parser;
 	SetupDefaultCommandOptions(&parser);
-	//parser.AddOption("o", "0");
-	//parser.AddOption("f", "0");
-	//parser.AddOption("t", "0");
-	//parser.AddOption("run", "0");
 	parser.Parse(argc, argv);
 
 	std::string cmd = argc > 1 ? argv[1] : "";
@@ -438,17 +454,9 @@ void DoCommand(int argc, char* argv[])
 	{
 		//finish tests
 		parser.GetOption("f").SetValue("1");
-		//OptionParser parser;
-		//parser.AddOption("o", "0");
-		//parser.AddOption("f", "1");
-		//parser.AddOption("t", "0");
-		//parser.AddOption("run", "0");
-		//parser.Parse(argc, argv);
 
 		CompilerOptions options;
 		options.ApplyOptions(&parser);
-		//options.optimization = parser.GetOption("o").GetInt();
-		//options.force = parser.GetOption("f").GetString().length() == 0;
 		
 		std::string config = "";
 		if (parser.commands.size())
@@ -539,10 +547,6 @@ void DoCommand(int argc, char* argv[])
 	//add options to this later
 	CompilerOptions options;
 	options.ApplyOptions(&parser);
-	//options.optimization = parser.GetOption("o").GetInt();
-	//options.force = parser.GetOption("f").GetString().length() == 0;
-	//options.time = parser.GetOption("t").GetString().length() == 0;
-	//options.run = parser.GetOption("run").GetString().length() == 0;
 
 	std::string config = "";
 	if (parser.commands.size())
@@ -567,6 +571,13 @@ int main(int argc, char* argv[])
 
 		return 0;
 	}
+
+	//auto path = getenv("PATH");
+	//std::string newpath = path;
+	//newpath += ';';
+	//newpath += 
+	//putenv("PATH=")
+	//need way to configure jet to have a libraries folder that we can add to path
 
 	printf("Input the path to a project folder to build it\n");
 	while (true)
@@ -615,136 +626,6 @@ int main(int argc, char* argv[])
 #endif
 			continue;
 		}
-
-		//Jet::Compiler c2;
-
-		/*if (strncmp(command, "run ", 4) == 0)
-		{
-		printf("got run command");
-		int len = strlen(command) - 4;
-		memmove(command, command + 4, len);
-		command[len] = 0;
-		}*/
-
-		/*int i = 0;
-		while (command[i] != ' ' && command[i] != 0)
-			i++;
-
-		std::string args;
-		if (command[i] && command[i + 1])
-			args = (const char*)&command[i + 1];
-		//command[i] = 0;
-
-
-		std::stringstream commands(command);
-		std::string cmd;
-		commands >> cmd;
-		if (cmd == "runtests")// strcmp(command, "runtests") == 0)
-		{
-			//finish tests
-			OptionParser parser;
-			parser.AddOption("o", "0");
-			parser.AddOption("f", "1");
-			parser.Parse(args);
-
-			CompilerOptions options;
-			options.optimization = parser.GetOption("o").GetInt();
-			options.force = parser.GetOption("f").GetString().length() == 0;
-			std::string config = "";
-			if (parser.commands.size())
-				config = parser.commands.front();
-
-			std::vector<char*> programs = { "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors", "Enums" };
-
-
-			for (auto ii : programs)
-			{
-				printf("Running test '%s'...\n", ii);
-
-				//add options to this later
-				auto project = JetProject::Load("tests/" + std::string(ii));
-
-				if (!project)
-				{
-					printf("Test project %s not found\n", ii);
-					continue;
-				}
-
-				DiagnosticBuilder b([](Diagnostic& x) {x.Print(); });
-				auto compilation = Compilation::Make(project, &b);
-
-				std::string o;
-				for (auto ii : compilation->asts)
-				{
-					ii.second->Print(o, compilation->sources[ii.first]);
-					//std::cout << o;
-
-					//check that they match!!!
-					if (strcmp(o.c_str(), compilation->sources[ii.first]->GetLinePointer(1)) != 0)
-					{
-						printf("Tree printing test failed, did not match original\n");
-						std::cout << o;
-					}
-
-					o.clear();
-				}
-
-				if (b.GetErrors().size() > 0)
-				{
-					printf("Test '%s' failed\n", ii);
-				}
-				else
-				{
-					//assemble and execute, look for pass or fail
-					compilation->Assemble(0);
-
-					//
-					std::string cmd = "tests\\" + std::string(ii) + "\\build\\" + std::string(ii) + ".exe";
-					auto res = exec(cmd.c_str());
-					printf("%s\n", res.c_str());
-
-					if (res.find("fail") != -1)
-						printf("Test '%s' failed\n", ii);
-					//need to figure out why nothing is being printed
-				}
-
-				printf("\n");
-
-				delete compilation;
-				delete project;
-			}
-			continue;
-		}
-		else if (cmd == "convert")
-		{
-			std::stringstream commands(command);
-			std::string one, two;
-			commands >> one;
-			commands >> two;
-			std::string str = generate_jet_from_header(two.c_str());
-			if (str.length() == 0)
-				printf("No such file.");
-			else
-			{
-				std::ofstream o("windows.jet");
-				o << str;
-				o.close();
-			}
-		}
-
-		OptionParser parser;
-		parser.AddOption("o", "0");
-		parser.AddOption("f", "0");
-		parser.Parse(args);
-
-		//add options to this later
-		CompilerOptions options;
-		options.optimization = parser.GetOption("o").GetInt();
-		options.force = parser.GetOption("f").GetString().length() == 0;
-		std::string config = "";
-		if (parser.commands.size())
-			config = parser.commands.front();
-		c2.Compile(cmd.c_str(), &options, config, &parser);*/
 	}
 
 	return 0;

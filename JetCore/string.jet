@@ -41,10 +41,13 @@ struct string
 		this->data[this->cur_size++] = v;
 	}
 	
-	fun char get(int index)
-	{
-		return this->data[index];
-	}
+	//fun char* operator[](int index)
+	//{
+	//	return &this->data[index];
+	//}
+	
+	//fun void operator+(
+	
 	
 	fun void resize(int size)
 	{

@@ -51,7 +51,8 @@ namespace Jet
 			this->parent = parent;
 			left->SetParent(this);
 			for (auto ii : *args)
-				ii.first->SetParent(this);
+				if (ii.first)
+					ii.first->SetParent(this);
 		}
 
 		Function* call; //store the function being called here so we dont have to look up again (if we know it

@@ -193,6 +193,9 @@ bool JetProject::_Load(const std::string& projectdir)
 	if (root->children["requires"])
 		dependencies = *root->children["requires"];
 
+	if (root->children["headers"])
+		headers = *root->children["headers"];
+
 	for (auto ii : doc->sections)
 	{
 		if (ii.first.length() > 0)

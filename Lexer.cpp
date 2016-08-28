@@ -535,7 +535,7 @@ Token Lexer::Next()
 			}
 		}
 	}
-	
+
 	int trivia_length = src->GetIndex() - this->last_index;
 	this->last_index = src->GetIndex();
 

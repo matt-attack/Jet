@@ -568,9 +568,10 @@ namespace Jet
 		{
 			FunctionMember,
 			VariableMember,
+			DefinitionMember,
 		};
 		MemberType type;
-
+		StructExpression* definition;
 		FunctionExpression* function;
 		StructVariable variable;
 	};
@@ -598,7 +599,6 @@ namespace Jet
 	public:
 
 		std::vector<StructTemplate>* templates;
-
 		std::vector<StructMember> members;
 
 		Token template_open, template_close;
@@ -622,6 +622,8 @@ namespace Jet
 			for (auto ii : members)
 				if (ii.type == StructMember::FunctionMember)
 					delete ii.function;
+				else if (ii.type == StructMember::DefinitionMember)
+					delete ii.definition;
 		}
 
 		std::string GetName()
@@ -638,6 +640,8 @@ namespace Jet
 			{
 				if (ii.type == StructMember::FunctionMember)
 					ii.function->SetParent(this);
+				else if (ii.type == ii.type == StructMember::DefinitionMember)
+					ii.definition->SetParent(this);
 			}
 		}
 
@@ -678,6 +682,8 @@ namespace Jet
 			{
 				if (ii.type == StructMember::FunctionMember)
 					ii.function->Print(output, source);
+				else if (ii.type == ii.type == StructMember::DefinitionMember)
+					ii.definition->Print(output, source);
 				else
 				{
 					ii.variable.type.Print(output, source);
@@ -697,6 +703,8 @@ namespace Jet
 			{
 				if (ii.type == StructMember::FunctionMember)
 					ii.function->Visit(visitor);
+				else if (ii.type == StructMember::DefinitionMember)
+					ii.definition->Visit(visitor);
 			}
 		}
 	};

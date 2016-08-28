@@ -920,6 +920,10 @@ CValue StructExpression::Compile(CompilerContext* context)
 
 void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* context)
 {
+	//dont need these if we have no memers and no base class
+	if (this->base_type.text.length() == 0 && this->members.size() == 0)
+		return;
+
 	bool has_destructor = false;
 	bool has_constructor = false;
 	auto strname = str->data->template_base ? str->data->template_base->name : str->data->name;
@@ -949,6 +953,8 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 	}
 	if (has_destructor == false)
 	{
+		//ok, need to only add it if it is needed
+
 		auto fun = new Function("__" + str->data->name + "_~" + strname, false);//
 		fun->return_type = &VoidType;
 		fun->arguments = { { context->root->LookupType(str->data->name + "*", false), "this" } };
@@ -1163,7 +1169,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			auto dp = context->root->builder.getCurrentDebugLocation();
 
 			//setup vtable if there is one
-
+			ii.second->Load(context->root);
 			auto iter = ii.second->f->getBasicBlockList().begin()->begin();
 			for (int i = 0; i < ii.second->arguments.size() * 3; i++)
 				iter++;
@@ -1309,6 +1315,10 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 			str->data->struct_members.push_back({ ii.variable.name.text, ii.variable.type.text, 0 });
 			if (this->templates == 0)
 				context->root->AdvanceTypeLookup(&str->data->struct_members.back().type, ii.variable.type.text, &ii.variable.type);
+		}
+		else if (ii.type == StructMember::DefinitionMember)
+		{
+			ii.definition->CompileDeclarations(context);
 		}
 		else
 		{

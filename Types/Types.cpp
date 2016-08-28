@@ -117,14 +117,18 @@ llvm::Type* Type::GetLLVMType()
 		return llvm::Type::getDoubleTy(llvm::getGlobalContext());
 	case (int)Types::Float:
 		return llvm::Type::getFloatTy(llvm::getGlobalContext());
+	case (int)Types::UInt:
 	case (int)Types::Int:
 		return llvm::Type::getInt32Ty(llvm::getGlobalContext());
+	case (int)Types::ULong:
 	case (int)Types::Long:
 		return llvm::Type::getInt64Ty(llvm::getGlobalContext());
 	case (int)Types::Void:
 		return llvm::Type::getVoidTy(llvm::getGlobalContext());
+	case (int)Types::UChar:
 	case (int)Types::Char:
 		return llvm::Type::getInt8Ty(llvm::getGlobalContext());
+	case (int)Types::UShort:
 	case (int)Types::Short:
 		return llvm::Type::getInt16Ty(llvm::getGlobalContext());
 	case (int)Types::Bool:
@@ -149,6 +153,8 @@ llvm::Type* Type::GetLLVMType()
 		return this->_union->type;
 	case (int)Types::Trait:
 		return 0;
+	default:
+		throw 7;//oops
 	}
 }
 

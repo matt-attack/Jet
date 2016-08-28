@@ -144,7 +144,7 @@ namespace Jet
 		void Error(const std::string& string, Token token);
 
 		//generates and outputs an exe or lib file
-		void Assemble(int olevel, bool time = false);
+		void Assemble(const std::string& target = "", const std::string& linker = "", int olevel = 0, bool time = false);
 
 
 		//racer stuff

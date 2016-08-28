@@ -38,6 +38,8 @@ void Jet::SetupDefaultCommandOptions(OptionParser* parser)
 	parser->AddOption("f", "0");
 	parser->AddOption("t", "0");
 	parser->AddOption("r", "0");
+	parser->AddOption("target", "");
+	parser->AddOption("linker", "");
 }
 
 void CompilerOptions::ApplyOptions(OptionParser* parser)
@@ -46,9 +48,11 @@ void CompilerOptions::ApplyOptions(OptionParser* parser)
 	this->force = parser->GetOption("f").GetString().length() == 0;
 	this->time = parser->GetOption("t").GetString().length() == 0;
 	this->run = parser->GetOption("r").GetString().length() == 0;
+	this->target = parser->GetOption("target").GetString();
+	this->linker = parser->GetOption("linker").GetString();
 }
 
-extern Source* current_source;
+//extern Source* current_source;
 
 void Jet::Diagnostic::Print()
 {
@@ -266,8 +270,8 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	{
 		SetupDefaultCommandOptions(parser);
 
-		if (parser->commands.size())
-			config_name = parser->commands.front();
+		if (parser->commands.size() > 1)
+			config_name = parser->commands[1];
 	}
 
 	//get the config, or default
@@ -277,6 +281,11 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 		auto f = project->configurations.find(config_name);
 		if (f != project->configurations.end())
 			configuration = f->second;
+		else if (project->configurations.size() > 0)
+		{
+			configuration = project->configurations.begin()->second;
+			printf("Build Configuration name: '%s' does not exist, defaulting to '%s'\n", config_name.c_str(), project->configurations.begin()->first.c_str());
+		}
 	}
 	else
 	{
@@ -291,8 +300,6 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 		parser->Parse(configuration.options);
 
 		options.ApplyOptions(parser);
-		//options.optimization = parser->GetOption("o").GetInt();
-		//options.force = parser->GetOption("f").GetString().length() == 0;
 	}
 	else
 	{
@@ -301,8 +308,6 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 		p.Parse(configuration.options);
 
 		options.ApplyOptions(&p);
-		//options.optimization = p.GetOption("o").GetInt();
-		//options.force = p.GetOption("f").GetString().length() == 0;
 	}
 
 	//add options to this later
@@ -359,7 +364,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	{
 		msg.Print();
 	});
-	Compilation* compilation = Compilation::Make(project, &diagnostics, time);
+	Compilation* compilation = Compilation::Make(project, &diagnostics, options.time);
 
 error:
 
@@ -373,7 +378,7 @@ error:
 	}
 	else
 	{
-		compilation->Assemble(options.optimization, options.time);
+		compilation->Assemble(options.target, options.linker, options.optimization, options.time);
 
 		//output build times
 		std::ofstream rebuild("build/rebuild.txt");

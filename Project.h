@@ -41,8 +41,9 @@ namespace Jet
 		std::string path;
 		std::string project_name;
 		std::vector<std::string> files;
-		std::vector<std::string> dependencies;
+		std::vector<std::string> dependencies;//jet libraries we want to use
 		std::vector<std::string> libs;//libraries to link to
+		std::vector<std::string> headers;//headers to convert and add to the project
 		
 		~JetProject()
 		{
