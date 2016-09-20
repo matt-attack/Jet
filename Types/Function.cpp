@@ -65,6 +65,10 @@ void Function::Load(Compilation* compiler)
 		auto aname = this->arguments[Idx].second;
 
 		AI->setName(aname);
+
+		//auto D = compiler->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, this->scope, aname, compiler->debug_info.file, line,
+		//	this->arguments[Idx].first->GetDebugType(compiler));
+		//compiler->debug->insertDeclare(AI.getNodePtrUnchecked(), D, 0, llvm::DebugLoc::get(line, 0, this->scope), &f->getBasicBlockList().front());
 	}
 
 	this->loaded = true;

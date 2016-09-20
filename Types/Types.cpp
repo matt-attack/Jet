@@ -72,17 +72,21 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		int line = 0;
 		if (this->data->expression)
 			line = this->data->expression->token.line;
-		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 4, 0, typ, 0);
+		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 8, 0, typ, 0);
 		this->debug_type = dt;
 
 		//now build and set elements
-
 		std::vector<llvm::Metadata*> ftypes;
+		int offset = 0;
 		for (auto type : this->data->struct_members)
 		{
 			//assert(type.type->loaded);
 			type.type->Load(compiler);
-			ftypes.push_back(type.type->GetDebugType(compiler));
+			int size = type.type->GetSize();
+			auto mt = compiler->debug->createMemberType(compiler->debug_info.file, type.name, compiler->debug_info.file, line, size*8, 8, offset*8, 0, type.type->GetDebugType(compiler));
+
+			ftypes.push_back(mt);// type.type->GetDebugType(compiler));
+			offset += size;
 		}
 		dt->replaceElements(compiler->debug->getOrCreateArray(ftypes));
 	}

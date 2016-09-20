@@ -325,7 +325,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 				argsv[Idx].first->GetDebugType(context->root));
 
 			llvm::Instruction *Call = context->root->debug->insertDeclare(
-				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope), Alloca);
+				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope), context->root->builder.GetInsertBlock());
 			Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
 
 			// Add arguments to variable symbol table.
@@ -795,9 +795,9 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				type->GetDebugType(context->root));
 
 			llvm::Instruction *Call = context->root->debug->insertDeclare(
-				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), Alloca);
+				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
-
+			
 			// Store the initial value into the alloca.
 			if (this->_right)
 			{
@@ -820,11 +820,11 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 			llvm::DIFile* unit = context->root->debug_info.file;
 			type->Load(context->root);
-			llvm::DILocalVariable* D = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, context->function->scope, aname, unit, ii.second.line,
+			llvm::DILocalVariable* D = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, unit, ii.second.line,
 				type->GetDebugType(context->root));
 
 			llvm::Instruction *Call = context->root->debug->insertDeclare(
-				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), Alloca);
+				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
 
 			context->root->builder.CreateStore(val.val, Alloca);

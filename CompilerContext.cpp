@@ -999,7 +999,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 }
 
-
+//reduce redundancy by making one general version that just omits the llvm::Value from the CValue when doign a check
 bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
 {
 	CValue value;
@@ -1139,22 +1139,6 @@ void CompilerContext::PopScope()
 		if (this->scope->destructed == false)
 			for (auto ii : this->scope->named_values)
 			{
-				/*if (ii.second.type->type == Types::Struct)
-				{
-				//look for destructor
-				auto name = "~" + (ii.second.type->data->template_base ? ii.second.type->data->template_base->name : ii.second.type->data->name);
-				auto destructor = ii.second.type->data->functions.find(name);
-				if (destructor != ii.second.type->data->functions.end())
-				{
-				//call it
-				this->Call(name, { CValue(this->root->LookupType(ii.second.type->ToString() + "*"), ii.second.val) }, ii.second.type);
-				}
-				}
-				else if (ii.second.type->type == Types::Array && ii.second.type->base->type == Types::Struct)
-				{
-				printf("ok");
-				}*/
-
 				if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
 					this->Destruct(ii.second, 0);
 				else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)

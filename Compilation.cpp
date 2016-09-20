@@ -43,9 +43,6 @@
 
 using namespace Jet;
 
-//this is VERY TERRIBLE remove later
-//Source* current_source = 0;
-
 //options for the linker
 #ifdef _WIN32
 #define USE_MSVC
@@ -267,7 +264,10 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 				delete[] ii;
 
 			diagnostics->Error("Dependency compilation '"+ii+"' failed: could not find symbol file!", "project.jp");
-			//printf("Dependency compilation failed: could not find symbol file!\n");
+
+			//restore working directory
+			chdir(olddir);
+
 			return 0;
 		}
 
@@ -1342,7 +1342,7 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Const
 
 	llvm::Constant* initializer = init ? init : t->GetDefaultValue(this);
 	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
-
+	this->debug->createGlobalVariable(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false, 0);
 	this->ns->members.insert({ name, Symbol(new CValue(t->GetPointerType(), ng)) });
 	//this->globals[name] = 
 	return CValue(t, ng);
