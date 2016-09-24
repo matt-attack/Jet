@@ -1344,6 +1344,8 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Const
 	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
 	this->debug->createGlobalVariable(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false, 0);
 	this->ns->members.insert({ name, Symbol(new CValue(t->GetPointerType(), ng)) });
+
+	//if it has a constructor, make sure to call it
 	//this->globals[name] = 
 	return CValue(t, ng);
 }

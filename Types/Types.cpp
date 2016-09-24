@@ -83,7 +83,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 			//assert(type.type->loaded);
 			type.type->Load(compiler);
 			int size = type.type->GetSize();
-			auto mt = compiler->debug->createMemberType(compiler->debug_info.file, type.name, compiler->debug_info.file, line, size*8, 8, offset*8, 0, type.type->GetDebugType(compiler));
+			auto mt = compiler->debug->createMemberType(compiler->debug_info.file, type.name, compiler->debug_info.file, line, size * 8, 8, offset * 8, 0, type.type->GetDebugType(compiler));
 
 			ftypes.push_back(mt);// type.type->GetDebugType(compiler));
 			offset += size;
@@ -930,6 +930,10 @@ void Struct::Load(Compilation* compiler)
 	}
 
 	needs_vtable = true;//lets do it always just because (need to only do it when im inherited from)
+	//only do it if I have a function
+	//ok, need way to only set it if I have custom destructor or other functions
+	if (this->functions.size() <= 2) //a BAD hack
+		needs_vtable = false;
 	if (needs_vtable && this->parent_struct == 0)
 	{
 		this->struct_members.push_back({ "__vtable", "char*", compiler->LookupType("char**") });//add the member if we dont have it
@@ -968,7 +972,7 @@ void Struct::Load(Compilation* compiler)
 	}
 
 	if (struct_type == 0)
-		this->type = llvm::StructType::create(elementss, this->name);
+		this->type = llvm::StructType::create(elementss, this->name, true);
 	else
 	{
 		struct_type->setBody(elementss);
@@ -1205,6 +1209,22 @@ int Type::GetSize()
 		for (int i = 0; i < this->data->struct_members.size(); i++)
 			size += this->data->struct_members[i].type->GetSize();
 		return size;
+	}
+	switch (this->type)
+	{
+	case Types::UInt:
+	case Types::Int:
+		return 4;
+	case Types::Short:
+	case Types::UShort:
+		return 2;
+	case Types::Char:
+	case Types::UChar:
+		return 1;
+	case Types::ULong:
+	case Types::Long:
+	case Types::Double:
+		return 8;
 	}
 	return 4;//todo
 }

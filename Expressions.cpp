@@ -58,7 +58,7 @@ CValue SizeofExpression::Compile(CompilerContext* context)
 
 CValue TypeofExpression::Compile(CompilerContext* context)
 {
-	return CValue(this->arg->TypeCheck(context),0);
+	return CValue(this->arg->TypeCheck(context), 0);
 }
 
 CValue PostfixExpression::Compile(CompilerContext* context)
@@ -435,7 +435,7 @@ CValue OperatorAssignExpression::Compile(CompilerContext* context)
 	if (lhs.type->type == Types::Struct)
 		lhsptr = GetPtrToExprValue(context, left);
 	auto rhs = this->right->Compile(context);
-	
+
 	auto res = context->BinaryOperation(token.type, lhs, lhsptr, rhs);
 
 	//insert store here
@@ -507,7 +507,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		lhsptr = GetPtrToExprValue(context, left);
 
 	auto rhs = this->right->Compile(context);
-	
+
 	return context->BinaryOperation(this->_operator.type, lhs, lhsptr, rhs);
 }
 
@@ -545,6 +545,50 @@ CValue NewExpression::Compile(CompilerContext* context)
 	auto ptr = context->DoCast(ty->GetPointerType(), val, true);
 
 	//run constructors
+	if (this->args)
+	{
+		if (ptr.type->base->type == Types::Struct)// && arr_size == 0)
+		{
+			std::vector<llvm::Value*> llvm_args = { ptr.val };
+			std::vector<Type*> arg_types = { ptr.type };
+			for (auto ii : *this->args)
+			{
+				auto res = ii.first->Compile(context);
+				//need to try and do casts
+				llvm_args.push_back(res.val);
+				arg_types.push_back(res.type);
+			}
+			Type* ty = ptr.type->base;
+			Function* fun = 0;
+			if (ty->data->template_base)
+				fun = ty->GetMethod(ty->data->template_base->name, arg_types, context);
+			else
+				fun = ty->GetMethod(ty->data->name, arg_types, context);
+
+			if (fun == 0)
+			{
+				std::string err = "Constructor for '";
+				err += ty->data->template_base ? ty->data->template_base->name : ty->data->name;
+				err += "' with arguments (";
+				int i = 0;
+				for (auto ii : arg_types)
+				{
+					err += ii->ToString();
+					if (i++ < (arg_types.size() - 1))
+						err += ',';
+				}
+				err += ") not found!";
+				context->root->Error(err, this->token);
+			}
+			fun->Load(context->root);
+			context->root->builder.CreateCall(fun->f, llvm_args);
+		}
+		else
+			context->root->Error("Cannot construct non-struct type!", this->token);
+
+		//handle constructor args
+		return ptr;
+	}
 	context->Construct(ptr, arr_size);
 
 	return ptr;

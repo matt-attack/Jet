@@ -196,11 +196,23 @@ namespace Jet
 		Token token, type;
 		Token open_bracket, close_bracket;
 		Expression* size;
-		NewExpression(Token tok, Token type, Expression* size)
+		std::vector<std::pair<Expression*, Token>>* args;
+		NewExpression(Token tok, Token type, Expression* size, std::vector<std::pair<Expression*, Token>>* args = 0)
 		{
 			this->token = tok;
 			this->type = type;
+			this->args = args;
 			this->size = size;
+		}
+
+		~NewExpression()
+		{
+			if (this->args)
+			{
+				for (auto ii : *this->args)
+					delete ii.first;
+				delete args;
+			}
 		}
 
 		CValue Compile(CompilerContext* context);

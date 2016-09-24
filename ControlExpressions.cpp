@@ -360,6 +360,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 	}
 	else
 	{
+		//calling a function pointer type
 		auto lhs = this->left->Compile(context);
 		if (lhs.type->type != Types::Function)
 			context->root->Error("Cannot call non-function", *context->current_token);
@@ -369,6 +370,8 @@ CValue CallExpression::Compile(CompilerContext* context)
 			argts.push_back(ii.first->Compile(context).val);
 		return CValue(lhs.type->function->return_type, context->root->builder.CreateCall(lhs.val, argts));
 	}
+
+	//need to pass all structs as pointers
 
 	//build arg list
 	for (auto ii : *this->args)

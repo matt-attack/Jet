@@ -28,6 +28,9 @@ void Function::Load(Compilation* compiler)
 
 		//add debug stuff
 		ftypes.push_back(type.first->GetDebugType(compiler));
+
+		if (this->calling_convention == CallingConvention::StdCall && type.first->type == Types::Struct)
+			args[args.size() - 1] = args[args.size() - 1]->getPointerTo();
 	}
 
 	llvm::FunctionType *ft = llvm::FunctionType::get(this->return_type->GetLLVMType(), args, false);
@@ -65,6 +68,17 @@ void Function::Load(Compilation* compiler)
 		auto aname = this->arguments[Idx].second;
 
 		AI->setName(aname);
+
+		//if I do this I have to use it correctly
+		if (this->calling_convention == CallingConvention::StdCall && this->arguments[Idx].first->type == Types::Struct)
+		{
+			llvm::AttrBuilder b;
+			b.addAttribute(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::ByVal));
+			b.addAttribute(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::Alignment, 4));
+			auto s = llvm::AttributeSet::get(compiler->context, 0, b);
+			AI->addAttr(s);
+			
+		}
 
 		//auto D = compiler->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, this->scope, aname, compiler->debug_info.file, line,
 		//	this->arguments[Idx].first->GetDebugType(compiler));

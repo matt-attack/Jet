@@ -1269,7 +1269,12 @@ Expression* NamespaceParselet::parse(Parser* parser, Token token)
 
 Expression* NewParselet::parse(Parser* parser, Token token)
 {
-	auto type = ::ParseType(parser, false);
+	//is it a function?
+	Token type;
+	if (parser->LookAhead().type == TokenType::Name && parser->LookAhead(1).type == TokenType::LeftParen)
+		type = parser->Consume();//struct constructors
+	else
+		type = ::ParseType(parser, false);
 
 	//try and parse size expression
 	if (parser->LookAhead().type == TokenType::LeftBracket)//auto tok = parser->MatchAndConsume(TokenType::LeftBracket))
@@ -1284,6 +1289,30 @@ Expression* NewParselet::parse(Parser* parser, Token token)
 		x->open_bracket = ob;
 		x->close_bracket = cb;
 		return x;
+	}
+	else if (parser->LookAhead().type == TokenType::LeftParen)
+	{
+		//parse args
+		parser->Consume();
+
+		UniquePtr<std::vector<std::pair<Expression*, Token>>*> arguments = new std::vector < std::pair<Expression*, Token> >;
+		if (!parser->Match(TokenType::RightParen))
+		{
+			do
+			{
+				auto expr = parser->ParseExpression(Precedence::ASSIGNMENT);
+				auto comma = parser->LookAhead();
+				if (comma.type == TokenType::Comma)
+					arguments->push_back({ expr, comma });
+				else
+				{
+					arguments->push_back({ expr, Token() });
+				}
+			} while (parser->MatchAndConsume(TokenType::Comma));
+
+			Token cb = parser->Consume(TokenType::RightParen);
+		}
+		return new NewExpression(token, type, 0, arguments.Release());
 	}
 	return new NewExpression(token, type, 0);
 }

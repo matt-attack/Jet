@@ -197,8 +197,43 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::V
 	}
 	else
 	{
+		std::vector<int> to_convert;
+		if (fun->calling_convention == CallingConvention::StdCall)
+		{
+			int i = 0;
+			for (auto& ii : argsv)
+			{
+				if (ii->getType()->isStructTy())
+				{
+					//convert it to a pointer yo
+					auto alloc = context->root->builder.CreateAlloca(ii->getType(), 0, "stdcall_pass_tmp");
+					alloc->setAlignment(4);
+					context->root->builder.CreateStore(ii, alloc);
+					//alloc->dump();
+					//fun->f->dump();
+					ii = alloc;
+					to_convert.push_back(i);
+				}
+				i++;
+			}
+		}
 		auto call = context->root->builder.CreateCall(fun->f, argsv);
 		call->setCallingConv(fun->f->getCallingConv());
+		if (fun->calling_convention == CallingConvention::StdCall)
+		{
+			//add attributes
+			for (auto ii : to_convert)
+			{
+				//call->addAttribute(ii+1, llvm::Attribute::AttrKind::ByVal);
+				llvm::AttrBuilder b;
+				auto& ctext = context->root->builder.getContext();
+				b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
+				b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
+				auto s = llvm::AttributeSet::get(ctext, ii+1, b);
+				call->setAttributes(s);
+				//call->addAttribute(ii+1, "align", "4");
+			}
+		}
 		return CValue(fun->return_type, call);
 	}
 }

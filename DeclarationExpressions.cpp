@@ -791,6 +791,10 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				Alloca = context->root->builder.CreateAlloca(type->GetLLVMType(), 0, aname);
 			}
 
+			if (type->GetSize() >= 4)
+				Alloca->setAlignment(4);
+
+
 			auto D = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, context->root->debug_info.file, ii.second.line,
 				type->GetDebugType(context->root));
 
@@ -807,6 +811,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				context->root->builder.CreateStore(val.val, Alloca);
 			}
 		}
+		//todo setup vtables on globals and call constructors
 		else if (this->_right)
 		{
 			//infer the type
@@ -817,6 +822,9 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				Alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType(), context->root->builder.getInt32(val.type->size), aname);
 			else
 				Alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType(), 0, aname);
+
+			if (val.type->GetSize() >= 4)
+				Alloca->setAlignment(4);
 
 			llvm::DIFile* unit = context->root->debug_info.file;
 			type->Load(context->root);

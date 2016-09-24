@@ -100,9 +100,9 @@ struct WhereIterator<Any T, IEnumerator Base>
 }
 
 
-fun WhereIterable<T, IEnumerable > IEnumerable::Where(function<bool(T)> fn)
+fun WhereIterable<T, IEnumerable> IEnumerable::Where(function<bool(T)> fn)
 {
-	let WhereIterable<T, IEnumerable > x;
+	let WhereIterable<T, IEnumerable> x;
 	x.iterable = this;
 	x.fn = fn;
 	return x;
@@ -171,7 +171,7 @@ struct vector<Any TT>
 	fun VectorIterator<TT> GetEnumerator()
 	{
 		let VectorIterator<TT> iter;
-		iter.position = -1;
+		iter.position = 0;//important to make sure it is always a valid number
 		iter.size = this->cur_size;
 		iter.data = this->data;
 		return iter;
@@ -189,18 +189,18 @@ struct vector<Any TT>
 		
 		this->data[this->cur_size++] = v;
 	}
-
-	//fun TT get(int index)
-	//{
-	//	return this->data[index];
-	//}
 	
-	fun TT* operator[](int index)
+	fun uint size()
+	{
+		return this->cur_size;
+	}
+	
+	fun TT* operator[](uint index)
 	{
 		return &this->data[index];
 	}
 	
-	fun void resize(int size)
+	fun void resize(uint size)
 	{
 		//todo
 		let ne = new TT[size];//<TT*>malloc(sizeof(TT)*size);
