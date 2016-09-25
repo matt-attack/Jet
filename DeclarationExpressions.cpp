@@ -777,18 +777,22 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			context->CurrentToken(&ii.first);
 			type = context->root->LookupType(ii.first.text);
 
+			auto TheFunction = context->function->f;
+			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+				TheFunction->getEntryBlock().begin());
+
 			if (type->type == Types::Struct && type->data->templates.size() > 0)
 				context->root->Error("Missing template arguments for type '" + type->ToString() + "'", ii.first);
 			else if (type->type == Types::Array)
 			{
-				Alloca = context->root->builder.CreateAlloca(type->GetLLVMType(), context->root->builder.getInt32(type->size), aname);
+				Alloca = TmpB.CreateAlloca(type->GetLLVMType(), context->root->builder.getInt32(type->size), aname);
 			}
 			else
 			{
 				if (type->GetBaseType()->type == Types::Trait)
 					context->root->Error("Cannot instantiate trait", ii.second);
 
-				Alloca = context->root->builder.CreateAlloca(type->GetLLVMType(), 0, aname);
+				Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, aname);
 			}
 
 			if (type->GetSize() >= 4)
@@ -818,11 +822,15 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			auto val = (*this->_right)[i++].second->Compile(context);
 			type = val.type;
 
+			//need to move allocas outside of the loop and into the main body
+			auto TheFunction = context->function->f;
+			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+				TheFunction->getEntryBlock().begin());
 			if (val.type->type == Types::Array)
-				Alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType(), context->root->builder.getInt32(val.type->size), aname);
+				Alloca = TmpB.CreateAlloca(val.type->GetLLVMType(), context->root->builder.getInt32(val.type->size), aname);
 			else
-				Alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType(), 0, aname);
-
+				Alloca = TmpB.CreateAlloca(val.type->GetLLVMType(), 0, aname);
+			
 			if (val.type->GetSize() >= 4)
 				Alloca->setAlignment(4);
 
@@ -838,7 +846,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			context->root->builder.CreateStore(val.val, Alloca);
 		}
 		else
-			context->root->Error("Cannot infer type from nothing!", ii.second);
+			context->root->Error("Cannot infer variable type without a value!", ii.second);
 
 		// Add arguments to variable symbol table.
 		if (context->function->is_generator)
@@ -852,10 +860,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			{
 				auto val = (*this->_right)[i - 1].second->Compile(context);
 				val = context->DoCast(type, val);
-				//val.val->dump();
-				//val.val->getType()->dump();
-				//var_ptr->dump();
-				//var_ptr->getType()->dump();
 				context->root->builder.CreateStore(val.val, var_ptr);
 			}
 
