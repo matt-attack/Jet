@@ -1225,6 +1225,8 @@ int Type::GetSize()
 	case Types::Long:
 	case Types::Double:
 		return 8;
+	case Types::Pointer:
+		return 4;//todo: use correct size for 64 bit when that happens
 	}
 	return 4;//todo
 }

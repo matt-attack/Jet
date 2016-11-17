@@ -823,9 +823,11 @@ namespace Jet
 			{
 				auto loc = this->right->Compile(context);
 
-				right = context->DoCast(loc.type->base, right);
+				context->Store(loc, right);
+				//right = context->DoCast(loc.type->base, right);
 
-				context->root->builder.CreateStore(right.val, loc.val);
+				//add = operator here
+				//context->root->builder.CreateStore(right.val, loc.val);
 				return;
 			}
 			context->root->Error("Unimplemented!", _operator);

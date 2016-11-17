@@ -100,6 +100,7 @@ Token ParseType(Parser* parser, bool parse_arrays = true)
 	ret.trivia_length = name.trivia_length;
 	ret.text_ptr = name.text_ptr;
 	ret.text = out;
+	ret.type = TokenType::Name;
 	return ret;
 }
 
@@ -686,6 +687,10 @@ bool IsValidFunctionNameToken(TokenType op)
 		return true;
 	else if (op == TokenType::LessThanEqual)
 		return true;
+	else if (op == TokenType::Equals)
+		return true;
+	else if (op == TokenType::Assign)
+		return true;
 
 	return false;
 }
@@ -846,7 +851,28 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 		//its a struct definition
 		stru = name.text;
 		bool destructor = parser->MatchAndConsume(TokenType::BNot);
-		name = parser->Consume(TokenType::Name);//parse the real function name
+
+		name = parser->Consume();// TokenType::Name);//parse the real function name
+		//if
+
+		Token oper;
+		if (name.text == "operator")
+		{
+			//parse in the operator
+			oper = name;
+			name = parser->Consume();
+			if (name.type == TokenType::LeftBracket)
+			{
+				auto name2 = parser->Consume(TokenType::RightBracket);
+				name.text += ']';
+			}
+		}
+
+		//check that the name is ok
+		//if (stru.text.length() && stru.type != TokenType::Name)
+		//	parser->Error("Invalid struct name", stru);
+		/*else*/ if (!IsValidFunctionNameToken(name.type))
+			parser->Error("Not a valid operator overload", name);
 		if (destructor)
 			name.text = "~" + name.text;
 	}

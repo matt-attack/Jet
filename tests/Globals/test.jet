@@ -13,10 +13,14 @@ let int p[200];
 struct xx
 {
 	int p;
+	int q;
 }
 let xx globalt;
 fun int main() 
 {
+	globalt.p = 7;
+	let zz = 5;
+	zz++;
 	x = 5;
 	x++;
 	

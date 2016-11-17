@@ -17,13 +17,11 @@ CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
 	auto p = dynamic_cast<IndexExpression*>(right);
 	if (i)
 	{
-		auto var = context->GetVariable(i->GetName());
-		return CValue(var.type, var.val);
+		return context->GetVariable(i->GetName());
 	}
 	else if (p)
 	{
-		auto var = p->GetElementPointer(context);
-		return CValue(var.type, var.val);
+		return p->GetElementPointer(context);
 	}
 	context->root->Error("Not Implemented", *context->current_token);
 }
@@ -33,9 +31,7 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 	context->CurrentToken(&this->_operator);
 
 	if (this->_operator.type == TokenType::BAnd)
-	{
 		return GetPtrToExprValue(context, right);
-	}
 
 	auto rhs = right->Compile(context);
 
@@ -84,13 +80,15 @@ CValue IndexExpression::Compile(CompilerContext* context)
 	if (this->index && type->type == Types::Pointer && type->base->type == Types::Struct)
 	{
 		//todo
-		printf("call operator");
+		//printf("call operator");
 	}
 	auto loc = this->GetElementPointer(context);
 	if (loc.type->type == Types::Function)
 		return loc;
-	return CValue(loc.type->base, context->root->builder.CreateLoad(loc.val));
+	return CValue(loc.type->base, context->root->builder.CreateLoad(loc.val), loc.val);
 }
+
+//todo: add int[] with a .size to allow people to get the size of arrays
 //ok, idea
 //each expression will store type data in it loaded during typecheck
 //compiling will only emit instructions, it should do little actual work
@@ -355,8 +353,26 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	auto loc = this->GetElementPointer(context);
 
 	context->CurrentToken(oldtok);
-	right = context->DoCast(loc.type->base, right);
-	context->root->builder.CreateStore(right.val, loc.val);
+
+	context->Store(loc, right);
+
+	/*right = context->DoCast(loc.type->base, right);
+
+	if (loc.type->base->type == Types::Struct)
+	{
+		auto funiter = left.type->data->functions.find("=");
+		//todo: search through multimap to find one with the right number of args
+		if (funiter != left.type->data->functions.end() && funiter->second->arguments.size() == 2)
+		{
+			Function* fun = funiter->second;
+			fun->Load(context->root);
+			std::vector<llvm::Value*> argsv = { lhsptr.val, right.val };
+			return CallFunction(this, fun, argsv, false);
+			//ok, need to use proper function call here to include virtuals
+			//return CValue(fun->return_type, this->root->builder.CreateCall(fun->f, { lhsptr.val, right.val }, "operator_overload"));
+		}
+	}
+	context->root->builder.CreateStore(right.val, loc.val);*/
 }
 
 CValue StringExpression::Compile(CompilerContext* context)

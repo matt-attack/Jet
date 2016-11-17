@@ -40,6 +40,8 @@ namespace Jet
 		TCScope* prev;
 	};
 
+	//CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::Value*>& argsv, bool devirtualize);
+
 	//compiles functions
 	class Compiler;
 	class CompilerContext
@@ -210,10 +212,16 @@ namespace Jet
 			//for each scope
 			CValue value = GetVariable(name);
 
-			val = this->DoCast(value.type->base, val);
+			this->Store(value, val);
+			//return 0;
+			//val = this->DoCast(value.type->base, val);
 
-			return root->builder.CreateStore(val.val, value.val);
+			//check if there is an operator
+			return 0;
+			//return root->builder.CreateStore(val.val, value.val);
 		}
+
+		void Store(CValue loc, CValue val);
 
 		CValue Load(const std::string& name);
 

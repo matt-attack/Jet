@@ -287,10 +287,10 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	CompilerContext* function;
 	if (this->is_generator)
 	{
-		function = argsv.front().first->base->data->functions.find("MoveNext")->second->context; 
+		function = argsv.front().first->base->data->functions.find("MoveNext")->second->context;
 		llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", function->function->f);
 		context->root->builder.SetInsertPoint(bb);
-		
+
 		function->function->is_generator = true;
 	}
 	else
@@ -315,9 +315,20 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			auto aname = argsv[Idx].second;
 
 			llvm::IRBuilder<> TmpB(&function->function->f->getEntryBlock(), function->function->f->getEntryBlock().begin());
-			auto Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
+			//need to alloca pointer to struct if this is a struct type
+			llvm::AllocaInst* Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
+			llvm::Value* storeval = AI;
+			if (argsv[Idx].first->type == Types::Struct)
+				storeval = function->root->builder.CreateLoad(AI);
+				//Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType()->getPointerTo(), 0, aname);
+			//else
+				//Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
 			// Store the initial value into the alloca.
-			function->root->builder.CreateStore(AI, Alloca);
+			//AI->dump();
+			//AI->getType()->dump();
+			//Alloca->dump();
+			//Alloca->getType()->dump();
+			function->root->builder.CreateStore(storeval, Alloca);
 
 			AI->setName(aname);
 
@@ -439,7 +450,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		//now compile reset function
 		{
 			auto reset = argsv.front().first->base->data->functions.find("Reset")->second->context;
-			
+
 			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", reset->function->f);
 			context->root->builder.SetInsertPoint(bb);
 
@@ -654,7 +665,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 				if (temp.second.text == sub)
 				{
 					//insert dummy types
-					fun->arguments.push_back({ new Type(ii.type.text,Types::Invalid), ii.name.text });
+					fun->arguments.push_back({ new Type(ii.type.text, Types::Invalid), ii.name.text });
 					done = true;
 					break;
 				}
@@ -805,14 +816,19 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			llvm::Instruction *Call = context->root->debug->insertDeclare(
 				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
-			
+
 			// Store the initial value into the alloca.
 			if (this->_right)
 			{
 				auto val = (*this->_right)[i++].second->Compile(context);
 				//cast it
-				val = context->DoCast(type, val);
-				context->root->builder.CreateStore(val.val, Alloca);
+				CValue alloc;
+				alloc.type = type->GetPointerType();
+				alloc.val = Alloca;
+				context->Store(alloc, val);
+				//val = context->DoCast(type, val);
+				//context->root->builder.CreateStore(val.val, Alloca);
+				//assignment
 			}
 		}
 		//todo setup vtables on globals and call constructors
@@ -830,7 +846,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				Alloca = TmpB.CreateAlloca(val.type->GetLLVMType(), context->root->builder.getInt32(val.type->size), aname);
 			else
 				Alloca = TmpB.CreateAlloca(val.type->GetLLVMType(), 0, aname);
-			
+
 			if (val.type->GetSize() >= 4)
 				Alloca->setAlignment(4);
 
@@ -843,7 +859,12 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
 
-			context->root->builder.CreateStore(val.val, Alloca);
+			CValue alloc;
+			alloc.val = Alloca;
+			alloc.type = val.type->GetPointerType();
+			context->Store(alloc, val);
+			//assignment
+			//context->root->builder.CreateStore(val.val, Alloca);
 		}
 		else
 			context->root->Error("Cannot infer variable type without a value!", ii.second);

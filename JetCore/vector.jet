@@ -165,7 +165,7 @@ struct vector<Any TT>
 	fun void ~vector()
 	{
 		puts("destructor");
-		free(<char*>this->data);
+		//free(<char*>this->data);
 	}
 	
 	fun VectorIterator<TT> GetEnumerator()

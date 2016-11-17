@@ -24,19 +24,30 @@ namespace Jet
 		//my type info
 		Type* type;
 		llvm::Value* val;
+		llvm::Value* pointer;
 
 		CValue()
 		{
 			type = &VoidType;
 			val = 0;
+			pointer = 0;
 		}
 
 		CValue(Type* type, llvm::Value* val) : type(type), val(val) {}
+		CValue(Type* type, llvm::Value* val, llvm::Value* pointer) : type(type), val(val), pointer(pointer) {}
+
+		llvm::Value* GetReference()
+		{
+			if (this->pointer)
+				return this->pointer;
+
+			//need to make our own copy for this somehow...
+		}
 	};
 
 	enum class Types
 	{
-		Void,
+		Void,//valid really only as a return type
 		Double,//64 bit float
 		Float,//32 bit float
 
