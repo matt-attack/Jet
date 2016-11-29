@@ -378,6 +378,21 @@ CValue CallExpression::Compile(CompilerContext* context)
 		argsv.push_back(ii.first->Compile(context));
 
 	context->CurrentToken(&this->open);
-	return context->Call(fname, argsv, stru, devirtualize);
+	auto ret = context->Call(fname, argsv, stru, devirtualize);
+
+	//destruct if my parent doesnt use me
+	if (ret.type->type == Types::Struct && dynamic_cast<BlockExpression*>(this->parent))
+	{
+		//need to escalate to a pointer
+		auto TheFunction = context->function->f;
+		llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+			TheFunction->getEntryBlock().begin());
+		auto alloc = TmpB.CreateAlloca(ret.type->GetLLVMType(), 0, "return_pass_tmp");
+		context->root->builder.CreateStore(ret.val, alloc);
+
+		context->Destruct(CValue(ret.type->GetPointerType(),alloc), 0);
+	}
+
+	return ret;
 }
 

@@ -287,24 +287,46 @@ void CompilerContext::Store(CValue loc, CValue val)
 		//todo: search through multimap to find one with the right number of args
 		if (funiter != val.type->data->functions.end() && funiter->second->arguments.size() == 2)
 		{
-			if (val.pointer == 0)
-				this->root->Error("Missing pointer to value type, making new one not implemented.", *this->current_token);
+			llvm::AllocaInst* alloc = 0;
+			if (val.pointer == 0)//its a value type (return value)
+			{
+				//ok, lets be dumb
+				//copy it to an alloca
+				auto TheFunction = this->function->f;
+				llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+					TheFunction->getEntryBlock().begin());
+				alloc = TmpB.CreateAlloca(val.type->GetLLVMType(), 0, "return_pass_tmp");
+				this->root->builder.CreateStore(val.val, alloc);
+
+				//call copy into new place
+				//Function* fun = funiter->second;
+				//fun->Load(this->root);
+				//std::vector<llvm::Value*> argsv = { loc.val, alloc/*val.pointer*/ };
+
+				//CallFunction(this, fun, argsv, true);
+
+				//destruct old one
+				//this->root->Error("Missing pointer to value type, making new one not implemented.", *this->current_token);
+				val.pointer = alloc;
+			}
 			Function* fun = funiter->second;
 			fun->Load(this->root);
-			std::vector<llvm::Value*> argsv = { loc.val, val.pointer };// val.val};
-			//ok, this needs to pass by reference somehow
-				/*return */CallFunction(this, fun, argsv, true);
+			std::vector<llvm::Value*> argsv = { loc.val, val.pointer };
+
+			CallFunction(this, fun, argsv, true);
+
+			if (alloc)//val.pointer == 0)
+			{
+				//destruct temp one
+				this->Destruct(CValue(val.type->GetPointerType(), alloc), 0);
+			}
 			return;
-			//ok, need to use proper function call here to include virtuals
-			//return CValue(fun->return_type, this->root->builder.CreateCall(fun->f, { lhsptr.val, right.val }, "operator_overload"));
 		}
 	}
 
 	auto vall = this->DoCast(loc.type->base, val);
 
-	/*return */root->builder.CreateStore(vall.val, loc.val);
-	auto y = 7;
-	return;
+	root->builder.CreateStore(vall.val, loc.val);
 }
 
 CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue lhsptr, CValue right)
@@ -348,9 +370,8 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 				Function* fun = funiter->second;
 				fun->Load(this->root);
 				std::vector<llvm::Value*> argsv = { lhsptr.val, right.val };
+				//todo: use references
 				return CallFunction(this, fun, argsv, false);
-				//ok, need to use proper function call here to include virtuals
-				//return CValue(fun->return_type, this->root->builder.CreateCall(fun->f, { lhsptr.val, right.val }, "operator_overload"));
 			}
 		}
 	}
@@ -941,7 +962,9 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 		if (cur->destructed == false)
 			for (auto ii : cur->named_values)
 			{
-				if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
+				if (ii.second.val == ret.pointer)
+					continue;//dont destruct what we are returning
+				else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
 					this->Destruct(ii.second, 0);
 				else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
 					this->Destruct(CValue(ii.second.type->base, ii.second.val), this->root->builder.getInt32(ii.second.type->base->size));

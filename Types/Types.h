@@ -33,16 +33,10 @@ namespace Jet
 			pointer = 0;
 		}
 
-		CValue(Type* type, llvm::Value* val) : type(type), val(val) {}
+		CValue(Type* type, llvm::Value* val) : type(type), val(val), pointer(0) {}
 		CValue(Type* type, llvm::Value* val, llvm::Value* pointer) : type(type), val(val), pointer(pointer) {}
 
-		llvm::Value* GetReference()
-		{
-			if (this->pointer)
-				return this->pointer;
-
-			//need to make our own copy for this somehow...
-		}
+		llvm::Value* GetReference();
 	};
 
 	enum class Types
