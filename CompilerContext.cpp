@@ -22,21 +22,11 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 	Function* func = 0;
 	if (member)
 	{
-		//std::string str;
-		//int i = 2;
-		//for (; i < fname.length(); i++)
-		//{
-		//	if (fname[i] == '_')
-		//		break;
-
-		//	str += fname[i];
-		//}
 		//ok, if member just pass the type so we dont have to do this crap
-		auto type = member;// this->root->LookupType(str);
 		int i = member->name.length() + 2;
 		std::string fname2 = fname.substr(++i, fname.length() - i);
 
-		auto range = type->data->functions.equal_range(fname2);
+		auto range = member->data->functions.equal_range(fname2);
 		for (auto ii = range.first; ii != range.second; ii++)
 		{
 			//printf("found option for %s with %i args\n", fname.c_str(), ii->second->argst.size());
@@ -162,7 +152,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 	this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 }
 
-CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::Value*>& argsv, bool devirtualize)
+CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>& argsv, bool devirtualize)
 {
 	bool use_virtual = true;
 
@@ -170,26 +160,59 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::V
 	if (fun->is_generator)//todo expand this to current and reset
 		devirtualize = true;
 
+	//convert to an array of args
+	std::vector<llvm::Value*> arg_vals;
+	for (auto ii : argsv)
+		arg_vals.push_back(ii.val);
+
 	std::vector<int> to_convert;
 	//todo: use these to do assignment for structs for function calls, make sure to move this out
 	int i = 0;
 	for (auto& ii : argsv)
 	{
-		if (ii->getType()->isStructTy())
+		if (ii.val->getType()->isStructTy())
 		{
 			//convert it to a pointer yo
 			auto TheFunction = context->function->f;
 			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 				TheFunction->getEntryBlock().begin());
-			auto alloc = TmpB.CreateAlloca(ii->getType(), 0, "arg_pass_tmp");
+			auto alloc = TmpB.CreateAlloca(ii.val->getType(), 0, "arg_pass_tmp");
 			alloc->setAlignment(4);
 
+			//construct it
+			context->Construct(CValue(ii.type->GetPointerType(), alloc), 0);
+			
 			//need to promote from value types to get this to work
 			//ok, need to not do this for =
 			//extract the types from the function
-			context->Store(CValue(fun->arguments[i].first->GetPointerType(), alloc), CValue(fun->arguments[i].first, ii));
+			auto type = fun->arguments[i].first;
+			if (type->type == Types::Struct)
+			{
+				auto funiter = type->data->functions.find("=");
+				//todo: search through multimap to find one with the right number of args
+				if (funiter != type->data->functions.end() && funiter->second->arguments.size() == 2)
+				{
+					llvm::Value* pointer = alloc;// val.pointer;
+
+					Function* fun = funiter->second;
+					fun->Load(context->root);
+					if (ii.pointer == 0)
+						context->root->Error("Cannot convert to reference", *context->current_token);
+					
+					auto pt = type->GetPointerType();
+					std::vector<CValue> argsv = { CValue(pt, alloc), CValue(pt, ii.pointer) };
+
+					CallFunction(context, fun, argsv, true);
+				}
+			}
+			else
+			{
+				context->root->builder.CreateStore(ii.val, alloc);
+			}
+
+			//context->Store(CValue(fun->arguments[i].first->GetPointerType(), alloc), CValue(fun->arguments[i].first, ii));
 			//context->root->builder.CreateStore(ii, alloc);
-			ii = alloc;
+			arg_vals[i] = alloc;// ii = alloc;
 			to_convert.push_back(i);
 		}
 		i++;
@@ -200,7 +223,7 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::V
 	if (fun->is_virtual && devirtualize == false)
 	{
 		//ok, load the virtual table, then load the pointer to it
-		auto gep = context->root->builder.CreateGEP(argsv[0], { context->root->builder.getInt32(0), context->root->builder.getInt32(fun->virtual_table_location) }, "get_vtable");
+		auto gep = context->root->builder.CreateGEP(argsv[0].val, { context->root->builder.getInt32(0), context->root->builder.getInt32(fun->virtual_table_location) }, "get_vtable");
 
 		//then load it
 		llvm::Value* ptr = context->root->builder.CreateLoad(gep);
@@ -214,7 +237,9 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::V
 		//then cast it to the correct function type
 		auto func = context->root->builder.CreatePointerCast(ptr, fun->GetType(context->root)->GetLLVMType());
 
-		auto call = context->root->builder.CreateCall(func, argsv);
+		//then call it
+		auto call = context->root->builder.CreateCall(func, arg_vals);
+		//call->setCallingConv(fun->f->getCallingConv());
 
 		//add attributes
 		for (auto ii : to_convert)
@@ -227,53 +252,21 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::V
 			call->setAttributes(s);
 		}
 
-		//then call it
-		//auto call = context->root->builder.CreateCall(fun->f, argsv);
-		//call->setCallingConv(fun->f->getCallingConv());
 		return CValue(fun->return_type, call);
 	}
 	else
 	{
-		std::vector<int> to_convert;
-		//todo: use these to do assignment for structs for function calls, make sure to move this out
-		/*if (true)//fun->calling_convention == CallingConvention::StdCall)
-		{
-		int i = 0;
-		for (auto& ii : argsv)
-		{
-		if (ii->getType()->isStructTy())
-		{
-		//convert it to a pointer yo
-		auto TheFunction = context->function->f;
-		llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-		TheFunction->getEntryBlock().begin());
-		auto alloc = TmpB.CreateAlloca(ii->getType(), 0, "stdcall_pass_tmp");
-		alloc->setAlignment(4);
-		context->root->builder.CreateStore(ii, alloc);
-		ii = alloc;
-		to_convert.push_back(i);
-		}
-		i++;
-		}
-		}*/
-		//fun->f->dump();
-		//if (argsv.size() > 0)
-		//	argsv[0]->dump();
-		//context->function->f->dump();
-		auto call = context->root->builder.CreateCall(fun->f, argsv);
+		auto call = context->root->builder.CreateCall(fun->f, arg_vals);
 		call->setCallingConv(fun->f->getCallingConv());
-		if (true)//fun->calling_convention == CallingConvention::StdCall)
+		//add attributes
+		for (auto ii : to_convert)
 		{
-			//add attributes
-			for (auto ii : to_convert)
-			{
-				llvm::AttrBuilder b;
-				auto& ctext = context->root->builder.getContext();
-				b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
-				b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-				auto s = llvm::AttributeSet::get(ctext, ii + 1, b);
-				call->setAttributes(s);
-			}
+			llvm::AttrBuilder b;
+			auto& ctext = context->root->builder.getContext();
+			b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
+			b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
+			auto s = llvm::AttributeSet::get(ctext, ii + 1, b);
+			call->setAttributes(s);
 		}
 		return CValue(fun->return_type, call);
 	}
@@ -287,7 +280,7 @@ void CompilerContext::Store(CValue loc, CValue val)
 		//todo: search through multimap to find one with the right number of args
 		if (funiter != val.type->data->functions.end() && funiter->second->arguments.size() == 2)
 		{
-			llvm::AllocaInst* alloc = 0;
+			llvm::Value* pointer = val.pointer;
 			if (val.pointer == 0)//its a value type (return value)
 			{
 				//ok, lets be dumb
@@ -295,30 +288,20 @@ void CompilerContext::Store(CValue loc, CValue val)
 				auto TheFunction = this->function->f;
 				llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 					TheFunction->getEntryBlock().begin());
-				alloc = TmpB.CreateAlloca(val.type->GetLLVMType(), 0, "return_pass_tmp");
-				this->root->builder.CreateStore(val.val, alloc);
-
-				//call copy into new place
-				//Function* fun = funiter->second;
-				//fun->Load(this->root);
-				//std::vector<llvm::Value*> argsv = { loc.val, alloc/*val.pointer*/ };
-
-				//CallFunction(this, fun, argsv, true);
-
-				//destruct old one
-				//this->root->Error("Missing pointer to value type, making new one not implemented.", *this->current_token);
-				val.pointer = alloc;
+				pointer = TmpB.CreateAlloca(val.type->GetLLVMType(), 0, "return_pass_tmp");
+				this->root->builder.CreateStore(val.val, pointer);
 			}
+
 			Function* fun = funiter->second;
 			fun->Load(this->root);
-			std::vector<llvm::Value*> argsv = { loc.val, val.pointer };
+			std::vector<CValue> argsv = { loc, CValue(loc.type, pointer) };
 
 			CallFunction(this, fun, argsv, true);
 
-			if (alloc)//val.pointer == 0)
+			if (pointer != val.pointer)
 			{
 				//destruct temp one
-				this->Destruct(CValue(val.type->GetPointerType(), alloc), 0);
+				this->Destruct(CValue(val.type->GetPointerType(), pointer), 0);
 			}
 			return;
 		}
@@ -365,13 +348,14 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 		{
 			auto funiter = left.type->data->functions.find(res->second);
 			//todo: search through multimap to find one with the right number of args
+			//check args
 			if (funiter != left.type->data->functions.end() && funiter->second->arguments.size() == 2)
 			{
 				Function* fun = funiter->second;
 				fun->Load(this->root);
-				std::vector<llvm::Value*> argsv = { lhsptr.val, right.val };
+				std::vector<CValue> argsv = { lhsptr, right };
 				//todo: use references
-				return CallFunction(this, fun, argsv, false);
+				return CallFunction(this, fun, argsv, true);//for now lets keep these operators non-virtual
 			}
 		}
 	}
@@ -850,9 +834,9 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		return CValue(type, this->root->builder.CreateLoad(Alloca));
 	}
 
-	std::vector<llvm::Value*> argsv;
+	std::vector<CValue> argsv;
 	for (int i = 0; i < args.size(); i++)
-		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]).val);//try and cast to the correct type if we can
+		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]));//try and cast to the correct type if we can
 
 	return CallFunction(this, fun, argsv, devirtualize);
 }
