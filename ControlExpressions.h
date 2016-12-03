@@ -765,7 +765,7 @@ namespace Jet
 			if (right)
 				context->Return(right->Compile(context));
 			else
-				context->root->builder.CreateRetVoid();
+				context->Return(CValue());// root->builder.CreateRetVoid(); um, im not destructing if I return void
 
 			return CValue();
 		}

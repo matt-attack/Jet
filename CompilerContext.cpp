@@ -181,7 +181,7 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 
 			//construct it
 			context->Construct(CValue(ii.type->GetPointerType(), alloc), 0);
-			
+
 			//need to promote from value types to get this to work
 			//ok, need to not do this for =
 			//extract the types from the function
@@ -198,7 +198,7 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 					fun->Load(context->root);
 					if (ii.pointer == 0)
 						context->root->Error("Cannot convert to reference", *context->current_token);
-					
+
 					auto pt = type->GetPointerType();
 					std::vector<CValue> argsv = { CValue(pt, alloc), CValue(pt, ii.pointer) };
 
@@ -953,9 +953,25 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 				else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
 					this->Destruct(CValue(ii.second.type->base, ii.second.val), this->root->builder.getInt32(ii.second.type->base->size));
 			}
+
+		/*if (cur->prev == 0 && cur->destructed == false)
+		{
+			int i = 0;
+			for (auto ii : cur->named_values)
+			{
+				if (this->function->arguments[i].first->type == Types::Struct && ii.second.val != ret.pointer)
+				{
+					//this->Destruct(ii.second,0);
+				}
+				i++;
+			}
+		}*/
 		cur->destructed = true;
 		cur = cur->prev;
 	} while (cur);
+
+	if (ret.type->type == Types::Void)
+		return root->builder.CreateRetVoid();
 
 	if (ret.val)
 		ret = this->DoCast(this->function->return_type, ret);
