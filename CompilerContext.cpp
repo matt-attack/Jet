@@ -582,7 +582,11 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 
 			if (type)
 			{
-				return type->data->functions.find(type->data->template_base->name)->second;
+				auto fun = type->data->functions.find(type->data->template_base->name);
+				if (fun != type->data->functions.end())
+					return fun->second;// type->data->functions.find(type->data->template_base->name)->second;
+				else
+					return 0;
 			}
 			//instantiate here
 			this->root->Error("Not implemented", *this->current_token);
@@ -743,6 +747,14 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				this->root->builder.CreateCall(fun->f, argsv);
 
 				return CValue(type, this->root->builder.CreateLoad(Alloca));
+			}
+			else
+			{
+				type->Load(this->root);
+				//auto Alloca = this->root->builder.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
+
+				//fake a constructor
+				return CValue(type, type->GetDefaultValue(this->root));// this->root->builder.CreateLoad(Alloca));
 			}
 		}
 		else
@@ -956,15 +968,15 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 
 		/*if (cur->prev == 0 && cur->destructed == false)
 		{
-			int i = 0;
-			for (auto ii : cur->named_values)
-			{
-				if (this->function->arguments[i].first->type == Types::Struct && ii.second.val != ret.pointer)
-				{
-					//this->Destruct(ii.second,0);
-				}
-				i++;
-			}
+		int i = 0;
+		for (auto ii : cur->named_values)
+		{
+		if (this->function->arguments[i].first->type == Types::Struct && ii.second.val != ret.pointer)
+		{
+		//this->Destruct(ii.second,0);
+		}
+		i++;
+		}
 		}*/
 		cur->destructed = true;
 		cur = cur->prev;

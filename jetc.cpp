@@ -509,7 +509,7 @@ void DoCommand(int argc, char* argv[])
 			else
 			{
 				//assemble and execute, look for pass or fail
-				compilation->Assemble(0);
+				compilation->Assemble();
 
 				//
 				std::string cmd = "tests\\" + std::string(ii) + "\\build\\" + std::string(ii) + ".exe";

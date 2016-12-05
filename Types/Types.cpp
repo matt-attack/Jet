@@ -1277,6 +1277,11 @@ llvm::Constant* Type::GetDefaultValue(Compilation* compilation)
 		std::vector<llvm::Constant*> arr;
 		for (auto ii : this->data->struct_members)
 			arr.push_back(ii.type->GetDefaultValue(compilation));
+		if (this->data->struct_members.size() == 0)
+		{
+			//add the padding value
+			arr.push_back(llvm::ConstantInt::get(compilation->context, llvm::APInt(32, 0, true)));
+		}
 		initializer = llvm::ConstantStruct::get(llvm::dyn_cast<llvm::StructType>(this->GetLLVMType()), arr);
 	}
 	else
