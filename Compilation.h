@@ -135,7 +135,7 @@ namespace Jet
 
 		CValue AddGlobal(const std::string& name, Type* t, llvm::Constant* init = 0, bool intern = false);
 
-		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder, bool time = false);
+		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder, bool time = false, int debug = 2);
 
 		std::vector<Diagnostic>& GetErrors()
 		{

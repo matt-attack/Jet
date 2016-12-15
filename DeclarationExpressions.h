@@ -708,7 +708,7 @@ namespace Jet
 			}
 		}
 	};
-
+	
 	class AttributeExpression : public Expression
 	{
 		Token open_bracket, close_bracket;
@@ -748,7 +748,6 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			//just need to make sure the attribute exists
-			//throw 7;
 			next->TypeCheck(context);
 			return 0;
 		}

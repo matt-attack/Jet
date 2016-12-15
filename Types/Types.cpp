@@ -1258,7 +1258,7 @@ bool Struct::IsParent(Type* ty)
 llvm::Constant* Type::GetDefaultValue(Compilation* compilation)
 {
 	llvm::Constant* initializer = 0;
-	if (this->type == Types::Int || this->type == Types::Short || this->type == Types::Char || this->type == Types::Long)
+	if (this->IsInteger())//this->type == Types::Int || this->type == Types::Short || this->type == Types::Char || this->type == Types::Long)
 		initializer = llvm::ConstantInt::get(compilation->context, llvm::APInt(32, 0, true));
 	else if (this->type == Types::Double)
 		initializer = llvm::ConstantFP::get(compilation->context, llvm::APFloat(0.0));

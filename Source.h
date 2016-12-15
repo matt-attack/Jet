@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 #include <string.h>
 #include <stdio.h>
@@ -16,13 +17,13 @@ namespace Jet
 		unsigned int index;
 
 		unsigned int length;
-		const char* text;
+		char* text;
 
 		std::vector<std::pair<const char*, unsigned int> > lines;
 	public:
 
-		//takes ownership
-		Source(const char* source, const std::string& filename);
+		//takes ownership of source
+		Source(char* source, const std::string& filename);
 		Source(Source&& source)
 		{
 			this->text = source.text;
@@ -40,6 +41,8 @@ namespace Jet
 
 		std::string GetLine(unsigned int line);
 		const char* GetLinePointer(unsigned int line);
+
+		void PreProcess(std::map<std::string, bool>& vars, DiagnosticBuilder* diag);
 
 		char ConsumeChar();
 		char MatchAndConsumeChar(char c);

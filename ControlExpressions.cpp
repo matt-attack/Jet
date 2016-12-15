@@ -191,7 +191,6 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 	{
 		//its a constructor or something
 		return fun->arguments[0].first->base;
-		//throw 7;
 	}
 
 	//keep working on this, dont forget constructors

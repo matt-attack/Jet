@@ -166,7 +166,6 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 		arg_vals.push_back(ii.val);
 
 	std::vector<int> to_convert;
-	//todo: use these to do assignment for structs for function calls, make sure to move this out
 	int i = 0;
 	for (auto& ii : argsv)
 	{
@@ -877,11 +876,6 @@ CValue CompilerContext::GetVariable(const std::string& name)
 
 	if (value.type->type == Types::Void)
 	{
-		//ok, now search globals
-		//auto global = this->root->globals.find(name);
-		//if (global != this->root->globals.end())
-		//	return global->second;
-
 		auto sym = this->root->GetVariableOrFunction(name);
 		if (sym.type != SymbolType::Invalid)
 		{
@@ -895,17 +889,8 @@ CValue CompilerContext::GetVariable(const std::string& name)
 			{
 				//variable
 				return *sym.val;
-				//throw 7;
 			}
 		}
-		//throw 7;
-
-		/*auto function = this->root->GetFunction(name);
-		if (function != 0)
-		{
-		function->Load(this->root);
-		return CValue(function->GetType(this->root), function->f);
-		}*/
 
 		if (this->function->is_lambda)
 		{

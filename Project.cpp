@@ -196,6 +196,14 @@ bool JetProject::_Load(const std::string& projectdir)
 	if (root->children["headers"])
 		headers = *root->children["headers"];
 
+	if (root->children["defines"])
+	{
+		for (auto ii : *root->children["defines"])
+		{
+			defines[ii] = true;
+		}
+	}
+
 	for (auto ii : doc->sections)
 	{
 		if (ii.first.length() > 0)

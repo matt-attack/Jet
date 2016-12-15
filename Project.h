@@ -44,6 +44,7 @@ namespace Jet
 		std::vector<std::string> dependencies;//jet libraries we want to use
 		std::vector<std::string> libs;//libraries to link to
 		std::vector<std::string> headers;//headers to convert and add to the project
+		std::map<std::string, bool> defines;//conditional compilation
 		
 		~JetProject()
 		{

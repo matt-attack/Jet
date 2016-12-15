@@ -150,7 +150,6 @@ namespace Jet
 					{
 						//variable
 						return sym.val->type;
-						throw 7;
 					}
 				}
 				//gotta figure out how to put constants here....

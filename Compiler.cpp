@@ -40,6 +40,7 @@ void Jet::SetupDefaultCommandOptions(OptionParser* parser)
 	parser->AddOption("r", "0");
 	parser->AddOption("target", "");
 	parser->AddOption("linker", "");
+	parser->AddOption("debug", "2");
 }
 
 void CompilerOptions::ApplyOptions(OptionParser* parser)
@@ -50,6 +51,7 @@ void CompilerOptions::ApplyOptions(OptionParser* parser)
 	this->run = parser->GetOption("r").GetString().length() == 0;
 	this->target = parser->GetOption("target").GetString();
 	this->linker = parser->GetOption("linker").GetString();
+	this->debug = parser->GetOption("debug").GetInt();
 }
 
 //extern Source* current_source;
@@ -372,7 +374,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	{
 		msg.Print();
 	});
-	Compilation* compilation = Compilation::Make(project, &diagnostics, options.time);
+	Compilation* compilation = Compilation::Make(project, &diagnostics, options.time, options.debug);
 
 error:
 

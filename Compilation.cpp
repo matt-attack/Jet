@@ -234,7 +234,7 @@ public:
 
 
 extern std::string generate_jet_from_header(const char* header);
-Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnostics, bool time)
+Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnostics, bool time, int debug)
 {
 	Compilation* compilation = new Compilation(project);
 	compilation->diagnostics = diagnostics;
@@ -263,7 +263,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			for (auto ii : lib_symbols)
 				delete[] ii;
 
-			diagnostics->Error("Dependency compilation '"+ii+"' failed: could not find symbol file!", "project.jp");
+			diagnostics->Error("Dependency compilation '" + ii + "' failed: could not find symbol file!", "project.jp");
 
 			//restore working directory
 			chdir(olddir);
@@ -288,9 +288,12 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 
 	//spin off children and lets compile this!
 	compilation->module = new llvm::Module("hi.im.jet", compilation->context);
-
 	compilation->debug = new llvm::DIBuilder(*compilation->module, true);
-	compilation->debug_info.cu = compilation->debug->createCompileUnit(dwarf::DW_LANG_C, "../aaaa.jet", ".", "Jet Compiler", false, "", 0, "");
+
+	bool emit_debug = debug > 0;
+	auto emission_kind = debug <= 1 ? llvm::DIBuilder::DebugEmissionKind::LineTablesOnly : llvm::DIBuilder::DebugEmissionKind::FullDebug;
+
+	compilation->debug_info.cu = compilation->debug->createCompileUnit(dwarf::DW_LANG_C, "../aaaa.jet", ".", "Jet Compiler", false, "", 0, "", emission_kind, 0, emit_debug);
 
 	//compile it
 	//first lets create the global context!!
@@ -299,6 +302,24 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	auto global = new CompilerContext(compilation, 0);
 	compilation->current_function = global;
 	compilation->sources = project->GetSources();
+
+	//add default defines
+	auto defines = project->defines;
+#ifdef _WIN32
+	defines["WINDOWS"] = true;
+#else
+	defines["LINUX"] = true;
+#endif
+	if (debug > 1)// project debug info is enabled
+		defines["DEBUG"] = true;
+	else
+		defines["RELEASE"] = true;
+
+	//run preprocessor on each source
+	for (auto source : compilation->sources)
+	{
+		source.second->PreProcess(defines, diagnostics);
+	}
 
 	//builder converted headers and add their source
 	for (auto hdr : project->headers)
@@ -1550,7 +1571,7 @@ void DiagnosticBuilder::Error(const std::string& text, const Token& token)
 	Diagnostic error;
 	error.token = token;
 	error.message = text;
-	
+
 	if (token.type != TokenType::InvalidToken)
 	{
 		auto current_source = token.GetSource((Compilation*)compilation);
