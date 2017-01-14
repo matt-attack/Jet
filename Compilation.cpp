@@ -247,7 +247,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	if (path.length() > 1)
 		chdir(path.c_str());
 
-	std::vector<char*> lib_symbols;
+	std::vector<std::pair<std::string, char*>> lib_symbols;
 	int deps = project->dependencies.size();
 	for (int i = 0; i < deps; i++)
 	{
@@ -261,7 +261,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		if (symbols.is_open() == false)
 		{
 			for (auto ii : lib_symbols)
-				delete[] ii;
+				delete[] ii.second;
 
 			diagnostics->Error("Dependency compilation '" + ii + "' failed: could not find symbol file!", "project.jp");
 
@@ -283,7 +283,9 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		buffer[length - start - 4] = 0;
 		symbols.close();
 
-		lib_symbols.push_back(buffer);
+		//ok, need to parse this out into different lines/files
+
+		lib_symbols.push_back({ symbol_filepath, buffer });
 	}
 
 	//spin off children and lets compile this!
@@ -314,12 +316,6 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		defines["DEBUG"] = true;
 	else
 		defines["RELEASE"] = true;
-
-	//run preprocessor on each source
-	for (auto source : compilation->sources)
-	{
-		source.second->PreProcess(defines, diagnostics);
-	}
 
 	//builder converted headers and add their source
 	for (auto hdr : project->headers)
@@ -373,10 +369,10 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		compilation->compiling_includes = true;
 		for (auto buffer : lib_symbols)
 		{
-			Source* src = new Source(buffer, "symbols");
+			Source* src = new Source(buffer.second, buffer.first);
 			compilation->sources["#symbols_" + std::to_string(symbol_asts.size() + 1)] = src;
 
-			BlockExpression* result = src->GetAST(diagnostics);
+			BlockExpression* result = src->GetAST(diagnostics, {});
 			if (diagnostics->GetErrors().size())
 			{
 				delete result;
@@ -404,8 +400,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			}
 
 			compilation->asts["#symbols_" + std::to_string(symbol_asts.size())] = result;
-			//compilation->sources["#symbols_" + std::to_string(symbol_asts.size()+1)] = src;
-
+			
 			//this fixes some errors, need to resolve them later
 			compilation->debug_info.file = compilation->debug->createFile("temp",
 				compilation->debug_info.cu->getDirectory());
@@ -433,7 +428,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			if (file.first[0] == '#')//ignore symbol files, we already parsed them
 				continue;
 
-			BlockExpression* result = file.second->GetAST(diagnostics);
+			BlockExpression* result = file.second->GetAST(diagnostics, defines);
 			if (diagnostics->GetErrors().size())
 			{//stop if we encountered a parsing error
 				printf("Compilation Stopped, Parser Error\n");
@@ -613,11 +608,9 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 	//output the IR for debugging
 	this->OutputIR("build/output.ir");
 
-	//output the .o file for this package
+	//output the .o file and .jlib for this package
 	this->OutputPackage(project->project_name, olevel, time);
-	//add a trait test and template test
-	//figure out how to do[] operator
-	//	todo unary operators and comparisons
+	
 	//and handling the arguments as well as function overloads, which is still a BIG problem
 	//need name mangling
 
@@ -800,7 +793,7 @@ void Compilation::Optimize(int level)
 	if (level > 0)
 	{
 		MPM.add(llvm::createFunctionInliningPass(level, 3));
-		//MPM.run(*module);
+		MPM.run(*module);
 	}
 
 	llvm::legacy::FunctionPassManager OurFPM(module);

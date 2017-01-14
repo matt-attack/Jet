@@ -92,11 +92,11 @@ bool Source::IsAtEnd()
 
 
 //extern Source* current_source;
-BlockExpression* Source::GetAST(DiagnosticBuilder* builder)
+BlockExpression* Source::GetAST(DiagnosticBuilder* builder, const std::map<std::string, bool>& defines)
 {
 	//current_source = this;
 
-	Lexer lexer(this, builder);
+	Lexer lexer(this, builder, defines);
 	Parser parser(&lexer, builder);
 
 	BlockExpression* result = 0;
@@ -287,7 +287,7 @@ void Source::PreProcess(std::map<std::string, bool>& vars, DiagnosticBuilder* di
 				i += ProcessBlock(&this->text[i], this->length, vars, diag);
 			else
 			{
-				diag->Error("Unexpected # statement", Token());
+				diag->Error("Unexpected # statement", Token(text, 0, 1, 0, TokenType::AddAssign, "#"));
 				throw 7;
 			}
 		}

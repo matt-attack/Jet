@@ -16,7 +16,6 @@
 #endif
 
 #include <fstream>
-//#include <filesystem>
 
 
 using namespace Jet;
@@ -32,6 +31,7 @@ using namespace Jet;
 #include <unistd.h>
 #endif
 
+//this adds all the available options to the parser for jet
 void Jet::SetupDefaultCommandOptions(OptionParser* parser)
 {
 	parser->AddOption("o", "0");
@@ -43,6 +43,7 @@ void Jet::SetupDefaultCommandOptions(OptionParser* parser)
 	parser->AddOption("debug", "2");
 }
 
+//this reads the options out of the parser and applys them 
 void CompilerOptions::ApplyOptions(OptionParser* parser)
 {
 	this->optimization = parser->GetOption("o").GetInt();
@@ -53,8 +54,6 @@ void CompilerOptions::ApplyOptions(OptionParser* parser)
 	this->linker = parser->GetOption("linker").GetString();
 	this->debug = parser->GetOption("debug").GetInt();
 }
-
-//extern Source* current_source;
 
 void Jet::Diagnostic::Print()
 {
@@ -158,6 +157,7 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 	
 	//spawnl(P_NOWAIT, "cmd.exe", "cmd.exe", path.c_str(), 0);
 }
+
 bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std::string& confg_name, OptionParser* parser)
 {
 	JetProject* project = JetProject::Load(projectdir);
@@ -274,7 +274,6 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 #endif
 	}
 
-	//OptionParser parser;
 	std::string config_name = "";
 	if (parser)
 	{
@@ -288,19 +287,28 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	JetProject::BuildConfig configuration;
 	if (config_name.length() > 0)
 	{
-		auto f = project->configurations.find(config_name);
-		if (f != project->configurations.end())
-			configuration = f->second;
-		else if (project->configurations.size() > 0)
+		//find the configuration
+		bool found = false;
+		for (auto ii : project->configurations)
 		{
-			configuration = project->configurations.begin()->second;
-			printf("Build Configuration name: '%s' does not exist, defaulting to '%s'\n", config_name.c_str(), project->configurations.begin()->first.c_str());
+			if (ii.name == confg_name)
+			{
+				configuration = ii;
+				found = true;
+			}
 		}
+		if (found == false && project->configurations.size() > 0)
+		{
+			configuration = *project->configurations.begin();
+			printf("Build Configuration Name: '%s' Does Not Exist, Defaulting To '%s'\n", config_name.c_str(), project->configurations.begin()->name.c_str());
+		}
+		else if (found == false)
+			printf("Build Configuration Name: '%s' Does Not Exist\n", config_name.c_str());
 	}
 	else
 	{
 		if (project->configurations.size() > 0)
-			configuration = project->configurations.begin()->second;
+			configuration = *project->configurations.begin();
 	}
 
 	//read in config from command and stuff

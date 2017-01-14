@@ -76,7 +76,7 @@ namespace Jet
 		}
 
 		//throw this in a try catch statement, as it can throw errors
-		BlockExpression* GetAST(DiagnosticBuilder* diagnostics);
+		BlockExpression* GetAST(DiagnosticBuilder* diagnostics, const std::map<std::string, bool>& defines);
 
 		std::string filename;
 

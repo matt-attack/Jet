@@ -53,10 +53,11 @@ namespace Jet
 
 		struct BuildConfig
 		{
+			std::string name;
 			std::string prebuild, postbuild;
 			std::string options;
 		};
-		std::map<std::string, BuildConfig> configurations;
+		std::vector<BuildConfig> configurations;
 
 		bool IsExecutable()
 		{

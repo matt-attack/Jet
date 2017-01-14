@@ -782,8 +782,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 					argsv.push_back(data_ptr);
 
 					llvm::Value* fun = this->root->builder.CreateLoad(function_ptr);
-					//fun->getType()->dump();
-
+					
 					auto rtype = fun->getType()->getContainedType(0)->getContainedType(0);
 					std::vector<llvm::Type*> fargs;
 					for (int i = 1; i < fun->getType()->getContainedType(0)->getNumContainedTypes(); i++)
@@ -857,7 +856,6 @@ void CompilerContext::SetDebugLocation(const Token& t)
 	assert(this->function->loaded);
 	this->root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope));
 }
-
 
 CValue CompilerContext::GetVariable(const std::string& name)
 {

@@ -20,8 +20,12 @@ namespace Jet
 		int last_index;//location where last token ended, used for tracking whitespace
 
 		DiagnosticBuilder* diag;
+
+		std::vector<std::string> ifstack;
+
+		std::map<std::string, bool> defines;
 	public:
-		Lexer(Source* source, DiagnosticBuilder* diag);
+		Lexer(Source* source, DiagnosticBuilder* diag, const std::map<std::string, bool>& defines);
 
 		Token Next();
 	};

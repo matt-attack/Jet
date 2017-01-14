@@ -64,9 +64,9 @@ fun int main()
 	
 	//q.b_val = 0;
 	q = q + 5;
-	//q = q - 4;
-	//q = q * 5;
-	//q = q / 5;
+	q = q - 4;
+	q = q * 5;
+	q = q / 5;
 	//puts("hello");
 	
 	//let int arr[50];
@@ -79,6 +79,6 @@ fun int main()
 		puts("pass\n");
 	
 	printf("%i", q[5]);
-	getchar();
+	//getchar();
 	return 0;
 }

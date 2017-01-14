@@ -583,8 +583,9 @@ namespace Jet
 	{
 		friend class Compiler;
 		friend class Type;
-
+	public:
 		Token token;
+	private:
 		Token name;
 
 

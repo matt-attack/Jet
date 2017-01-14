@@ -25,12 +25,20 @@ This is a short introductory tutorial to Jet and its compiler.
 ## Projects
 To create your first Jet program, you first need to create a new folder somewhere on your system with a file named "project.jp".
 
-An example project.jp file should look as follows:
+The format of Jet project files looks as follows:
+Text in [ ] denotes optional. Text in ( ) are comments.
 ```cpp
 [lib:] (only if you are making a library, not an executable)
 files: (space delimited list of all source files in your program)
-requires: (space delimited list of paths to all required libraries)
+[requires:] (space delimited list of paths to all required libraries)
 [libs:] (space delimited list of libraries to link to)
+[defines:] (space delimited list of defines used with conditional compilation
+[headers:] (space delimited list of C headers to convert to Jet and include in project)
+
+
+[[build_type]] (replace build_type with your build configuration name)
+prebuild: "" (string of commands to run prior to building with this config)
+postbuid: "" (string of commands to run after building with this config
 ```
 Each section of the project file can span any number of lines.
 
@@ -55,5 +63,5 @@ fun int main()
 In order to run your program, navigate your terminal to the directory in which your program resides.
 Then run the command "jet -build".
 
-Now, there will be an executable named "program.exe" in your project directory.
+Now, there will be an executable named "program.exe" in your project's 'build' directory.
 This program, when executed, will output Hello World! to console.

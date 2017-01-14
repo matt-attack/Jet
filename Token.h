@@ -125,6 +125,11 @@ namespace Jet
 
 		EoF,
 
+		IfMacro,
+		ElseMacro,
+		ElseIfMacro,
+		EndIfMacro,
+
 		InvalidToken
 	};
 
@@ -169,6 +174,12 @@ namespace Jet
 		void Print(std::string& str, Source* source) const;
 
 		Source* GetSource(Compilation* compilation) const;
+	};
+
+	struct TokenRange
+	{
+		Token first;
+		Token last;
 	};
 }
 

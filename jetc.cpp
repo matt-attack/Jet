@@ -19,6 +19,7 @@
 #include <streambuf>
 #include <math.h>
 #include <functional>
+#include <direct.h>
 
 using namespace Jet;
 
@@ -190,6 +191,7 @@ std::string convert_type(CXType type)
 
 	return out;
 }
+
 //ok integrate this, then we need to add unsigned types
 std::string generate_jet_from_header(const char* header)
 {
@@ -457,7 +459,7 @@ void DoCommand(int argc, char* argv[])
 
 		CompilerOptions options;
 		options.ApplyOptions(&parser);
-		
+
 		std::string config = "";
 		if (parser.commands.size())
 			config = parser.commands.front();
@@ -537,10 +539,50 @@ void DoCommand(int argc, char* argv[])
 			printf("No such file.");
 		else
 		{
-			std::ofstream o(two+".jet");
+			std::ofstream o(two + ".jet");
 			o << str;
 			o.close();
 		}
+		return;
+	}
+	else if (cmd == "new")
+	{
+		std::string name = argv[2];
+
+		mkdir(name.c_str());
+
+		//insert a project file and a main code file
+
+		//project file
+		std::string project_file_name = name + "/project.jp";
+		FILE* f = fopen(project_file_name.c_str(), "wb");
+		const char* project = "requires: jetc\n"
+			"files: main.jet\n"
+			"libs:\n"
+			"[debug]\n"
+			"prebuild: \"\"\n"
+			"postbuild : \"\"\n"
+			"config : \"\"\n\n"
+
+			"[release]\n"
+			"prebuild : \"\"\n"
+			"postbuild : \"\"\n"
+			"config : \"-d1 -o3\"\n";
+		fwrite(project, strlen(project), 1, f);
+		fclose(f);
+
+		//write the main.jet file
+		std::string main_file_name = name + "/main.jet";
+		f = fopen(main_file_name.c_str(), "wb");
+		const char* main = "//This is your main function\n"
+			"fun int main()\n"
+			"{\n"
+			"\treturn 1;\n"
+			"}\n";
+		fwrite(main, strlen(main), 1, f);
+		fclose(f);
+
+		printf("Created new empty project.\n");
 		return;
 	}
 
@@ -565,6 +607,9 @@ int main(int argc, char* argv[])
 #ifdef _WIN32
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
+
+	//look for config file, and create default if not there
+
 	if (argc > 1)//if we get a command, just try and build the project at that path
 	{
 		DoCommand(argc, argv);

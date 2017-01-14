@@ -820,6 +820,11 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			// Store the initial value into the alloca.
 			if (this->_right)
 			{
+				if (type->type == Types::Struct)
+					context->Construct(CValue(type->GetPointerType(), Alloca), 0);
+				else if (type->type == Types::Array && type->base->type == Types::Struct)
+					context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
+
 				auto val = (*this->_right)[i++].second->Compile(context);
 				//cast it
 				CValue alloc;
@@ -838,6 +843,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			auto val = (*this->_right)[i++].second->Compile(context);
 			type = val.type;
 
+			
 			//need to move allocas outside of the loop and into the main body
 			auto TheFunction = context->function->f;
 			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
@@ -858,6 +864,13 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			llvm::Instruction *Call = context->root->debug->insertDeclare(
 				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
+
+
+			//before storing we need to construct it 
+			if (type->type == Types::Struct)
+				context->Construct(CValue(type->GetPointerType(), Alloca), 0);
+			else if (type->type == Types::Array && type->base->type == Types::Struct)
+				context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
 
 			CValue alloc;
 			alloc.val = Alloca;

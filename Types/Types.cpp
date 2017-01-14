@@ -6,10 +6,6 @@
 #include "Lexer.h"
 #include "Function.h"
 
-//#include <llvm/IR/Attributes.h>
-//#include <llvm/IR/Argument.h>
-//#include <llvm/ADT/ilist.h>
-
 using namespace Jet;
 
 Type Jet::VoidType("void", Types::Void);
@@ -1043,6 +1039,17 @@ Namespace::~Namespace()
 	}
 }
 
+void add_location(Token token, std::string& data, Compilation* compilation)
+{
+	auto location = token.GetSource(compilation);
+
+	data += "\n//!@!";
+	data += location->filename;
+	data += "@";
+	data += std::to_string(token.line);
+	data += '\n';
+}
+
 void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 {
 	//ok, change this to output in blocks, give size and location/namespace
@@ -1071,6 +1078,10 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 			{
 				if (ii.second.ty->data->template_base)
 					continue;//dont bother exporting instantiated templates for now
+
+				//set the current location
+				if (ii.second.ty->data->expression)
+					add_location(ii.second.ty->data->expression->token, data, compilation);
 
 				//export me
 				if (ii.second.ty->data->templates.size() > 0)
@@ -1131,6 +1142,11 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 				for (auto fun : ii.second.ty->data->functions)
 				{
 					data += "extern fun " + fun.second->return_type->ToString() + " " + ii.second.ty->data->name + "::";
+
+					if (IsLetter(fun.first[0]) == false)
+						if (!(fun.first[0] == '~' && fun.first.length() > 1 && IsLetter(fun.first[1])))
+							data += "operator";
+
 					data += fun.first + "(";
 					bool first = false;
 					for (int i = 1; i < fun.second->arguments.size(); i++)
@@ -1147,6 +1163,9 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 			}
 			else if (ii.second.ty->type == Types::Trait)
 			{
+				//if (ii.second.ty->data->expression)
+				//	add_location(ii.second.ty->trait->expression->token, data, compilation);
+
 				data += "trait " + ii.second.ty->trait->name;
 				for (int i = 0; i < ii.second.ty->trait->templates.size(); i++)
 				{

@@ -135,6 +135,11 @@ public:
 		keywords["free"] = TokenType::Free;
 
 		keywords["typedef"] = TokenType::Typedef;
+
+		operators["#if"] = TokenType::IfMacro;
+		operators["#else"] = TokenType::ElseMacro;
+		operators["#elseif"] = TokenType::ElseIfMacro;
+		operators["#endif"] = TokenType::EndIfMacro;
 		//keywords["const"] = TokenType::Const;
 
 		//keywords["operator"] = TokenType::Operator;
@@ -173,11 +178,12 @@ bool Jet::IsNumber(char c)
 	return (c >= '0' && c <= '9');
 }
 
-Lexer::Lexer(Source* source, DiagnosticBuilder* diag)
+Lexer::Lexer(Source* source, DiagnosticBuilder* diag, const std::map<std::string, bool>& defines)
 {
 	this->diag = diag;
 	this->last_index = 0;
 	this->src = source;
+	this->defines = defines;
 }
 
 
@@ -374,6 +380,65 @@ Token Lexer::Next()
 				index += 3;
 				return Token(src->linenumber, src->column, TokenType::String, txt);*/
 			}
+			else if (toktype == TokenType::IfMacro)
+			{
+				src->ConsumeChar();
+
+				std::string condition;
+				while (true)
+				{
+					char c = src->PeekChar();
+					if (IsLetter(c) || IsNumber(c) || c == '_')
+					{
+						condition += c;
+						src->ConsumeChar();
+					}
+					else
+						break;
+				}
+
+				ifstack.push_back(condition);
+
+				bool is_true = true;// this->defines[condition];
+				if (is_true)
+					continue;
+
+				//read until we find and else or end if
+				while (true)
+				{
+					char c = src->PeekChar();
+					if (c != '#')
+						src->ConsumeChar();
+					else
+					{
+						//see if its an else or end if
+						break;
+					}
+				}
+
+				continue;
+			}
+			else if (toktype == TokenType::ElseMacro)
+			{
+				if (ifstack.size() == 0)
+				{
+					diag->Error("#else without matching #if", Token());
+					throw 7;
+				}
+
+				continue;//just parse it for now
+			}
+			else if (toktype == TokenType::EndIfMacro)
+			{
+				if (ifstack.size() > 0)
+					ifstack.pop_back();
+				else
+				{
+					diag->Error("#endif without matching #if", Token());
+					throw 7;
+				}
+				continue;
+			}
 			this->last_index = src->GetIndex();
 
 			return Token(t_ptr, trivia_length, src->linenumber, column, toktype, str);
@@ -538,6 +603,12 @@ Token Lexer::Next()
 
 	int trivia_length = src->GetIndex() - this->last_index;
 	this->last_index = src->GetIndex();
+
+	if (this->ifstack.size() > 0)
+	{
+		diag->Error("#if without matching #endif", Token());
+		throw 7;
+	}
 
 	return Token(src->GetLinePointer(1) + src->GetLength(), trivia_length, src->linenumber, src->column, TokenType::EoF, "");
 }
