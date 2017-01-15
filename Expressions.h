@@ -161,11 +161,11 @@ namespace Jet
 
 			context->SetNamespace(v->GetName());
 
-			right->Compile(context);
+			auto rval = right->Compile(context);
 
 			context->PopNamespace();
 
-			return CValue();
+			return rval;// CValue();
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};

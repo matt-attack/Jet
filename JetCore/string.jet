@@ -12,7 +12,9 @@ struct string
 	fun void string()
 	{
 		//v = 8;
-		//puts("constructed string");
+#if RELEASE
+		//puts("other constructed string");
+#endif
 		this->data = new char[4];//<char*>malloc(sizeof(char)*4);
 		this->max_size = 4;
 		this->cur_size = 1;
@@ -43,19 +45,25 @@ struct string
 	
 	fun void push_back(char v)
 	{
-		if (this->cur_size >= this->max_size)
+		//puts("pushed back");
+		if (this->cur_size >= this->max_size-1)
 		{
 			//resize
 			this->resize(this->cur_size*2);
 		}
 		
-		this->data[this->cur_size++] = v;
+		this->data[this->cur_size-1] = v;
+		this->cur_size += 1;
+		this->data[this->cur_size-1] = 0;
+		
+		//puts(this->c_str());
+		//puts("push_back complete");
 	}
 	
 	fun void assign(char* str)
 	{	
 		this->resize(100);
-		let len = 0;
+		let len = 0; 
 		while (str[len] != 0)
 		{
 			this->data[len] = str[len];
@@ -65,12 +73,12 @@ struct string
 		this->cur_size = len+1;
 	}
 	
-	//fun char* operator[](int index)
-	//{
-	//	return &this->data[index];
-	//}
+	fun char* operator[](int index)
+	{
+		return &this->data[index];
+	}
 	
-	fun string operator+ (string other)
+	fun string operator+ (string* other)
 	{
 		return *this;
 	}

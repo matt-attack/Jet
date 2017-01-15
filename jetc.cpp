@@ -559,6 +559,8 @@ void DoCommand(int argc, char* argv[])
 		const char* project = "requires: jetc\n"
 			"files: main.jet\n"
 			"libs:\n"
+			"defines:\n"
+
 			"[debug]\n"
 			"prebuild: \"\"\n"
 			"postbuild : \"\"\n"
