@@ -240,6 +240,8 @@ namespace Jet
 		llvm::Type* type;
 		Type* parent_struct;//when inheritance
 
+		bool is_class = false;
+
 		struct StructMember
 		{
 			std::string name;

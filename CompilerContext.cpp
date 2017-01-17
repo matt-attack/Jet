@@ -203,6 +203,8 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 
 					CallFunction(context, fun, argsv, true);
 				}
+				else if (type->data->is_class)
+					context->root->Error("Cannot copy class '" + type->data->name + "' unless it has a copy operator.", *context->current_token);
 			}
 			else
 			{
@@ -271,10 +273,13 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 	}
 }
 
-void CompilerContext::Store(CValue loc, CValue val)
+void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 {
-	if (loc.type->base->type == Types::Struct)
+	if (loc.type->base->type == Types::Struct && RVO == false)
 	{
+		if (loc.type->base->data->is_class == true)
+			this->root->Error("Cannot copy class '" + loc.type->base->data->name + "' unless it has a copy operator.", *this->current_token);
+
 		auto funiter = val.type->data->functions.find("=");
 		//todo: search through multimap to find one with the right number of args
 		if (funiter != val.type->data->functions.end() && funiter->second->arguments.size() == 2)
@@ -731,7 +736,11 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				//ok, we allocate, call then 
 				//allocate thing
 				type->Load(this->root);
-				auto Alloca = this->root->builder.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
+
+				auto TheFunction = this->function->f;
+				llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+					TheFunction->getEntryBlock().begin());
+				auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
 
 				std::vector<llvm::Value*> argsv;
 				int i = 1;
@@ -782,7 +791,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 					argsv.push_back(data_ptr);
 
 					llvm::Value* fun = this->root->builder.CreateLoad(function_ptr);
-					
+
 					auto rtype = fun->getType()->getContainedType(0)->getContainedType(0);
 					std::vector<llvm::Type*> fargs;
 					for (int i = 1; i < fun->getType()->getContainedType(0)->getNumContainedTypes(); i++)
@@ -827,7 +836,12 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		//allocate thing
 		auto type = fun->arguments[0].first->base;
 		type->Load(this->root);
-		auto Alloca = this->root->builder.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
+
+		auto TheFunction = this->function->f;
+		llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+			TheFunction->getEntryBlock().begin());
+
+		auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
 
 		std::vector<llvm::Value*> argsv;
 		int i = 1;
@@ -996,8 +1010,8 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		//	return CValue(t, root->builder.CreateFPToSI(value.val, tt));
 		if (t->IsSignedInteger())
 			return CValue(t, root->builder.CreateFPToSI(value.val, tt));
-		else if (t->IsInteger());
-		return CValue(t, root->builder.CreateFPToUI(value.val, tt));
+		else if (t->IsInteger())
+			return CValue(t, root->builder.CreateFPToUI(value.val, tt));
 
 		//todo: maybe do a warning if implicit from float->int or larger as it cant directly fit 1 to 1
 		//remove me later float to bool

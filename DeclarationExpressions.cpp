@@ -820,17 +820,18 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			// Store the initial value into the alloca.
 			if (this->_right)
 			{
-				if (type->type == Types::Struct)
-					context->Construct(CValue(type->GetPointerType(), Alloca), 0);
-				else if (type->type == Types::Array && type->base->type == Types::Struct)
-					context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
+				//if (type->type == Types::Struct)
+				//	context->Construct(CValue(type->GetPointerType(), Alloca), 0);
+				//else if (type->type == Types::Array && type->base->type == Types::Struct)
+				//	context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
 
+				//do return value optimization here?
 				auto val = (*this->_right)[i++].second->Compile(context);
 				//cast it
 				CValue alloc;
 				alloc.type = type->GetPointerType();
 				alloc.val = Alloca;
-				context->Store(alloc, val);
+				context->Store(alloc, val, true);
 				//val = context->DoCast(type, val);
 				//context->root->builder.CreateStore(val.val, Alloca);
 				//assignment
@@ -867,15 +868,15 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 
 			//before storing we need to construct it 
-			if (type->type == Types::Struct)
-				context->Construct(CValue(type->GetPointerType(), Alloca), 0);
-			else if (type->type == Types::Array && type->base->type == Types::Struct)
-				context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
+			//if (type->type == Types::Struct)
+			//	context->Construct(CValue(type->GetPointerType(), Alloca), 0);
+			//else if (type->type == Types::Array && type->base->type == Types::Struct)
+			//	context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
 
 			CValue alloc;
 			alloc.val = Alloca;
 			alloc.type = val.type->GetPointerType();
-			context->Store(alloc, val);
+			context->Store(alloc, val, true);
 			//assignment
 			//context->root->builder.CreateStore(val.val, Alloca);
 		}
@@ -1315,6 +1316,9 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 {
 	//build data about the struct
 	Type* str = new Type(this->name.text, Types::Struct, new Struct);
+	if (this->token.type == TokenType::Class)
+		str->data->is_class = true;
+
 	context->root->ns->members.insert({ this->name.text, str });
 	str->ns = context->root->ns;
 

@@ -1039,6 +1039,7 @@ Namespace::~Namespace()
 	}
 }
 
+//todo, condense the data later using numeric identifiers and a list rather than whole name on each also could sort by file
 void add_location(Token token, std::string& data, Compilation* compilation)
 {
 	auto location = token.GetSource(compilation);
@@ -1058,6 +1059,9 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 		//ok, lets add debug location info
 		if (ii.second.type == SymbolType::Function && ii.second.fn->do_export)
 		{
+			if (ii.second.fn->expression)
+				add_location(ii.second.fn->expression->token, data, compilation);
+
 			data += "extern fun " + ii.second.fn->return_type->ToString() + " ";
 			data += ii.first + "(";
 			bool first = false;
@@ -1141,6 +1145,9 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 				//output member functions
 				for (auto fun : ii.second.ty->data->functions)
 				{
+					if (fun.second->expression)
+						add_location(fun.second->expression->token, data, compilation);
+
 					data += "extern fun " + fun.second->return_type->ToString() + " " + ii.second.ty->data->name + "::";
 
 					if (IsLetter(fun.first[0]) == false)
@@ -1202,6 +1209,8 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 				{
 					auto source = fun.second->expression->GetBlock()->start.GetSource(compilation);
 
+					if (fun.second->expression)
+						add_location(fun.second->expression->token, data, compilation);
 					data += "fun ";
 					fun.second->expression->ret_type.Print(data, source);
 					data += " ";

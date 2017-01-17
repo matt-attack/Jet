@@ -108,6 +108,7 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 
 	this->Register(TokenType::Extern, new ExternParselet());
 	this->Register(TokenType::Struct, new StructParselet());
+	this->Register(TokenType::Class, new StructParselet());
 	this->Register(TokenType::Trait, new TraitParselet());
 	this->Register(TokenType::Namespace, new NamespaceParselet());
 
@@ -127,8 +128,6 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 
 	this->Register(TokenType::Yield, new YieldParselet());
 	this->Register(TokenType::Yield, new InlineYieldParselet());
-	//this->Register(TokenType::Resume, new ResumeParselet());
-	//this->Register(TokenType::Resume, new ResumePrefixParselet());
 }
 
 Parser::~Parser()

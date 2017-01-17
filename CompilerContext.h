@@ -220,7 +220,7 @@ namespace Jet
 			//return root->builder.CreateStore(val.val, value.val);
 		}
 
-		void Store(CValue loc, CValue val);
+		void Store(CValue loc, CValue val, bool rvo = false);
 
 		CValue Load(const std::string& name);
 

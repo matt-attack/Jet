@@ -124,6 +124,7 @@ public:
 		keywords["union"] = TokenType::Union;
 		keywords["extern"] = TokenType::Extern;
 		keywords["struct"] = TokenType::Struct;
+		keywords["class"] = TokenType::Class;
 		keywords["namespace"] = TokenType::Namespace;
 		keywords["enum"] = TokenType::Enum;
 

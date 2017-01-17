@@ -389,10 +389,21 @@ error:
 	if (compilation == 0)
 	{
 		//compiling failed completely
+		//delete compilation;
+
+		//restore working directory
+		chdir(olddir);
+		return false;
 	}
 	else if (compilation->GetErrors().size() > 0)
 	{
 		printf("Compiling Failed: %d Errors Found\n", compilation->GetErrors().size());
+
+		delete compilation;
+
+		//restore working directory
+		chdir(olddir);
+		return false;
 	}
 	else
 	{

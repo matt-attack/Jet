@@ -86,6 +86,7 @@ namespace Jet
 		//newkeywords
 		Extern,
 		Struct,
+		Class,
 		Trait,
 		Namespace,
 		Union,
