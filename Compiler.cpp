@@ -53,6 +53,8 @@ void CompilerOptions::ApplyOptions(OptionParser* parser)
 	this->target = parser->GetOption("target").GetString();
 	this->linker = parser->GetOption("linker").GetString();
 	this->debug = parser->GetOption("debug").GetInt();
+
+	//todo error if we have other options specified
 }
 
 void Jet::Diagnostic::Print()
@@ -158,7 +160,7 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 	//spawnl(P_NOWAIT, "cmd.exe", "cmd.exe", path.c_str(), 0);
 }
 
-bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std::string& confg_name, OptionParser* parser)
+int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std::string& confg_name, OptionParser* parser)
 {
 	JetProject* project = JetProject::Load(projectdir);
 	if (project == 0)
@@ -173,6 +175,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 		chdir(path.c_str());
 
 	//build each dependency
+	bool needs_rebuild = false;
 	int deps = project->dependencies.size();
 	for (int i = 0; i < deps; i++)
 	{
@@ -180,13 +183,17 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 		//spin up new compiler instance and build it
 		Compiler compiler;
 		auto success = compiler.Compile(ii.c_str());
-		if (success == false)
+		if (success == 0)
 		{
 			printf("Dependency compilation failed, stopping compilation");
 
 			//restore working directory
 			chdir(olddir);
-			return false;
+			return 0;
+		}
+		else if (success == 2)//compilation was successful but a rebuild was done, so we also need to rebuild
+		{
+			needs_rebuild = true;
 		}
 	}
 
@@ -273,6 +280,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 		modifiedtimes.push_back(data.st_mtime);
 #endif
 	}
+	//todo: push back times for dependencies
 
 	std::string config_name = "";
 	if (parser)
@@ -331,7 +339,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	//add options to this later
 	FILE* jlib = fopen("build/symbols.jlib", "rb");
 	FILE* output = fopen(("build/" + project->project_name + ".o").c_str(), "rb");
-	if (options.force)
+	if (options.force || needs_rebuild)
 	{
 		//the rebuild was forced
 	}
@@ -347,11 +355,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 	{
 		for (int i = 0; i < modifiedtimes.size(); i++)
 		{
-			//#if 0 //_WIN32
-			//if (modifiedtimes[i].first == buildtimes[i].first && modifiedtimes[i].second == buildtimes[i].second)
-			//#else
-			if (modifiedtimes[i] == buildtimes[i])// && modifiedtimes[i].second == buildtimes[i].second)
-				//#endif
+			if (modifiedtimes[i] == buildtimes[i])
 			{
 				if (i == modifiedtimes.size() - 1)
 				{
@@ -362,7 +366,7 @@ bool Compiler::Compile(const char* projectdir, CompilerOptions* optons, const st
 
 					//restore working directory
 					chdir(olddir);
-					return true;
+					return 1;
 				}
 			}
 			else
@@ -389,11 +393,10 @@ error:
 	if (compilation == 0)
 	{
 		//compiling failed completely
-		//delete compilation;
 
 		//restore working directory
 		chdir(olddir);
-		return false;
+		return 0;
 	}
 	else if (compilation->GetErrors().size() > 0)
 	{
@@ -403,7 +406,7 @@ error:
 
 		//restore working directory
 		chdir(olddir);
-		return false;
+		return 0;
 	}
 	else
 	{
@@ -424,6 +427,7 @@ error:
 #endif
 			rebuild.write(str, len);
 		}
+		//todo: output for dependencies too
 
 		printf("Project built successfully.\n\n");
 
@@ -432,12 +436,21 @@ error:
 			printf("%s", exec(configuration.postbuild.c_str()).c_str());
 
 		if (options.run && project->IsExecutable())
+		{
 			ExecuteProject(project, projectdir);
+			Sleep(50);//give it a moment to run, for some reason derps up without this
+		}
+		//todo: need to look at compilation time of dependencies to see if we need to rebuild
+		delete compilation;
+
+		//restore working directory
+		chdir(olddir);
+		return 2;
 	}
 
 	delete compilation;
 
 	//restore working directory
 	chdir(olddir);
-	return true;
+	return 1;
 }

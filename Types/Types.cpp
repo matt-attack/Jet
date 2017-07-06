@@ -146,7 +146,17 @@ llvm::Type* Type::GetLLVMType()
 		assert(this->loaded);
 		return this->data->type;
 	case (int)Types::Array:
-		return llvm::ArrayType::get(this->base->GetLLVMType(), this->size);
+	{
+		if (this->llvm_type)
+			return this->llvm_type;
+		std::vector<llvm::Type*> types = { llvm::Type::getInt32Ty(llvm::getGlobalContext()), base->GetPointerType()->GetLLVMType() };
+		auto res = llvm::StructType::create(types, this->name);
+		this->llvm_type = res;
+		return res;
+		//fix this to use the new type
+		//	maybe store the llvm type in it
+		//return llvm::ArrayType::get(this->base->GetLLVMType(), this->size);
+	}
 	case (int)Types::Pointer:
 		return llvm::PointerType::get(this->base->GetLLVMType(), 0);//address space, wat?
 	case (int)Types::Function:
@@ -681,7 +691,7 @@ std::string Type::ToString()
 	case (int)Types::Pointer:
 		return this->base->ToString() + "*";
 	case (int)Types::Array:
-		return this->base->ToString() + "[" + std::to_string(this->size) + "]";
+		return this->base->ToString() + "[]";// +std::to_string(this->size) + "]";
 	case (int)Types::Bool:
 		return "bool";
 	case (int)Types::Char:

@@ -563,13 +563,13 @@ void DoCommand(int argc, char* argv[])
 
 			"[debug]\n"
 			"prebuild: \"\"\n"
-			"postbuild : \"\"\n"
-			"config : \"\"\n\n"
+			"postbuild: \"\"\n"
+			"config: \"\"\n\n"
 
 			"[release]\n"
-			"prebuild : \"\"\n"
-			"postbuild : \"\"\n"
-			"config : \"-d1 -o3\"\n";
+			"prebuild: \"\"\n"
+			"postbuild: \"\"\n"
+			"config: \"-d1 -o3\"\n";
 		fwrite(project, strlen(project), 1, f);
 		fclose(f);
 

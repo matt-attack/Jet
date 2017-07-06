@@ -154,6 +154,8 @@ namespace Jet
 	private:
 
 		Type* GetFunctionType(Type* return_type, const std::vector<Type*>& args);
+		std::map<Type*, Type*> array_types;
+		Type* GetArrayType(Type* base);
 
 		Function* GetFunction(const std::string& name, const std::vector<CValue>& args)
 		{

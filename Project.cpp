@@ -215,7 +215,7 @@ bool JetProject::_Load(const std::string& projectdir)
 				post = ii.second->children["postbuild"]->front();
 			if (ii.second->children["config"] && ii.second->children["config"]->size() > 0)
 				config = ii.second->children["config"]->front();
-			this->configurations.push_back({ pre, post, config });//this->configurations[ii.first] = { pre, post, config };
+			this->configurations.push_back({ ii.first, pre, post, config });//this->configurations[ii.first] = { pre, post, config };
 		}
 	}
 

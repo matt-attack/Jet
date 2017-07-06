@@ -2,3 +2,4 @@ lib:
 requires: ../jetc
 files: core.jet vector.jet string.jet
 libs: "C:\Program Files (x86)\Windows Kits\8.1\Lib\winv6.3\um\x86\kernel32.lib"
+defines: TEST

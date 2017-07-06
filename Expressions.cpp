@@ -76,12 +76,7 @@ CValue IndexExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&token);
 	context->SetDebugLocation(this->token);
-	auto type = this->GetBaseType(context);
-	if (this->index && type->type == Types::Pointer && type->base->type == Types::Struct)
-	{
-		//todo
-		//printf("call operator");
-	}
+	
 	auto loc = this->GetElementPointer(context);
 	if (loc.type->type == Types::Function)
 		return loc;
@@ -308,9 +303,24 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
 		{
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
-			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
+			auto first_loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+			first_loc = context->root->builder.CreateLoad(first_loc);
+			auto loc = context->root->builder.CreateGEP(first_loc/*lhs.val*/, context->DoCast(context->root->IntType, index->Compile(context)).val/*iindex*/, "index");
 			auto typ = lhs.type->base->base->GetPointerType();
 			return CValue(typ, loc);
+		}
+		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Array)
+		{
+			if (this->member.text == "size")
+			{
+				auto loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+				return CValue(context->root->IntType->GetPointerType(), loc);
+			}
+			else if (this->member.text == "ptr")
+			{
+				auto loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+				return CValue(lhs.type->base->base->GetPointerType()->GetPointerType(), loc);
+			}
 		}
 		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
 		{
@@ -350,6 +360,7 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	auto oldtok = context->current_token;
 	context->CurrentToken(&token);
 	context->SetDebugLocation(this->token);
+	//todo: do not allow store into .size on arrays
 	auto loc = this->GetElementPointer(context);
 
 	context->CurrentToken(oldtok);
@@ -535,11 +546,15 @@ CValue NewExpression::Compile(CompilerContext* context)
 	auto size = context->GetSizeof(ty);
 	auto arr_size = this->size ? this->size->Compile(context).val : context->root->builder.getInt32(1);
 	//if (arr_size)//this->size)
+
+	
+	//todo, on free mark size as zero
 	//{
 	if (this->size)
 		size.val = context->root->builder.CreateMul(size.val, arr_size);
 	size.val = context->root->builder.CreateAdd(size.val, context->root->builder.getInt32(4));
 	//}
+	//ok now get new working with it
 	CValue val = context->Call("malloc", { size });
 
 	//build the array type struct, which is just an int followed by a pointer to the underlying data
@@ -607,6 +622,27 @@ CValue NewExpression::Compile(CompilerContext* context)
 	}
 	context->Construct(ptr, arr_size);
 
+
+	//ok now stick it in an array if we specified size
+	if (this->size)//ty->type == Types::Array)
+	{
+		auto str_type = context->root->GetArrayType(ty);// type->base);
+		//alloc the struct for it
+		auto str = context->root->builder.CreateAlloca(str_type->GetLLVMType(), context->root->builder.getInt32(1), "newarray");
+		
+		//allocate the array
+		//auto size = TmpB.getInt32(type->size);
+		//auto arr = TmpB.CreateAlloca(type->base->GetLLVMType(), size, aname + ".array");
+		//store size
+		auto size_p = context->root->builder.CreateGEP(str, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+		context->root->builder.CreateStore(arr_size, size_p);
+
+		//store pointer
+		auto pointer_p = context->root->builder.CreateGEP(str, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+		context->root->builder.CreateStore(ptr.val, pointer_p);
+
+		return CValue(str_type, str);
+	}
 	return ptr;
 }
 

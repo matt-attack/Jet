@@ -169,7 +169,7 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 	int i = 0;
 	for (auto& ii : argsv)
 	{
-		if (ii.val->getType()->isStructTy())
+		if (ii.val->getType()->isStructTy() && ii.type->type != Types::Array)
 		{
 			//convert it to a pointer yo
 			auto TheFunction = context->function->f;
@@ -1132,6 +1132,8 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		}
 	}
 
+	value.val->dump();
+	//this->root->current_function->function->f->dump();
 	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 }
 
@@ -1324,12 +1326,13 @@ CValue CompilerContext::Load(const std::string& name)
 	CValue value = GetVariable(name);
 	if (value.type->type == Types::Function)
 		return value;
-	else if (value.type->type == Types::Pointer && value.type->base->type == Types::Array)//load it as a pointer
-	{
-		auto type = value.type->base->GetPointerType();
-		auto loc = this->root->builder.CreatePointerCast(value.val, type->GetLLVMType());
-		return CValue(type, loc);
-	}
+	//this is out of date
+	//else if (value.type->type == Types::Pointer && value.type->base->type == Types::Array)//load it as a pointer
+	//{
+		//auto type = value.type->base->GetPointerType();
+		//auto loc = this->root->builder.CreatePointerCast(value.val, type->GetLLVMType());
+		//return CValue(type, loc);
+	//}
 	else if (value.type->type == Types::Int)
 	{
 		//its a constant

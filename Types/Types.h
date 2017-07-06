@@ -63,7 +63,7 @@ namespace Jet
 		Trait,//cant instantiate this!!
 
 		Pointer,
-		Array,//acts just like a pointer
+		Array,//acts just like a pointer but really is a struct with size contained
 
 		Invalid,//for unloaded types
 	};
@@ -88,6 +88,7 @@ namespace Jet
 		//cached stuff;
 		llvm::DIType* debug_type;
 		Type* pointer_type;
+		llvm::Type* llvm_type = 0;
 	public:
 
 		Types type : 8;

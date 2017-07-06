@@ -50,8 +50,9 @@ namespace Jet
 	{
 	public:
 
-		//returns if was successful
-		bool Compile(const char* projectfile, CompilerOptions* options = 0, const std::string& config = "", OptionParser* parser = 0);
+		//returns if was successful, errored, or if there was a rebuild
+		//0 = error, 1 = success, 2 = recompiled, but successful
+		int Compile(const char* projectfile, CompilerOptions* options = 0, const std::string& config = "", OptionParser* parser = 0);
 	};
 
 

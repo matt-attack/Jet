@@ -75,22 +75,30 @@ Token ParseType(Parser* parser, bool parse_arrays = true)
 	//parse arrays
 	if (parse_arrays && parser->MatchAndConsume(TokenType::LeftBracket))
 	{
-		//its an array type
-		//read the number
-		auto size = parser->ParseExpression(Precedence::ASSIGNMENT);
-
-		auto tok = parser->Consume(TokenType::RightBracket);
-
-		if (auto s = dynamic_cast<NumberExpression*>(size))
+		if (parser->MatchAndConsume(TokenType::RightBracket))
 		{
-			if (s->GetIntValue() <= 0)
-				parser->Error("Cannot size array with a zero or negative size", tok);
-
-			out += "[" + std::to_string((int)s->GetIntValue()) + "]";
+			//its an array with no size
+			out += "[]";
 		}
 		else
 		{
-			parser->Error("Cannot size array with a non constant size", tok);
+			//its an array type
+			//read the number
+			auto size = parser->ParseExpression(Precedence::ASSIGNMENT);
+
+			auto tok = parser->Consume(TokenType::RightBracket);
+
+			if (auto s = dynamic_cast<NumberExpression*>(size))
+			{
+				if (s->GetIntValue() <= 0)
+					parser->Error("Cannot size array with a zero or negative size", tok);
+
+				out += "[" + std::to_string((int)s->GetIntValue()) + "]";
+			}
+			else
+			{
+				parser->Error("Cannot size array with a non constant size", tok);
+			}
 		}
 	}
 

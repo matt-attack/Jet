@@ -295,7 +295,9 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	bool emit_debug = debug > 0;
 	auto emission_kind = debug <= 1 ? llvm::DIBuilder::DebugEmissionKind::LineTablesOnly : llvm::DIBuilder::DebugEmissionKind::FullDebug;
 
-	compilation->debug_info.cu = compilation->debug->createCompileUnit(dwarf::DW_LANG_C, "../aaaa.jet", ".", "Jet Compiler", false, "", 0, "", emission_kind, 0, emit_debug);
+	char tmp_cwd[500];
+	getcwd(tmp_cwd, 500);
+	compilation->debug_info.cu = compilation->debug->createCompileUnit(dwarf::DW_LANG_C, "../aaaa.jet", tmp_cwd, "Jet Compiler", false, "", 0, "", emission_kind, 0, emit_debug);
 
 	//compile it
 	//first lets create the global context!!
@@ -843,6 +845,7 @@ void Compilation::SetTarget(const std::string& triple)
 	LLVMInitializeARMAsmPrinter();
 	LLVMInitializeARMTargetMC();
 	LLVMInitializeARMTargetInfo();
+	//LLVMInitializeMSP430Target();
 	//llvm::initializeTarget()
 
 	auto MCPU = llvm::sys::getHostCPUName();
@@ -1249,11 +1252,16 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			auto tname = name.substr(0, p);
 			auto t = this->LookupType(tname, load);
 
-			type = new Type;
+			type = this->GetArrayType(t);
+			
+			/*type = new Type;
 			type->name = name;
 			type->base = t;
 			type->type = Types::Array;
-			type->size = std::stoi(len);//cheat for now
+			if (len.length())
+				type->size = std::stoi(len);//cheat for now
+			else
+				type->size = 0;*/
 			curns->members.insert({ name, type });
 		}
 		else if (name[name.length() - 1] == '>')
@@ -1376,6 +1384,20 @@ void Compilation::Error(const std::string& string, Token token)
 	//this->errors.push_back(error);
 	throw 7;
 }
+
+Jet::Type* Compilation::GetArrayType(Jet::Type* base)
+{
+	auto res = this->array_types.find(base);
+	if (res != this->array_types.end())
+		return res->second;
+
+	Type* t = new Type(base->name + "[]", Types::Array, base);
+	t->ns = this->ns;
+	//ok, fix this and make it work right
+	this->array_types[base] = t;
+	return t;
+}
+
 
 ::Jet::Type* Compilation::GetFunctionType(::Jet::Type* return_type, const std::vector<::Jet::Type*>& args)
 {

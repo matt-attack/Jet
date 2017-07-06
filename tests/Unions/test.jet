@@ -18,6 +18,8 @@ union C = A | B;
 
 fun int main() 
 {
+	let l = 5;
+	l = 5+7;
 	let C p;
 	let B q;
 	p = q;

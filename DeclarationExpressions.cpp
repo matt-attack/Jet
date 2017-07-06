@@ -796,13 +796,36 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				context->root->Error("Missing template arguments for type '" + type->ToString() + "'", ii.first);
 			else if (type->type == Types::Array)
 			{
-				Alloca = TmpB.CreateAlloca(type->GetLLVMType(), context->root->builder.getInt32(type->size), aname);
+				if (this->_right && type->size)
+					context->root->Error("Cannot assign to a sized array type!", ii.second);
+
+				//CValue size = // context->GetSizeof(type->base);
+				//now implement[] for arrays then new for them
+				auto str_type = context->root->GetArrayType(type->base);
+				//alloc the struct for it
+				auto str = TmpB.CreateAlloca(str_type->GetLLVMType(), TmpB.getInt32(1), aname);
+				Alloca = str;
+				//allocate the array
+
+				//get the array size
+				int l = std::atoi(ii.first.text.substr(ii.first.text.find_first_of('[')+1).c_str());
+				
+				auto size = TmpB.getInt32(l);//need to figure out better way to get size
+				auto arr = TmpB.CreateAlloca(type->base->GetLLVMType(), size, aname + ".array");
+				//store size
+				auto size_p = TmpB.CreateGEP(str, { TmpB.getInt32(0), TmpB.getInt32(0) });
+				TmpB.CreateStore(size, size_p);
+
+				//store pointer
+				auto pointer_p = TmpB.CreateGEP(str, { TmpB.getInt32(0), TmpB.getInt32(1) });
+				TmpB.CreateStore(arr, pointer_p);
+			}
+			else if (type->GetBaseType()->type == Types::Trait)
+			{
+				context->root->Error("Cannot instantiate trait", ii.second);
 			}
 			else
 			{
-				if (type->GetBaseType()->type == Types::Trait)
-					context->root->Error("Cannot instantiate trait", ii.second);
-
 				Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, aname);
 			}
 
@@ -820,11 +843,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			// Store the initial value into the alloca.
 			if (this->_right)
 			{
-				//if (type->type == Types::Struct)
-				//	context->Construct(CValue(type->GetPointerType(), Alloca), 0);
-				//else if (type->type == Types::Array && type->base->type == Types::Struct)
-				//	context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
-
 				//do return value optimization here?
 				auto val = (*this->_right)[i++].second->Compile(context);
 				//cast it
@@ -849,9 +867,9 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			auto TheFunction = context->function->f;
 			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 				TheFunction->getEntryBlock().begin());
-			if (val.type->type == Types::Array)
-				Alloca = TmpB.CreateAlloca(val.type->GetLLVMType(), context->root->builder.getInt32(val.type->size), aname);
-			else
+			//if (val.type->type == Types::Array)
+				//Alloca = TmpB.CreateAlloca(val.type->GetLLVMType(), context->root->builder.getInt32(val.type->size), aname);
+			//else
 				Alloca = TmpB.CreateAlloca(val.type->GetLLVMType(), 0, aname);
 
 			if (val.type->GetSize() >= 4)
@@ -867,18 +885,16 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
 
 
-			//before storing we need to construct it 
-			//if (type->type == Types::Struct)
-			//	context->Construct(CValue(type->GetPointerType(), Alloca), 0);
-			//else if (type->type == Types::Array && type->base->type == Types::Struct)
-			//	context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
-
 			CValue alloc;
 			alloc.val = Alloca;
 			alloc.type = val.type->GetPointerType();
+			if (val.type->type == Types::Array)
+			{
+				val.val = context->root->builder.CreateLoad(val.val);//todo: move this to new probably
+			}
+			//next fix there being a size in the array types that prevents it from being passed into a function
+			//	or rather just fix that being a problem
 			context->Store(alloc, val, true);
-			//assignment
-			//context->root->builder.CreateStore(val.val, Alloca);
 		}
 		else
 			context->root->Error("Cannot infer variable type without a value!", ii.second);
