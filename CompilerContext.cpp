@@ -946,44 +946,32 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 {
 	//try and cast if we can
 	if (this->function == 0)
+	{
 		this->root->Error("Cannot return from outside function!", *current_token);
+	}
 
 	//call destructors
 	auto cur = this->scope;
 	do
 	{
 		if (cur->destructed == false)
-			for (auto ii : cur->named_values)
-			{
-				if (ii.second.val == ret.pointer)
-					continue;//dont destruct what we are returning
-				else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
-					this->Destruct(ii.second, 0);
-				else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
-					this->Destruct(CValue(ii.second.type->base, ii.second.val), this->root->builder.getInt32(ii.second.type->base->size));
-			}
+		{
+			cur->Destruct(this, ret.pointer);
+		}
 
-		/*if (cur->prev == 0 && cur->destructed == false)
-		{
-		int i = 0;
-		for (auto ii : cur->named_values)
-		{
-		if (this->function->arguments[i].first->type == Types::Struct && ii.second.val != ret.pointer)
-		{
-		//this->Destruct(ii.second,0);
-		}
-		i++;
-		}
-		}*/
 		cur->destructed = true;
 		cur = cur->prev;
 	} while (cur);
 
 	if (ret.type->type == Types::Void)
+	{
 		return root->builder.CreateRetVoid();
+	}
 
 	if (ret.val)
+	{
 		ret = this->DoCast(this->function->return_type, ret);
+	}
 	return root->builder.CreateRet(ret.val);
 }
 
@@ -1132,7 +1120,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		}
 	}
 
-	value.val->dump();
+	//value.val->dump();
 	//this->root->current_function->function->f->dump();
 	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 }
@@ -1269,19 +1257,41 @@ Scope* CompilerContext::PushScope()
 	return this->scope;
 }
 
+void Scope::Destruct(CompilerContext* context, llvm::Value* ignore)
+{
+	for (auto ii : this->named_values)
+	{
+		if (ii.second.val == ignore)
+			continue;//dont destruct what we are returning
+		if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
+			context->Destruct(ii.second, 0);
+		//else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
+		//	context->Destruct(CValue(ii.second.type->base, ii.second.val), context->root->builder.getInt32(ii.second.type->base->size));
+	}
+
+	for (auto ii : this->to_destruct)
+	{
+		if (ii.type->type == Types::Pointer && ii.type->base->type == Types::Array && ii.type->base->base->type == Types::Struct)
+		{
+			auto loc = context->root->builder.CreateGEP(ii.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+			auto size = context->root->builder.CreateLoad(loc);
+
+			auto ptr = context->root->builder.CreateGEP(ii.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+			ptr = context->root->builder.CreateLoad(ptr);
+			context->Destruct(CValue(ii.type->base->GetPointerType() , ptr), size);
+		}
+	}
+	this->destructed = true;
+}
+
 void CompilerContext::PopScope()
 {
 	//call destructors
 	if (this->scope->prev != 0)// && this->scope->prev->prev != 0)
 	{
 		if (this->scope->destructed == false)
-			for (auto ii : this->scope->named_values)
-			{
-				if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
-					this->Destruct(ii.second, 0);
-				else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
-					this->Destruct(CValue(ii.second.type->base, ii.second.val), this->root->builder.getInt32(ii.second.type->base->size));
-			}
+			this->scope->Destruct(this);
+
 		this->scope->destructed = true;
 	}
 
@@ -1329,9 +1339,9 @@ CValue CompilerContext::Load(const std::string& name)
 	//this is out of date
 	//else if (value.type->type == Types::Pointer && value.type->base->type == Types::Array)//load it as a pointer
 	//{
-		//auto type = value.type->base->GetPointerType();
-		//auto loc = this->root->builder.CreatePointerCast(value.val, type->GetLLVMType());
-		//return CValue(type, loc);
+	//auto type = value.type->base->GetPointerType();
+	//auto loc = this->root->builder.CreatePointerCast(value.val, type->GetLLVMType());
+	//return CValue(type, loc);
 	//}
 	else if (value.type->type == Types::Int)
 	{
@@ -1351,6 +1361,8 @@ void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
 			fun = ty->GetMethod(ty->data->template_base->name, { pointer.type }, this);
 		else
 			fun = ty->GetMethod(ty->data->name, { pointer.type }, this);
+		if (fun == 0)
+			return;//todo: is this right behavior?
 		fun->Load(this->root);
 		if (arr_size == 0)//size == 0)
 		{//just one element, construct it

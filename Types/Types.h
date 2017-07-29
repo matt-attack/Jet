@@ -64,6 +64,8 @@ namespace Jet
 
 		Pointer,
 		Array,//acts just like a pointer but really is a struct with size contained
+		InternalArray,//used for things like global arrays
+
 
 		Invalid,//for unloaded types
 	};

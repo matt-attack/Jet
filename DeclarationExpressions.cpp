@@ -772,11 +772,21 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				context->root->Error("Cannot instantiate global with non constant value", token);
 		}
 
-		context->root->AddGlobal(this->_names->front().second.text, type, cval);
+		if (this->_names->front().first.text.back() == ']')
+		{
+			std::string len = this->_names->front().first.text;
+			len = len.substr(len.find_first_of('[')+1);
+			context->root->AddGlobal(this->_names->front().second.text, type->base, std::atoi(len.c_str()));
+		}
+		else
+		{
+			context->root->AddGlobal(this->_names->front().second.text, type, cval);
+		}
 
 		return CValue();
 	}
 
+	bool needs_destruction = false;
 	int i = 0;
 	for (auto ii : *this->_names) {
 		auto aname = ii.second.text;
@@ -786,6 +796,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		if (ii.first.text.length() > 0)//type was specified
 		{
 			context->CurrentToken(&ii.first);
+			//fixme sending the size for stack arrays
 			type = context->root->LookupType(ii.first.text);
 
 			auto TheFunction = context->function->f;
@@ -794,21 +805,24 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 			if (type->type == Types::Struct && type->data->templates.size() > 0)
 				context->root->Error("Missing template arguments for type '" + type->ToString() + "'", ii.first);
-			else if (type->type == Types::Array)
+			else if (type->type == Types::Array || type->type == Types::InternalArray)
 			{
 				if (this->_right && type->size)
 					context->root->Error("Cannot assign to a sized array type!", ii.second);
+				if (type->size)
+					needs_destruction = true;
 
 				//CValue size = // context->GetSizeof(type->base);
 				//now implement[] for arrays then new for them
 				auto str_type = context->root->GetArrayType(type->base);
+				type = str_type;
 				//alloc the struct for it
 				auto str = TmpB.CreateAlloca(str_type->GetLLVMType(), TmpB.getInt32(1), aname);
 				Alloca = str;
 				//allocate the array
 
 				//get the array size
-				int l = std::atoi(ii.first.text.substr(ii.first.text.find_first_of('[')+1).c_str());
+				int l = std::atoi(ii.first.text.substr(ii.first.text.find_last_of('[')+1).c_str());
 				
 				auto size = TmpB.getInt32(l);//need to figure out better way to get size
 				auto arr = TmpB.CreateAlloca(type->base->GetLLVMType(), size, aname + ".array");
@@ -839,6 +853,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			llvm::Instruction *Call = context->root->debug->insertDeclare(
 				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
 			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
+			
 
 			// Store the initial value into the alloca.
 			if (this->_right)
@@ -918,7 +933,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			context->RegisterLocal(aname, CValue(type->GetPointerType(), var_ptr));
 		}
 		else
-			context->RegisterLocal(aname, CValue(type->GetPointerType(), Alloca));
+			context->RegisterLocal(aname, CValue(type->GetPointerType(), Alloca), needs_destruction);
 
 		//construct it!
 		if (this->_right == 0)
@@ -926,7 +941,15 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			if (type->type == Types::Struct)
 				context->Construct(CValue(type->GetPointerType(), Alloca), 0);
 			else if (type->type == Types::Array && type->base->type == Types::Struct)
-				context->Construct(CValue(type, Alloca), context->root->builder.getInt32(type->size));
+			{
+				//todo lets move this junk into construct so we dont have to do this in multiple places
+				auto loc = context->root->builder.CreateGEP(Alloca, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+				auto size = context->root->builder.CreateLoad(loc);
+
+				auto ptr = context->root->builder.CreateGEP(Alloca, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+				ptr = context->root->builder.CreateLoad(ptr);
+				context->Construct(CValue(type->base->GetPointerType(), ptr), size);
+			}
 		}
 	}
 
@@ -1198,11 +1221,13 @@ void StructExpression::AddConstructors(CompilerContext* context)
 						//set ns
 						auto oldns = function->root->ns;
 						function->root->ns = str->data;
-						CValue vtable = function->Load("__" + this->name.text + "_vtable");
+						CValue vtable = function->GetVariable/*Load*/("__" + this->name.text + "_vtable");
 						function->root->ns = oldns;
 						//restore ns
 
 						//cast the global to a char**
+						//vtable.val->dump();
+						//vtable.val->getType()->dump();
 						vtable.val = context->root->builder.CreatePointerCast(vtable.val, context->root->LookupType("char**")->GetLLVMType());
 
 						auto myself = function->Load("this");
@@ -1267,9 +1292,10 @@ void StructExpression::AddConstructors(CompilerContext* context)
 					//first load the global
 					auto oldns = context->root->ns;
 					context->root->ns = str->data;
-					CValue vtable = ii.second->context->Load("__" + this->name.text + "_vtable");
+					CValue vtable = ii.second->context->GetVariable("__" + this->name.text + "_vtable");
 					context->root->ns = oldns;
-
+					//vtable.val->dump();
+					//vtable.val->getType()->dump();
 					//cast the global to a char**
 					vtable.val = context->root->builder.CreatePointerCast(vtable.val, context->root->LookupType("char**")->GetLLVMType());
 

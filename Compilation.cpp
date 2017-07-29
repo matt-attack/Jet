@@ -402,7 +402,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			}
 
 			compilation->asts["#symbols_" + std::to_string(symbol_asts.size())] = result;
-			
+
 			//this fixes some errors, need to resolve them later
 			compilation->debug_info.file = compilation->debug->createFile("temp",
 				compilation->debug_info.cu->getDirectory());
@@ -612,7 +612,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 
 	//output the .o file and .jlib for this package
 	this->OutputPackage(project->project_name, olevel, time);
-	
+
 	//and handling the arguments as well as function overloads, which is still a BIG problem
 	//need name mangling
 
@@ -1252,16 +1252,19 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			auto tname = name.substr(0, p);
 			auto t = this->LookupType(tname, load);
 
-			type = this->GetArrayType(t);
-			
+			if (len.length())
+				type = this->GetInternalArrayType(t, std::atoi(len.c_str()));
+			else
+				type = this->GetArrayType(t);
+
 			/*type = new Type;
 			type->name = name;
 			type->base = t;
 			type->type = Types::Array;
 			if (len.length())
-				type->size = std::stoi(len);//cheat for now
+			type->size = std::stoi(len);//cheat for now
 			else
-				type->size = 0;*/
+			type->size = 0;*/
 			curns->members.insert({ name, type });
 		}
 		else if (name[name.length() - 1] == '>')
@@ -1356,6 +1359,31 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 	return type;
 }
 
+CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, llvm::Constant* init, bool intern)//, bool Extern = false)
+{
+	auto global = this->ns->members.find(name);// this->globals.find(name);
+	if (global != this->ns->members.end())
+		Error("Global variable '" + name + "' already exists in " + this->ns->name, *this->current_function->current_token);
+
+	if (init == 0)
+	{
+		std::vector<llvm::Constant*> arr;
+		arr.push_back(t->GetDefaultValue(this));
+		init = llvm::ConstantArray::get(llvm::ArrayType::get(t->GetLLVMType(), size), arr);// llvm::dyn_cast<llvm::ArrayType>(this->GetLLVMType()), arr);
+	}
+	//Error("Global variable '" + name + "' is an array without initialize, this hasnt been implemented yet", *this->current_function->current_token);//lets just die if we dont have initializer, can fix later
+	llvm::Constant* initializer = init;// ? init : t->GetDefaultValue(this);
+	auto ng = new llvm::GlobalVariable(*module, llvm::ArrayType::get(t->GetLLVMType(), size)/*t->GetLLVMType()*/, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
+	this->debug->createGlobalVariable(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false, 0);
+	this->ns->members.insert({ name, Symbol(new CValue(this->GetInternalArrayType(t, size)->GetPointerType(), ng)) });
+	//ng->dump();
+	//ng->getType()->dump();
+	//ok for arrays we need to create two globals. one that holds a pointer to the other global
+	//if it has a constructor, make sure to call it
+	//this->globals[name] = 
+	return CValue(this->GetInternalArrayType(t, size)->GetPointerType(), ng);
+}
+
 CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Constant* init, bool intern)//, bool Extern = false)
 {
 	auto global = this->ns->members.find(name);// this->globals.find(name);
@@ -1395,6 +1423,20 @@ Jet::Type* Compilation::GetArrayType(Jet::Type* base)
 	t->ns = this->ns;
 	//ok, fix this and make it work right
 	this->array_types[base] = t;
+	return t;
+}
+
+Jet::Type* Compilation::GetInternalArrayType(Jet::Type* base, unsigned int size)
+{
+	auto res = this->internal_array_types.find(std::pair<Jet::Type*, unsigned int>(base, size));
+	if (res != this->internal_array_types.end())
+		return res->second;
+
+	Type* t = new Type(base->name + "[" + std::to_string(size) + "]", Types::InternalArray, base);
+	t->size = size;
+	t->ns = this->ns;
+	//ok, fix this and make it work right
+	this->internal_array_types[std::pair<Jet::Type*, unsigned int>(base, size)] = t;
 	return t;
 }
 

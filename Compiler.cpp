@@ -280,7 +280,17 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 		modifiedtimes.push_back(data.st_mtime);
 #endif
 	}
-	//todo: push back times for dependencies
+
+	//lets look at the .jlib modification time
+	for (auto ii : project->dependencies)
+	{
+		std::string path = ii;
+		path += "/build/symbols.jlib";
+		struct stat data;
+		int x = stat(path.c_str(), &data);
+
+		modifiedtimes.push_back(data.st_mtime);
+	}
 
 	std::string config_name = "";
 	if (parser)

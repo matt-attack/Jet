@@ -26,10 +26,15 @@ namespace Jet
 	{
 		std::map<std::string, CValue> named_values;
 
+		//used for struct arrays
+		std::vector<CValue> to_destruct;
+
 		std::vector<Scope*> next;
 		Scope* prev;
 
 		bool destructed = false;
+
+		void Destruct(CompilerContext* context, llvm::Value* ignore = 0);//the ignore is used for returns
 	};
 
 	struct TCScope
@@ -102,10 +107,12 @@ namespace Jet
 			return CValue(this->root->LookupType("char*"), res);
 		}
 
-		void RegisterLocal(const std::string& name, CValue val)
+		void RegisterLocal(const std::string& name, CValue val, bool needs_destruction = false)
 		{
 			if (this->scope->named_values.find(name) != this->scope->named_values.end())
 				this->root->Error("Variable '" + name + "' already defined", *this->current_token);
+			if (needs_destruction)
+				this->scope->to_destruct.push_back(val);
 			this->scope->named_values[name] = val;
 		}
 

@@ -191,7 +191,7 @@ std::string convert_type(CXType type)
 
 	return out;
 }
-
+//todo: C++ bindings
 //ok integrate this, then we need to add unsigned types
 std::string generate_jet_from_header(const char* header)
 {
@@ -246,6 +246,8 @@ std::string generate_jet_from_header(const char* header)
 			//print out last part of structure 
 			*out += "}\n";
 		}
+		//ok, lets generate c++ bindings
+		//	c.kind == CXCursor_ClassDecl
 		if (c.kind == CXCursor_StructDecl)
 		{
 			CXString name = clang_getCursorSpelling(c);
@@ -445,6 +447,66 @@ std::string generate_jet_from_header(const char* header)
 	return out;
 }
 
+void MakeDocs(Compilation* compilation)
+{
+	//lets output some docs
+	//this needs to be recursive
+	std::string out;
+	out += //"<!DOCTYPE html>\n"
+		"<html>\n"
+		"<head>\n"
+		"<style>\n"
+		"table, th, td{\n"
+		"border: 1px solid black;\n"
+		"}\n"
+		"</style>\n"
+		"</head>\n"
+		"<body>\n";
+	out += "<table style=\"width:80%\">\n";
+	out += "<tr>\n";
+	out += "\t<th>Name</th>\n";
+	out += "\t<th>Description</th>\n";
+	out += "</tr>\n";
+
+	for (auto mem : compilation->ns->members)
+	{
+		if (mem.second.type == Jet::SymbolType::Namespace)
+		{
+			//output a new namespace block and recurse
+		}
+		else if (mem.second.type == Jet::SymbolType::Function)
+		{
+			out += "<tr>\n";
+			out += "\t<td>" + mem.first + "</td>\n";
+			out += "\t<td>Returns " + mem.second.fn->return_type->name + "</td>\n";
+			out += "</tr>\n";
+		}
+		else if (mem.second.type == Jet::SymbolType::Type)
+		{
+			if (mem.second.ty->type == Types::Pointer)
+				continue;
+			out += "<tr>\n";
+			out += "\t<td>" + mem.first + "</td>\n";
+			out += "\t<td>" + mem.second.ty->name + "</td>\n";
+			out += "</tr>\n";
+
+			//mem.second.ty->data->expression
+		}
+	}
+	out += "</table>";
+	out += "</body></html>";
+	/*Target of the Link :
+
+	<a name = "name_of_target">Content< / a>
+
+	Link to the Target :
+
+	<a href = "#name_of_target">Link Text< / a>*/
+	//todo use this and add description
+	auto of = std::ofstream("build/docs.html", std::ios_base::out);
+	of << out;
+}
+
 void DoCommand(int argc, char* argv[])
 {
 	OptionParser parser;
@@ -483,6 +545,10 @@ void DoCommand(int argc, char* argv[])
 			DiagnosticBuilder b([](Diagnostic& x) {x.Print(); });
 			auto compilation = Compilation::Make(project, &b);
 
+			MakeDocs(compilation);
+
+			//also need to output to file and integrate this correctly
+			//	also need to implement it for classes
 			if (compilation == 0)
 			{
 				delete project;

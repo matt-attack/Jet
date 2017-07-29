@@ -324,6 +324,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		}
 		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
 		{
+			//throw 7;
 			std::vector<llvm::Value*> iindex = { context->DoCast(context->root->IntType, index->Compile(context)).val };
 
 			//loadme!!!
@@ -332,6 +333,31 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
 
 			return CValue(lhs.type->base, loc);
+		}
+		//maybe this case shouldnt happen
+		/*else if (lhs.type->type == Types::InternalArray && this->member.text.length() == 0)//or pointer!!(later)
+		{
+			//throw 7;
+			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
+
+			//loadme!!!
+			//lhs.val = context->root->builder.CreateLoad(lhs.val);
+			//llllload my index
+			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
+			
+			return CValue(lhs.type->base->GetPointerType(), loc);
+		}*/
+		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::InternalArray && this->member.text.length() == 0)//or pointer!!(later)
+		{
+			//throw 7;
+			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
+
+			//loadme!!!
+			//lhs.val = context->root->builder.CreateLoad(lhs.val);
+			//llllload my index
+			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
+
+			return CValue(lhs.type->base->base->GetPointerType(), loc);
 		}
 		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct && this->member.text.length() == 0)
 		{
@@ -545,33 +571,23 @@ CValue NewExpression::Compile(CompilerContext* context)
 	auto ty = context->root->LookupType(type.text);
 	auto size = context->GetSizeof(ty);
 	auto arr_size = this->size ? this->size->Compile(context).val : context->root->builder.getInt32(1);
-	//if (arr_size)//this->size)
-
 	
 	//todo, on free mark size as zero
-	//{
 	if (this->size)
 		size.val = context->root->builder.CreateMul(size.val, arr_size);
 	size.val = context->root->builder.CreateAdd(size.val, context->root->builder.getInt32(4));
-	//}
+	
 	//ok now get new working with it
 	CValue val = context->Call("malloc", { size });
 
-	//build the array type struct, which is just an int followed by a pointer to the underlying data
-	//auto array_t = llvm::StructType::get(llvm::IntegerType::get(context->root->context, 32), ty->GetPointerType()->GetLLVMType());
-	//auto array_data = context->root->builder.CreateAlloca(array_t);
-	//context->root->builder.CreateStructGEP(array_t, array_data, 0);
-	//add free
-	//increment val to the right location and store array size
-	//context->root->builder.CreateStructGEP(context->root->)
-	//oops this is being run for individual news too, do I want to do this????
-	//	probably not but would remove the need for free[]
-	//if (arr_size)//this->size)
-	//{
 	auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
 	context->root->builder.CreateStore(arr_size, pointer);
 	val.val = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(4) });
-	//}
+
+	//ok when we free this mark the size as zero and lets check size before we free
+	//	this will make double frees IMPOSSIBLE on arrays :D
+	//if we are in debug mark as zero and we can crash if we double free maybe?
+
 
 	auto ptr = context->DoCast(ty->GetPointerType(), val, true);
 
@@ -624,15 +640,12 @@ CValue NewExpression::Compile(CompilerContext* context)
 
 
 	//ok now stick it in an array if we specified size
-	if (this->size)//ty->type == Types::Array)
+	if (this->size)
 	{
-		auto str_type = context->root->GetArrayType(ty);// type->base);
+		auto str_type = context->root->GetArrayType(ty);
 		//alloc the struct for it
 		auto str = context->root->builder.CreateAlloca(str_type->GetLLVMType(), context->root->builder.getInt32(1), "newarray");
 		
-		//allocate the array
-		//auto size = TmpB.getInt32(type->size);
-		//auto arr = TmpB.CreateAlloca(type->base->GetLLVMType(), size, aname + ".array");
 		//store size
 		auto size_p = context->root->builder.CreateGEP(str, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 		context->root->builder.CreateStore(arr_size, size_p);
@@ -652,31 +665,21 @@ CValue FreeExpression::Compile(CompilerContext* context)
 
 	auto pointer = this->pointer->Compile(context);
 
-	if (pointer.type->type != Types::Pointer)
-		context->root->Error("Cannot free a non pointer type!", this->token);
+	if (pointer.type->type != Types::Pointer && pointer.type->type != Types::Array)
+		context->root->Error("Cannot free a non pointer/array type!", this->token);
 
-	//auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
-	//context->root->builder.CreateStore(arr_size, pointer);
-	//val.val = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(4) });
+	//extract the pointer from the array if we are one
+	if (pointer.type->type == Types::Array)
+	{
+		auto ptr = context->root->builder.CreateExtractValue(pointer.val, 1);
+		pointer = CValue(pointer.type->base->GetPointerType(), ptr);	
+	}
 
-	//pointer.val = context->root->builder.CreateSub(pointer.val, context->root->builder.getInt32(4));
+	//get to the root of the pointer (remove the offset for the size)
+	llvm::Value* charptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
+	llvm::Value* rootptr = context->root->builder.CreateGEP(charptr, { context->root->builder.getInt32(-4) });
 
-	//build the array type struct, which is just an int followed by a pointer to the underlying data
-	//auto array_t = llvm::StructType::get(llvm::IntegerType::get(context->root->context, 32), ty->GetPointerType()->GetLLVMType());
-	//auto array_data = context->root->builder.CreateAlloca(array_t);
-	//context->root->builder.CreateStructGEP(array_t, array_data, 0);
-	//add free
-	//increment val to the right location and store array size
-	//context->root->builder.CreateStructGEP(context->root->)
-	//auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
-
-	//auto ptr = context->DoCast(ty->GetPointerType(), val, true);
-
-	llvm::Value* rootptr;
-	auto charptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
-	rootptr = context->root->builder.CreateGEP(charptr, { context->root->builder.getInt32(-4) });
-
-	//run constructors
+	//run destructors
 	if (pointer.type->base->type == Types::Struct)
 	{
 		Type* ty = pointer.type->base;

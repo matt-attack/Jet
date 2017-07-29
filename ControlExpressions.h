@@ -647,53 +647,7 @@ namespace Jet
 			}
 		}
 
-		CValue Compile(CompilerContext* context)
-		{
-			context->CurrentToken(&token);
-
-			int pos = 0;
-			bool hasElse = this->Else ? this->Else->block->statements.size() > 0 : false;
-			llvm::BasicBlock *EndBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "endif");
-			llvm::BasicBlock *ElseBB = 0;
-			if (hasElse)
-				ElseBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "else");
-
-			llvm::BasicBlock *NextBB = 0;
-			for (auto& ii : this->branches)
-			{
-				if (NextBB)
-					context->root->builder.SetInsertPoint(NextBB);
-
-				auto cond = ii->condition->Compile(context);
-				cond = context->DoCast(context->root->BoolType, cond);//try and cast to bool
-
-				llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "then", context->function->f);
-				NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(llvm::getGlobalContext(), "elseif", context->function->f);
-
-				context->root->builder.CreateCondBr(cond.val, ThenBB, NextBB);
-
-				//statement body
-				context->root->builder.SetInsertPoint(ThenBB);
-				ii->block->Compile(context);
-				if (context->root->builder.GetInsertBlock()->getTerminator() == 0)
-					context->root->builder.CreateBr(EndBB);//branch to end
-
-				pos++;
-			}
-
-			if (hasElse)
-			{
-				context->function->f->getBasicBlockList().push_back(ElseBB);
-				context->root->builder.SetInsertPoint(ElseBB);
-
-				this->Else->block->Compile(context);
-				context->root->builder.CreateBr(EndBB);
-			}
-			context->function->f->getBasicBlockList().push_back(EndBB);
-			context->root->builder.SetInsertPoint(EndBB);
-
-			return CValue();
-		}
+		CValue Compile(CompilerContext* context);
 
 		void CompileDeclarations(CompilerContext* context) {};
 

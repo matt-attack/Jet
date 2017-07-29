@@ -134,6 +134,7 @@ namespace Jet
 		Type* TryLookupType(const std::string& name);
 
 		CValue AddGlobal(const std::string& name, Type* t, llvm::Constant* init = 0, bool intern = false);
+		CValue AddGlobal(const std::string& name, Type* t, int size, llvm::Constant* init = 0, bool intern = false);
 
 		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder, bool time = false, int debug = 2);
 
@@ -156,6 +157,9 @@ namespace Jet
 		Type* GetFunctionType(Type* return_type, const std::vector<Type*>& args);
 		std::map<Type*, Type*> array_types;
 		Type* GetArrayType(Type* base);
+		std::map<std::pair<Type*, unsigned int>, Type*> internal_array_types;
+		Type* GetInternalArrayType(Type* base, unsigned int size);
+
 
 		Function* GetFunction(const std::string& name, const std::vector<CValue>& args)
 		{

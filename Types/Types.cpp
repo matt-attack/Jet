@@ -109,12 +109,45 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 	}
 	else if (this->type == Types::Array)
 	{
-		this->debug_type = compiler->debug->createArrayType(this->size, 8, this->base->GetDebugType(compiler), 0);
+		llvm::DIType* typ = 0;
+
+		int line = 0;
+		//if (this->data->expression)
+		//	line = this->data->expression->token.line;
+
+		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 8, 0, typ, 0);
+		this->debug_type = dt;
+
+		//now build and set elements
+		std::vector<llvm::Metadata*> ftypes;
+		int offset = 0;
+		auto list = { compiler->IntType, this->base->GetPointerType() };
+		char* names[] = { "size", "ptr" };
+		int i = 0;
+		for (auto type : list)
+		{
+			type->Load(compiler);
+			int size = type->GetSize();
+			auto mt = compiler->debug->createMemberType(compiler->debug_info.file, names[i++], compiler->debug_info.file, line, size * 8, 8, offset * 8, 0, type->GetDebugType(compiler));
+
+			ftypes.push_back(mt);
+			offset += size;
+		}
+		dt->replaceElements(compiler->debug->getOrCreateArray(ftypes));
+
+
+		this->debug_type = dt;
+	}
+	else if (this->type == Types::InternalArray)
+	{
+		auto dt = compiler->debug->createArrayType(this->size, 8, this->base->GetDebugType(compiler), {});
+		this->debug_type = dt;
 	}
 
 	if (this->debug_type)
 		return this->debug_type;
 
+	compiler->Error("Compiler Error: GetDebugType not implemented for type", *compiler->current_function->current_token);
 	throw 7;
 }
 
@@ -157,6 +190,11 @@ llvm::Type* Type::GetLLVMType()
 		//	maybe store the llvm type in it
 		//return llvm::ArrayType::get(this->base->GetLLVMType(), this->size);
 	}
+	case (int)Types::InternalArray:
+	{
+		auto res = llvm::ArrayType::get(base->GetLLVMType(), this->size);//todo: use real size here
+		return res;
+	}
 	case (int)Types::Pointer:
 		return llvm::PointerType::get(this->base->GetLLVMType(), 0);//address space, wat?
 	case (int)Types::Function:
@@ -173,6 +211,7 @@ llvm::Type* Type::GetLLVMType()
 	case (int)Types::Trait:
 		return 0;
 	default:
+		printf("ERROR: GetLLVMType not implemented for type!\n");
 		throw 7;//oops
 	}
 }
@@ -690,6 +729,8 @@ std::string Type::ToString()
 		return this->data->name;
 	case (int)Types::Pointer:
 		return this->base->ToString() + "*";
+	case (int)Types::InternalArray:
+		return this->base->ToString() + "[" + std::to_string(this->size) + "]";
 	case (int)Types::Array:
 		return this->base->ToString() + "[]";// +std::to_string(this->size) + "]";
 	case (int)Types::Bool:
@@ -1034,7 +1075,7 @@ void Struct::Load(Compilation* compiler)
 
 		compiler->ns = this;
 		//then need to have function calls to virtual functions to go the lookup table
-		compiler->AddGlobal("__" + this->name + "_vtable", compiler->LookupType("char*[" + std::to_string(vtable_size) + "]"), arr, true);
+		compiler->AddGlobal("__" + this->name + "_vtable", compiler->LookupType("char*"), vtable_size, arr, true);
 
 		compiler->ns = oldns;
 	}
@@ -1274,6 +1315,8 @@ int Type::GetSize()
 		return 8;
 	case Types::Pointer:
 		return 4;//todo: use correct size for 64 bit when that happens
+	case Types::Array:
+		return 8;//pointer + integer
 	}
 	return 4;//todo
 }
