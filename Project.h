@@ -32,6 +32,7 @@ namespace Jet
 		{
 			document = 0;
 			opened = false;
+			version = "0.0.0";//default version for if one is not specified
 		}
 
 		bool _Load(const std::string& projectdir);
@@ -40,6 +41,7 @@ namespace Jet
 		Document* document;
 		std::string path;
 		std::string project_name;
+		std::string version;
 		std::vector<std::string> files;
 		std::vector<std::string> dependencies;//jet libraries we want to use
 		std::vector<std::string> libs;//libraries to link to

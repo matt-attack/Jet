@@ -184,17 +184,20 @@ bool JetProject::_Load(const std::string& projectdir)
 	if (root->children.find("lib") != root->children.end())
 		is_executable = false;
 
+	if (root->children.find("version") != root->children.end())
+		this->version = root->children["version"]->at(0);
+
 	if (root->children["files"])
-		files = *root->children["files"];
+		this->files = *root->children["files"];
 
 	if (root->children["libs"])
-		libs = *root->children["libs"];
+		this->libs = *root->children["libs"];
 
 	if (root->children["requires"])
-		dependencies = *root->children["requires"];
+		this->dependencies = *root->children["requires"];
 
 	if (root->children["headers"])
-		headers = *root->children["headers"];
+		this->headers = *root->children["headers"];
 
 	if (root->children["defines"])
 	{

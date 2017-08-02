@@ -487,12 +487,12 @@ error:
 						printf("TWO PACKAGES WITH THE SAME NAME EXIST, THIS CAN CAUSE ISSUES!\n");
 					}
 
-					/*if (version != project->version)
+					if (version != project->version)
 					{
-						if the path is right, but the version changed we need to edit the version
-							found = true;
-					}*/
-
+						//if the path is right, but the version changed we need to edit the version
+						printf("PACKAGE VERSION MISMATCH NEED TO HANDLE THIS");
+					}
+					found = true;
 					break;
 				}
 			}
@@ -516,7 +516,7 @@ error:
 
 				//append our name
 				std::ofstream file(db_filename, std::ios_base::app);
-				file << project->project_name << "|" << curpath << '|' << "0.0.0" << '\n';
+				file << project->project_name << "|" << curpath << '|' << project->version << '\n';
 			}
 		}
 
