@@ -16,6 +16,7 @@
 #endif
 
 #include <fstream>
+#include <sstream>
 
 
 using namespace Jet;
@@ -156,10 +157,11 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 	x.detach();
 #endif
 	//system(path.c_str());
-	
+
 	//spawnl(P_NOWAIT, "cmd.exe", "cmd.exe", path.c_str(), 0);
 }
 
+extern std::string executable_path;
 int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std::string& confg_name, OptionParser* parser)
 {
 	JetProject* project = JetProject::Load(projectdir);
@@ -444,6 +446,79 @@ error:
 		//running postbuild
 		if (configuration.postbuild.length() > 0)
 			printf("%s", exec(configuration.postbuild.c_str()).c_str());
+
+		//ok now lets add it to the project cache, lets be sure to always save a backup though and need to get current path of the jetc 
+		if (executable_path.length())
+		{
+			//ok, now we need to remove our executable name from this
+			int pos = executable_path.find_last_of('\\');
+			if (pos == -1)
+				pos = executable_path.find_last_of('/');
+			std::string path = executable_path.substr(0, pos);
+			std::string db_filename = path + "/project_database.txt";
+
+			char curpath[500];
+			getcwd(curpath, 500);//todo escape our filename and project name and make parser above able to read it out
+
+			//ok, lets scan through the database to see if we are in it
+			//todo: break this search out into a function
+			std::ifstream file(db_filename, std::ios_base::binary);
+			bool found = false;
+			std::string line;
+			while (std::getline(file, line))
+			{
+				std::istringstream iss(line);
+				std::string name, path, version;
+
+				//there is three parts, name, path and version separated by | and delimited by lines
+				int first = line.find_first_of('|');
+				int last = line.find_last_of('|');
+				if (first == -1 || first == last)
+					continue;//invalid line
+
+				name = line.substr(0, first);
+				path = line.substr(first + 1, last - 1 - first);
+				version = line.substr(last + 1, line.length() - last);
+
+				if (name == project->project_name)
+				{
+					if (path != curpath)
+					{
+						printf("TWO PACKAGES WITH THE SAME NAME EXIST, THIS CAN CAUSE ISSUES!\n");
+					}
+
+					/*if (version != project->version)
+					{
+						if the path is right, but the version changed we need to edit the version
+							found = true;
+					}*/
+
+					break;
+				}
+			}
+
+			//if we arent in it, backup the old one, then append ourselves to the new one
+			if (found == false)
+			{
+				//perform copy
+				{
+					std::ifstream source(db_filename, std::ios::binary);
+					std::ofstream dest(db_filename + ".backup", std::ios::binary);
+
+					std::istreambuf_iterator<char> begin_source(source);
+					std::istreambuf_iterator<char> end_source;
+					std::ostreambuf_iterator<char> begin_dest(dest);
+					copy(begin_source, end_source, begin_dest);
+
+					source.close();
+					dest.close();
+				}
+
+				//append our name
+				std::ofstream file(db_filename, std::ios_base::app);
+				file << project->project_name << "|" << curpath << '|' << "0.0.0" << '\n';
+			}
+		}
 
 		if (options.run && project->IsExecutable())
 		{

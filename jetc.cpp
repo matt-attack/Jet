@@ -670,11 +670,15 @@ void DoCommand(int argc, char* argv[])
 		c.Compile(argv[1], &options, config, &parser);
 }
 
+
+std::string executable_path;
 int main(int argc, char* argv[])
 {
 #ifdef _WIN32
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
+
+	executable_path = argv[0];
 
 	//look for config file, and create default if not there
 
