@@ -37,6 +37,8 @@ namespace Jet
 
 		bool _Load(const std::string& projectdir);
 
+		std::vector<std::string> resolved_deps;
+
 	public:
 		Document* document;
 		std::string path;
@@ -79,6 +81,8 @@ namespace Jet
 				delete p;
 			return 0;
 		}
+
+		const std::vector<std::string>& ResolveDependencies();
 	};
 }
 

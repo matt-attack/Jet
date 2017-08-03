@@ -248,12 +248,16 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		chdir(path.c_str());
 
 	std::vector<std::pair<std::string, char*>> lib_symbols;
+	const std::vector<std::string>& resolved_deps = project->ResolveDependencies();
 	int deps = project->dependencies.size();
 	for (int i = 0; i < deps; i++)
 	{
-		auto ii = project->dependencies[i];
+		auto ii = resolved_deps[i];// project->dependencies[i];
 
-		//todo: resolve dependencies here and check global library directory
+		if (resolved_deps[i].length() == 0)
+		{
+			throw 7;// we are missing a dependency
+		}
 
 		//read in declarations for each dependency
 		std::string symbol_filepath = ii + "/build/symbols.jlib";
@@ -646,7 +650,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 			cmd += "-o build/" + project->project_name + ".exe ";
 
 			//need to link each dependency
-			for (auto ii : project->dependencies)
+			for (auto ii : project->ResolveDependencies())
 			{
 				cmd += ii + "/build/";//cmd += "-L" + ii + "/build/ ";
 
@@ -654,7 +658,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 			}
 
 			//then for each dependency add libs that it needs to link
-			for (auto ii : project->dependencies)
+			for (auto ii : project->ResolveDependencies())
 			{
 				//open up and read first part of the jlib file
 				int size;
@@ -698,7 +702,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 				cmd += ii + "/build/lib" + GetNameFromPath(ii) + ".a ";
 
 			//then for each dependency add libs that it needs to link
-			for (auto ii : project->dependencies)
+			for (auto ii : project->ResolveDependencies())
 			{
 				//open up and read first part of the jlib file
 				int size;
@@ -745,7 +749,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 		std::string cmd = ar + " rcs build/lib" + project->project_name + ".a ";
 		cmd += "build/" + project->project_name + ".o ";
 
-		for (auto ii : project->dependencies)
+		for (auto ii : project->ResolveDependencies())
 		{
 			//need to extract then merge
 			//can use llvm-ar or just ar

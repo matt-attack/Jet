@@ -838,7 +838,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	Token name = parser->Consume();
 	if (name.type == TokenType::Free)
 	{
-		name.type == TokenType::Name;
+		name.type = TokenType::Name;
 	}
 	else if (name.type != TokenType::Name)
 	{

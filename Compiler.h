@@ -15,15 +15,6 @@
 #include "Token.h"
 #include "Compilation.h"
 
-//#include "llvm/ExecutionEngine/ExecutionEngine.h"
-//#include "llvm/ExecutionEngine/MCJIT.h"
-//#include "llvm/ExecutionEngine/SectionMemoryManager.h"
-//#include "llvm/IR/LegacyPassManager.h"
-//#include "llvm/Analysis/Passes.h"
-//#include "llvm/Support/TargetSelect.h"
-//#include "llvm/Transforms/Scalar.h"
-
-
 class OptionParser;
 
 namespace Jet
@@ -48,7 +39,11 @@ namespace Jet
 	//todo: why is this a class?
 	class Compiler
 	{
+		void UpdateProjectList(JetProject* project);
+
 	public:
+
+		static std::string FindProject(const std::string& name, const std::string& desired_version);
 
 		//returns if was successful, errored, or if there was a rebuild
 		//0 = error, 1 = success, 2 = recompiled, but successful

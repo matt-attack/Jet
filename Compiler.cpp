@@ -179,9 +179,26 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 	//build each dependency
 	bool needs_rebuild = false;
 	int deps = project->dependencies.size();
+	const std::vector<std::string>& resolved_deps = project->ResolveDependencies();
 	for (int i = 0; i < deps; i++)
 	{
 		auto ii = project->dependencies[i];
+
+		if (resolved_deps[i].length() == 0)
+		{
+			printf("Project: %s could not be found!", ii.c_str());
+			delete project;
+			return 0;
+		}
+
+		ii = resolved_deps[i];
+
+		if (ii[0] != '.' && ii.find('/') == -1 && ii.find('\\') == -1)
+		{
+			//ok, search for the p/ackage using our database, we didnt give a path to one
+			std::string path = this->FindProject(ii, "0.0.0");
+		}
+
 		//spin up new compiler instance and build it
 		Compiler compiler;
 		auto success = compiler.Compile(ii.c_str());
@@ -218,20 +235,7 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 			std::getline(rebuild, line, '\n');
 			if (line.length() == 0)
 				break;
-#if 0 //def false//_WIN32
-			int hi, lo;
-			sscanf(line.c_str(), "%i,%i", &hi, &lo);
 
-			if (first)
-			{
-				compiler_version = line;
-				first = false;
-			}
-			else
-			{
-				buildtimes.push_back({ hi, lo });
-			}
-#else
 			int hi;
 			sscanf(line.c_str(), "%i", &hi);
 
@@ -244,47 +248,26 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 			{
 				buildtimes.push_back(hi);
 			}
-#endif
 		} while (true);
 	}
 
-
-#if 0 //def _WIN32
-	std::vector<std::pair<int, int>> modifiedtimes;
-	auto file = CreateFileA("project.jp", GENERIC_READ, FILE_SHARE_READ, NULL,
-		OPEN_EXISTING, 0, NULL);
-	FILETIME create, modified, access;
-	GetFileTime(file, &create, &access, &modified);
-	CloseHandle(file);
-	modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
-#else
 	std::vector<time_t> modifiedtimes;
 	struct stat data;
 	int x = stat("project.jp", &data);
 
 	modifiedtimes.push_back(data.st_mtime);
-#endif
 
 	for (auto ii : project->files)
 	{
-#if 0 //_WIN32
-		auto file = CreateFileA(ii.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
-			OPEN_EXISTING, 0, NULL);
-		FILETIME create, modified, access;
-		GetFileTime(file, &create, &access, &modified);
-
-		CloseHandle(file);
-		modifiedtimes.push_back({ modified.dwHighDateTime, modified.dwLowDateTime });
-#else
 		struct stat data;
 		int x = stat(ii.c_str(), &data);
 
 		modifiedtimes.push_back(data.st_mtime);
-#endif
 	}
 
 	//lets look at the .jlib modification time
-	for (auto ii : project->dependencies)
+	//this need to use the correct paths from the located dependencies
+	for (auto ii : resolved_deps)//project->dependencies)
 	{
 		std::string path = ii;
 		path += "/build/symbols.jlib";
@@ -450,74 +433,7 @@ error:
 		//ok now lets add it to the project cache, lets be sure to always save a backup though and need to get current path of the jetc 
 		if (executable_path.length())
 		{
-			//ok, now we need to remove our executable name from this
-			int pos = executable_path.find_last_of('\\');
-			if (pos == -1)
-				pos = executable_path.find_last_of('/');
-			std::string path = executable_path.substr(0, pos);
-			std::string db_filename = path + "/project_database.txt";
-
-			char curpath[500];
-			getcwd(curpath, 500);//todo escape our filename and project name and make parser above able to read it out
-
-			//ok, lets scan through the database to see if we are in it
-			//todo: break this search out into a function
-			std::ifstream file(db_filename, std::ios_base::binary);
-			bool found = false;
-			std::string line;
-			while (std::getline(file, line))
-			{
-				std::istringstream iss(line);
-				std::string name, path, version;
-
-				//there is three parts, name, path and version separated by | and delimited by lines
-				int first = line.find_first_of('|');
-				int last = line.find_last_of('|');
-				if (first == -1 || first == last)
-					continue;//invalid line
-
-				name = line.substr(0, first);
-				path = line.substr(first + 1, last - 1 - first);
-				version = line.substr(last + 1, line.length() - last);
-
-				if (name == project->project_name)
-				{
-					if (path != curpath)
-					{
-						printf("TWO PACKAGES WITH THE SAME NAME EXIST, THIS CAN CAUSE ISSUES!\n");
-					}
-
-					if (version != project->version)
-					{
-						//if the path is right, but the version changed we need to edit the version
-						printf("PACKAGE VERSION MISMATCH NEED TO HANDLE THIS");
-					}
-					found = true;
-					break;
-				}
-			}
-
-			//if we arent in it, backup the old one, then append ourselves to the new one
-			if (found == false)
-			{
-				//perform copy
-				{
-					std::ifstream source(db_filename, std::ios::binary);
-					std::ofstream dest(db_filename + ".backup", std::ios::binary);
-
-					std::istreambuf_iterator<char> begin_source(source);
-					std::istreambuf_iterator<char> end_source;
-					std::ostreambuf_iterator<char> begin_dest(dest);
-					copy(begin_source, end_source, begin_dest);
-
-					source.close();
-					dest.close();
-				}
-
-				//append our name
-				std::ofstream file(db_filename, std::ios_base::app);
-				file << project->project_name << "|" << curpath << '|' << project->version << '\n';
-			}
+			this->UpdateProjectList(project);
 		}
 
 		if (options.run && project->IsExecutable())
@@ -538,4 +454,126 @@ error:
 	//restore working directory
 	chdir(olddir);
 	return 1;
+}
+
+std::string Compiler::FindProject(const std::string& project_name, const std::string& desired_version)
+{
+	//ok, now we need to remove our executable name from this
+	int pos = executable_path.find_last_of('\\');
+	if (pos == -1)
+		pos = executable_path.find_last_of('/');
+	std::string path = executable_path.substr(0, pos);
+	std::string db_filename = path + "/project_database.txt";
+
+	std::ifstream file(db_filename, std::ios_base::binary);
+	bool found = false;
+	std::string line;
+	while (std::getline(file, line))
+	{
+		std::istringstream iss(line);
+		std::string name, path, version;
+
+		//there is three parts, name, path and version separated by | and delimited by lines
+		int first = line.find_first_of('|');
+		int last = line.find_last_of('|');
+		if (first == -1 || first == last)
+			continue;//invalid line
+
+		name = line.substr(0, first);
+		path = line.substr(first + 1, last - 1 - first);
+		version = line.substr(last + 1, line.length() - last);
+
+		//todo if no version is specified, we want the newest version
+		if (name == project_name)
+		{
+			//if (path != curpath)
+			//{
+			//	printf("TWO PACKAGES WITH THE SAME NAME EXIST, THIS CAN CAUSE ISSUES!\n");
+			//}
+
+			/*if (version != desired_version)
+			{
+				//if the path is right, but the version changed we need to edit the version
+				printf("PACKAGE VERSION MISMATCH NEED TO HANDLE THIS\n");
+			}*/
+
+			return path;
+
+			//we found it, lets return the path
+			found = true;
+			break;
+		}
+	}
+}
+
+void Compiler::UpdateProjectList(JetProject* project)
+{
+	//ok, now we need to remove our executable name from this
+	int pos = executable_path.find_last_of('\\');
+	if (pos == -1)
+		pos = executable_path.find_last_of('/');
+	std::string path = executable_path.substr(0, pos);
+	std::string db_filename = path + "/project_database.txt";
+
+	char curpath[500];
+	getcwd(curpath, 500);//todo escape our filename and project name and make parser above able to read it out
+
+	//ok, lets scan through the database to see if we are in it
+	//todo: break this search out into a function
+	std::ifstream file(db_filename, std::ios_base::binary);
+	bool found = false;
+	std::string line;
+	while (std::getline(file, line))
+	{
+		std::istringstream iss(line);
+		std::string name, path, version;
+
+		//there is three parts, name, path and version separated by | and delimited by lines
+		int first = line.find_first_of('|');
+		int last = line.find_last_of('|');
+		if (first == -1 || first == last)
+			continue;//invalid line
+
+		name = line.substr(0, first);
+		path = line.substr(first + 1, last - 1 - first);
+		version = line.substr(last + 1, line.length() - last);
+
+		if (name == project->project_name)
+		{
+			if (path != curpath)
+			{
+				printf("TWO PACKAGES WITH THE SAME NAME EXIST, THIS CAN CAUSE ISSUES!\n");
+			}
+
+			/*if (version != project->version)
+			{
+				//if the path is right, but the version changed we need to edit the version
+				printf("PACKAGE VERSION MISMATCH NEED TO HANDLE THIS\n");
+			}*/
+			found = true;
+			break;
+		}
+	}
+
+	//if we arent in it, backup the old one, then append ourselves to the new one
+	if (found == false)
+	{
+		//perform copy
+		{
+			std::ifstream source(db_filename, std::ios::binary);
+			std::ofstream dest(db_filename + ".backup", std::ios::binary);
+
+			std::istreambuf_iterator<char> begin_source(source);
+			std::istreambuf_iterator<char> end_source;
+			std::ostreambuf_iterator<char> begin_dest(dest);
+			copy(begin_source, end_source, begin_dest);
+
+			source.close();
+			dest.close();
+		}
+
+		//append our name
+		std::ofstream file(db_filename, std::ios_base::app);
+		file << project->project_name << "|" << curpath << '|' << project->version << '\n';
+	}
 }

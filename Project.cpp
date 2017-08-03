@@ -1,6 +1,8 @@
 #include "Project.h"
 #include "Source.h"
 
+#include "Compiler.h"
+
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -263,4 +265,29 @@ std::map<std::string, Source*> JetProject::GetSources()
 		}
 	}
 	return sources;
+}
+
+const std::vector<std::string>& JetProject::ResolveDependencies()
+{
+	if (this->resolved_deps.size())
+		return this->resolved_deps;
+
+	for (auto dep : this->dependencies)
+	{
+		if (dep[0] != '.' && dep.find('/') == -1 && dep.find('\\') == -1)
+		{
+			//ok, search for the p/ackage using our database, we didnt give a path to one
+			std::string path = Compiler::FindProject(dep, "0.0.0");//todo, can optimize this so we dont read the file n times lolol
+			
+			printf("Project \"%s\" resolved to %s\n", dep.c_str(), path.c_str());
+
+			//if we couldnt find it there will just be a blank string that we can handle down later
+			this->resolved_deps.push_back(path);
+		}
+		else
+		{
+			this->resolved_deps.push_back(dep);
+		}
+	}
+	return this->resolved_deps;
 }

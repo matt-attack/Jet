@@ -1,4 +1,5 @@
 lib: jetc
 requires:
+version: 0.1.0
 files: test.jet stdio.jet
 libs: "%VS120COMNTOOLS%\..\..\VC\lib\msvcrtd.lib" "C:\Program Files (x86)\Windows Kits\8.1\Lib\winv6.3\um\x86\kernel32.lib"
