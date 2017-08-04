@@ -456,6 +456,41 @@ error:
 	return 1;
 }
 
+
+std::vector<Compiler::ProjectInfo> Compiler::GetProjectList()
+{
+	//ok, now we need to remove our executable name from this
+	int pos = executable_path.find_last_of('\\');
+	if (pos == -1)
+		pos = executable_path.find_last_of('/');
+	std::string path = executable_path.substr(0, pos);
+	std::string db_filename = path + "/project_database.txt";
+
+	std::ifstream file(db_filename, std::ios_base::binary);
+	bool found = false;
+	std::string line;
+
+	std::vector<Compiler::ProjectInfo> vec;
+	while (std::getline(file, line))
+	{
+		std::istringstream iss(line);
+		std::string name, path, version;
+
+		//there is three parts, name, path and version separated by | and delimited by lines
+		int first = line.find_first_of('|');
+		int last = line.find_last_of('|');
+		if (first == -1 || first == last)
+			continue;//invalid line
+
+		name = line.substr(0, first);
+		path = line.substr(first + 1, last - 1 - first);
+		version = line.substr(last + 1, line.length() - last);
+		
+		vec.push_back({ name, path, version });
+	}
+	return vec;
+}
+
 std::string Compiler::FindProject(const std::string& project_name, const std::string& desired_version)
 {
 	//ok, now we need to remove our executable name from this

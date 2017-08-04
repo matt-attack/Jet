@@ -45,6 +45,15 @@ namespace Jet
 
 		static std::string FindProject(const std::string& name, const std::string& desired_version);
 
+
+		struct ProjectInfo
+		{
+			std::string name;
+			std::string path;
+			std::string version;
+		};
+		static std::vector<ProjectInfo> GetProjectList();
+
 		//returns if was successful, errored, or if there was a rebuild
 		//0 = error, 1 = success, 2 = recompiled, but successful
 		int Compile(const char* projectfile, CompilerOptions* options = 0, const std::string& config = "", OptionParser* parser = 0);

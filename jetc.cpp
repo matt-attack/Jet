@@ -514,7 +514,21 @@ void DoCommand(int argc, char* argv[])
 	parser.Parse(argc, argv);
 
 	std::string cmd = argc > 1 ? argv[1] : "";
-	if (cmd == "runtests")
+	if (cmd == "projects")
+	{
+		//print out all the projects and versions
+		auto projects = Compiler::GetProjectList();
+
+		for (auto proj : projects)
+		{
+			if (proj.version.find('\r') != -1)
+				proj.version.pop_back();
+			printf("'%s' version '%s' at %s\n", proj.name.c_str(), proj.version.c_str(), proj.path.c_str());
+			//std::cout << proj.name << " " << proj.version << " " << proj.path << "\n";
+		}
+		return;
+	}
+	else if (cmd == "runtests")
 	{
 		//finish tests
 		parser.GetOption("f").SetValue("1");

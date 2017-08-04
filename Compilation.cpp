@@ -1249,7 +1249,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 		else if (name[name.length() - 1] == ']')
 		{
 			//its an array
-			int p = name.find_first_of('[');
+			int p = name.find_last_of('[');
 
 			auto len = name.substr(p + 1, name.length() - p - 2);
 
@@ -1257,19 +1257,15 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			auto t = this->LookupType(tname, load);
 
 			if (len.length())
+			{
 				type = this->GetInternalArrayType(t, std::atoi(len.c_str()));
+				curns->members.insert({ name, type });
+			}
 			else
+			{
 				type = this->GetArrayType(t);
-
-			/*type = new Type;
-			type->name = name;
-			type->base = t;
-			type->type = Types::Array;
-			if (len.length())
-			type->size = std::stoi(len);//cheat for now
-			else
-			type->size = 0;*/
-			curns->members.insert({ name, type });
+				curns->members.insert({ type->name, type });
+			}
 		}
 		else if (name[name.length() - 1] == '>')
 		{
