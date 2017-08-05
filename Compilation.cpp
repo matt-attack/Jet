@@ -1244,7 +1244,11 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 				type->Load(this);
 			else
 				type->ns = type->base->ns;
-			type->base->ns->members.insert({ name, type });
+			//go down the tree and make sure the base type is valid, this is a pretty dumb hack to solve a template problem
+			//but should be durable and can be fixed later
+			//todo try and remove this hack
+			if (type->base->IsValid())
+				type->base->ns->members.insert({ name, type });
 		}
 		else if (name[name.length() - 1] == ']')
 		{

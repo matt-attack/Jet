@@ -586,7 +586,7 @@ void DoCommand(int argc, char* argv[])
 
 			if (b.GetErrors().size() > 0)
 			{
-				printf("Test '%s' failed\n", ii);
+				printf("Test '%s' failed to build\n", ii);
 			}
 			else
 			{
@@ -599,7 +599,7 @@ void DoCommand(int argc, char* argv[])
 				printf("%s\n", res.c_str());
 
 				if (res.find("fail") != -1)
-					printf("Test '%s' failed\n", ii);
+					printf("Test '%s' failed in execution\n", ii);
 				//need to figure out why nothing is being printed
 			}
 

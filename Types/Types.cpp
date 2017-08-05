@@ -537,6 +537,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	compiler->ns = str;
 
 	//register the types
+	bool has_trait_template_arg = false;
 	int i = 0;
 	for (auto& ii : this->data->templates)
 	{
@@ -548,6 +549,10 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 			ii.first->trait = compiler->LookupType(ii.first->name)->trait;
 			compiler->ns = oldns;
 		}
+
+		if (types[i]->type == Types::Trait)
+			has_trait_template_arg = true;
+
 		//check if traits match
 		if (types[i]->MatchesTrait(compiler, ii.first->trait) == false)
 			compiler->Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
@@ -567,24 +572,20 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	str->name += ">";
 	str->expression = this->data->expression;
 
-	//build members
-	for (auto ii : this->data->expression->members)
-	{
-		if (ii.type == StructMember::VariableMember)
-		{
-			auto type = compiler->LookupType(ii.variable.type.text, false);
 
-			str->struct_members.push_back({ ii.variable.name.text, ii.variable.type.text, type });
-		}
-	}
 
 	Type* t = new Type(str->name, Types::Struct, str);
 	t->ns = this->ns;
 
 	//make sure the real thing is stored as this
 	auto realname = t->ToString();
-
+	//oh, this is wrong
 	//uh oh, this duplicates
+	if (has_trait_template_arg)
+	{
+		t->name += '^';
+		realname += '^';
+	}
 	auto res = t->ns->members.find(realname);
 	if (res != t->ns->members.end() && res->second.type == SymbolType::Type && res->second.ty->type != Types::Invalid)
 	{
@@ -596,8 +597,21 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 
 		return t;// goto exit;
 	}
-	else
+	//else if (has_trait_template_arg == true)
+	//	t->ns->members.insert({ realname, t });
+	else //if (has_trait_template_arg == false)
 		t->ns->members.insert({ realname, t });
+
+	//build members
+	for (auto ii : this->data->expression->members)
+	{
+		if (ii.type == StructMember::VariableMember)
+		{
+			auto type = compiler->LookupType(ii.variable.type.text, false);
+
+			str->struct_members.push_back({ ii.variable.name.text, ii.variable.type.text, type });
+		}
+	}
 
 	//compile its functions
 	if (t->data->expression->members.size() > 0 && (compiler->typecheck == false || t->IsValid()))// t->data->template_args[0]->type != Types::Trait)
@@ -663,6 +677,12 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		expr->name = oldname;
 	}
 
+	//remove myself from my ns if im a trait
+	if (has_trait_template_arg)
+	{
+		//t->ns->members.erase(t->ns->members.find(realname));
+	}
+
 	//restore namespace
 	compiler->ns = oldns;
 
@@ -717,6 +737,14 @@ bool Type::IsValid()
 		}
 		if (this->function->return_type->IsValid() == false)
 			return false;
+	}
+	else if (this->type == Types::Pointer)
+	{
+		Type* base = this->base;
+		while (base->type == Types::Pointer)
+			base = base->base;
+
+		return base->IsValid();
 	}
 	return true;
 }
@@ -998,6 +1026,7 @@ void Struct::Load(Compilation* compiler)
 	//recursively load
 	llvm::StructType* struct_type = 0;
 	std::vector<llvm::Type*> elementss;
+	int i = 0;
 	for (auto ii : this->struct_members)
 	{
 		auto type = ii.type;
@@ -1012,7 +1041,14 @@ void Struct::Load(Compilation* compiler)
 				elementss.push_back(struct_type->getPointerTo());
 			}
 			else
-				compiler->Error("Circular dependency", *compiler->current_function->current_token);
+			{
+				if (this->expression)
+				{
+					compiler->Error("Circular dependency in class \"" + this->name +  "\"", this->expression->members[i].variable.type);
+				}
+				else
+					compiler->Error("Circular dependency in class \"" + this->name + "\"", *compiler->current_function->current_token);
+			}
 		}
 		else
 		{
@@ -1020,6 +1056,7 @@ void Struct::Load(Compilation* compiler)
 
 			elementss.push_back(type->GetLLVMType());
 		}
+		i++;
 	}
 	if (elementss.size() == 0)
 	{
