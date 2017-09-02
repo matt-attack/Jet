@@ -5,6 +5,8 @@ extern fun void free(char* x);
 
 extern fun int puts(char* str);
 
+extern fun char getchar();
+
 let int x;
 let double y;
 let float z;
@@ -27,10 +29,21 @@ fun int main()
 	let int qasd[200];
 	qasd[2] = 6;
 	
-	p[2] = 6;
+	p[2] = 8;
 	
 	if (x != 6)
 		puts("fail");
+	else
+		puts("pass1");
+	if (p[2] != 8)
+		puts("fail");
+	else
+		puts("pass2");
+		
+	if (globalt.p != 7)
+		puts("fail");
+	else
+		puts("pass3");
 		
 	return 0;
 }

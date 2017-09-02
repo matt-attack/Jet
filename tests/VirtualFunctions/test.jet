@@ -1,0 +1,53 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+extern fun char getchar();
+
+struct A
+{
+	int a_val;
+	
+	fun void hi()
+	{
+		puts("I'm A\n");
+	}
+}
+
+struct B: A
+{
+	fun void hi()
+	{
+		puts("I'm B\n");
+	}
+}
+
+struct C: B
+{
+	fun void hi()
+	{
+		puts("I'm C\n");
+	}
+}
+
+fun int main() 
+{
+	let B b;
+	let A a;
+	let C c;
+	
+	a.hi();
+	b.hi();
+	c.hi();
+	
+	let A* bp = &b;
+	bp->hi();
+	
+	let B* cp = &c;
+	cp->hi();
+
+	getchar();
+	return 0;
+}

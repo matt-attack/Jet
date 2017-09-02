@@ -13,9 +13,9 @@ struct string
 	{
 		//v = 8;
 #if RELEASE
-		//puts("other constructed string");
+		//puts("constructed string");
 #endif
-		this->data = new char[4];//<char*>malloc(sizeof(char)*4);
+		this->data = <char*>malloc(sizeof(char)*4);
 		this->max_size = 4;
 		this->cur_size = 1;
 		this->data[0] = 0;
@@ -33,7 +33,7 @@ struct string
 	fun void ~string()
 	{
 		//puts("freeing string");
-		free this->data;
+		free(this->data);
 		//puts("Freed string");
 		//free(<char*>this->data);
 	}
@@ -96,7 +96,7 @@ struct string
 		//puts("freed");
 		this->max_size = other->length() + 1;
 		this->cur_size = this->max_size;
-		this->data = data;
+		this->data = data.ptr;
 		//puts("assign complete");
 	}
 	//fun void operator+(
@@ -119,7 +119,7 @@ struct string
 		
 		free this->data;
 		//free(<char*>this->data);
-		this->data = neww;
+		this->data = neww.ptr;
 		this->max_size = size;
 		//puts("done rezizing");
 	}

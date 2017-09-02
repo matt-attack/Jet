@@ -1,0 +1,133 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+extern fun char getchar();
+
+fun void IEnumerable::Print()
+{
+	let enumer = this->GetEnumerator();
+	while (enumer.MoveNext())// == 1)
+	{
+		puts("Got one!");
+	}
+}
+
+fun void IEnumerator::Test()
+{
+	while (this->MoveNext())// == 1)
+	{
+		puts("testing");
+	}
+}
+
+generator int test(char qp)
+{
+	let short y = 7;
+	for (let q = 10; q < 15; q++)
+	{
+		yield q;
+	}
+		
+	//puts("one");
+	yield y;
+	//puts("two");
+	yield qp;
+	//puts("three");
+	yield 3;
+}
+
+generator int power(int number, int exponent)
+{
+	let result = 1;
+	for (let i = 0; i < exponent; i++)
+	{
+		result = result * number;
+		yield result;
+	}
+}
+
+/*struct WhereIterable<Any T, IEnumerable Base>
+{
+	Base* iterable;
+	function<bool(T)> fn;
+		
+	fun WhereIterator<T, VectorIterator<T>> GetEnumerator()
+	{
+		let WhereIterator<T, VectorIterator<T>> x;
+		x.iter = this->iterable->GetEnumerator();
+		x.fn = this->fn;
+		return x;
+	}
+}
+
+struct WhereIterator<Any T, IEnumerator Base>
+{
+	Base iter;
+	function<bool(T)> fn;
+		
+	fun T Current()
+	{
+		return this->iter.Current();
+	}
+		
+	fun void Reset()
+	{
+		this->iter.Reset();
+	}
+		
+	fun int MoveNext()
+	{
+		while (this->iter.MoveNext())
+		{
+			let fn = this->fn;
+			if (fn(this->iter.Current()))
+				return 1;
+		}
+		return 0;
+	}
+}
+
+fun WhereIterable<T, IEnumerable> IEnumerable::Where(function<bool(T)> fn)
+{
+	let WhereIterable<T, IEnumerable> x;
+	x.iterable = this;
+	x.fn = fn;
+	return x;
+}*/
+
+fun int main() 
+{ 
+	let x = power(2, 20);
+	let p = 0;
+	while (x.MoveNext())
+	{
+		p = x.Current();
+		//printf("%i\n", x.Current());
+	}
+	if (p != 1048576)
+		puts("fail");
+	else
+		puts("pass");
+	x.Reset();
+	//x.Test();
+	
+	let int q = 5;
+	let fn = [](int x) -> bool { if (q == 5) puts("lambda"); return x > 5; };
+	fn(5);
+	//let where = x.Where(fn);
+	let t = test(5);
+	while (t.MoveNext())
+	{
+		p = t.Current();
+		//printf("%i\n", t.Current());
+	}
+	if (p != 3)
+		puts("fail");
+		
+	getchar();
+	
+	return 0;
+}

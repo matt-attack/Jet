@@ -776,7 +776,8 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 				{
 					auto function_ptr = this->root->builder.CreateGEP(var.val, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) }, "fptr");
 
-					auto type = var.type->base->data->members.find("T")->second.ty;
+					//get the template param to examine the type
+					auto type = var.type->base->data->members.begin()->second.ty;// .find("T")->second.ty;
 
 					if (args.size() != type->function->args.size())
 						this->root->Error("Too many args in function call got " + std::to_string(args.size()) + " expected " + std::to_string(type->function->args.size()), *this->current_token);
@@ -1314,6 +1315,7 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 
 		auto storage_t = llvm::StructType::get(this->root->context, elements);
 
+		int size = 0;
 		for (int i = 0; i < this->captures.size(); i++)
 		{
 			auto var = this->captures[i];
@@ -1325,7 +1327,12 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 
 			//then store it
 			auto val = parent->Load(var);
+			size += val.type->GetSize();
 			root->builder.CreateStore(val.val, ptr);
+		}
+		if (size > 64)
+		{
+			this->root->Error("Capture size too big! Captured " + std::to_string(size) + " bytes but max was 64!", *this->current_token);
 		}
 	}
 	this->captures.clear();

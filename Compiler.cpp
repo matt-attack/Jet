@@ -494,6 +494,7 @@ std::vector<Compiler::ProjectInfo> Compiler::GetProjectList()
 std::string Compiler::FindProject(const std::string& project_name, const std::string& desired_version)
 {
 	//ok, now we need to remove our executable name from this
+	printf("Executable Path: %s\n", executable_path.c_str());
 	int pos = executable_path.find_last_of('\\');
 	if (pos == -1)
 		pos = executable_path.find_last_of('/');
@@ -539,6 +540,7 @@ std::string Compiler::FindProject(const std::string& project_name, const std::st
 			break;
 		}
 	}
+	return "";
 }
 
 void Compiler::UpdateProjectList(JetProject* project)

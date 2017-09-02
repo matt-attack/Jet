@@ -1,0 +1,153 @@
+
+
+/*struct MapIterator<Any TTT>
+{
+	int position;
+	int size;
+	TTT* data;
+	
+	fun TTT Current()
+	{
+		return this->data[this->position];
+	}
+	
+	fun void Reset()
+	{
+		this->position = 0;
+	}
+	
+	fun int MoveNext()
+	{
+		this->position++;
+		let res = 0;
+		if (this->position >= this->size)
+			res = 0;
+		else
+			res = 1;
+		return res;
+	}
+}*/
+
+struct Str
+{
+	Str* ptr;
+}
+
+fun void p()
+{
+	let Str pp;
+}
+
+struct ObjNode<Any Key, Any Value>
+{
+	Key first;
+	Value second;
+
+	ObjNode<Key, Value>* next;
+}
+
+struct Testt<Any T>
+{
+	T p;
+}
+
+struct map<Any Key, Any Value>
+{
+	ObjNode<Key,Value>* nodes;
+	
+	uint size;
+	uint node_count;
+	
+	fun void map()
+	{
+		puts("constructor a");
+		this->nodes = <ObjNode<Key,Value>*>malloc(sizeof(ObjNode<Key,Value>)*20);
+		this->size = 0;
+		this->node_count = 20;
+		
+		for (let uint i = 0; i < this->node_count; i++)
+			this->nodes[i].next = <ObjNode<Key,Value>*>5;
+	}
+	
+	fun void ~map()
+	{
+		puts("destructor");
+		free(<char*>this->nodes);
+	}
+	
+	fun ObjNode<Key,Value>* get_free_pos()
+	{
+		for (let uint i = 0; i < this->node_count; i++)
+		{
+			if (this->nodes[i].next == <ObjNode<Key,Value>*>5)
+				return &this->nodes[i];
+		}
+		return 0;
+	}
+	
+	fun ObjNode<Key,Value>* find(Key k)
+	{
+		let node = &this->nodes[k%this->node_count];
+		if (node->next != <ObjNode<Key,Value>*>5)
+		{
+			while (node)
+			{
+				if (node->first == k)
+				{
+					return node;
+				}
+				else
+				{
+					node = node->next;
+				}
+			}
+		}
+		return 0;
+	}
+	
+	fun void upsize()
+	{
+		let onodes = this->nodes;
+		this->nodes = <ObjNode<Key,Value>*>malloc(sizeof(ObjNode<Key,Value>)*this->node_count*2);
+		this->node_count *= 2;
+		let osize = this->size;
+		this->size = 0;
+		for (let uint i = 0; i < osize; i++)
+		{
+		
+		}
+		free(<char*>this->nodes);
+	}
+	
+	fun void insert(Key k, Value v)
+	{
+		let node = &this->nodes[k%this->node_count];
+		if (node->next == <ObjNode<Key,Value>*>5)
+		{
+			node->first = k;
+			node->second = v;
+			node->next = 0;
+			return;
+		}
+		
+		//ok, our first spot is taken, need to do something about it!
+	}
+	
+	//fun VectorIterator<TT> GetEnumerator()
+	//{
+	//	let VectorIterator<TT> iter;
+	///	iter.position = 0;//important to make sure it is always a valid number
+	//	iter.size = this->cur_size;
+	//	iter.data = this->data;
+	//	return iter;
+	//}
+}
+
+fun void map_test()
+{
+	let map<int,int> m;
+	let map<char,double> p;
+	m.insert(5,2);
+	
+	let node = m.find(5);
+}

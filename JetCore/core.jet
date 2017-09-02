@@ -12,6 +12,15 @@ struct Pointy
 	} 
 }
 
+// This is used as backing structure for lamdbas
+// do not change the order of these members, it is currently hardcoded
+// inside jet
+struct function<Any T>
+{
+	T fn;
+	char data[64];// 64 bytes max capture size
+}
+
 trait Any
 {
 

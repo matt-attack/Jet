@@ -1,0 +1,85 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun void free(char* x);
+
+extern fun int puts(char* str);
+
+extern fun char getchar();
+
+/* array internal format looks like so:
+struct<Any T> Array
+{
+	int size;
+	T* values;
+}
+
+internally implemented as passing this struct arround
+(pointer points just to the values this allows it to be easily casted)
+
+*/
+trait Any
+{
+}
+
+struct __Array<Any T>
+{
+	int size;
+	T* values;
+}
+
+fun void test(int[] array)
+{
+	for (let i = 0; i < array.size; i++)
+		puts("one\n");
+		//array[i] = 5;
+}
+
+//ok virtual texturing
+//indirection texture that is per 32x32 section of verts that gives x and y offset into indirection texture as well as a scale
+//this is used to get texture from virtual page table which is 4k by 2k
+//can later compress this to make it faster
+
+fun int main() 
+{
+	let int[5] y;	
+	for (let i = 0; i < y.size; i++)
+	{
+		//puts("one\n");
+		y[i] = 5;
+	}
+	
+	
+	test(y);
+	
+	let x = new int[25];
+	for (let i = 0; i < x.size; i++)
+	{
+		x[i] = 5;
+		puts("two\n");
+	}
+	
+	test(x);
+	//x.ptr = <int*>0;
+	
+	//free x;
+	//free y;
+	
+	x[5] = 0;
+	x[24] = 5;
+	y[4] = 5;
+	
+	for (let i = 0; i < x.size; i++)
+	{
+		x[i] = 5;
+		puts("two\n");
+	}
+	free x;
+	
+	//free y;
+	
+	//getchar();
+	
+	return 0;
+}

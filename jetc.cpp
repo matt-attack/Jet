@@ -684,6 +684,21 @@ void DoCommand(int argc, char* argv[])
 		c.Compile(argv[1], &options, config, &parser);
 }
 
+#if (BOOST_OS_CYGWIN || _WINDOWS)
+
+#include <Windows.h>
+
+std::string exec_path(const char *argv0)
+{
+	char buf[1024] = { 0 };
+	DWORD ret = GetModuleFileNameA(NULL, buf, sizeof(buf));
+	if (ret == 0 || ret == sizeof(buf))
+	{
+		//return executable_path_fallback(argv0);
+	}
+	return buf;
+}
+#endif
 
 std::string executable_path;
 int main(int argc, char* argv[])
@@ -692,7 +707,7 @@ int main(int argc, char* argv[])
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
-	executable_path = argv[0];
+	executable_path = exec_path(argv[0]);
 
 	//look for config file, and create default if not there
 

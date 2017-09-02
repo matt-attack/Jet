@@ -1,0 +1,41 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+struct A
+{
+	int a_val;
+}
+
+struct B
+{
+	int b_val;
+}
+
+union C = A | B;
+
+fun int main() 
+{
+	let C p;
+	let B q;
+	p = q;
+	match (p)
+	{
+		A a =>{
+			a.a_val++;
+			puts("fail");
+		}
+		B b =>{
+			b.b_val++;
+			puts("pass");
+		}
+		default =>
+		{
+			printf("default", 0);
+		}
+	}
+	
+	return 0;
+}

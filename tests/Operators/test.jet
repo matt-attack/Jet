@@ -1,0 +1,64 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+
+fun int main() 
+{ 
+	let t = 1;
+	
+	for (let x = 5; x < 25; x++)
+	{
+		t = x;
+	}
+	
+	if (t != 24)
+		puts("fail");
+	else
+		puts("pass");
+	
+	for (let p = 0; p < 20; p++)
+		t = p;
+		
+	if (t != 19)
+		puts("fail");
+	else
+		puts("pass");
+		
+	for (let p = 0; p < 20;)
+		t = p++;
+		
+	if (t != 19)
+		puts("fail");
+	else
+		puts("pass");
+	
+	let p = 0;
+	for (;p < 25;)
+	{
+		t = p++;
+		continue;
+	}
+		
+	if (t != 24)
+		puts("fail");
+	else
+		puts("pass");
+		
+	//local p = 0;
+	p = 0;
+	for (;;)
+		if (p++ > 5)
+			break;
+		
+	if (p != 7)
+		puts("fail");
+	else
+		puts("pass");
+	
+	return 0;
+}/*comment*/
+
+
+  
