@@ -100,6 +100,7 @@ public:
 		keywords["elseif"] = TokenType::ElseIf;
 		keywords["else"] = TokenType::Else;
 		keywords["fun"] = TokenType::Function;
+		keywords["virtual"] = TokenType::Virtual;
 		keywords["return"] = TokenType::Ret;
 		keywords["for"] = TokenType::For;
 

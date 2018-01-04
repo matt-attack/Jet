@@ -275,7 +275,8 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		std::vector<Type*> args;
 		for (auto ii : argsv)
 			args.push_back(ii.first);
-
+		
+		//fix the function<> type
 		lambda_type = context->root->LookupType("function<" + context->root->GetFunctionType(ret, args)->ToString() + ">");
 		lambda = context->root->builder.CreateAlloca(lambda_type->GetLLVMType());
 
@@ -288,6 +289,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	if (this->is_generator)
 	{
 		function = argsv.front().first->base->data->functions.find("MoveNext")->second->context;
+		function->function->Load(context->root);
 		llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", function->function->f);
 		context->root->builder.SetInsertPoint(bb);
 
@@ -314,6 +316,8 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		{
 			auto aname = argsv[Idx].second;
 
+			//function->function->f->dump();
+			//function->function->f->getEntryBlock().dump();
 			llvm::IRBuilder<> TmpB(&function->function->f->getEntryBlock(), function->function->f->getEntryBlock().begin());
 			//need to alloca pointer to struct if this is a struct type
 			llvm::AllocaInst* Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
@@ -450,12 +454,10 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		//now compile reset function
 		{
 			auto reset = argsv.front().first->base->data->functions.find("Reset")->second->context;
-
+			context->root->current_function = reset;
+			reset->function->Load(reset->root);
 			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", reset->function->f);
 			context->root->builder.SetInsertPoint(bb);
-
-			context->root->current_function = reset;
-			reset->function->Load(context->root);
 
 			auto self = reset->function->f->arg_begin();
 			//set the branch location back to start
@@ -468,14 +470,13 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		//compile current function
 		{
 			auto current = argsv.front().first->base->data->functions.find("Current")->second->context;
-
+			context->root->current_function = current;
+			current->function->Load(current->root);
 			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", current->function->f);
 			context->root->builder.SetInsertPoint(bb);
 
 			//add a return and shizzle
-			context->root->current_function = current;
-			current->function->Load(context->root);
-
+			
 			//return the current value
 			auto self = current->function->f->arg_begin();
 			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
@@ -518,6 +519,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	bool advlookup = true;
 	Function* fun = new Function(this->GetRealName(), false);
 	fun->expression = this;
+	fun->is_virtual = (this->token.type == TokenType::Virtual);
 	context->root->functions.push_back(fun);
 	auto str = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
 
@@ -1294,8 +1296,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 					context->root->ns = str->data;
 					CValue vtable = ii.second->context->GetVariable("__" + this->name.text + "_vtable");
 					context->root->ns = oldns;
-					//vtable.val->dump();
-					//vtable.val->getType()->dump();
+
 					//cast the global to a char**
 					vtable.val = context->root->builder.CreatePointerCast(vtable.val, context->root->LookupType("char**")->GetLLVMType());
 

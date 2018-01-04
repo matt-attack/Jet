@@ -47,7 +47,7 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	this->Register(TokenType::BAnd, new PrefixOperatorParselet(Precedence::PREFIX));
 	this->Register(TokenType::Asterisk, new PrefixOperatorParselet(Precedence::PREFIX));
 	this->Register(TokenType::Not, new PrefixOperatorParselet(Precedence::PREFIX));
-	
+
 	//casting!
 	this->Register(TokenType::LessThan, new CastParselet());
 
@@ -91,6 +91,7 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	this->Register(TokenType::While, new WhileParselet());
 	this->Register(TokenType::If, new IfParselet());
 	this->Register(TokenType::Function, new FunctionParselet());
+	this->Register(TokenType::Virtual, new FunctionParselet());
 	this->Register(TokenType::Generator, new FunctionParselet());
 	this->Register(TokenType::Ret, new ReturnParselet());
 	this->Register(TokenType::For, new ForParselet());
@@ -140,7 +141,7 @@ Parser::~Parser()
 
 	for (auto ii : this->mStatementParselets)
 		delete ii.second;
-};
+}
 
 Expression* Parser::ParseExpression(int precedence)
 {
@@ -242,8 +243,8 @@ Token Parser::Consume(TokenType expected)
 	if (temp.type != expected)
 	{
 		std::string str = "Token Not As Expected! Expected: " + TokenToString[expected] + " Got: " + temp.text;
-		
-			//it was probably forgotten, insert dummy
+
+		//it was probably forgotten, insert dummy
 		//fabricate a fake token
 		this->Error(str, temp);//need to make this throw again
 
@@ -265,7 +266,7 @@ Token Parser::ConsumeTemplateGT()
 	if (temp.type != TokenType::GreaterThan && temp.type != TokenType::RightShift)
 	{
 		std::string str = "Token Not As Expected! Expected: " + TokenToString[TokenType::GreaterThan] + " Got: " + temp.text;
-		
+
 		//fabricate a fake token
 		this->Error(str, temp);
 		//lets give up on this, it doesnt work well
@@ -278,9 +279,9 @@ Token Parser::ConsumeTemplateGT()
 	{
 		//split the token
 		mRead.pop_front();
-		mRead.push_front(Token(temp.text_ptr+1, 0, temp.line, temp.column, TokenType::GreaterThan, ">"));
+		mRead.push_front(Token(temp.text_ptr + 1, 0, temp.line, temp.column, TokenType::GreaterThan, ">"));
 
-		return Token(temp.text_ptr, temp.trivia_length, temp.line, temp.column+1, TokenType::GreaterThan, ">");
+		return Token(temp.text_ptr, temp.trivia_length, temp.line, temp.column + 1, TokenType::GreaterThan, ">");
 	}
 	mRead.pop_front();
 	return temp;

@@ -157,7 +157,8 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 	bool use_virtual = true;
 
 	//virtual function calls for generators fail, need to devirtualize them
-	if (fun->is_generator)//todo expand this to current and reset
+	// this shouldnt matter, all generators shouldnt be virtual
+	if (fun->is_generator)
 		devirtualize = true;
 
 	//convert to an array of args
@@ -1067,7 +1068,6 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 			{
 				return CValue(t, root->builder.CreatePtrToInt(value.val, t->GetLLVMType(), "ptr2int"));
 			}
-			//todo: pointer to int
 		}
 	}
 	if (value.type->type == Types::Array)

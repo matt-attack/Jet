@@ -1009,11 +1009,13 @@ void Struct::Load(Compilation* compiler)
 			if (ii.first == this->name || ii.second == 0)
 				continue;
 
-			ii.second->virtual_offset = vtable_size++;
+			if (ii.second->is_virtual)
+				ii.second->virtual_offset = vtable_size++;
 		}
 	}
 
-	needs_vtable = true;//lets do it always just because (need to only do it when im inherited from)
+	if (vtable_size > 0)
+		needs_vtable = true;//lets do it always just because (need to only do it when im inherited from)
 	//only do it if I have a function
 	//ok, need way to only set it if I have custom destructor or other functions
 	if (this->functions.size() <= 2) //a BAD hack
@@ -1096,7 +1098,7 @@ void Struct::Load(Compilation* compiler)
 			if (ii.second == 0 || ii.second->virtual_offset == -1)
 				continue;
 
-			ii.second->is_virtual = true;
+			//ii.second->is_virtual = true;
 			ii.second->virtual_table_location = vtable_loc;
 
 			ii.second->Load(compiler);

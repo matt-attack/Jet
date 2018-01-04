@@ -70,6 +70,7 @@ namespace Jet
 		Null,
 
 		Function,
+		Virtual,
 		For,
 		Let,
 		Break,

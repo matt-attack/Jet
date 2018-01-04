@@ -566,7 +566,7 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		}
 
 		//first read type
-		if (parser->Match(TokenType::Function))
+		if (parser->LookAhead().type == TokenType::Function || parser->LookAhead().type == TokenType::Virtual)
 		{
 			//parse the function
 			auto* expr = parser->ParseStatement(true);
@@ -725,8 +725,9 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 		name.trivia_length = t.trivia_length;
 	}
 	else
+	{
 		name = parser->Consume(TokenType::Name);
-	//bool destructor = parser->MatchAndConsume(TokenType::BNot);//todo: fix this parser hack
+	}
 
 	auto arguments = new std::vector < FunctionArg > ;
 
