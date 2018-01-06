@@ -83,7 +83,6 @@ CValue IndexExpression::Compile(CompilerContext* context)
 	return CValue(loc.type->base, context->root->builder.CreateLoad(loc.val), loc.val);
 }
 
-//todo: add int[] with a .size to allow people to get the size of arrays
 //ok, idea
 //each expression will store type data in it loaded during typecheck
 //compiling will only emit instructions, it should do little actual work
@@ -730,7 +729,9 @@ CValue FreeExpression::Compile(CompilerContext* context)
 		}
 	}
 
-	context->Call("free", { CValue(context->root->LookupType("char*"), rootptr) });
+	context->Call("free", { CValue(context->root->CharPointerType/*LookupType("char*")*/, rootptr) });
+
+	//todo: can mark the size and pointer as zero now
 
 	return CValue();
 }

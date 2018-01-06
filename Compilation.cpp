@@ -103,6 +103,7 @@ Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), 
 		if (ii.second.type == SymbolType::Type)
 			ii.second.ty->ns = ns;
 	}
+	this->CharPointerType = ns->members.find("char")->second.ty->GetPointerType();
 }
 
 Compilation::~Compilation()
@@ -1363,9 +1364,9 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 	return type;
 }
 
-CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, llvm::Constant* init, bool intern)//, bool Extern = false)
+CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, llvm::Constant* init, bool intern)
 {
-	auto global = this->ns->members.find(name);// this->globals.find(name);
+	auto global = this->ns->members.find(name);
 	if (global != this->ns->members.end())
 		Error("Global variable '" + name + "' already exists in " + this->ns->name, *this->current_function->current_token);
 
@@ -1375,22 +1376,21 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 		arr.push_back(t->GetDefaultValue(this));
 		init = llvm::ConstantArray::get(llvm::ArrayType::get(t->GetLLVMType(), size), arr);// llvm::dyn_cast<llvm::ArrayType>(this->GetLLVMType()), arr);
 	}
-	//Error("Global variable '" + name + "' is an array without initialize, this hasnt been implemented yet", *this->current_function->current_token);//lets just die if we dont have initializer, can fix later
+	
 	llvm::Constant* initializer = init;// ? init : t->GetDefaultValue(this);
 	auto ng = new llvm::GlobalVariable(*module, llvm::ArrayType::get(t->GetLLVMType(), size)/*t->GetLLVMType()*/, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
 	this->debug->createGlobalVariable(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false, 0);
 	this->ns->members.insert({ name, Symbol(new CValue(this->GetInternalArrayType(t, size)->GetPointerType(), ng)) });
-	//ng->dump();
-	//ng->getType()->dump();
+
 	//ok for arrays we need to create two globals. one that holds a pointer to the other global
 	//if it has a constructor, make sure to call it
 	//this->globals[name] = 
 	return CValue(this->GetInternalArrayType(t, size)->GetPointerType(), ng);
 }
 
-CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Constant* init, bool intern)//, bool Extern = false)
+CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Constant* init, bool intern)
 {
-	auto global = this->ns->members.find(name);// this->globals.find(name);
+	auto global = this->ns->members.find(name);
 	if (global != this->ns->members.end())
 		Error("Global variable '" + name + "' already exists in " + this->ns->name, *this->current_function->current_token);
 
@@ -1656,7 +1656,7 @@ void DiagnosticBuilder::Error(const std::string& text, const std::string& file, 
 	error.token = Token();
 	error.message = text;
 
-	error.line = line;// current_source->GetLine(token.line);
+	error.line = line;
 	error.file = file;
 
 	error.severity = 0;

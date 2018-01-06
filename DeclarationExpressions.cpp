@@ -165,25 +165,24 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	bool is_lambda = name.text.length() == 0;
 	if (this->captures)
 		is_lambda = false;
-	//this->
+
 	//if we have specifier we are not lambda, just inline function
 
 	//build list of types of vars
 	std::vector<std::pair<Type*, std::string>> argsv;
-	auto Struct = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
+	auto struct_name = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
 
-	//insert this argument if I am a member function
-	if (Struct.length() > 0)
+	//insert the 'this' argument if I am a member function
+	if (struct_name.length() > 0)
 	{
-		auto type = context->root->LookupType(Struct + "*");
+		auto type = context->root->LookupType(struct_name + "*");
 
 		argsv.push_back({ type, "this" });
 	}
 
-	llvm::BasicBlock* yieldbb;//location of starting point in generator function
+	//add the context pointer as an argument if this is a generator
 	if (this->is_generator)
 	{
-		//add the context pointer as an argument if this is a generator
 		auto func = context->root->ns->GetFunction(this->GetRealName());
 
 		auto str = func->return_type;
@@ -261,12 +260,13 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	context->CurrentToken(&this->ret_type);
 	Type* ret;
 	if (this->is_generator)
-		ret = context->root->LookupType("bool");
+		ret = context->root->BoolType;
 	else
 		ret = context->root->LookupType(this->ret_type.text);
 
-	llvm::Value* lambda = 0;
 
+	// Build lambda data if we are one
+	llvm::Value* lambda = 0;
 	Type* lambda_type = 0;
 	llvm::StructType* storage_t = 0;
 	if (is_lambda)
@@ -275,126 +275,124 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		std::vector<Type*> args;
 		for (auto ii : argsv)
 			args.push_back(ii.first);
-		
+
 		//fix the function<> type
 		lambda_type = context->root->LookupType("function<" + context->root->GetFunctionType(ret, args)->ToString() + ">");
 		lambda = context->root->builder.CreateAlloca(lambda_type->GetLLVMType());
 
 		storage_t = llvm::StructType::get(context->root->context, {});
 
-		argsv.push_back({ context->root->LookupType("char*"), "_capture_data" });
+		argsv.push_back({ context->root->CharPointerType/*LookupType("char*")*/, "_capture_data" });
 	}
 
-	CompilerContext* function;
+	CompilerContext* function_context;
 	if (this->is_generator)
 	{
-		function = argsv.front().first->base->data->functions.find("MoveNext")->second->context;
-		function->function->Load(context->root);
-		llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", function->function->f);
+		function_context = argsv.front().first->base->data->functions.find("MoveNext")->second->context;
+		function_context->function->Load(context->root);
+		llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", function_context->function->f);
 		context->root->builder.SetInsertPoint(bb);
 
-		function->function->is_generator = true;
+		function_context->function->is_generator = true;
 	}
 	else
-		function = context->AddFunction(this->GetRealName(), ret, argsv, Struct.length() > 0 ? argsv[0].first->base : 0, is_lambda);// , this->varargs);
-
-	function->function->lambda.storage_type = storage_t;
-	context->root->current_function = function;
-	function->function->Load(context->root);
-
-	function->SetDebugLocation(this->token);
-
-	if (is_lambda)
-		function->function->do_export = false;
-
-	//alloc args
-	auto AI = function->function->f->arg_begin();
-	for (unsigned Idx = 0, e = argsv.size(); Idx != e; ++Idx, ++AI)
 	{
-		// Create an alloca for this variable.
-		if (!(Idx > 0 && this->is_generator))
-		{
-			auto aname = argsv[Idx].second;
-
-			//function->function->f->dump();
-			//function->function->f->getEntryBlock().dump();
-			llvm::IRBuilder<> TmpB(&function->function->f->getEntryBlock(), function->function->f->getEntryBlock().begin());
-			//need to alloca pointer to struct if this is a struct type
-			llvm::AllocaInst* Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
-			llvm::Value* storeval = AI;
-			if (argsv[Idx].first->type == Types::Struct)
-				storeval = function->root->builder.CreateLoad(AI);
-				//Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType()->getPointerTo(), 0, aname);
-			//else
-				//Alloca = TmpB.CreateAlloca(argsv[Idx].first->GetLLVMType(), 0, aname);
-			// Store the initial value into the alloca.
-			//AI->dump();
-			//AI->getType()->dump();
-			//Alloca->dump();
-			//Alloca->getType()->dump();
-			function->root->builder.CreateStore(storeval, Alloca);
-
-			AI->setName(aname);
-
-			auto D = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, context->root->debug_info.file, this->token.line,
-				argsv[Idx].first->GetDebugType(context->root));
-
-			llvm::Instruction *Call = context->root->debug->insertDeclare(
-				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope), context->root->builder.GetInsertBlock());
-			Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
-
-			// Add arguments to variable symbol table.
-			function->RegisterLocal(aname, CValue(argsv[Idx].first->GetPointerType(), Alloca));
-		}
+		function_context = context->AddFunction(this->GetRealName(), ret, argsv, struct_name.length() > 0 ? argsv[0].first->base : 0, is_lambda);// , this->varargs);
 	}
 
+	function_context->function->lambda.storage_type = storage_t;
+	context->root->current_function = function_context;
+	function_context->function->Load(context->root);
+
+	function_context->SetDebugLocation(this->token);
+
+	if (is_lambda)
+		function_context->function->do_export = false;
+
+	//alloc args
+	auto AI = function_context->function->f->arg_begin();
+	for (unsigned i = 0, e = argsv.size(); i != e; ++i, ++AI)
+	{
+		// Create an alloca for this variable.
+		if (i > 0 && this->is_generator)
+			continue;
+
+		auto aname = argsv[i].second;
+
+		llvm::IRBuilder<> TmpB(&function_context->function->f->getEntryBlock(), function_context->function->f->getEntryBlock().begin());
+		//need to alloca pointer to struct if this is a struct type
+		llvm::AllocaInst* Alloca = TmpB.CreateAlloca(argsv[i].first->GetLLVMType(), 0, aname);
+		llvm::Value* storeval = AI;
+		if (argsv[i].first->type == Types::Struct)
+			storeval = function_context->root->builder.CreateLoad(AI);
+
+		// Store the initial value into the alloca.
+		function_context->root->builder.CreateStore(storeval, Alloca);
+
+		AI->setName(aname);
+
+		//insert debug declarations
+		auto local = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function_context->function->scope, aname,
+			context->root->debug_info.file, this->token.line,
+			argsv[i].first->GetDebugType(context->root));
+
+		llvm::Instruction* call = context->root->debug->insertDeclare(Alloca, local, context->root->debug->createExpression(),
+			llvm::DebugLoc::get(this->token.line, this->token.column, function_context->function->scope),
+			context->root->builder.GetInsertBlock());
+		call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function_context->function->scope));
+
+		// Add arguments to variable symbol table.
+		function_context->RegisterLocal(aname, CValue(argsv[i].first->GetPointerType(), Alloca));
+	}
+
+	llvm::BasicBlock* yieldbb;//location of starting point in generator function
 	if (this->is_generator)
 	{
 		//compile the start code for a generator function
-		auto data = function->Load("_context");
+		auto data = function_context->Load("_context");
 
 		//add arguments
 		int i = 0;
 		for (auto ii : *this->args)
 		{
 			auto ptr = data.val;
-			auto val = function->root->builder.CreateGEP(ptr, { function->root->builder.getInt32(0), function->root->builder.getInt32(2 + i++) });
-			function->RegisterLocal(ii.name.text, CValue(function->root->LookupType(ii.type.text)->GetPointerType(), val));
+			auto val = function_context->root->builder.CreateGEP(ptr, { function_context->root->builder.getInt32(0), function_context->root->builder.getInt32(2 + i++) });
+			function_context->RegisterLocal(ii.name.text, CValue(function_context->root->LookupType(ii.type.text)->GetPointerType(), val));
 		}
 
 		//add local vars
 		for (int i = 2 + this->args->size(); i < data.type->base->data->struct_members.size(); i++)
 		{
 			auto gep = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(i) });
-			function->function->generator.variable_geps.push_back(gep);
+			function_context->function->generator.variable_geps.push_back(gep);
 		}
 
 		//branch to the continue point
-		auto br = function->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
-		auto loc = function->root->builder.CreateLoad(br);
-		auto ibr = function->root->builder.CreateIndirectBr(loc, 10);
-		function->function->generator.ibr = ibr;
+		auto br = function_context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+		auto loc = function_context->root->builder.CreateLoad(br);
+		auto ibr = function_context->root->builder.CreateIndirectBr(loc, 10);//todo this number may need to be different
+		function_context->function->generator.ibr = ibr;
 
 		//add new bb
-		yieldbb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "yield", function->function->f);
+		yieldbb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "yield", function_context->function->f);
 		ibr->addDestination(yieldbb);
 
-		function->root->builder.SetInsertPoint(yieldbb);
+		function_context->root->builder.SetInsertPoint(yieldbb);
 	}
 
-	block->Compile(function);
+	block->Compile(function_context);
 
 	//check for return, and insert one or error if there isnt one
-	if (function->function->is_generator)
-		function->root->builder.CreateRet(function->root->builder.getInt1(false));//signal we are gone generating values
-	else if (function->function->f->getBasicBlockList().back().getTerminator() == 0)
+	if (function_context->function->is_generator)
+		function_context->root->builder.CreateRet(function_context->root->builder.getInt1(false));//signal we are gone generating values
+	else if (function_context->function->f->getBasicBlockList().back().getTerminator() == 0)
 		if (this->ret_type.text == "void")
-			function->Return(CValue());
+			function_context->Return(CValue());
 		else
 			context->root->Error("Function must return a value!", token);
 
-	//remove instructions after the first terminator in a block
-	for (auto ii = function->function->f->getBasicBlockList().begin(); ii != function->function->f->getBasicBlockList().end(); ii++)
+	//remove instructions after the first terminator in a block to prevent issues
+	for (auto ii = function_context->function->f->getBasicBlockList().begin(); ii != function_context->function->f->getBasicBlockList().end(); ii++)
 	{
 		bool returned = false;
 		for (auto inst = ii->begin(); inst != ii->end();)
@@ -417,12 +415,10 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		}
 	}
 
-	//fix having instructions after a return in a block
-	//so need to check every basic block for anything after a return
 	if (this->is_generator)
 	{
 		//compile the other function necessary for an iterator
-		auto func = context->AddFunction(this->GetRealName(), 0, { argsv.front() }, Struct.length() > 0 ? argsv[0].first : 0, is_lambda);
+		auto func = context->AddFunction(this->GetRealName(), 0, { argsv.front() }, struct_name.length() > 0 ? argsv[0].first : 0, is_lambda);
 
 		auto str = func->function->return_type;
 
@@ -475,8 +471,6 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", current->function->f);
 			context->root->builder.SetInsertPoint(bb);
 
-			//add a return and shizzle
-			
 			//return the current value
 			auto self = current->function->f->arg_begin();
 			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
@@ -493,19 +487,19 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	//store the lambda value
 	if (lambda)
 	{
-		function->WriteCaptures(lambda);
+		function_context->WriteCaptures(lambda);
 
 		auto ptr = context->root->builder.CreateGEP(lambda, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) }, "name");
 
-		ptr = context->root->builder.CreatePointerCast(ptr, function->function->f->getType()->getPointerTo());
-		context->root->builder.CreateStore(function->function->f, ptr);
+		ptr = context->root->builder.CreatePointerCast(ptr, function_context->function->f->getType()->getPointerTo());
+		context->root->builder.CreateStore(function_context->function->f, ptr);
 	}
 
 	context->CurrentToken(&this->token);
 	if (lambda)//return the lambda if we are one
 		return CValue(lambda_type, context->root->builder.CreateLoad(lambda));
 	else
-		return CValue(function->function->GetType(context->root), function->function->f);
+		return CValue(function_context->function->GetType(context->root), function_context->function->f);
 }
 
 void FunctionExpression::CompileDeclarations(CompilerContext* context)
@@ -572,7 +566,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		//add default iterator methods, will fill in function later
 		{
 			auto func = new Function(this->GetRealName() + "_generator", name.text.length() == 0);
-			func->return_type = context->root->LookupType("bool");
+			func->return_type = context->root->BoolType;// LookupType("bool");
 			func->arguments = { { 0, "_context" } };
 			func->arguments.resize(1);
 			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
@@ -586,7 +580,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		}
 		{
 			auto func = new Function(this->GetRealName() + "_yield_reset", name.text.length() == 0);
-			func->return_type = context->root->LookupType("void");
+			func->return_type = &VoidType;// context->root->LookupType("void");
 			func->arguments = { { 0, "_context" } };
 			func->arguments.resize(1);
 			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
@@ -600,7 +594,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		}
 		{
 			auto func = new Function(this->GetRealName() + "_generator_current", name.text.length() == 0);
-			func->return_type = context->root->LookupType("void");
+			func->return_type = &VoidType;// context->root->LookupType("void");
 			context->root->AdvanceTypeLookup(&func->return_type, this->ret_type.text, &this->ret_type);
 
 			func->arguments = { { 0, "_context" } };
@@ -615,7 +609,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		}
 
 		//add the position and return variables to the context
-		str->data->struct_members.push_back({ "position", "char*", context->root->LookupType("char*") });
+		str->data->struct_members.push_back({ "position", "char*", context->root->CharPointerType/*LookupType("char*")*/ });
 		str->data->struct_members.push_back({ "return", this->ret_type.text, context->root->LookupType(this->ret_type.text) });
 
 		//add arguments to context
@@ -625,7 +619,6 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		str->ns = context->root->ns;
 
 		//DO NOT LOAD THIS UNTIL COMPILATION, IN FACT DONT LOAD ANYTHING
-		//str->Load(context->root);
 		fun->return_type = str;
 	}
 	else if (is_trait)
@@ -777,7 +770,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		if (this->_names->front().first.text.back() == ']')
 		{
 			std::string len = this->_names->front().first.text;
-			len = len.substr(len.find_first_of('[')+1);
+			len = len.substr(len.find_first_of('[') + 1);
 			context->root->AddGlobal(this->_names->front().second.text, type->base, std::atoi(len.c_str()));
 		}
 		else
@@ -814,7 +807,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				if (type->size)
 					needs_destruction = true;
 
-				//CValue size = // context->GetSizeof(type->base);
 				//now implement[] for arrays then new for them
 				auto str_type = context->root->GetArrayType(type->base);
 				type = str_type;
@@ -824,8 +816,8 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				//allocate the array
 
 				//get the array size
-				int l = std::atoi(ii.first.text.substr(ii.first.text.find_last_of('[')+1).c_str());
-				
+				int l = std::atoi(ii.first.text.substr(ii.first.text.find_last_of('[') + 1).c_str());
+
 				auto size = TmpB.getInt32(l);//need to figure out better way to get size
 				auto arr = TmpB.CreateAlloca(type->base->GetLLVMType(), size, aname + ".array");
 				//store size
@@ -849,13 +841,16 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				Alloca->setAlignment(4);
 
 
-			auto D = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, context->root->debug_info.file, ii.second.line,
+			auto local = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, 
+				aname, context->root->debug_info.file, ii.second.line,
 				type->GetDebugType(context->root));
 
-			llvm::Instruction *Call = context->root->debug->insertDeclare(
-				Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
-			Call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
-			
+			llvm::Instruction *call = context->root->debug->insertDeclare(
+				Alloca, local, context->root->debug->createExpression(), 
+				llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), 
+				context->root->builder.GetInsertBlock());
+			call->setDebugLoc(llvm::DebugLoc::get(ii.second.line, ii.second.column, context->function->scope));
+
 
 			// Store the initial value into the alloca.
 			if (this->_right)
@@ -867,9 +862,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				alloc.type = type->GetPointerType();
 				alloc.val = Alloca;
 				context->Store(alloc, val, true);
-				//val = context->DoCast(type, val);
-				//context->root->builder.CreateStore(val.val, Alloca);
-				//assignment
 			}
 		}
 		//todo setup vtables on globals and call constructors
@@ -879,15 +871,13 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			auto val = (*this->_right)[i++].second->Compile(context);
 			type = val.type;
 
-			
+
 			//need to move allocas outside of the loop and into the main body
 			auto TheFunction = context->function->f;
 			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 				TheFunction->getEntryBlock().begin());
-			//if (val.type->type == Types::Array)
-				//Alloca = TmpB.CreateAlloca(val.type->GetLLVMType(), context->root->builder.getInt32(val.type->size), aname);
-			//else
-				Alloca = TmpB.CreateAlloca(val.type->GetLLVMType(), 0, aname);
+
+			Alloca = TmpB.CreateAlloca(val.type->GetLLVMType(), 0, aname);
 
 			if (val.type->GetSize() >= 4)
 				Alloca->setAlignment(4);
@@ -1033,7 +1023,7 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 	{
 		auto fun = new Function("__" + str->data->name + "_" + strname, false);//
 		fun->return_type = &VoidType;
-		fun->arguments = { { context->root->LookupType(str->data->name + "*", false), "this" } };
+		fun->arguments = { { str->GetPointerType(), "this" } };
 		fun->f = 0;
 		fun->expression = 0;
 		fun->type = (FunctionType*)-1;
@@ -1045,7 +1035,7 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 
 		auto fun = new Function("__" + str->data->name + "_~" + strname, false);//
 		fun->return_type = &VoidType;
-		fun->arguments = { { context->root->LookupType(str->data->name + "*", false), "this" } };
+		fun->arguments = { { str->GetPointerType(), "this" } };
 		fun->f = 0;
 		fun->expression = 0;
 		fun->type = (FunctionType*)-1;
@@ -1075,10 +1065,10 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				auto dp = context->root->builder.getCurrentDebugLocation();
 
 				std::vector<std::pair<Type*, std::string>> argsv;
-				argsv.push_back({ context->root->LookupType(str->data->name + "*"), "this" });
+				argsv.push_back({ str->GetPointerType(), "this" });
 
 				//context->CurrentToken(&this->ret_type);
-				auto ret = context->root->LookupType("void");
+				auto ret = &VoidType;// context->root->LookupType("void");
 
 				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? str : 0, false);// , this->varargs);
 				ii.second->f = function->function->f;
@@ -1102,12 +1092,14 @@ void StructExpression::AddConstructors(CompilerContext* context)
 
 					AI->setName(aname);
 
-					auto D = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, context->root->debug_info.file, this->token.line,
+					auto local = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, 
+						function->function->scope, aname, context->root->debug_info.file, this->token.line,
 						argsv[Idx].first->GetDebugType(context->root));
 
-					llvm::Instruction *Call = context->root->debug->insertDeclare(
-						Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope), Alloca);
-					Call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
+					llvm::Instruction *call = context->root->debug->insertDeclare(
+						Alloca, local, context->root->debug->createExpression(), 
+						llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope), Alloca);
+					call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function->function->scope));
 
 					// Add arguments to variable symbol table.
 					function->RegisterLocal(aname, CValue(argsv[Idx].first->GetPointerType(), Alloca));
@@ -1155,9 +1147,9 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				auto dp = context->root->builder.getCurrentDebugLocation();
 
 				std::vector<std::pair<Type*, std::string>> argsv;
-				argsv.push_back({ context->root->LookupType(str->data->name + "*"), "this" });
+				argsv.push_back({ str->GetPointerType(), "this" });
 
-				auto ret = context->root->LookupType("void");
+				auto ret = &VoidType;// context->root->LookupType("void");
 
 				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? str : 0, false);// , this->varargs);
 				ii.second->f = function->function->f;
@@ -1223,13 +1215,11 @@ void StructExpression::AddConstructors(CompilerContext* context)
 						//set ns
 						auto oldns = function->root->ns;
 						function->root->ns = str->data;
-						CValue vtable = function->GetVariable/*Load*/("__" + this->name.text + "_vtable");
+						CValue vtable = function->GetVariable("__" + this->name.text + "_vtable");
 						function->root->ns = oldns;
 						//restore ns
 
 						//cast the global to a char**
-						//vtable.val->dump();
-						//vtable.val->getType()->dump();
 						vtable.val = context->root->builder.CreatePointerCast(vtable.val, context->root->LookupType("char**")->GetLLVMType());
 
 						auto myself = function->Load("this");
@@ -1399,12 +1389,13 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		{
 			//error if we already have the member
 			for (auto mem : str->data->struct_members)
+			{
 				if (mem.name == ii.variable.name.text)
 				{
-					//context->root->diagnostics->Error("", mem.);
 					//todo: show where first defintion is
 					context->root->Error("Duplicate member variable '" + ii.variable.name.text + "'", ii.variable.name);
 				}
+			}
 			str->data->struct_members.push_back({ ii.variable.name.text, ii.variable.type.text, 0 });
 			if (this->templates == 0)
 				context->root->AdvanceTypeLookup(&str->data->struct_members.back().type, ii.variable.type.text, &ii.variable.type);

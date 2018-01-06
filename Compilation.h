@@ -117,6 +117,7 @@ namespace Jet
 		Type* DoubleType;
 		Type* IntType;
 		Type* BoolType;
+		Type* CharPointerType;
 
 		JetProject* project;
 

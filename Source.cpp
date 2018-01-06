@@ -90,12 +90,8 @@ bool Source::IsAtEnd()
 }
 
 
-
-//extern Source* current_source;
 BlockExpression* Source::GetAST(DiagnosticBuilder* builder, const std::map<std::string, bool>& defines)
 {
-	//current_source = this;
-
 	Lexer lexer(this, builder, defines);
 	Parser parser(&lexer, builder);
 

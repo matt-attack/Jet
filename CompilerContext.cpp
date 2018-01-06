@@ -359,7 +359,6 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 				Function* fun = funiter->second;
 				fun->Load(this->root);
 				std::vector<CValue> argsv = { lhsptr, right };
-				//todo: use references
 				return CallFunction(this, fun, argsv, true);//for now lets keep these operators non-virtual
 			}
 		}
@@ -426,7 +425,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 
 		return CValue(left.type, res);
 	}
-	else if (left.type->IsInteger())//left.type->type == Types::Int || left.type->type == Types::Short || left.type->type == Types::Char)
+	else if (left.type->IsInteger())
 	{
 		//integer probably
 		switch (op)
@@ -545,11 +544,11 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 	if (Struct == 0)
 	{
 		//global function?
-		auto iter = this->root->GetFunction(name);// functions.find(name);
-		if (iter == 0)//this->root->functions.end())
+		auto iter = this->root->GetFunction(name);
+		if (iter == 0)
 		{
 			//check if its a type, if so try and find a constructor
-			auto type = this->root->TryLookupType(name);// types.find(name);// LookupType(name);
+			auto type = this->root->TryLookupType(name);
 			if (type != 0 && type->type == Types::Struct)
 			{
 				type->Load(this->root);
@@ -589,7 +588,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 			{
 				auto fun = type->data->functions.find(type->data->template_base->name);
 				if (fun != type->data->functions.end())
-					return fun->second;// type->data->functions.find(type->data->template_base->name)->second;
+					return fun->second;
 				else
 					return 0;
 			}
@@ -893,7 +892,7 @@ CValue CompilerContext::GetVariable(const std::string& name)
 		auto sym = this->root->GetVariableOrFunction(name);
 		if (sym.type != SymbolType::Invalid)
 		{
-			if (sym.type == SymbolType::Function)// function != 0)
+			if (sym.type == SymbolType::Function)
 			{
 				auto function = sym.fn;
 				function->Load(this->root);
@@ -914,6 +913,7 @@ CValue CompilerContext::GetVariable(const std::string& name)
 			CValue location = this->Load("_capture_data");
 			auto storage_t = this->function->lambda.storage_type;
 
+			//todo make sure this is the right location to do all of this
 			//append the new type
 			std::vector<llvm::Type*> types;
 			for (int i = 0; i < this->captures.size(); i++)
@@ -1004,11 +1004,8 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 			return CValue(t, root->builder.CreateFPToUI(value.val, tt));
 
 		//todo: maybe do a warning if implicit from float->int or larger as it cant directly fit 1 to 1
-		//remove me later float to bool
-		//if (t->type == Types::Bool)
-		//return CValue(t, root->builder.CreateFCmpONE(value.val, llvm::ConstantFP::get(llvm::getGlobalContext(), llvm::APFloat(0.0))));
 	}
-	if (value.type->IsInteger())//value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
+	if (value.type->IsInteger())
 	{
 		//int to float
 		if (t->type == Types::Double || t->type == Types::Float)
@@ -1028,15 +1025,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 			return CValue(t, root->builder.CreateIntToPtr(value.val, t->GetLLVMType()));
 		}
 
-		/*if (value.type->type == Types::Int && (t->type == Types::Char || t->type == Types::Short))
-		{
-		return CValue(t, root->builder.CreateTrunc(value.val, tt));
-		}
-		if (value.type->type == Types::Short && t->type == Types::Int)
-		{
-		return CValue(t, root->builder.CreateSExt(value.val, tt));
-		}*/
-		if (t->IsSignedInteger())//t->type == Types::Int || t->type == Types::Short || t->type == Types::Char)
+		if (t->IsSignedInteger())
 			return CValue(t, root->builder.CreateSExtOrTrunc(value.val, tt));
 		else if (t->IsInteger())
 			return CValue(t, root->builder.CreateZExtOrTrunc(value.val, tt));
@@ -1121,8 +1110,6 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		}
 	}
 
-	//value.val->dump();
-	//this->root->current_function->function->f->dump();
 	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 }
 
@@ -1288,7 +1275,7 @@ void Scope::Destruct(CompilerContext* context, llvm::Value* ignore)
 void CompilerContext::PopScope()
 {
 	//call destructors
-	if (this->scope->prev != 0)// && this->scope->prev->prev != 0)
+	if (this->scope->prev != 0)
 	{
 		if (this->scope->destructed == false)
 			this->scope->Destruct(this);
@@ -1352,6 +1339,7 @@ CValue CompilerContext::Load(const std::string& name)
 	//}
 	else if (value.type->type == Types::Int)
 	{
+		//todo wtf is this
 		//its a constant
 		return value;
 	}
@@ -1371,7 +1359,7 @@ void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
 		if (fun == 0)
 			return;//todo: is this right behavior?
 		fun->Load(this->root);
-		if (arr_size == 0)//size == 0)
+		if (arr_size == 0)
 		{//just one element, construct it
 			this->root->builder.CreateCall(fun->f, { pointer.val });
 		}

@@ -104,7 +104,7 @@ namespace Jet
 			
 			auto res = this->root->builder.CreateGEP(FBloc, const_ptr_7_indices, "x");
 
-			return CValue(this->root->LookupType("char*"), res);
+			return CValue(this->root->CharPointerType/*LookupType("char*")*/, res);
 		}
 
 		void RegisterLocal(const std::string& name, CValue val, bool needs_destruction = false)

@@ -153,7 +153,7 @@ Expression* NameParselet::parse(Parser* parser, Token token)
 		//if (ahead.type != TokenType::Not)//ahead.type != TokenType::Comma && ahead.type != TokenType::GreaterThan)
 		//return new NameExpression(token);
 
-		parser->Consume();
+		auto begin_tok = parser->Consume();
 		//parser->Consume(TokenType::LessThan);
 
 		//token.text += "<";
@@ -469,9 +469,7 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 				templated->push_back({ ttname, Token() });
 				break;
 			}
-
-			//templated->push_back({ ttname, tname });
-		} while (true);//parser->MatchAndConsume(TokenType::Comma));
+		} while (true);
 		tcb = parser->Consume(TokenType::GreaterThan);
 	}
 
@@ -705,7 +703,6 @@ bool IsValidFunctionNameToken(TokenType op)
 //maybe add a way to make non - nullable non - freeable pointers
 //add superconst to represent const int* const x;
 //still gotta solve operator problem with passing operands as pointers
-//ok, [] operator can be implemented by returning a pointer to the value
 Expression* FunctionParselet::parse(Parser* parser, Token token)
 {
 	//read in type
@@ -983,33 +980,6 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 	Token ob = parser->Consume(TokenType::LeftParen);
 
 	auto arguments = new std::vector < FunctionArg > ;
-	/*if (parser->LookAhead().type != TokenType::RightParen)
-	{
-		do
-		{
-			Token type;
-			if (parser->LookAhead(1).type != TokenType::Comma && parser->LookAhead(1).type != TokenType::RightParen)
-				type = ::ParseType(parser);
-
-			Token name = parser->Consume();
-			Token comma = parser->LookAhead();
-			if (name.type == TokenType::Name)
-			{
-				if (comma.type == TokenType::Comma)
-					arguments->push_back({ type, name, comma });
-				else
-				{
-					arguments->push_back({ type, name, Token() });
-					break;
-				}
-			}
-			else
-			{
-				std::string str = "Token not as expected! Expected name got: " + name.text;
-				parser->Error(str, token);
-			}
-		} while (true);// parser->MatchAndConsume(TokenType::Comma));
-	}*/
 
 	if (!parser->Match(TokenType::RightParen))
 	{
@@ -1354,10 +1324,8 @@ Expression* NewParselet::parse(Parser* parser, Token token)
 
 Expression* FreeParselet::parse(Parser* parser, Token token)
 {
-	//auto type = ::ParseType(parser, false);
-
 	//try and parse size expression
-	if (parser->LookAhead().type == TokenType::LeftBracket)//auto tok = parser->MatchAndConsume(TokenType::LeftBracket))
+	if (parser->LookAhead().type == TokenType::LeftBracket)
 	{
 		auto ob = parser->Consume();
 		auto cb = parser->Consume(TokenType::RightBracket);

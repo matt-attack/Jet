@@ -1022,7 +1022,7 @@ void Struct::Load(Compilation* compiler)
 		needs_vtable = false;
 	if (needs_vtable && this->parent_struct == 0)
 	{
-		this->struct_members.push_back({ "__vtable", "char*", compiler->LookupType("char**") });//add the member if we dont have it
+		this->struct_members.push_back({ "__vtable", "char*", compiler->CharPointerType->GetPointerType()/*compiler->LookupType("char**")*/ });//add the member if we dont have it
 	}
 
 	//recursively load
@@ -1103,18 +1103,18 @@ void Struct::Load(Compilation* compiler)
 
 			ii.second->Load(compiler);
 			auto ptr = ii.second->f;
-			auto charptr = llvm::ConstantExpr::getBitCast(ptr, compiler->LookupType("char*")->GetLLVMType());
+			auto charptr = llvm::ConstantExpr::getBitCast(ptr, compiler->CharPointerType/*compiler->LookupType("char*")*/->GetLLVMType());
 
 			ptrs[ii.second->virtual_offset] = charptr;
 		}
 
-		auto arr = llvm::ConstantArray::get(llvm::ArrayType::get(compiler->LookupType("char*")->GetLLVMType(), vtable_size), ptrs);
+		auto arr = llvm::ConstantArray::get(llvm::ArrayType::get(compiler->CharPointerType/*LookupType("char*")*/->GetLLVMType(), vtable_size), ptrs);
 
 		auto oldns = compiler->ns;
 
 		compiler->ns = this;
 		//then need to have function calls to virtual functions to go the lookup table
-		compiler->AddGlobal("__" + this->name + "_vtable", compiler->LookupType("char*"), vtable_size, arr, true);
+		compiler->AddGlobal("__" + this->name + "_vtable", compiler->CharPointerType/*LookupType("char*")*/, vtable_size, arr, true);
 
 		compiler->ns = oldns;
 	}
