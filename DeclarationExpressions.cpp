@@ -332,7 +332,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		AI->setName(aname);
 
 		//insert debug declarations
-		auto local = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function_context->function->scope, aname,
+		auto local = context->root->debug->createAutoVariable(function_context->function->scope, aname,
 			context->root->debug_info.file, this->token.line,
 			argsv[i].first->GetDebugType(context->root));
 
@@ -374,7 +374,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		function_context->function->generator.ibr = ibr;
 
 		//add new bb
-		yieldbb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "yield", function_context->function->f);
+		yieldbb = llvm::BasicBlock::Create(context->context, "yield", function_context->function->f);
 		ibr->addDestination(yieldbb);
 
 		function_context->root->builder.SetInsertPoint(yieldbb);
@@ -399,9 +399,9 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		{
 			if (returned == true)
 			{
-				auto temp = inst.getNodePtrUnchecked();
+				auto temp = inst.getNodePtr();// getNodePtrUnchecked();
 				inst++;
-				temp->eraseFromParent();
+				temp->getIterator()->eraseFromParent();//this could be broken
 			}
 			else if (inst->isTerminator())
 			{
@@ -841,7 +841,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				Alloca->setAlignment(4);
 
 
-			auto local = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, 
+			auto local = context->root->debug->createAutoVariable(context->function->scope, 
 				aname, context->root->debug_info.file, ii.second.line,
 				type->GetDebugType(context->root));
 
@@ -884,7 +884,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 
 			llvm::DIFile* unit = context->root->debug_info.file;
 			type->Load(context->root);
-			llvm::DILocalVariable* D = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_auto_variable, context->function->scope, aname, unit, ii.second.line,
+			llvm::DILocalVariable* D = context->root->debug->createAutoVariable(context->function->scope, aname, unit, ii.second.line,
 				type->GetDebugType(context->root));
 
 			llvm::Instruction *Call = context->root->debug->insertDeclare(
@@ -1092,7 +1092,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 
 					AI->setName(aname);
 
-					auto local = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, 
+					auto local = context->root->debug->createAutoVariable(
 						function->function->scope, aname, context->root->debug_info.file, this->token.line,
 						argsv[Idx].first->GetDebugType(context->root));
 
@@ -1175,7 +1175,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 
 					llvm::DIFile* unit = context->root->debug_info.file;
 
-					auto D = context->root->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, function->function->scope, aname, unit, this->token.line,
+					auto D = context->root->debug->createAutoVariable(function->function->scope, aname, unit, this->token.line,
 						argsv[Idx].first->GetDebugType(context->root));
 
 					llvm::Instruction *Call = context->root->debug->insertDeclare(
@@ -1253,7 +1253,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			auto iter = ii.second->f->getBasicBlockList().begin()->begin();
 			for (int i = 0; i < ii.second->arguments.size() * 3; i++)
 				iter++;
-			context->root->builder.SetInsertPoint(iter);
+			context->root->builder.SetInsertPoint(&*iter);
 
 			//todo: oops code duplication here
 			int i = 0;
@@ -1311,7 +1311,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			auto iter = ii.second->f->getBasicBlockList().begin()->begin();
 			for (int i = 0; i < ii.second->arguments.size() * 3; i++)
 				iter++;
-			context->root->builder.SetInsertPoint(iter);
+			context->root->builder.SetInsertPoint(&*iter);
 
 			int i = 0;
 			for (auto iip : str->data->struct_members)

@@ -47,7 +47,7 @@ CValue CaseExpression::Compile(CompilerContext* context)
 		context->root->Error("Cannot use case expression outside of a switch!", token);
 
 	//create a new block for this case
-	llvm::BasicBlock* block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "case" + value.text);
+	llvm::BasicBlock* block = llvm::BasicBlock::Create(context->context, "case" + value.text);
 
 	//add the case to the switch
 	bool is_first = sw->AddCase(context->root->builder.getInt32(std::stol(this->value.text)), block);
@@ -68,10 +68,10 @@ CValue IfExpression::Compile(CompilerContext* context)
 
 	int pos = 0;
 	bool hasElse = this->Else ? this->Else->block->statements.size() > 0 : false;
-	llvm::BasicBlock *EndBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "endif");
+	llvm::BasicBlock *EndBB = llvm::BasicBlock::Create(context->context, "endif");
 	llvm::BasicBlock *ElseBB = 0;
 	if (hasElse)
-		ElseBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "else");
+		ElseBB = llvm::BasicBlock::Create(context->context, "else");
 
 	llvm::BasicBlock *NextBB = 0;
 	for (auto& ii : this->branches)
@@ -82,8 +82,8 @@ CValue IfExpression::Compile(CompilerContext* context)
 		auto cond = ii->condition->Compile(context);
 		cond = context->DoCast(context->root->BoolType, cond);//try and cast to bool
 
-		llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(llvm::getGlobalContext(), "then", context->function->f);
-		NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(llvm::getGlobalContext(), "elseif", context->function->f);
+		llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(context->context, "then", context->function->f);
+		NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(context->context, "elseif", context->function->f);
 
 		context->root->builder.CreateCondBr(cond.val, ThenBB, NextBB);
 
@@ -119,7 +119,7 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	if (value.type->type != Types::Int)
 		context->root->Error("Argument to Case Statement Must Be an Integer", token);
 
-	this->switch_end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchend");
+	this->switch_end = llvm::BasicBlock::Create(context->context, "switchend");
 
 	//look for all case and default expressions
 	std::vector < CaseExpression* > cases;
@@ -135,7 +135,7 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 			//do default
 			if (this->def)
 				context->root->Error("Multiple defaults defined for the same switch!", token);
-			this->def = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefault");
+			this->def = llvm::BasicBlock::Create(context->context, "switchdefault");
 		}
 	}
 
@@ -143,7 +143,7 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	if (def == 0)
 	{
 		//create default block at end if there isnt one
-		this->def = llvm::BasicBlock::Create(llvm::getGlobalContext(), "switchdefault");
+		this->def = llvm::BasicBlock::Create(context->context, "switchdefault");
 	}
 
 	//create the switch instruction
@@ -258,7 +258,7 @@ CValue YieldExpression::Compile(CompilerContext* context)
 		context->root->Error("Cannot use yield outside of a generator!", this->token);
 
 	//create a new block for after the yield
-	auto bb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "yield");
+	auto bb = llvm::BasicBlock::Create(context->context, "yield");
 	context->function->f->getBasicBlockList().push_back(bb);
 
 	//add the new block to the indirect branch list
@@ -303,7 +303,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 	if (val.type->base->type != Types::Union)
 		context->root->Error("Cannot match with a non-union", token);
 
-	auto endbb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "match.end");
+	auto endbb = llvm::BasicBlock::Create(context->context, "match.end");
 
 	//from val get the type
 	auto key = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
@@ -316,7 +316,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		if (ii.type.type == TokenType::Default)
 		{
 			//add bb for case
-			auto bb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "match.case", context->function->f);
+			auto bb = llvm::BasicBlock::Create(context->context, "match.case", context->function->f);
 			context->root->builder.SetInsertPoint(bb);
 			sw->setDefaultDest(bb);
 
@@ -340,9 +340,9 @@ CValue MatchExpression::Compile(CompilerContext* context)
 			context->root->Error("Type '" + ii.type.text + "' not in union, cannot match to it.", ii.type);
 
 		//add bb for case
-		auto bb = llvm::BasicBlock::Create(llvm::getGlobalContext(), "match.case", context->function->f);
+		auto bb = llvm::BasicBlock::Create(context->context, "match.case", context->function->f);
 		context->root->builder.SetInsertPoint(bb);
-		auto i = llvm::ConstantInt::get(llvm::getGlobalContext(), llvm::APInt(32, (uint64_t)pi));
+		auto i = llvm::ConstantInt::get(context->context, llvm::APInt(32, (uint64_t)pi));
 		sw->addCase(i, bb);
 
 		//add local

@@ -205,9 +205,9 @@ namespace Jet
 		{
 			context->CurrentToken(&token);
 
-			llvm::BasicBlock *start = llvm::BasicBlock::Create(llvm::getGlobalContext(), "whilestart");
-			llvm::BasicBlock *body = llvm::BasicBlock::Create(llvm::getGlobalContext(), "whilebody");
-			llvm::BasicBlock *end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "whileend");
+			llvm::BasicBlock *start = llvm::BasicBlock::Create(context->context, "whilestart");
+			llvm::BasicBlock *body = llvm::BasicBlock::Create(context->context, "whilebody");
+			llvm::BasicBlock *end = llvm::BasicBlock::Create(context->context, "whileend");
 
 
 			context->root->builder.CreateBr(start);
@@ -321,10 +321,10 @@ namespace Jet
 			if (this->initial)
 				this->initial->Compile(context);
 
-			llvm::BasicBlock *start = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forstart");
-			llvm::BasicBlock *body = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forbody");
-			llvm::BasicBlock *end = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forend");
-			llvm::BasicBlock *cont = llvm::BasicBlock::Create(llvm::getGlobalContext(), "forcontinue");
+			llvm::BasicBlock *start = llvm::BasicBlock::Create(context->context, "forstart");
+			llvm::BasicBlock *body = llvm::BasicBlock::Create(context->context, "forbody");
+			llvm::BasicBlock *end = llvm::BasicBlock::Create(context->context, "forend");
+			llvm::BasicBlock *cont = llvm::BasicBlock::Create(context->context, "forcontinue");
 
 			//insert stupid branch
 			context->root->builder.CreateBr(start);

@@ -16,6 +16,7 @@
 namespace llvm
 {
 	class DIBuilder;
+	class TargetMachine;
 }
 namespace Jet
 {

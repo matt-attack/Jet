@@ -25,7 +25,7 @@ using namespace Jet;
 
 
 #include <sstream>
-#include <clang-c/Index.h>
+//#include <clang-c/Index.h>
 
 #include "OptionParser.h"
 
@@ -85,7 +85,7 @@ const char* type_conversion[] =
 	"double",//long double
 };
 //clang_getPointeeType
-std::string convert_type(CXType type)
+/*std::string convert_type(CXType type)
 {
 	std::string out;
 	CXString tname = clang_getTypeSpelling(type);
@@ -190,12 +190,13 @@ std::string convert_type(CXType type)
 	clang_disposeString(tname);
 
 	return out;
-}
+}*/
 //todo: C++ bindings
 //ok integrate this, then we need to add unsigned types
 std::string generate_jet_from_header(const char* header)
 {
-	CXIndex index = clang_createIndex(0, 0);
+	return "";
+	/*CXIndex index = clang_createIndex(0, 0);
 	const char *args[] = {
 		"-I\"C:/Program Files (x86)/Microsoft Visual Studio 12.0/VC/include\""
 		//"-I/usr/include",
@@ -262,32 +263,6 @@ std::string generate_jet_from_header(const char* header)
 
 			//push the structure
 			data->struct_stack.push(c);
-
-			//ok get rid of this and move it down
-			/*clang_visitChildren(c, [](CXCursor c, CXCursor parent, CXClientData client_data)
-			{
-			std::string* out = (std::string*)client_data;
-
-			if (c.kind == CXCursor_FieldDecl)
-			{
-			CXString name = clang_getCursorSpelling(c);
-			auto str = clang_getCString(name);
-			//printf("    Field: %s ", str);
-
-			auto type = clang_getCursorType(c);
-
-			*out += convert_type(type);
-			*out += ' ';
-			*out += str;
-			*out += ";\n";
-			clang_disposeString(name);
-
-			return CXChildVisit_Continue;
-			}
-			//oops, we can have struct and enum declarations in a struct todo
-			//	also there are "first attributes" whatever those are
-			return CXChildVisit_Continue;
-			}, out);*/
 
 			//*out += "}\n";
 			return CXChildVisit_Recurse;
@@ -444,7 +419,7 @@ std::string generate_jet_from_header(const char* header)
 		clang_disposeTranslationUnit(tu);
 	clang_disposeIndex(index);
 
-	return out;
+	return out;*/
 }
 
 void MakeDocs(Compilation* compilation)

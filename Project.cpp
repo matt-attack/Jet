@@ -109,9 +109,9 @@ void GetFilesInDirectory(std::vector<std::string> &out, const std::string &direc
 {
 #ifdef _WIN32
 	HANDLE dir;
-	WIN32_FIND_DATA file_data;
+	WIN32_FIND_DATAA file_data;
 
-	if ((dir = FindFirstFile((directory + "/*").c_str(), &file_data)) == INVALID_HANDLE_VALUE)
+	if ((dir = FindFirstFileA((directory + "/*").c_str(), &file_data)) == INVALID_HANDLE_VALUE)
 		return; /* No files found */
 
 	do {
@@ -126,7 +126,7 @@ void GetFilesInDirectory(std::vector<std::string> &out, const std::string &direc
 			continue;
 
 		out.push_back(file_name);
-	} while (FindNextFile(dir, &file_data));
+	} while (FindNextFileA(dir, &file_data));
 
 	FindClose(dir);
 #else

@@ -61,10 +61,10 @@ namespace Jet
 	public:
 		Compilation* root;
 		CompilerContext* parent;
-
+		llvm::LLVMContext& context;
 		Function* function;
 
-		CompilerContext(Compilation* root, CompilerContext* parent)
+		CompilerContext(Compilation* root, CompilerContext* parent) : context(root->context)
 		{
 			this->root = root;
 			this->parent = parent;
@@ -99,7 +99,7 @@ namespace Jet
 			auto FBloc = new llvm::GlobalVariable(*root->module, fname->getType(), true,
 				llvm::GlobalValue::InternalLinkage, fname,
 				"const_string");
-			auto const_inst32 = llvm::ConstantInt::get(llvm::getGlobalContext(), llvm::APInt(32, 0, 10));
+			auto const_inst32 = llvm::ConstantInt::get(this->context, llvm::APInt(32, 0, 10));
 			std::vector<llvm::Value*> const_ptr_7_indices = { const_inst32, const_inst32 };
 			
 			auto res = this->root->builder.CreateGEP(FBloc, const_ptr_7_indices, "x");

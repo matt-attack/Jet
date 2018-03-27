@@ -53,9 +53,9 @@ void Function::Load(Compilation* compiler)
 	//	winapi functions fail on return it seems :S
 	llvm::DIFile* unit = compiler->debug_info.file;
 
-	auto functiontype = compiler->debug->createSubroutineType(unit, compiler->debug->getOrCreateTypeArray(ftypes));
+	auto functiontype = compiler->debug->createSubroutineType(compiler->debug->getOrCreateTypeArray(ftypes));
 	int line = this->expression ? this->expression->token.line : 0;
-	llvm::DISubprogram* sp = compiler->debug->createFunction(unit, this->name, this->name, unit, line, functiontype, false, true, line, 0, false, f);
+	llvm::DISubprogram* sp = compiler->debug->createFunction(unit, this->name, this->name, unit, line, functiontype, false, true, line, llvm::DINode::DIFlags::FlagPublic, false, nullptr);// , f);
 
 	assert(sp->describes(f));
 	this->scope = sp;
@@ -73,11 +73,8 @@ void Function::Load(Compilation* compiler)
 		//if I do this I have to use it correctly
 		if (/*this->calling_convention == CallingConvention::StdCall &&*/ this->arguments[Idx].first->type == Types::Struct)
 		{
-			llvm::AttrBuilder b;
-			b.addAttribute(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::ByVal));
-			b.addAttribute(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::Alignment, 4));
-			auto s = llvm::AttributeSet::get(compiler->context, 0, b);
-			AI->addAttr(s);
+			AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::ByVal));
+			AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::Alignment, 4));
 		}
 
 		//auto D = compiler->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, this->scope, aname, compiler->debug_info.file, line,

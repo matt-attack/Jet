@@ -246,12 +246,14 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 		//add attributes
 		for (auto ii : to_convert)
 		{
-			llvm::AttrBuilder b;
+			//llvm::AttrBuilder b;
 			auto& ctext = context->root->builder.getContext();
-			b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
-			b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-			auto s = llvm::AttributeSet::get(ctext, ii + 1, b);
-			call->setAttributes(s);
+			//b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
+			//b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
+			//auto s = llvm::AttributeSet::get(ctext, ii + 1, b);
+			call->addParamAttr(ii + 1, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
+			call->addParamAttr(ii + 1, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
+			//call->setAttributes(s);
 		}
 
 		return CValue(fun->return_type, call);
@@ -263,12 +265,14 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 		//add attributes
 		for (auto ii : to_convert)
 		{
-			llvm::AttrBuilder b;
+			//llvm::AttrBuilder b;
 			auto& ctext = context->root->builder.getContext();
-			b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
-			b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-			auto s = llvm::AttributeSet::get(ctext, ii + 1, b);
-			call->setAttributes(s);
+			//b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
+			//b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
+			//auto s = llvm::AttributeSet::get(ctext, ii + 1, b);
+			call->addParamAttr(ii + 1, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
+			call->addParamAttr(ii + 1, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
+			//call->setAttributes(s);
 		}
 		return CValue(fun->return_type, call);
 	}

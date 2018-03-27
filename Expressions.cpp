@@ -504,8 +504,8 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 	context->SetDebugLocation(this->_operator);
 	if (this->_operator.type == TokenType::And)
 	{
-		auto else_block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "land.shortcircuitelse");
-		auto end_block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "land.endshortcircuit");
+		auto else_block = llvm::BasicBlock::Create(context->context, "land.shortcircuitelse");
+		auto end_block = llvm::BasicBlock::Create(context->context, "land.endshortcircuit");
 		auto cur_block = context->root->builder.GetInsertBlock();
 
 		auto cond = this->left->Compile(context);
@@ -530,8 +530,8 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 
 	if (this->_operator.type == TokenType::Or)
 	{
-		auto else_block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "lor.shortcircuitelse");
-		auto end_block = llvm::BasicBlock::Create(llvm::getGlobalContext(), "lor.endshortcircuit");
+		auto else_block = llvm::BasicBlock::Create(context->context, "lor.shortcircuitelse");
+		auto end_block = llvm::BasicBlock::Create(context->context, "lor.endshortcircuit");
 		auto cur_block = context->root->builder.GetInsertBlock();
 
 		auto cond = this->left->Compile(context);

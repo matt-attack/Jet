@@ -45,31 +45,31 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		return this->debug_type;
 
 	if (this->type == Types::Bool)
-		this->debug_type = compiler->debug->createBasicType("bool", 1, 8, llvm::dwarf::DW_ATE_boolean);
+		this->debug_type = compiler->debug->createBasicType("bool", 8, llvm::dwarf::DW_ATE_boolean);
 	else if (this->type == Types::Int)
-		this->debug_type = compiler->debug->createBasicType("int", 32, 32, llvm::dwarf::DW_ATE_signed);
+		this->debug_type = compiler->debug->createBasicType("int", 32, llvm::dwarf::DW_ATE_signed);
 	else if (this->type == Types::UInt)
-		this->debug_type = compiler->debug->createBasicType("uint", 32, 32, llvm::dwarf::DW_ATE_unsigned);
+		this->debug_type = compiler->debug->createBasicType("uint", 32, llvm::dwarf::DW_ATE_unsigned);
 	else if (this->type == Types::Short)
-		this->debug_type = compiler->debug->createBasicType("short", 16, 16, llvm::dwarf::DW_ATE_signed);
+		this->debug_type = compiler->debug->createBasicType("short", 16, llvm::dwarf::DW_ATE_signed);
 	else if (this->type == Types::UShort)
-		this->debug_type = compiler->debug->createBasicType("ushort", 16, 16, llvm::dwarf::DW_ATE_unsigned);
+		this->debug_type = compiler->debug->createBasicType("ushort", 16, llvm::dwarf::DW_ATE_unsigned);
 	else if (this->type == Types::Char)
-		this->debug_type = compiler->debug->createBasicType("char", 8, 8, llvm::dwarf::DW_ATE_signed_char);
+		this->debug_type = compiler->debug->createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char);
 	else if (this->type == Types::UChar)
-		this->debug_type = compiler->debug->createBasicType("uchar", 8, 8, llvm::dwarf::DW_ATE_unsigned_char);
+		this->debug_type = compiler->debug->createBasicType("uchar", 8, llvm::dwarf::DW_ATE_unsigned_char);
 	else if (this->type == Types::Long)
-		this->debug_type = compiler->debug->createBasicType("long", 64, 64, llvm::dwarf::DW_ATE_signed);
+		this->debug_type = compiler->debug->createBasicType("long", 64, llvm::dwarf::DW_ATE_signed);
 	else if (this->type == Types::ULong)
-		this->debug_type = compiler->debug->createBasicType("ulong", 64, 64, llvm::dwarf::DW_ATE_unsigned);
+		this->debug_type = compiler->debug->createBasicType("ulong", 64, llvm::dwarf::DW_ATE_unsigned);
 	else if (this->type == Types::Float)
-		this->debug_type = compiler->debug->createBasicType("float", 32, 32, llvm::dwarf::DW_ATE_float);
+		this->debug_type = compiler->debug->createBasicType("float", 32, llvm::dwarf::DW_ATE_float);
 	else if (this->type == Types::Double)
-		this->debug_type = compiler->debug->createBasicType("double", 64, 64, llvm::dwarf::DW_ATE_float);
+		this->debug_type = compiler->debug->createBasicType("double", 64, llvm::dwarf::DW_ATE_float);
 	else if (this->type == Types::Pointer)
-		this->debug_type = compiler->debug->createPointerType(this->base->GetDebugType(compiler), 32, 32, "pointer");
+		this->debug_type = compiler->debug->createPointerType(this->base->GetDebugType(compiler), 32);//todo handle 64 bit
 	else if (this->type == Types::Function)
-		this->debug_type = compiler->debug->createBasicType("fun_pointer", 32, 32, llvm::dwarf::DW_ATE_address);
+		this->debug_type = compiler->debug->createBasicType("fun_pointer", 32, llvm::dwarf::DW_ATE_address);
 	else if (this->type == Types::Struct)
 	{
 		llvm::DIType* typ = 0;
@@ -77,7 +77,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		int line = 0;
 		if (this->data->expression)
 			line = this->data->expression->token.line;
-		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 8, 0, typ, 0);
+		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 8, llvm::DINode::DIFlags::FlagPublic, typ, 0);
 		this->debug_type = dt;
 
 		//now build and set elements
@@ -88,7 +88,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 			//assert(type.type->loaded);
 			type.type->Load(compiler);
 			int size = type.type->GetSize();
-			auto mt = compiler->debug->createMemberType(compiler->debug_info.file, type.name, compiler->debug_info.file, line, size * 8, 8, offset * 8, 0, type.type->GetDebugType(compiler));
+			auto mt = compiler->debug->createMemberType(compiler->debug_info.file, type.name, compiler->debug_info.file, line, size * 8, 8, offset * 8, llvm::DINode::DIFlags::FlagPublic, type.type->GetDebugType(compiler));
 
 			ftypes.push_back(mt);// type.type->GetDebugType(compiler));
 			offset += size;
@@ -97,7 +97,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 	}
 	else if (this->type == Types::Union)
 	{
-		this->debug_type = compiler->debug->createUnionType(compiler->debug_info.file, this->name, compiler->debug_info.file, 0, 512, 8, 0, {});
+		this->debug_type = compiler->debug->createUnionType(compiler->debug_info.file, this->name, compiler->debug_info.file, 0, 512, 8, llvm::DINode::DIFlags::FlagPublic, {});
 	}
 	else if (this->type == Types::Function)
 	{
@@ -105,7 +105,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		for (auto type : this->function->args)
 			ftypes.push_back(type->GetDebugType(compiler));
 
-		this->debug_type = compiler->debug->createSubroutineType(compiler->debug_info.file, compiler->debug->getOrCreateTypeArray(ftypes));
+		this->debug_type = compiler->debug->createSubroutineType(/*compiler->debug_info.file,*/ compiler->debug->getOrCreateTypeArray(ftypes));
 	}
 	else if (this->type == Types::Array)
 	{
@@ -115,7 +115,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		//if (this->data->expression)
 		//	line = this->data->expression->token.line;
 
-		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 8, 0, typ, 0);
+		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 8, llvm::DINode::DIFlags::FlagPublic, typ, 0);
 		this->debug_type = dt;
 
 		//now build and set elements
@@ -128,7 +128,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		{
 			type->Load(compiler);
 			int size = type->GetSize();
-			auto mt = compiler->debug->createMemberType(compiler->debug_info.file, names[i++], compiler->debug_info.file, line, size * 8, 8, offset * 8, 0, type->GetDebugType(compiler));
+			auto mt = compiler->debug->createMemberType(compiler->debug_info.file, names[i++], compiler->debug_info.file, line, size * 8, 8, offset * 8, llvm::DINode::DIFlags::FlagPublic, type->GetDebugType(compiler));
 
 			ftypes.push_back(mt);
 			offset += size;
@@ -151,30 +151,32 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 	throw 7;
 }
 
+//todo make this not a global context
+extern llvm::LLVMContext llvm_context_jet;
 llvm::Type* Type::GetLLVMType()
 {
 	switch ((int)this->type)
 	{
 	case (int)Types::Double:
-		return llvm::Type::getDoubleTy(llvm::getGlobalContext());
+		return llvm::Type::getDoubleTy(llvm_context_jet);
 	case (int)Types::Float:
-		return llvm::Type::getFloatTy(llvm::getGlobalContext());
+		return llvm::Type::getFloatTy(llvm_context_jet);
 	case (int)Types::UInt:
 	case (int)Types::Int:
-		return llvm::Type::getInt32Ty(llvm::getGlobalContext());
+		return llvm::Type::getInt32Ty(llvm_context_jet);
 	case (int)Types::ULong:
 	case (int)Types::Long:
-		return llvm::Type::getInt64Ty(llvm::getGlobalContext());
+		return llvm::Type::getInt64Ty(llvm_context_jet);
 	case (int)Types::Void:
-		return llvm::Type::getVoidTy(llvm::getGlobalContext());
+		return llvm::Type::getVoidTy(llvm_context_jet);
 	case (int)Types::UChar:
 	case (int)Types::Char:
-		return llvm::Type::getInt8Ty(llvm::getGlobalContext());
+		return llvm::Type::getInt8Ty(llvm_context_jet);
 	case (int)Types::UShort:
 	case (int)Types::Short:
-		return llvm::Type::getInt16Ty(llvm::getGlobalContext());
+		return llvm::Type::getInt16Ty(llvm_context_jet);
 	case (int)Types::Bool:
-		return llvm::Type::getInt1Ty(llvm::getGlobalContext());
+		return llvm::Type::getInt1Ty(llvm_context_jet);
 	case (int)Types::Struct:
 		assert(this->loaded);
 		return this->data->type;
@@ -182,7 +184,7 @@ llvm::Type* Type::GetLLVMType()
 	{
 		if (this->llvm_type)
 			return this->llvm_type;
-		std::vector<llvm::Type*> types = { llvm::Type::getInt32Ty(llvm::getGlobalContext()), base->GetPointerType()->GetLLVMType() };
+		std::vector<llvm::Type*> types = { llvm::Type::getInt32Ty(llvm_context_jet), base->GetPointerType()->GetLLVMType() };
 		auto res = llvm::StructType::create(types, this->name);
 		this->llvm_type = res;
 		return res;

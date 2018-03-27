@@ -134,7 +134,7 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 {
 	//now try running it if we are supposed to
 #ifdef _WIN32
-	STARTUPINFO si;
+	STARTUPINFOA si;
 	PROCESS_INFORMATION pi;
 
 	ZeroMemory(&si, sizeof(si));
@@ -143,7 +143,7 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 	ZeroMemory(&pi, sizeof(pi));
 
 	std::string path = "build\\" + project->project_name + ".exe ";
-	CreateProcess(path.c_str(), "", 0, 0, 0, CREATE_NEW_CONSOLE, 0, 0, &si, &pi);
+	CreateProcessA(path.c_str(), "", 0, 0, 0, CREATE_NEW_CONSOLE, 0, 0, &si, &pi);
 
 	//throw up a thread that closes the handle when its done
 	std::thread x([pi](){

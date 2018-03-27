@@ -21,11 +21,11 @@
 #include <llvm/IR/AssemblyAnnotationWriter.h>
 #include <llvm/Support/FormattedStream.h>
 #include <llvm/Support/raw_os_ostream.h>
-#include <llvm/CodeGen/CommandFlags.h>
-#include <llvm/Target/TargetRegisterInfo.h>
+//#include <llvm/CodeGen/CommandFlags.h>
+//#include <llvm/Target/TargetRegisterInfo.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Target/TargetMachine.h>
-#include <llvm/Target/TargetSubtargetInfo.h>
+//#include <llvm/Target/TargetSubtargetInfo.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/GlobalVariable.h>
@@ -72,8 +72,8 @@ std::string Jet::exec(const char* cmd) {
 	return result;
 }
 
-
-Compilation::Compilation(JetProject* proj) : builder(llvm::getGlobalContext()), context(llvm::getGlobalContext()), project(proj)
+llvm::LLVMContext llvm_context_jet;
+Compilation::Compilation(JetProject* proj) : builder(llvm_context_jet), context(llvm_context_jet), project(proj)
 {
 	this->typecheck = false;
 	this->target = 0;
@@ -298,11 +298,12 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	compilation->debug = new llvm::DIBuilder(*compilation->module, true);
 
 	bool emit_debug = debug > 0;
-	auto emission_kind = debug <= 1 ? llvm::DIBuilder::DebugEmissionKind::LineTablesOnly : llvm::DIBuilder::DebugEmissionKind::FullDebug;
+	auto emission_kind = debug <= 1 ? llvm::DICompileUnit::DebugEmissionKind::LineTablesOnly : llvm::DICompileUnit::DebugEmissionKind::FullDebug;
 
 	char tmp_cwd[500];
 	getcwd(tmp_cwd, 500);
-	compilation->debug_info.cu = compilation->debug->createCompileUnit(dwarf::DW_LANG_C, "../aaaa.jet", tmp_cwd, "Jet Compiler", false, "", 0, "", emission_kind, 0, emit_debug);
+	auto file = compilation->debug->createFile("../aaaa.jet", "");
+	compilation->debug_info.cu = compilation->debug->createCompileUnit(llvm::dwarf::DW_LANG_C, file, "Jet Compiler", false, "", 0, "", emission_kind, 0, emit_debug);
 
 	//compile it
 	//first lets create the global context!!
@@ -785,7 +786,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 #ifndef _WIN32
 			remove(ii.c_str());
 #else
-			DeleteFile(ii.c_str());
+			DeleteFileA(ii.c_str());
 #endif
 	}
 
@@ -799,7 +800,7 @@ void Compilation::Optimize(int level)
 	llvm::legacy::PassManager MPM;
 	if (level > 0)
 	{
-		MPM.add(llvm::createFunctionInliningPass(level, 3));
+		MPM.add(llvm::createFunctionInliningPass(level, 3, false));
 		MPM.run(*module);
 	}
 
@@ -810,7 +811,7 @@ void Compilation::Optimize(int level)
 	// Do the main datalayout
 	//OurFPM.add(new llvm::DataLayoutPass());
 	// Provide basic AliasAnalysis support for GVN.
-	OurFPM.add(llvm::createBasicAliasAnalysisPass());
+	//OurFPM.add(llvm::createBasicAliasAnalysisPass());
 	// Do simple "peephole" optimizations and bit-twiddling optzns.
 	OurFPM.add(llvm::createInstructionCombiningPass());
 	// Reassociate expressions.
@@ -821,7 +822,7 @@ void Compilation::Optimize(int level)
 	// Promote allocas to registers
 	OurFPM.add(llvm::createPromoteMemoryToRegisterPass());
 	// Eliminate Common SubExpressions.
-	OurFPM.add(llvm::createGVNPass());
+	//OurFPM.add(llvm::createGVNPass());
 	// Simplify the control flow graph (deleting unreachable blocks, etc).
 	OurFPM.add(llvm::createCFGSimplificationPass());
 
@@ -846,10 +847,10 @@ void Compilation::SetTarget(const std::string& triple)
 	llvm::InitializeNativeTarget();
 	llvm::InitializeNativeTargetAsmParser();
 	llvm::InitializeNativeTargetAsmPrinter();
-	LLVMInitializeARMTarget();
-	LLVMInitializeARMAsmPrinter();
-	LLVMInitializeARMTargetMC();
-	LLVMInitializeARMTargetInfo();
+	//LLVMInitializeARMTarget();
+	//LLVMInitializeARMAsmPrinter();
+	//LLVMInitializeARMTargetMC();
+	//LLVMInitializeARMTargetInfo();
 	//LLVMInitializeMSP430Target();
 	//llvm::initializeTarget()
 
@@ -869,7 +870,7 @@ void Compilation::SetTarget(const std::string& triple)
 	//TheTriple = llvm::Triple("i686", "pc", "linux", "gnu");
 	// Get the target specific parser.
 	std::string Error;
-	const llvm::Target *TheTarget = llvm::TargetRegistry::lookupTarget(MArch, TheTriple, Error);
+	const llvm::Target *TheTarget = llvm::TargetRegistry::lookupTarget(TheTriple.str(), Error);
 
 	if (TheTarget == 0)
 	{
@@ -881,12 +882,12 @@ void Compilation::SetTarget(const std::string& triple)
 		//TheTriple = llvm::Triple("i686", "pc", "linux", "gnu");
 		// Get the target specific parser.
 		std::string Error;
-		TheTarget = llvm::TargetRegistry::lookupTarget(MArch, TheTriple, Error);
+		TheTarget = llvm::TargetRegistry::lookupTarget(TheTriple.str(), Error);
 	}
 	//for linux builds use i686-pc-linux-gnu
 
 	//ok add linux builds
-	llvm::TargetOptions Options = InitTargetOptionsFromCodeGenFlags();
+	llvm::TargetOptions Options;// = llvm::InitTargetOptionsFromCodeGenFlags();
 	//Options.MCOption
 	//Options.DisableIntegratedAS = NoIntegratedAssembler;
 	//Options.MCOptions.ShowMCEncoding = llvm::ShowMCEncoding;
@@ -895,11 +896,11 @@ void Compilation::SetTarget(const std::string& triple)
 	llvm::CodeGenOpt::Level OLvl = llvm::CodeGenOpt::Default;
 	Options.MCOptions.AsmVerbose = false;// llvm::AsmVerbose;
 	//llvm::TargetMachine Target(*(llvm::Target*)TheTarget, TheTriple.getTriple(), MCPU, FeaturesStr, Options);
-	auto RelocModel = llvm::Reloc::Default;
-	auto CodeModel = llvm::CodeModel::Default;
+	auto RelocModel = llvm::Reloc::Static;//this could be problematic
+	auto CodeModel = llvm::CodeModel::Medium;
 	this->target = TheTarget->createTargetMachine(TheTriple.getTriple(), MCPU, FeaturesStr, Options, RelocModel, CodeModel, OLvl);
 
-	module->setDataLayout(*this->target->getDataLayout());
+	module->setDataLayout(this->target->createDataLayout());
 }
 
 void Compilation::OutputPackage(const std::string& project_name, int o_level, bool time)
@@ -1379,7 +1380,7 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 	
 	llvm::Constant* initializer = init;// ? init : t->GetDefaultValue(this);
 	auto ng = new llvm::GlobalVariable(*module, llvm::ArrayType::get(t->GetLLVMType(), size)/*t->GetLLVMType()*/, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
-	this->debug->createGlobalVariable(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false, 0);
+	this->debug->createAutoVariable(this->debug_info.file, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
 	this->ns->members.insert({ name, Symbol(new CValue(this->GetInternalArrayType(t, size)->GetPointerType(), ng)) });
 
 	//ok for arrays we need to create two globals. one that holds a pointer to the other global
@@ -1396,7 +1397,7 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Const
 
 	llvm::Constant* initializer = init ? init : t->GetDefaultValue(this);
 	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
-	this->debug->createGlobalVariable(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false, 0);
+	this->debug->createAutoVariable(this->debug_info.file, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
 	this->ns->members.insert({ name, Symbol(new CValue(t->GetPointerType(), ng)) });
 
 	//if it has a constructor, make sure to call it
