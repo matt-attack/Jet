@@ -871,7 +871,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			auto val = (*this->_right)[i++].second->Compile(context);
 			type = val.type;
 
-
 			//need to move allocas outside of the loop and into the main body
 			auto TheFunction = context->function->f;
 			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
@@ -895,12 +894,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			CValue alloc;
 			alloc.val = Alloca;
 			alloc.type = val.type->GetPointerType();
-			if (val.type->type == Types::Array)
-			{
-				val.val = context->root->builder.CreateLoad(val.val);//todo: move this to new probably
-			}
-			//next fix there being a size in the array types that prevents it from being passed into a function
-			//	or rather just fix that being a problem
 			context->Store(alloc, val, true);
 		}
 		else

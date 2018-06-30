@@ -142,6 +142,8 @@ public:
 		operators["#else"] = TokenType::ElseMacro;
 		operators["#elseif"] = TokenType::ElseIfMacro;
 		operators["#endif"] = TokenType::EndIfMacro;
+
+		operators["//!@!"] = TokenType::LocationMacro;
 		//keywords["const"] = TokenType::Const;
 
 		//keywords["operator"] = TokenType::Operator;
@@ -439,6 +441,30 @@ Token Lexer::Next()
 					diag->Error("#endif without matching #if", Token());
 					throw 7;
 				}
+				continue;
+			}
+			else if (toktype == TokenType::LocationMacro)
+			{
+				//parse to the end of the line and throw out for now, eventually going to use this to set
+				//the line number
+				std::string location;
+				char c = src->EatChar();
+				while (c != '\n' && c != 0)
+				{
+					location += c;
+					c = src->EatChar();
+				}
+
+				//extract the line number from the end, start by finding last of @
+				int index = location.find_last_of('@');
+				std::string line = location.substr(index+1);
+				int lnum = std::atoi(line.c_str());
+
+				src->SetCurrentLine(lnum);
+
+				if (c == 0)
+					break;
+				
 				continue;
 			}
 			this->last_index = src->GetIndex();

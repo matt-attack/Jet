@@ -1,4 +1,13 @@
 
+trait TestTrait
+{
+	fun void Test();
+}
+
+struct TraitTester<TestTrait T>
+{
+	T var;
+}
 
 struct function<Any T>
 {
@@ -63,7 +72,7 @@ struct WhereIterable<Any T, IEnumerable Base>
 	Base* iterable;
 	function<bool(T)> fn;
 		
-	fun WhereIterator<T, VectorIterator<T> > GetEnumerator()
+	fun WhereIterator<T, VectorIterator<T>> GetEnumerator()
 	{
 		let WhereIterator<T, VectorIterator<T>/*typeof(this->iterable->GetEnumerator())*/ > x;
 		x.iter = this->iterable->GetEnumerator();
@@ -99,7 +108,6 @@ struct WhereIterator<Any T, IEnumerator Base>
 	}
 }
 
-
 fun WhereIterable<T, IEnumerable> IEnumerable::Where(function<bool(T)> fn)
 {
 	let WhereIterable<T, IEnumerable> x;
@@ -123,7 +131,7 @@ struct VectorIterator<Any TTT>
 {
 	int position;
 	int size;
-	TTT* data;
+	TTT[] data;
 	
 	fun TTT Current()
 	{
@@ -149,7 +157,7 @@ struct VectorIterator<Any TTT>
 
 struct vector<Any TT>
 {
-	TT* data;
+	TT[] data;
 	int max_size;
 	int cur_size; 
 	
@@ -212,7 +220,7 @@ struct vector<Any TT>
 			ne[i] = this->data[i];
 		}
 		puts("copied data");
-		free(<char*>this->data);
+		free this->data;
 		this->data = ne;
 		this->max_size = size;
 	}

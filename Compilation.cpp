@@ -325,7 +325,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	else
 		defines["RELEASE"] = true;
 
-	//builder converted headers and add their source
+	//build converted headers and add their source
 	for (auto hdr : project->headers)
 	{
 		std::string two = hdr;// argv[2];
@@ -375,9 +375,69 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	{
 		StackTime timer("Reading Symbols", time);
 		compilation->compiling_includes = true;
+		std::map<std::string, std::string*> tsymbol_sources;//used so we can reuse them
 		for (auto buffer : lib_symbols)
 		{
-			Source* src = new Source(buffer.second, buffer.first);
+			//parse into sources so we can use them below
+			const char* data = buffer.second;
+			unsigned int len = strlen(buffer.second);
+			std::string current_filename = buffer.first;
+			//lets read each line at a time
+			int i = 0;
+			while (i < len)
+			{
+				//find end of the line
+				int start = i;
+				while ( i < len && data[i++] != '\n')
+				{ }
+				int end = i-1;
+
+				const char* line = &data[start];
+				if (data[start] == '/' 
+					&& data[start + 1] == '/' 
+					&& data[start + 2] == '!'
+					&& data[start+3] == '@'
+					&& data[start+4] == '!')
+				{
+					const char* file_name = &data[start + 5];
+
+					//look for end of file_name
+					int p = start+5;
+					while (p < len && data[p++] != '@')
+					{
+					}
+
+					current_filename = std::string(file_name, p-(start+6));
+
+					//printf("Got filename %s", current_filename.c_str());
+				}
+				//else
+				{
+					//insert the line into the correct source...
+					// use current_filename to look up the source
+					auto source = tsymbol_sources.find(current_filename);
+					if (source == tsymbol_sources.end())
+					{
+						//create new one and add it to the list
+						tsymbol_sources[current_filename] = new std::string();// Source(buffer.second, current_filename, true);
+						source = tsymbol_sources.find(current_filename);
+					}
+
+					//ok now insert
+					source->second->append(line, end - start + 1);
+					//source->second->push_back('\n');
+				}
+			}
+		}
+
+		for (auto ii : tsymbol_sources)
+		{
+			//parse into sources
+			char* data = new char[ii.second->size()+1];
+			strcpy(data, ii.second->c_str());
+			delete ii.second;//we are done with this now
+			//printf("%s", data);
+			Source* src = new Source(data, ii.first);
 			compilation->sources["#symbols_" + std::to_string(symbol_asts.size() + 1)] = src;
 
 			BlockExpression* result = src->GetAST(diagnostics, {});
@@ -413,8 +473,9 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			compilation->debug_info.file = compilation->debug->createFile("temp",
 				compilation->debug_info.cu->getDirectory());
 
-			compilation->ResolveTypes();
+			//compilation->ResolveTypes();
 		}
+		compilation->ResolveTypes();
 		compilation->compiling_includes = false;
 	}
 
@@ -1380,7 +1441,7 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 	
 	llvm::Constant* initializer = init;// ? init : t->GetDefaultValue(this);
 	auto ng = new llvm::GlobalVariable(*module, llvm::ArrayType::get(t->GetLLVMType(), size)/*t->GetLLVMType()*/, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
-	this->debug->createAutoVariable(this->debug_info.file, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
+	//this->debug->createAutoVariable(this->debug_info.file, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
 	this->ns->members.insert({ name, Symbol(new CValue(this->GetInternalArrayType(t, size)->GetPointerType(), ng)) });
 
 	//ok for arrays we need to create two globals. one that holds a pointer to the other global
@@ -1397,7 +1458,13 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Const
 
 	llvm::Constant* initializer = init ? init : t->GetDefaultValue(this);
 	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
-	this->debug->createAutoVariable(this->debug_info.file, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
+	//this->debug->createAutoVariable(this->debug_info.file, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
+	/*DIGlobalVariableExpression *createGlobalVariableExpression(
+		DIScope *Context, StringRef Name, StringRef LinkageName, DIFile *File,
+		unsigned LineNo, DIType *Ty, bool isLocalToUnit,
+		DIExpression *Expr = nullptr, MDNode *Decl = nullptr,
+		uint32_t AlignInBits = 0);*/
+	this->debug->createGlobalVariableExpression(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
 	this->ns->members.insert({ name, Symbol(new CValue(t->GetPointerType(), ng)) });
 
 	//if it has a constructor, make sure to call it

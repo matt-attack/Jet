@@ -39,11 +39,15 @@ namespace Jet
 		}
 		~Source();
 
+		//used for setting up debug info from symbols
+		void SetCurrentLine(unsigned int line);
+
 		std::string GetLine(unsigned int line);
 		const char* GetLinePointer(unsigned int line);
 
 		void PreProcess(std::map<std::string, bool>& vars, DiagnosticBuilder* diag);
 
+		char EatChar();//do not produce a line from it
 		char ConsumeChar();
 		char MatchAndConsumeChar(char c);
 		char PeekChar();

@@ -15,12 +15,12 @@ void Token::Print(std::string& str, Source* source) const
 	str += text;
 }
 
-
 Source* Token::GetSource(Compilation* compilation) const 
 {
 	for (auto ii : compilation->sources)
 	{
-		if (ii.second->GetLinePointer(1) <= this->text_ptr && this->text_ptr <= &ii.second->GetLinePointer(1)[ii.second->GetLength()])
+		const char* data = ii.second->GetSubstring(0, 0);
+		if (data <= this->text_ptr && this->text_ptr <= &data[ii.second->GetLength()])
 		{
 			return ii.second;
 		}

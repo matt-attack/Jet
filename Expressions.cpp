@@ -652,8 +652,9 @@ CValue NewExpression::Compile(CompilerContext* context)
 		//store pointer
 		auto pointer_p = context->root->builder.CreateGEP(str, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 		context->root->builder.CreateStore(ptr.val, pointer_p);
-
-		return CValue(str_type, str);
+		
+		auto strv = context->root->builder.CreateLoad(str);
+		return CValue(str_type, strv);
 	}
 	return ptr;
 }

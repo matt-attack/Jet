@@ -132,6 +132,8 @@ namespace Jet
 		ElseIfMacro,
 		EndIfMacro,
 
+		LocationMacro,
+
 		InvalidToken
 	};
 

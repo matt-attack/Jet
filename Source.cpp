@@ -20,6 +20,17 @@ Source::~Source()
 	delete[] this->text;
 }
 
+void Source::SetCurrentLine(unsigned int line)
+{
+	if (line > this->lines.size())
+	{
+		this->lines.resize(line);
+	}
+	this->lines[line - 1].first = &text[index];
+	this->linenumber = line;
+	this->column = 0;
+}
+
 std::string Source::GetLine(unsigned int line)
 {
 	auto l = this->lines[line - 1];
@@ -38,6 +49,15 @@ const char* Source::GetLinePointer(unsigned int line)
 
 	return l.first;
 }
+char Source::EatChar()
+{
+	if (index >= length)
+		return 0;
+
+	column++;
+
+	return text[index++];
+}
 
 char Source::ConsumeChar()
 {
@@ -50,7 +70,14 @@ char Source::ConsumeChar()
 		this->linenumber++;
 		this->column = 0;
 
-		this->lines.push_back({ &text[index + 1], 0 });
+		if (this->lines.size() == this->linenumber - 1)
+		{
+			this->lines.push_back({ &text[index + 1], 0 });
+		}
+		else
+		{
+			this->lines[this->linenumber - 2] = { &text[index + 1], 0 };
+		}
 	}
 
 	return text[index++];
@@ -70,7 +97,15 @@ char Source::MatchAndConsumeChar(char c)
 		{
 			this->column = 0;
 			this->linenumber++;
-			this->lines.push_back({ &text[index + 1], 0 });
+			//this->lines.push_back({ &text[index + 1], 0 });
+			if (this->lines.size() == this->linenumber - 1)
+			{
+				this->lines.push_back({ &text[index + 1], 0 });
+			}
+			else
+			{
+				this->lines[this->linenumber - 2] = { &text[index + 1], 0 };
+			}
 		}
 	}
 	return ch;
@@ -88,7 +123,6 @@ bool Source::IsAtEnd()
 {
 	return this->index >= length;
 }
-
 
 BlockExpression* Source::GetAST(DiagnosticBuilder* builder, const std::map<std::string, bool>& defines)
 {
