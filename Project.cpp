@@ -243,7 +243,12 @@ bool JetProject::_Load(const std::string& projectdir)
 
 std::map<std::string, Source*> JetProject::GetSources()
 {
+	//char cwd[500];
+	//getcwd(cwd, 500);
 	std::map<std::string, Source*> sources;
+	//std::string scwd = cwd;
+	//int p = scwd.find_last_of('\\');
+	std::string project = this->project_name + "/";
 	for (auto file : files)
 	{
 		std::ifstream t(file, std::ios::in | std::ios::binary);
@@ -257,7 +262,7 @@ std::map<std::string, Source*> JetProject::GetSources()
 			buffer[length] = 0;
 			t.close();
 
-			sources[file] = new Source(buffer, file);
+			sources[file] = new Source(buffer, project + file);
 		}
 		else
 		{

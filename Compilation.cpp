@@ -375,7 +375,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	{
 		StackTime timer("Reading Symbols", time);
 		compilation->compiling_includes = true;
-		std::map<std::string, std::string*> tsymbol_sources;//used so we can reuse them
+		std::map<std::string, std::string*> source_strings;//used so we can reuse them
 		for (auto buffer : lib_symbols)
 		{
 			//parse into sources so we can use them below
@@ -388,55 +388,46 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			{
 				//find end of the line
 				int start = i;
-				while ( i < len && data[i++] != '\n')
-				{ }
+				while ( i < len && data[i++] != '\n') { }
 				int end = i-1;
 
 				const char* line = &data[start];
-				if (data[start] == '/' 
+				if (end - start > 6 && data[start] == '/' 
 					&& data[start + 1] == '/' 
 					&& data[start + 2] == '!'
-					&& data[start+3] == '@'
-					&& data[start+4] == '!')
+					&& data[start + 3] == '@'
+					&& data[start + 4] == '!')
 				{
 					const char* file_name = &data[start + 5];
 
 					//look for end of file_name
 					int p = start+5;
-					while (p < len && data[p++] != '@')
-					{
-					}
+					while (p < len && data[p++] != '@') {}
 
 					current_filename = std::string(file_name, p-(start+6));
-
-					//printf("Got filename %s", current_filename.c_str());
 				}
-				//else
+				//insert the line into the correct source...
+				// use current_filename to look up the source
+				auto source = source_strings.find(current_filename);
+				if (source == source_strings.end())
 				{
-					//insert the line into the correct source...
-					// use current_filename to look up the source
-					auto source = tsymbol_sources.find(current_filename);
-					if (source == tsymbol_sources.end())
-					{
-						//create new one and add it to the list
-						tsymbol_sources[current_filename] = new std::string();// Source(buffer.second, current_filename, true);
-						source = tsymbol_sources.find(current_filename);
-					}
-
-					//ok now insert
-					source->second->append(line, end - start + 1);
-					//source->second->push_back('\n');
+					//create new one and add it to the list
+					source_strings[current_filename] = new std::string();
+					source = source_strings.find(current_filename);
 				}
+
+				//ok now insert
+				source->second->append(line, end - start + 1);
 			}
 		}
 
-		for (auto ii : tsymbol_sources)
+		for (auto ii : source_strings)
 		{
-			//parse into sources
+			//copy into sources now that we are done
 			char* data = new char[ii.second->size()+1];
 			strcpy(data, ii.second->c_str());
-			delete ii.second;//we are done with this now
-			//printf("%s", data);
+			delete ii.second;//free the strings now that we are done with them
+
 			Source* src = new Source(data, ii.first);
 			compilation->sources["#symbols_" + std::to_string(symbol_asts.size() + 1)] = src;
 
@@ -641,6 +632,35 @@ char* ReadDependenciesFromSymbols(const char* path, int& size)
 	return 0;
 }
 
+std::string LinkLibLD(const std::string& path)
+{
+	int div = path.find_last_of('\\');
+	int d2 = path.find_last_of('/');
+	if (d2 > div)
+		div = d2;
+	std::string file = path.substr(div+1);
+	std::string lib_name = file;
+	//strip off any extension
+	if (lib_name.find_last_of('.'))
+	{
+		lib_name = lib_name.substr(0, lib_name.find_last_of('.'));
+	}
+	if (lib_name.length() > 3 && lib_name[0] == 'l'
+		&& lib_name[1] == 'i'
+		&& lib_name[2] == 'b')
+	{
+		lib_name = lib_name.substr(3);
+	}
+	std::string folder = path.substr(0, div);
+	std::string out;
+	if (div > -1)
+		out += " -L\"" + folder + "\" ";
+	else
+		out += " -L. ";
+	out += " -l\"" + lib_name + "\" ";
+	return out;
+}
+
 void Compilation::Assemble(const std::string& target, const std::string& linker, int olevel, bool time)
 {
 	if (this->diagnostics->GetErrors().size() > 0)
@@ -711,7 +731,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 
 			cmd += "build/" + project->project_name + ".o ";
 			cmd += "-o build/" + project->project_name + ".exe ";
-
+			//todo need to make sure to link in deps of deps also fix linking
 			//need to link each dependency
 			for (auto ii : project->ResolveDependencies())
 			{
@@ -737,16 +757,17 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 				{
 					const char* file = &data[pos];
 					if (file[0])
-						cmd += " -l:\"" + std::string(file) + "\"";
+						cmd += LinkLibLD(file);
+						//cmd += " -l:\"" + std::string(file) + "\"";
 
 					pos += strlen(&data[pos]) + 1;
 				}
 				delete[] data;
 			}
 
-			cmd += " -L.";
+			//cmd += " -L.";
 			for (auto ii : project->libs)
-				cmd += " -l:\"" + ii + "\" ";
+				cmd += LinkLibLD(ii);// " -l:\"" + ii + "\" ";
 
 			auto res = exec(cmd.c_str());
 			printf(res.c_str());
@@ -1006,7 +1027,7 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level, bo
 	//write names of libraries to link
 	std::string libnames;
 	//add libs from dependencies
-	for (auto ii : this->project->dependencies)
+	for (auto ii : this->project->ResolveDependencies())
 	{
 		//open up and read first part of the jlib file
 		int size;

@@ -1225,6 +1225,14 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 						{
 							std::string source;
 							auto src = ii.function->GetBlock()->start.GetSource(compilation);
+							int line = ii.function->token.line;
+							//subtract out any lines in the trivia
+							for (int i = 1; i <= ii.function->token.trivia_length; i++)
+							{
+								if (ii.function->token.text_ptr[-i] == '\n')
+									line -= 1;
+							}
+							data += "\n//!@!" + src->filename + "@" + std::to_string(line) + "\n";
 							ii.function->Print(source, src);
 							data += source;
 						}

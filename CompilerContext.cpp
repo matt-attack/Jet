@@ -270,8 +270,8 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 			//b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
 			//b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
 			//auto s = llvm::AttributeSet::get(ctext, ii + 1, b);
-			call->addParamAttr(ii + 1, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
-			call->addParamAttr(ii + 1, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
+			call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
+			call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
 			//call->setAttributes(s);
 		}
 		return CValue(fun->return_type, call);

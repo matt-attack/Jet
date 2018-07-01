@@ -9,16 +9,6 @@
 
 #include <stdlib.h>
 
-//#ifdef _DEBUG
-//#ifndef DBG_NEW      
-//#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )     
-//#define new DBG_NEW   
-//#endif
-//
-//#define _CRTDBG_MAP_ALLOC
-//#include <crtdbg.h>
-//#endif
-
 namespace Jet
 {
 	enum Precedence {
@@ -60,28 +50,7 @@ namespace Jet
 		}
 	};
 
-	/*class NullParselet: public PrefixParselet
-	{
-	public:
-		Expression* parse(Parser* parser, Token token)
-		{
-			return new NullExpression();
-		}
-	};*/
-
 	class LambdaAndAttributeParselet : public PrefixParselet
-	{
-	public:
-		Expression* parse(Parser* parser, Token token);
-	};
-
-	class ArrayParselet: public PrefixParselet
-	{
-	public:
-		Expression* parse(Parser* parser, Token token);
-	};
-
-	class ObjectParselet: public PrefixParselet
 	{
 	public:
 		Expression* parse(Parser* parser, Token token);
@@ -193,17 +162,6 @@ namespace Jet
 	{
 	public:
 
-		Expression* parse(Parser* parser, Expression* left, Token token);
-
-		int getPrecedence()
-		{
-			return Precedence::ASSIGNMENT;
-		}
-	};
-
-	class SwapParselet: public InfixParselet
-	{
-	public:
 		Expression* parse(Parser* parser, Expression* left, Token token);
 
 		int getPrecedence()
@@ -572,18 +530,6 @@ namespace Jet
 	public:
 		Expression* parse(Parser* parser, Token token);
 	};
-
-	/*class ResumeParselet: public StatementParselet
-	{
-	public:
-		Expression* parse(Parser* parser, Token token);
-	};
-
-	class ResumePrefixParselet: public PrefixParselet
-	{
-	public:
-		Expression* parse(Parser* parser, Token token);
-	};*/
 };
 
 #endif
