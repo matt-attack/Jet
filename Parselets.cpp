@@ -1163,6 +1163,7 @@ Expression* MemberParselet::parse(Parser* parser, Expression* left, Token token)
 	{
 		delete member; delete left;
 		parser->Error("Cannot access member name that is not a string", token);
+		return 0;
 	}
 
 	return new IndexExpression(left, name->token, token);
@@ -1177,6 +1178,7 @@ Expression* PointerMemberParselet::parse(Parser* parser, Expression* left, Token
 	{
 		delete member; delete left;
 		parser->Error("Cannot access member name that is not a string", token);
+		return 0;
 	}
 
 	return new IndexExpression(left, name->token, token);

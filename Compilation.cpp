@@ -661,7 +661,7 @@ std::string LinkLibLD(const std::string& path)
 	return out;
 }
 
-void Compilation::Assemble(const std::string& target, const std::string& linker, int olevel, bool time)
+void Compilation::Assemble(const std::string& target, const std::string& linker, int olevel, bool time, bool output_ir)
 {
 	if (this->diagnostics->GetErrors().size() > 0)
 		return;
@@ -695,7 +695,8 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 		this->Optimize(olevel);
 
 	//output the IR for debugging
-	this->OutputIR("build/output.ir");
+	if (output_ir)
+		this->OutputIR("build/output.ir");
 
 	//output the .o file and .jlib for this package
 	this->OutputPackage(project->project_name, olevel, time);
@@ -729,15 +730,15 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 			//set entry
 			cmd += "--entry _main ";
 
-			cmd += "build/" + project->project_name + ".o ";
-			cmd += "-o build/" + project->project_name + ".exe ";
+			cmd += "\"build/" + project->project_name + ".o\" ";
+			cmd += "-o \"build/" + project->project_name + ".exe\" ";
 			//todo need to make sure to link in deps of deps also fix linking
 			//need to link each dependency
 			for (auto ii : project->ResolveDependencies())
 			{
-				cmd += ii + "/build/";//cmd += "-L" + ii + "/build/ ";
+				cmd += "\"" + ii + "/build/";//cmd += "-L" + ii + "/build/ ";
 
-				cmd += GetNameFromPath(ii) + ".o ";
+				cmd += GetNameFromPath(ii) + ".o\" ";
 			}
 
 			//then for each dependency add libs that it needs to link
@@ -758,17 +759,17 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 					const char* file = &data[pos];
 					if (file[0])
 						cmd += LinkLibLD(file);
-						//cmd += " -l:\"" + std::string(file) + "\"";
 
 					pos += strlen(&data[pos]) + 1;
 				}
 				delete[] data;
 			}
 
-			//cmd += " -L.";
 			for (auto ii : project->libs)
-				cmd += LinkLibLD(ii);// " -l:\"" + ii + "\" ";
-
+				cmd += LinkLibLD(ii);
+			//rename _context into this in generators, figure out why passing by value into async doesnt work
+			//	implement basic containers
+			printf("\n%s\n", cmd.c_str());
 			auto res = exec(cmd.c_str());
 			printf(res.c_str());
 		}

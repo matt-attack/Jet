@@ -484,10 +484,6 @@ void MakeDocs(Compilation* compilation)
 
 void DoCommand(int argc, char* argv[])
 {
-	OptionParser parser;
-	SetupDefaultCommandOptions(&parser);
-	parser.Parse(argc, argv);
-
 	std::string cmd = argc > 1 ? argv[1] : "";
 	if (cmd == "projects")
 	{
@@ -505,6 +501,10 @@ void DoCommand(int argc, char* argv[])
 	}
 	else if (cmd == "runtests")
 	{
+		OptionParser parser;
+		SetupDefaultCommandOptions(&parser);
+		parser.Parse(argc, argv);
+
 		//finish tests
 		parser.GetOption("f").SetValue("1");
 
@@ -642,21 +642,29 @@ void DoCommand(int argc, char* argv[])
 		printf("Created new empty project.\n");
 		return;
 	}
+	else if (cmd == "build")
+	{
+		OptionParser parser;
+		SetupDefaultCommandOptions(&parser);
+		parser.Parse(argc-1, &argv[1]);
 
-	//add options to this later
-	CompilerOptions options;
-	options.ApplyOptions(&parser);
+		CompilerOptions options;
+		options.ApplyOptions(&parser);
 
-	std::string config = "";
-	if (parser.commands.size())
-		config = parser.commands.front();
+		std::string config = "";
+		if (parser.commands.size() > 1)
+			config = parser.commands[1];
 
-	//todo, use command list from parser and get configurations working correctly
-	Jet::Compiler c;
-	if (argc == 1 || strcmp(argv[1], "-build") == 0)
-		c.Compile("", &options, config, &parser);
+		Jet::Compiler c;
+		if (argc >= 3)
+			c.Compile(argv[2], &options, config, &parser);
+		else
+			c.Compile("", &options, config, &parser);
+	}
 	else
-		c.Compile(argv[1], &options, config, &parser);
+	{
+		printf("Unknown verb.\n");
+	}
 }
 
 #if (BOOST_OS_CYGWIN || _WINDOWS)

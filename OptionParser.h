@@ -102,56 +102,6 @@ public:
 
 		this->Parse(numargs, args);
 		delete[] command;
-		return;
-		//just parse it into an array of space separated things to process below
-		/*int pos = 0;
-		while (pos < args.length())
-		{
-			char c = args[pos++];
-			if (c == '-' && pos < args.length())//its an option
-			{
-				char o = args[pos++];
-
-				std::string option;
-				if (o == '-')//multicharacter name
-				{
-					//parse then name then spit out
-					pos++;
-					while ((o >= 'a' && o <= 'z') || (o >= 'A' && o <= 'Z'))
-					{
-
-						o = args[pos++];
-						option += o;
-					}
-				}
-				else
-					option += o;
-
-				//read in value
-				std::string value;
-				while (args[pos] && args[pos] != ' ')
-					value += args[pos++];
-
-				pos++;
-
-				auto find = vars.find(option);
-				if (find != vars.end())
-					vars[option].SetValue(value);
-				else
-					vars[option] = OptionVar(option.c_str(), value.c_str());
-			}
-			else
-			{
-				//read in value
-				std::string value;
-				value += c;
-				while (args[pos] && args[pos] != ' ')
-					value += args[pos++];
-
-				pos++;
-				this->commands.push_back(value);
-			}
-		}*/
 	}
 
 	void Parse(int argc, char ** args)
@@ -189,7 +139,10 @@ public:
 				if (find != vars.end())
 					vars[option].SetValue(value);
 				else
+				{
+					printf("WARNING: Argument/flag '%s' does not exist\n", option.c_str());
 					vars[option] = OptionVar(option.c_str(), value.c_str());
+				}
 			}
 			else
 			{

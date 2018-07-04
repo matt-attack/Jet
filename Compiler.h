@@ -26,6 +26,7 @@ namespace Jet
 		int optimization;//from 0-3
 		int debug;//0 = none, 1 = lines, 2 = everything
 		bool force, run = false, time = false;
+		bool output_ir = false;
 		std::string target, linker;
 		CompilerOptions()
 		{

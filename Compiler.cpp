@@ -18,11 +18,8 @@
 #include <fstream>
 #include <sstream>
 
-
 using namespace Jet;
 
-//#include "JIT.h"
-//MCJITHelper* JITHelper;
 #ifdef _WIN32
 #include <Windows.h>
 
@@ -31,6 +28,9 @@ using namespace Jet;
 #include <sys/types.h>
 #include <unistd.h>
 #endif
+
+#include <process.h>
+#include <thread>
 
 //this adds all the available options to the parser for jet
 void Jet::SetupDefaultCommandOptions(OptionParser* parser)
@@ -42,6 +42,7 @@ void Jet::SetupDefaultCommandOptions(OptionParser* parser)
 	parser->AddOption("target", "");
 	parser->AddOption("linker", "");
 	parser->AddOption("debug", "2");
+	parser->AddOption("ir", "0");
 }
 
 //this reads the options out of the parser and applys them 
@@ -54,8 +55,7 @@ void CompilerOptions::ApplyOptions(OptionParser* parser)
 	this->target = parser->GetOption("target").GetString();
 	this->linker = parser->GetOption("linker").GetString();
 	this->debug = parser->GetOption("debug").GetInt();
-
-	//todo error if we have other options specified
+	this->output_ir = parser->GetOption("ir").GetString().length() == 0;
 }
 
 void Jet::Diagnostic::Print()
@@ -128,8 +128,6 @@ public:
 	}
 };
 
-#include <process.h>
-#include <thread>
 void ExecuteProject(JetProject* project, const char* projectdir)
 {
 	//now try running it if we are supposed to
@@ -303,10 +301,10 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 		if (found == false && project->configurations.size() > 0)
 		{
 			configuration = *project->configurations.begin();
-			printf("Build Configuration Name: '%s' Does Not Exist, Defaulting To '%s'\n", config_name.c_str(), project->configurations.begin()->name.c_str());
+			printf("WARNING: Build Configuration Name: '%s' Does Not Exist, Defaulting To '%s'\n", config_name.c_str(), project->configurations.begin()->name.c_str());
 		}
 		else if (found == false)
-			printf("Build Configuration Name: '%s' Does Not Exist\n", config_name.c_str());
+			printf("WARNING: Build Configuration Name: '%s' Does Not Exist\n", config_name.c_str());
 	}
 	else
 	{
@@ -405,7 +403,7 @@ error:
 	}
 	else
 	{
-		compilation->Assemble(options.target, options.linker, options.optimization, options.time);
+		compilation->Assemble(options.target, options.linker, options.optimization, options.time, options.output_ir);
 
 		//output build times
 		std::ofstream rebuild("build/rebuild.txt");

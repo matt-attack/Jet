@@ -301,10 +301,11 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		}
 		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
 		{
-			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
+			auto indexv = index->Compile(context);
+			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, indexv).val };
 			auto first_loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 			first_loc = context->root->builder.CreateLoad(first_loc);
-			auto loc = context->root->builder.CreateGEP(first_loc/*lhs.val*/, context->DoCast(context->root->IntType, index->Compile(context)).val/*iindex*/, "index");
+			auto loc = context->root->builder.CreateGEP(first_loc/*lhs.val*/, context->DoCast(context->root->IntType, indexv).val/*iindex*/, "index");
 			auto typ = lhs.type->base->base->GetPointerType();
 			return CValue(typ, loc);
 		}
@@ -321,20 +322,26 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 				return CValue(lhs.type->base->base->GetPointerType()->GetPointerType(), loc);
 			}
 		}
-		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && this->member.text.length() == 0)//or pointer!!(later)
+		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::InternalArray && this->member.text.length() != 0)//or pointer!!(later)
 		{
-			//throw 7;
-			std::vector<llvm::Value*> iindex = { context->DoCast(context->root->IntType, index->Compile(context)).val };
+			if (this->member.text == "size")
+			{
+				auto loc = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType());
+				context->root->builder.CreateStore(context->root->builder.getInt32(lhs.type->base->size), loc);
+				return CValue(context->root->IntType->GetPointerType(), loc);
+			}
+			else if (this->member.text == "ptr")
+			{
+				//just return a pointer to myself
+				auto loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 
-			//loadme!!!
-			lhs.val = context->root->builder.CreateLoad(lhs.val);
-			//llllload my index
-			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
-
-			return CValue(lhs.type->base, loc);
+				auto alloca = context->root->builder.CreateAlloca(loc->getType());
+				context->root->builder.CreateStore(loc, alloca);
+				return CValue(lhs.type->base->base->GetPointerType()->GetPointerType(), alloca);
+			}
 		}
 		//maybe this case shouldnt happen
-		/*else if (lhs.type->type == Types::InternalArray && this->member.text.length() == 0)//or pointer!!(later)
+		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::InternalArray && this->member.text.length() == 0)//or pointer!!(later)
 		{
 			//throw 7;
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
@@ -345,8 +352,10 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
 			
 			return CValue(lhs.type->base->GetPointerType(), loc);
-		}*/
-		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::InternalArray && this->member.text.length() == 0)//or pointer!!(later)
+		}
+		else if (lhs.type->type == Types::Pointer 
+			&& lhs.type->base->type == Types::InternalArray
+			&& this->member.text.length() == 0)
 		{
 			//throw 7;
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
@@ -355,6 +364,17 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			//lhs.val = context->root->builder.CreateLoad(lhs.val);
 			//llllload my index
 			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
+
+			return CValue(lhs.type->base->base->GetPointerType(), loc);
+		}
+		else if (lhs.type->type == Types::Pointer
+			&& lhs.type->base->type == Types::Pointer
+			&& this->member.text.length() == 0)
+		{
+			std::vector<llvm::Value*> iindex = { context->DoCast(context->root->IntType, index->Compile(context)).val };
+
+			auto val = context->root->builder.CreateLoad(lhs.val);
+			auto loc = context->root->builder.CreateGEP(val, iindex, "index");
 
 			return CValue(lhs.type->base->base->GetPointerType(), loc);
 		}
@@ -635,7 +655,7 @@ CValue NewExpression::Compile(CompilerContext* context)
 		//handle constructor args
 		return ptr;
 	}
-	context->Construct(ptr, arr_size);
+	context->Construct(ptr, this->size ? arr_size : 0);
 
 
 	//ok now stick it in an array if we specified size

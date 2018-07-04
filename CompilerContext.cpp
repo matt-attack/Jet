@@ -72,7 +72,10 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 	llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->function->f);
 	root->builder.SetInsertPoint(bb);
 
-	this->root->current_function = n;
+	// Do not export lambdas
+	if (lambda)
+		func->do_export = false;
+
 	return n;
 }
 
@@ -205,16 +208,20 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 					CallFunction(context, fun, argsv, true);
 				}
 				else if (type->data->is_class)
+				{
 					context->root->Error("Cannot copy class '" + type->data->name + "' unless it has a copy operator.", *context->current_token);
+				}
+				else
+				{
+					context->root->builder.CreateStore(ii.val, alloc);
+				}
 			}
 			else
 			{
 				context->root->builder.CreateStore(ii.val, alloc);
 			}
 
-			//context->Store(CValue(fun->arguments[i].first->GetPointerType(), alloc), CValue(fun->arguments[i].first, ii));
-			//context->root->builder.CreateStore(ii, alloc);
-			arg_vals[i] = alloc;// ii = alloc;
+			arg_vals[i] = alloc;
 			to_convert.push_back(i);
 		}
 		i++;
@@ -246,14 +253,9 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 		//add attributes
 		for (auto ii : to_convert)
 		{
-			//llvm::AttrBuilder b;
 			auto& ctext = context->root->builder.getContext();
-			//b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
-			//b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-			//auto s = llvm::AttributeSet::get(ctext, ii + 1, b);
 			call->addParamAttr(ii + 1, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
 			call->addParamAttr(ii + 1, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-			//call->setAttributes(s);
 		}
 
 		return CValue(fun->return_type, call);
@@ -265,14 +267,9 @@ CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>
 		//add attributes
 		for (auto ii : to_convert)
 		{
-			//llvm::AttrBuilder b;
 			auto& ctext = context->root->builder.getContext();
-			//b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
-			//b.addAttribute(llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-			//auto s = llvm::AttributeSet::get(ctext, ii + 1, b);
 			call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
 			call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-			//call->setAttributes(s);
 		}
 		return CValue(fun->return_type, call);
 	}
@@ -569,13 +566,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 				}
 				if (fun)
 				{
-					//ok, we allocate, call then 
-					//allocate thing
-					//auto Alloca = this->root->builder.CreateAlloca(GetType(type->second), 0, "constructortemp");
-
-					//fun->Load(this->parent);
-
-					return fun;// CValue(type->second, this->root->builder.CreateLoad(Alloca));
+					return fun;
 				}
 			}
 		}
@@ -625,7 +616,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 						int subl = 0;
 						for (; subl < iii.first->name.length(); subl++)
 						{
-							if (!IsLetter(iii.first->name[subl]))
+							if (!IsLetter(iii.first->name[subl]))//todo this might break with numbers in variable names
 								break;
 						}
 						//check if it refers to same type
@@ -651,7 +642,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 									this->root->Error("Could not infer template type", *this->current_token);
 								pos--;
 							}
-							templates[i] = cur_type;// args[i2];
+							templates[i] = cur_type;
 						}
 						i2++;
 					}
@@ -763,10 +754,9 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			else
 			{
 				type->Load(this->root);
-				//auto Alloca = this->root->builder.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
 
 				//fake a constructor
-				return CValue(type, type->GetDefaultValue(this->root));// this->root->builder.CreateLoad(Alloca));
+				return CValue(type, type->GetDefaultValue(this->root));
 			}
 		}
 		else
@@ -986,7 +976,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	if (value.type->type == t->type && value.type->data == t->data)
 		return value;
 
-	llvm::Type* tt = t->GetLLVMType();// GetType(t);
+	llvm::Type* tt = t->GetLLVMType();
 	if (value.type->type == Types::Float && t->type == Types::Double)
 	{
 		//lets do this
