@@ -67,7 +67,7 @@ void Jet::Diagnostic::Print()
 
 		std::string code = this->line;
 		std::string underline = "";
-		for (int i = 0; i < code.length(); i++)
+		for (unsigned int i = 0; i < code.length(); i++)
 		{
 			if (code[i] == '\t')
 				underline += '\t';
@@ -346,7 +346,7 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 	}
 	else if (modifiedtimes.size() == buildtimes.size())//check if files were modified
 	{
-		for (int i = 0; i < modifiedtimes.size(); i++)
+		for (unsigned int i = 0; i < modifiedtimes.size(); i++)
 		{
 			if (modifiedtimes[i] == buildtimes[i])
 			{

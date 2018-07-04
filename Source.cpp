@@ -309,7 +309,7 @@ int ProcessBlock(char* text, int length, std::map<std::string, bool>& vars, Diag
 void Source::PreProcess(std::map<std::string, bool>& vars, DiagnosticBuilder* diag)
 {
 	//read until an if or stop otherwise
-	for (int i = 0; i < this->length; i++)
+	for (unsigned int i = 0; i < this->length; i++)
 	{
 		if (this->text[i] == '#')
 		{

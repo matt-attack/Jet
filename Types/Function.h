@@ -123,7 +123,7 @@ namespace Jet
 			if (f->arguments.size() != this->arguments.size())
 				return false;
 
-			for (int i = 0; i < f->arguments.size(); i++)
+			for (unsigned int i = 0; i < f->arguments.size(); i++)
 				if (f->arguments[i].first != this->arguments[i].first)
 					return false;
 

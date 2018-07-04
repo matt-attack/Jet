@@ -88,7 +88,7 @@ namespace Jet
 			if (this->_right)
 				this->equals.Print(output, source);
 
-			int i = 0;
+			unsigned int i = 0;
 			for (auto ii : *_names)
 			{
 				if (_right && i < _right->size())
@@ -139,7 +139,7 @@ namespace Jet
 			Type* ty = new Type(this->name.text, Types::Union);
 			ty->_union = new Union;
 			ty->_union->members.resize(this->elements.size());
-			for (int i = 0; i < this->elements.size(); i++)
+			for (unsigned int i = 0; i < this->elements.size(); i++)
 				context->root->AdvanceTypeLookup(&ty->_union->members[i], this->elements[i].first.text, &this->elements[i].first);
 
 			context->root->ns->members.insert({ this->name.text, ty });
@@ -203,12 +203,12 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
-			for (int i = 0; i < this->names->size(); i++)
+			for (unsigned int i = 0; i < this->names->size(); i++)
 				context->SetNamespace((*this->names)[i].first.text);
 
 			this->block->Compile(context);
 
-			for (int i = 0; i < this->names->size(); i++)
+			for (unsigned int i = 0; i < this->names->size(); i++)
 				context->PopNamespace();
 
 			return CValue();
@@ -217,12 +217,12 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			//push namespace
-			for (int i = 0; i < this->names->size(); i++)
+			for (unsigned int i = 0; i < this->names->size(); i++)
 				context->SetNamespace((*this->names)[i].first.text);
 
 			this->block->TypeCheck(context);
 
-			for (int i = 0; i < this->names->size(); i++)
+			for (unsigned int i = 0; i < this->names->size(); i++)
 				context->PopNamespace();
 
 			return 0;
@@ -230,19 +230,19 @@ namespace Jet
 
 		void CompileDeclarations(CompilerContext* context)
 		{
-			for (int i = 0; i < this->names->size(); i++)
+			for (unsigned int i = 0; i < this->names->size(); i++)
 				context->SetNamespace((*this->names)[i].first.text);
 
 			this->block->CompileDeclarations(context);
 
-			for (int i = 0; i < this->names->size(); i++)
+			for (unsigned int i = 0; i < this->names->size(); i++)
 				context->PopNamespace();
 		}
 
 		void Print(std::string& output, Source* source)
 		{
 			token.Print(output, source);
-			for (int i = 0; i < this->names->size(); i++)
+			for (unsigned int i = 0; i < this->names->size(); i++)
 			{
 				(*this->names)[i].first.Print(output, source);
 
@@ -265,11 +265,11 @@ namespace Jet
 	class FunctionExpression : public Expression
 	{
 		friend class StructExpression;
-		friend class Namespace;
+		friend struct Namespace;
 		friend class Compiler;
 		friend class CompilerContext;
 		friend class Type;
-		friend class Function;
+		friend struct Function;
 		friend struct Struct;
 		Token name;
 		std::vector<FunctionArg>* args;
@@ -641,7 +641,7 @@ namespace Jet
 			{
 				if (ii.type == StructMember::FunctionMember)
 					ii.function->SetParent(this);
-				else if (ii.type == ii.type == StructMember::DefinitionMember)
+				else if (ii.type == StructMember::DefinitionMember)
 					ii.definition->SetParent(this);
 			}
 		}
@@ -683,7 +683,7 @@ namespace Jet
 			{
 				if (ii.type == StructMember::FunctionMember)
 					ii.function->Print(output, source);
-				else if (ii.type == ii.type == StructMember::DefinitionMember)
+				else if (ii.type == StructMember::DefinitionMember)
 					ii.definition->Print(output, source);
 				else
 				{

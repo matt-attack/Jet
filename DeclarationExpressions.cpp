@@ -204,7 +204,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			if (call->left == this)
 				context->root->Error("Cannot imply type of lambda with the args of its call", *context->current_token);
 
-			int i = dynamic_cast<NameExpression*>(call->left) ? 0 : 1;
+			unsigned int i = dynamic_cast<NameExpression*>(call->left) ? 0 : 1;
 			for (; i < call->args->size(); i++)
 			{
 				if ((*call->args)[i].first == this)
@@ -360,7 +360,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		}
 
 		//add local vars
-		for (int i = 2 + this->args->size(); i < data.type->base->data->struct_members.size(); i++)
+		for (unsigned int i = 2 + this->args->size(); i < data.type->base->data->struct_members.size(); i++)
 		{
 			auto gep = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(i) });
 			function_context->function->generator.variable_geps.push_back(gep);
@@ -436,7 +436,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		if (argsv.size() > 1)
 		{
 			auto AI = func->function->f->arg_begin();
-			for (int i = 1; i < argsv.size(); i++)
+			for (unsigned int i = 1; i < argsv.size(); i++)
 			{
 				auto ptr = context->root->builder.CreateGEP(alloc, { context->root->builder.getInt32(0), context->root->builder.getInt32(2 + i - 1) });
 				context->root->builder.CreateStore(AI++, ptr);
@@ -648,7 +648,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			for (auto temp : *this->templates)
 			{
 				//get the name of the variable
-				int subl = 0;
+				unsigned int subl = 0;
 				for (; subl < ii.type.text.length(); subl++)
 				{
 					if (!IsLetter(ii.type.text[subl]))
@@ -790,7 +790,9 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		llvm::AllocaInst* Alloca = 0;
 		if (ii.first.text.length())
 		{
+			context->CurrentToken(&ii.first);
 			type = context->root->LookupType(ii.first.text);
+			context->CurrentToken(&(*_names)[0].second);
 			if (this->_right)
 				val = (*this->_right)[i++].second->Compile(context);
 		}
@@ -1246,7 +1248,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			//setup vtable if there is one
 			ii.second->Load(context->root);
 			auto iter = ii.second->f->getBasicBlockList().begin()->begin();
-			for (int i = 0; i < ii.second->arguments.size() * 3; i++)
+			for (unsigned int i = 0; i < ii.second->arguments.size() * 3; i++)
 				iter++;
 			context->root->builder.SetInsertPoint(&*iter);
 
@@ -1304,7 +1306,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			auto dp = context->root->builder.getCurrentDebugLocation();
 
 			auto iter = ii.second->f->getBasicBlockList().begin()->begin();
-			for (int i = 0; i < ii.second->arguments.size() * 3; i++)
+			for (unsigned int i = 0; i < ii.second->arguments.size() * 3; i++)
 				iter++;
 			context->root->builder.SetInsertPoint(&*iter);
 
@@ -1410,7 +1412,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 				context->root->typecheck = true;
 				context->root->AdvanceTypeLookup(&func->return_type, ii.function->ret_type.text, &ii.function->ret_type);
 				func->arguments.push_back({ 0, "this" });
-				for (int i = 0; i < ii.function->args->size(); i++)
+				for (unsigned int i = 0; i < ii.function->args->size(); i++)
 					func->arguments.push_back({ 0, ii.function->args->at(i).name.text });
 
 				context->root->typecheck = false;

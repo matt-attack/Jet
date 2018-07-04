@@ -134,7 +134,7 @@ Function* Function::Instantiate(Compilation* compiler, const std::vector<Type*>&
 Type* Function::GetType(Compilation* compiler)
 {
 	std::vector<Type*> args;
-	for (int i = 0; i < this->arguments.size(); i++)
+	for (unsigned int i = 0; i < this->arguments.size(); i++)
 		args.push_back(this->arguments[i].first);
 	
 	return compiler->GetFunctionType(return_type, args);

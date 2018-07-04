@@ -625,7 +625,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		auto oldname = expr->name;
 		expr->name.text = t->data->name;
 
-		int start = compiler->types.size();
+		int start = compiler->unresolved_types.size();
 
 		//store then restore insertion point
 		auto rp = compiler->builder.GetInsertBlock();
@@ -638,7 +638,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		expr->AddConstructorDeclarations(t, compiler->current_function);
 
 		//fixme later, compiler->types should have a size of 0 and this should be unnecesary
-		assert(start == compiler->types.size());
+		assert(start == compiler->unresolved_types.size());
 
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
@@ -666,12 +666,14 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		expr->AddConstructorDeclarations(t, compiler->current_function);
 
 		bool has_trait = false;
-		for (int i = 0; i < types.size(); i++)
+		for (unsigned int i = 0; i < types.size(); i++)
+		{
 			if (types[i]->IsValid() == false)
 			{
 				has_trait = true;
 				break;
 			}
+		}
 
 		if (has_trait == false)
 			compiler->unfinished_templates.push_back(t);
@@ -914,7 +916,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 bool is_constructor(const std::string& name)
 {
 	std::string strname;
-	for (int i = 2; i < name.length(); i++)
+	for (unsigned int i = 2; i < name.length(); i++)
 	{
 		if (name[i] == '_')
 			break;
@@ -1086,7 +1088,7 @@ void Struct::Load(Compilation* compiler)
 		ptrs.resize(vtable_size);
 
 		//find the vtable location
-		int vtable_loc = 0;
+		unsigned int vtable_loc = 0;
 		for (; vtable_loc < this->struct_members.size(); vtable_loc++)
 		{
 			if (this->struct_members[vtable_loc].name == "__vtable")
@@ -1183,7 +1185,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 				if (ii.second.ty->data->templates.size() > 0)
 				{
 					data += "struct " + ii.second.ty->data->name + "<";
-					for (int i = 0; i < ii.second.ty->data->templates.size(); i++)
+					for (unsigned int i = 0; i < ii.second.ty->data->templates.size(); i++)
 					{
 						data += ii.second.ty->data->templates[i].first->name + " ";
 						data += ii.second.ty->data->templates[i].second;
@@ -1256,7 +1258,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 
 					data += fun.first + "(";
 					bool first = false;
-					for (int i = 1; i < fun.second->arguments.size(); i++)
+					for (unsigned int i = 1; i < fun.second->arguments.size(); i++)
 					{
 						if (first)
 							data += ",";
@@ -1274,7 +1276,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 				//	add_location(ii.second.ty->trait->expression->token, data, compilation);
 
 				data += "trait " + ii.second.ty->trait->name;
-				for (int i = 0; i < ii.second.ty->trait->templates.size(); i++)
+				for (unsigned int i = 0; i < ii.second.ty->trait->templates.size(); i++)
 				{
 					if (i == 0)
 						data += '<';
@@ -1343,7 +1345,7 @@ int Type::GetSize()
 	if (this->type == Types::Struct)
 	{
 		int size = 0;
-		for (int i = 0; i < this->data->struct_members.size(); i++)
+		for (unsigned int i = 0; i < this->data->struct_members.size(); i++)
 			size += this->data->struct_members[i].type->GetSize();
 		return size;
 	}

@@ -136,7 +136,7 @@ namespace Jet
 		Type* GetBaseType()//returns bottom level type
 		{
 			if (this->type == Types::Pointer)
-				this->base->GetBaseType();
+				return this->base->GetBaseType();
 			else if (this->type == Types::Array)
 				return this->base->GetBaseType();
 			else
@@ -224,7 +224,7 @@ namespace Jet
 		void OutputMetadata(std::string& data, Compilation* comp);
 	};
 
-	class Function;
+	struct Function;
 	struct Trait : public Namespace
 	{
 		bool valid;

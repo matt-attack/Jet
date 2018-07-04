@@ -99,12 +99,12 @@ namespace Jet
 			auto FBloc = new llvm::GlobalVariable(*root->module, fname->getType(), true,
 				llvm::GlobalValue::InternalLinkage, fname,
 				"const_string");
-			auto const_inst32 = llvm::ConstantInt::get(this->context, llvm::APInt(32, 0, 10));
+			auto const_inst32 = llvm::ConstantInt::get(this->context, llvm::APInt(32, 0, false));
 			std::vector<llvm::Value*> const_ptr_7_indices = { const_inst32, const_inst32 };
 			
 			auto res = this->root->builder.CreateGEP(FBloc, const_ptr_7_indices, "x");
 
-			return CValue(this->root->CharPointerType/*LookupType("char*")*/, res);
+			return CValue(this->root->CharPointerType, res);
 		}
 
 		void RegisterLocal(const std::string& name, CValue val, bool needs_destruction = false)

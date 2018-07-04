@@ -703,7 +703,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 
 	//and handling the arguments as well as function overloads, which is still a BIG problem
 	//need name mangling
-
+	
 	//then, if and only if I am an executable, make the .exe
 	if (project->IsExecutable())
 	{
@@ -1088,7 +1088,7 @@ void Compilation::AdvanceTypeLookup(Jet::Type** dest, const std::string& name, T
 	type->_location = location;
 	if (this->typecheck)
 		type->pointer_type = (Type*)-7;
-	types.push_back({ this->ns, dest });
+	unresolved_types.push_back({ this->ns, dest });
 
 	*dest = type;
 }
@@ -1258,7 +1258,7 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 
 Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 {
-	int i = 0;
+	unsigned int i = 0;
 	while (IsLetter(name[i]) || IsNumber(name[i]))
 	{
 		i++;
@@ -1551,7 +1551,7 @@ Jet::Type* Compilation::GetInternalArrayType(Jet::Type* base, unsigned int size)
 		if (it->second->function->return_type == return_type && it->second->function->args.size() == args.size())
 		{
 			found = true;
-			for (int i = 0; i < it->second->function->args.size(); i++)
+			for (unsigned int i = 0; i < it->second->function->args.size(); i++)
 			{
 				if (it->second->function->args[i] != args[i])
 					found = false;
@@ -1595,14 +1595,14 @@ Jet::Type* Compilation::GetInternalArrayType(Jet::Type* base, unsigned int size)
 void Compilation::ResolveTypes()
 {
 	auto oldns = this->ns;
-	for (int i = 0; i < this->types.size(); i++)
+	for (unsigned int i = 0; i < this->unresolved_types.size(); i++)
 	{
-		auto loc = types[i].second;
+		auto loc = unresolved_types[i].second;
 		if ((*loc)->type == Types::Invalid)
 		{
 			//resolve me
 			this->current_function->current_token = (*loc)->_location;
-			this->ns = types[i].first;
+			this->ns = unresolved_types[i].first;
 
 			if ((*loc)->pointer_type == (Type*)-7)
 				this->typecheck = true;
@@ -1614,7 +1614,7 @@ void Compilation::ResolveTypes()
 			*loc = res;
 		}
 	}
-	this->types.clear();
+	this->unresolved_types.clear();
 	this->ns = oldns;
 }
 

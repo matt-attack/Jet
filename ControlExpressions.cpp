@@ -328,7 +328,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 			break;
 		}
 
-		int pi = 0;//find what index it is
+		unsigned int pi = 0;//find what index it is
 		for (auto mem : val.type->base->_union->members)
 		{
 			if (mem->name == ii.type.text)

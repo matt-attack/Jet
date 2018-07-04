@@ -57,10 +57,10 @@ namespace Jet
 		}
 	};
 
-	class Namespace;
+	struct Namespace;
 	class Source;
 	class Type;
-	class Trait;
+	struct Trait;
 	class CompilerContext;
 	class JetProject;
 	class BlockExpression;
@@ -68,7 +68,7 @@ namespace Jet
 	{
 		friend class Type;
 		friend struct Struct;
-		friend class Function;
+		friend struct Function;
 		friend class Compiler;
 		friend class Expression;
 		friend class CompilerContext;
@@ -88,7 +88,7 @@ namespace Jet
 			llvm::DIFile* file;
 		} debug_info;
 
-		std::vector<std::pair<Namespace*, Type**>> types;//a list of all referenced types and their locations, used for type lookahead
+		std::vector<std::pair<Namespace*, Type**>> unresolved_types;//a list of all referenced types and their locations, used for type lookahead
 
 		std::map<std::string, Trait*> traits;//a list of all traits
 		std::vector<Function*> functions;//a list of all functions to be able to optimize and shizzle
@@ -142,7 +142,7 @@ namespace Jet
 
 		std::vector<Diagnostic>& GetErrors()
 		{
-			return this->diagnostics->GetErrors();// errors;
+			return this->diagnostics->GetErrors();
 		}
 
 		void Error(const std::string& string, Token token);

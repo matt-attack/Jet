@@ -599,7 +599,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 		if (fun && fun->templates.size() > 0)
 		{
 			auto templates = new Type*[fun->templates.size()];
-			for (int i = 0; i < fun->templates.size(); i++)
+			for (unsigned int i = 0; i < fun->templates.size(); i++)
 				templates[i] = 0;
 
 			//need to infer
@@ -613,7 +613,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 					for (auto iii : fun->arguments)
 					{
 						//get the name of the variable
-						int subl = 0;
+						unsigned int subl = 0;
 						for (; subl < iii.first->name.length(); subl++)
 						{
 							if (!IsLetter(iii.first->name[subl]))//todo this might break with numbers in variable names
@@ -650,7 +650,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 				}
 			}
 
-			for (int i = 0; i < fun->templates.size(); i++)
+			for (unsigned int i = 0; i < fun->templates.size(); i++)
 			{
 				if (templates[i] == 0)
 					this->root->Error("Could not infer template type", *this->current_token);
@@ -658,7 +658,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 
 			auto oldname = fun->expression->name.text;
 			fun->expression->name.text += '<';
-			for (int i = 0; i < fun->templates.size(); i++)
+			for (unsigned int i = 0; i < fun->templates.size(); i++)
 			{
 				fun->expression->name.text += templates[i]->ToString();
 				if (i + 1 < fun->templates.size())
@@ -777,7 +777,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 						this->root->Error("Too many args in function call got " + std::to_string(args.size()) + " expected " + std::to_string(type->function->args.size()), *this->current_token);
 
 					std::vector<llvm::Value*> argsv;
-					for (int i = 0; i < args.size(); i++)
+					for (unsigned int i = 0; i < args.size(); i++)
 						argsv.push_back(this->DoCast(type->function->args[i], args[i]).val);//try and cast to the correct type if we can
 
 					//add the data
@@ -789,7 +789,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 					auto rtype = fun->getType()->getContainedType(0)->getContainedType(0);
 					std::vector<llvm::Type*> fargs;
-					for (int i = 1; i < fun->getType()->getContainedType(0)->getNumContainedTypes(); i++)
+					for (unsigned int i = 1; i < fun->getType()->getContainedType(0)->getNumContainedTypes(); i++)
 						fargs.push_back(fun->getType()->getContainedType(0)->getContainedType(i));
 					fargs.push_back(this->root->builder.getInt8PtrTy());
 
@@ -807,7 +807,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			}
 
 			std::vector<llvm::Value*> argsv;
-			for (int i = 0; i < args.size(); i++)
+			for (unsigned int i = 0; i < args.size(); i++)
 				argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
 
 			return CValue(var.type->function->return_type, this->root->builder.CreateCall(var.val, argsv));
@@ -854,7 +854,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 	}
 
 	std::vector<CValue> argsv;
-	for (int i = 0; i < args.size(); i++)
+	for (unsigned int i = 0; i < args.size(); i++)
 		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]));//try and cast to the correct type if we can
 
 	return CallFunction(this, fun, argsv, devirtualize);
@@ -910,7 +910,7 @@ CValue CompilerContext::GetVariable(const std::string& name)
 			//todo make sure this is the right location to do all of this
 			//append the new type
 			std::vector<llvm::Type*> types;
-			for (int i = 0; i < this->captures.size(); i++)
+			for (unsigned int i = 0; i < this->captures.size(); i++)
 				types.push_back(storage_t->getContainedType(i));
 
 			types.push_back(var.type->base->GetLLVMType());
@@ -1082,7 +1082,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	}
 	if (t->type == Types::Union && value.type->type == Types::Struct)
 	{
-		for (int i = 0; i < t->_union->members.size(); i++)
+		for (unsigned int i = 0; i < t->_union->members.size(); i++)
 		{
 			if (t->_union->members[i] == value.type)
 			{
@@ -1200,7 +1200,7 @@ bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
 	}
 	if (t->type == Types::Union && value.type->type == Types::Struct)
 	{
-		for (int i = 0; i < t->_union->members.size(); i++)
+		for (unsigned int i = 0; i < t->_union->members.size(); i++)
 		{
 			if (t->_union->members[i] == value.type)
 				return true;
@@ -1212,7 +1212,7 @@ bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
 	{
 		//this is a bad hack that doesnt catch all cases, but better than nothing
 		auto traits = t->GetTraits(this->root);
-		for (int i = 0; i < traits.size(); i++)
+		for (unsigned int i = 0; i < traits.size(); i++)
 			if (traits[i].second->name == value.type->trait->name)// t->MatchesTrait(this->root, value.type->trait))
 				return true;
 	}
@@ -1297,7 +1297,7 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 		auto storage_t = llvm::StructType::get(this->root->context, elements);
 
 		int size = 0;
-		for (int i = 0; i < this->captures.size(); i++)
+		for (unsigned int i = 0; i < this->captures.size(); i++)
 		{
 			auto var = this->captures[i];
 

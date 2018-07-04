@@ -200,7 +200,7 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 		}
 		else if (this->token.type == TokenType::Pointy && this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && lhs.type->base->base->type == Types::Struct)
 		{
-			int index = 0;
+			unsigned int index = 0;
 			for (; index < lhs.type->base->base->data->struct_members.size(); index++)
 			{
 				if (lhs.type->base->base->data->struct_members[index].name == this->member.text)
@@ -249,7 +249,7 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 
 CValue GetStructElement(CompilerContext* context, const std::string& name, const Token& token, Type* type, llvm::Value* lhs)
 {
-	int index = 0;
+	unsigned int index = 0;
 	for (; index < type->data->struct_members.size(); index++)
 	{
 		if (type->data->struct_members[index].name == name)
@@ -277,7 +277,12 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 
 	CValue lhs;
 	if (p)
+	{
+		auto old = context->current_token;
+		context->CurrentToken(&p->token);
 		lhs = context->GetVariable(p->GetName());
+		context->CurrentToken(old);
+	}
 	else if (i)
 		lhs = i->GetElementPointer(context);
 
@@ -585,9 +590,11 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 
 CValue NewExpression::Compile(CompilerContext* context)
 {
-	context->CurrentToken(&this->token);
+	context->CurrentToken(&this->type);
 
 	auto ty = context->root->LookupType(type.text);
+
+	context->CurrentToken(&this->token);
 	auto size = context->GetSizeof(ty);
 	auto arr_size = this->size ? this->size->Compile(context).val : context->root->builder.getInt32(1);
 	
@@ -636,7 +643,7 @@ CValue NewExpression::Compile(CompilerContext* context)
 				std::string err = "Constructor for '";
 				err += ty->data->template_base ? ty->data->template_base->name : ty->data->name;
 				err += "' with arguments (";
-				int i = 0;
+				unsigned int i = 0;
 				for (auto ii : arg_types)
 				{
 					err += ii->ToString();

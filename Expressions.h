@@ -360,11 +360,11 @@ namespace Jet
 			this->token = token;
 		}
 
-		int GetIntValue()
+		long int GetIntValue()
 		{
 			bool isint = true;
 			bool ishex = false;
-			for (int i = 0; i < this->token.text.length(); i++)
+			for (unsigned int i = 0; i < this->token.text.length(); i++)
 			{
 				if (this->token.text[i] == '.')
 					isint = false;
@@ -387,7 +387,7 @@ namespace Jet
 
 			//ok, lets get the type from what kind of constant it is
 			//get type from the constant
-			//this is pretty terrible, come back later
+			//todo this is pretty terrible, come back later
 			if (isint)
 				return std::stoi(this->token.text);
 			else
@@ -398,7 +398,7 @@ namespace Jet
 		{
 			bool isint = true;
 			bool ishex = false;
-			for (int i = 0; i < this->token.text.length(); i++)
+			for (unsigned int i = 0; i < this->token.text.length(); i++)
 			{
 				if (this->token.text[i] == '.')
 					isint = false;
