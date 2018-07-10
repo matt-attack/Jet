@@ -298,13 +298,13 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		//todo: improve these error messages
 		context->root->Error("Cannot index type '" + lhs.type->base->name + "'", this->token);
 	}
-	else if (p || i)
+	else if ((p || i) && lhs.type->type == Types::Pointer)
 	{
-		if (this->member.text.length() && lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct)
+		if (this->member.text.length() && lhs.type->base->type == Types::Struct)
 		{
 			return GetStructElement(context, this->member.text, this->member, lhs.type->base, lhs.val);
 		}
-		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
+		else if (lhs.type->base->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
 		{
 			auto indexv = index->Compile(context);
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, indexv).val };
@@ -314,7 +314,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			auto typ = lhs.type->base->base->GetPointerType();
 			return CValue(typ, loc);
 		}
-		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Array)
+		else if (lhs.type->base->type == Types::Array)
 		{
 			if (this->member.text == "size")
 			{
@@ -327,7 +327,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 				return CValue(lhs.type->base->base->GetPointerType()->GetPointerType(), loc);
 			}
 		}
-		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::InternalArray && this->member.text.length() != 0)//or pointer!!(later)
+		else if (lhs.type->base->type == Types::InternalArray && this->member.text.length() != 0)//or pointer!!(later)
 		{
 			if (this->member.text == "size")
 			{
@@ -346,7 +346,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			}
 		}
 		//maybe this case shouldnt happen
-		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::InternalArray && this->member.text.length() == 0)//or pointer!!(later)
+		else if (lhs.type->base->type == Types::InternalArray && this->member.text.length() == 0)//or pointer!!(later)
 		{
 			//throw 7;
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
@@ -358,8 +358,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			
 			return CValue(lhs.type->base->GetPointerType(), loc);
 		}
-		else if (lhs.type->type == Types::Pointer 
-			&& lhs.type->base->type == Types::InternalArray
+		else if (lhs.type->base->type == Types::InternalArray
 			&& this->member.text.length() == 0)
 		{
 			//throw 7;
@@ -372,8 +371,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 
 			return CValue(lhs.type->base->base->GetPointerType(), loc);
 		}
-		else if (lhs.type->type == Types::Pointer
-			&& lhs.type->base->type == Types::Pointer
+		else if (lhs.type->base->type == Types::Pointer
 			&& this->member.text.length() == 0)
 		{
 			std::vector<llvm::Value*> iindex = { context->DoCast(context->root->IntType, index->Compile(context)).val };
@@ -383,7 +381,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 
 			return CValue(lhs.type->base->base->GetPointerType(), loc);
 		}
-		else if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Struct && this->member.text.length() == 0)
+		else if (lhs.type->base->type == Types::Struct && this->member.text.length() == 0)
 		{
 			auto stru = lhs.type->base->data;
 
@@ -440,15 +438,6 @@ CValue StringExpression::Compile(CompilerContext* context)
 {
 	return context->String(this->value);
 }
-
-/*void NullExpression::Compile(CompilerContext* context)
-{
-context->Null();
-
-//pop off if we dont need the result
-if (dynamic_cast<BlockExpression*>(this->Parent))
-context->Pop();
-}*/
 
 CValue NumberExpression::Compile(CompilerContext* context)
 {
@@ -527,6 +516,8 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->_operator);
 	context->SetDebugLocation(this->_operator);
+
+	// Handle short circuiting
 	if (this->_operator.type == TokenType::And)
 	{
 		auto else_block = llvm::BasicBlock::Create(context->context, "land.shortcircuitelse");
@@ -598,7 +589,7 @@ CValue NewExpression::Compile(CompilerContext* context)
 	auto size = context->GetSizeof(ty);
 	auto arr_size = this->size ? this->size->Compile(context).val : context->root->builder.getInt32(1);
 	
-	//todo, on free mark size as zero
+	// todo watch out for this constant 4 for the size, limits char arrays to 4gb
 	if (this->size)
 		size.val = context->root->builder.CreateMul(size.val, arr_size);
 	size.val = context->root->builder.CreateAdd(size.val, context->root->builder.getInt32(4));
@@ -610,17 +601,12 @@ CValue NewExpression::Compile(CompilerContext* context)
 	context->root->builder.CreateStore(arr_size, pointer);
 	val.val = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(4) });
 
-	//ok when we free this mark the size as zero and lets check size before we free
-	//	this will make double frees IMPOSSIBLE on arrays :D
-	//if we are in debug mark as zero and we can crash if we double free maybe?
-
-
 	auto ptr = context->DoCast(ty->GetPointerType(), val, true);
 
 	//run constructors
 	if (this->args)
 	{
-		if (ptr.type->base->type == Types::Struct)// && arr_size == 0)
+		if (ptr.type->base->type == Types::Struct)
 		{
 			std::vector<llvm::Value*> llvm_args = { ptr.val };
 			std::vector<Type*> arg_types = { ptr.type };
@@ -757,7 +743,7 @@ CValue FreeExpression::Compile(CompilerContext* context)
 		}
 	}
 
-	context->Call("free", { CValue(context->root->CharPointerType/*LookupType("char*")*/, rootptr) });
+	context->Call("free", { CValue(context->root->CharPointerType, rootptr) });
 
 	//todo: can mark the size and pointer as zero now
 

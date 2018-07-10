@@ -7,14 +7,6 @@
 
 using namespace Jet;
 
-#ifdef _DEBUG
-#ifndef DBG_NEW
-#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
-#define new DBG_NEW
-#endif
-#endif  // _DEBUG
-
-
 //todo: fix this being a parser hack that drops potential tokens
 Token ParseType(Parser* parser, bool parse_arrays = true)
 {
@@ -146,7 +138,7 @@ Token ParseTrait(Parser* parser)
 
 Expression* NameParselet::parse(Parser* parser, Token token)
 {
-	if (parser->Match(TokenType::TemplateBegin))//TokenType::Not))
+	if (parser->Match(TokenType::TemplateBegin))
 	{
 		//check if the token after the next this is a , or a > if it is, then im a template
 		//Token ahead = parser->LookAhead(1);
@@ -858,8 +850,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 		stru = name.text;
 		bool destructor = parser->MatchAndConsume(TokenType::BNot);
 
-		name = parser->Consume();// TokenType::Name);//parse the real function name
-		//if
+		name = parser->Consume();
 
 		Token oper;
 		if (name.text == "operator")
@@ -1052,7 +1043,7 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 	do
 	{
 		auto next = parser->LookAhead(1);
-		Token type;// = next.type == TokenType::Assign ? "" : ParseType(parser).text;
+		Token type;
 		if (next.type != TokenType::Assign)
 			type = ::ParseType(parser);
 		Token name = parser->Consume(TokenType::Name);
@@ -1081,7 +1072,7 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 	} while (parser->MatchAndConsume(TokenType::Comma));
 
 	if (parser->Match(TokenType::Semicolon))
-		return new LocalExpression(token, Token(), names.Release(), 0);
+		return new LetExpression(token, Token(), names.Release(), 0);
 
 	Token equals = parser->Consume(TokenType::Assign);//its possible this wont be here and it may just be a mentioning, but no assignment
 
@@ -1098,7 +1089,7 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 			rights->push_back({ Token(), right });
 	} while (parser->MatchAndConsume(TokenType::Comma));
 
-	return new LocalExpression(token, equals, names.Release(), rights.Release());
+	return new LetExpression(token, equals, names.Release(), rights.Release());
 }
 
 Expression* ConstParselet::parse(Parser* parser, Token token)
@@ -1229,20 +1220,6 @@ Expression* InlineYieldParselet::parse(Parser* parser, Token token)
 	return new YieldExpression(token, right);
 }
 
-/*Expression* ResumeParselet::parse(Parser* parser, Token token)
-{
-Expression* right = parser->parseExpression(Precedence::ASSIGNMENT);
-
-return new ResumeExpression(token, right);
-}
-
-Expression* ResumePrefixParselet::parse(Parser* parser, Token token)
-{
-Expression* right = parser->parseExpression(Precedence::ASSIGNMENT);
-
-return new ResumeExpression(token, right);
-}*/
-
 Expression* TypedefParselet::parse(Parser* parser, Token token)
 {
 	Token new_type = parser->Consume(TokenType::Name);
@@ -1284,7 +1261,7 @@ Expression* NewParselet::parse(Parser* parser, Token token)
 		type = ::ParseType(parser, false);
 
 	//try and parse size expression
-	if (parser->LookAhead().type == TokenType::LeftBracket)//auto tok = parser->MatchAndConsume(TokenType::LeftBracket))
+	if (parser->LookAhead().type == TokenType::LeftBracket)
 	{
 		auto ob = parser->Consume();
 
@@ -1367,7 +1344,7 @@ Expression* EnumParselet::parse(Parser* parser, Token token)
 			value = parser->Consume(TokenType::Number);
 		}
 
-		if (parser->LookAhead(0).type != TokenType::Comma)
+		if (parser->LookAhead().type != TokenType::Comma)
 		{
 			values.push_back({ ename, equals, value, Token() });
 			break;

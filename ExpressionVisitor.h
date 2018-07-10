@@ -5,7 +5,7 @@ namespace Jet
 {
 	class NameExpression;
 	class TypeofExpression;
-	class LocalExpression;
+	class LetExpression;
 	class NumberExpression;
 	class StringExpression;
 	class GroupExpression;
@@ -47,7 +47,7 @@ namespace Jet
 
 		virtual void Visit(NameExpression* exp) {};
 
-		virtual void Visit(LocalExpression* exp) {};
+		virtual void Visit(LetExpression* exp) {};
 
 		virtual void Visit(NumberExpression* exp) {};
 		virtual void Visit(StringExpression* exp) {};

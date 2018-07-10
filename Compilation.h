@@ -77,7 +77,7 @@ namespace Jet
 		friend class FunctionExpression;
 		friend class ExternExpression;
 		friend class TraitExpression;
-		friend class LocalExpression;
+		friend class LetExpression;
 		friend class StructExpression;
 
 		llvm::TargetMachine* target;
@@ -132,10 +132,10 @@ namespace Jet
 		void AdvanceTypeLookup(Type** dest, const std::string& name, Token* location);
 
 
-		Type* LookupType(const std::string& name, bool load = true);
+		Type* LookupType(const std::string& name, bool load = true, bool error = true);
 		Type* TryLookupType(const std::string& name);
 
-		CValue AddGlobal(const std::string& name, Type* t, llvm::Constant* init = 0, bool intern = false);
+		//Give size of zero for non-array
 		CValue AddGlobal(const std::string& name, Type* t, int size, llvm::Constant* init = 0, bool intern = false);
 
 		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder, bool time = false, int debug = 2);

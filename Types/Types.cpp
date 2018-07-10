@@ -861,7 +861,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 
 	if (fun == 0)
 	{
-		//check for trait extension methods
+		//check for uncompiled trait extension methods and compile them if we find em
 		auto ttraits = this->GetTraits(context->root);
 		for (auto tr : ttraits)
 		{
@@ -1020,13 +1020,11 @@ void Struct::Load(Compilation* compiler)
 
 	if (vtable_size > 0)
 		needs_vtable = true;//lets do it always just because (need to only do it when im inherited from)
-	//only do it if I have a function
-	//ok, need way to only set it if I have custom destructor or other functions
-	if (this->functions.size() <= 2) //a BAD hack
-		needs_vtable = false;
+
+	// Add the vtable if we are the first in the tree and need it
 	if (needs_vtable && this->parent_struct == 0)
 	{
-		this->struct_members.push_back({ "__vtable", "char*", compiler->CharPointerType->GetPointerType()/*compiler->LookupType("char**")*/ });//add the member if we dont have it
+		this->struct_members.push_back({ "__vtable", "char*", compiler->CharPointerType->GetPointerType() });
 	}
 
 	//recursively load
@@ -1107,18 +1105,18 @@ void Struct::Load(Compilation* compiler)
 
 			ii.second->Load(compiler);
 			auto ptr = ii.second->f;
-			auto charptr = llvm::ConstantExpr::getBitCast(ptr, compiler->CharPointerType/*compiler->LookupType("char*")*/->GetLLVMType());
+			auto charptr = llvm::ConstantExpr::getBitCast(ptr, compiler->CharPointerType->GetLLVMType());
 
 			ptrs[ii.second->virtual_offset] = charptr;
 		}
 
-		auto arr = llvm::ConstantArray::get(llvm::ArrayType::get(compiler->CharPointerType/*LookupType("char*")*/->GetLLVMType(), vtable_size), ptrs);
+		auto arr = llvm::ConstantArray::get(llvm::ArrayType::get(compiler->CharPointerType->GetLLVMType(), vtable_size), ptrs);
 
 		auto oldns = compiler->ns;
 
 		compiler->ns = this;
 		//then need to have function calls to virtual functions to go the lookup table
-		compiler->AddGlobal("__" + this->name + "_vtable", compiler->CharPointerType/*LookupType("char*")*/, vtable_size, arr, true);
+		compiler->AddGlobal("__" + this->name + "_vtable", compiler->CharPointerType, vtable_size, arr, true);
 
 		compiler->ns = oldns;
 	}
@@ -1291,7 +1289,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 				data += "{";
 				for (auto fun : ii.second.ty->trait->functions)
 				{
-					data += " fun " + fun.second->return_type->name/*ToString()*/ + " " + fun.first + "(";
+					data += " fun " + fun.second->return_type->name + " " + fun.first + "(";
 					bool first = false;
 					for (auto arg : fun.second->arguments)
 					{
@@ -1367,7 +1365,7 @@ int Type::GetSize()
 	case Types::Pointer:
 		return 4;//todo: use correct size for 64 bit when that happens
 	case Types::Array:
-		return 8;//pointer + integer
+		return 8;//pointer + integer todo need to use pointer size here too
 	}
 	return 4;//todo
 }
@@ -1390,8 +1388,10 @@ bool Struct::IsParent(Type* ty)
 llvm::Constant* Type::GetDefaultValue(Compilation* compilation)
 {
 	llvm::Constant* initializer = 0;
-	if (this->IsInteger())//this->type == Types::Int || this->type == Types::Short || this->type == Types::Char || this->type == Types::Long)
-		initializer = llvm::ConstantInt::get(compilation->context, llvm::APInt(32, 0, true));
+	if (this->IsInteger())
+	{
+		initializer = llvm::ConstantInt::get(compilation->context, llvm::APInt(this->GetSize()*8, 0, this->IsSignedInteger()));
+	}
 	else if (this->type == Types::Double)
 		initializer = llvm::ConstantFP::get(compilation->context, llvm::APFloat(0.0));
 	else if (this->type == Types::Float)
@@ -1400,6 +1400,7 @@ llvm::Constant* Type::GetDefaultValue(Compilation* compilation)
 		initializer = llvm::ConstantPointerNull::get(llvm::dyn_cast<llvm::PointerType>(this->GetLLVMType()));
 	else if (this->type == Types::Array)
 	{
+		//todo this seems wrong...
 		std::vector<llvm::Constant*> arr;
 		arr.push_back(this->base->GetDefaultValue(compilation));
 		initializer = llvm::ConstantArray::get(llvm::dyn_cast<llvm::ArrayType>(this->GetLLVMType()), arr);
@@ -1416,7 +1417,16 @@ llvm::Constant* Type::GetDefaultValue(Compilation* compilation)
 		}
 		initializer = llvm::ConstantStruct::get(llvm::dyn_cast<llvm::StructType>(this->GetLLVMType()), arr);
 	}
+	else if (this->type == Types::InternalArray)
+	{
+		std::vector<llvm::Constant*> arr;
+		arr.push_back(this->base->GetDefaultValue(compilation));
+		initializer = llvm::ConstantArray::get(llvm::dyn_cast<llvm::ArrayType>(this->GetLLVMType()), arr);
+	}
 	else
+	{
+		printf("Unhandled Type in Type::GetDefaultValue!\n");
 		throw 7;
+	}
 	return initializer;
 }

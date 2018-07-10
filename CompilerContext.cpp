@@ -34,7 +34,7 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 				func = ii->second;
 		}
 	}
-	if (iter == 0 && member == false)
+	else if (iter == 0 && member == false)
 	{
 		//no function exists
 		func = new Function(fname, lambda);
@@ -282,6 +282,7 @@ void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 		if (loc.type->base->data->is_class == true)
 			this->root->Error("Cannot copy class '" + loc.type->base->data->name + "' unless it has a copy operator.", *this->current_token);
 
+		// Handle equality operator if we can find it
 		auto funiter = val.type->data->functions.find("=");
 		//todo: search through multimap to find one with the right number of args
 		if (funiter != val.type->data->functions.end() && funiter->second->arguments.size() == 2)
@@ -705,25 +706,25 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 
 CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct, bool devirtualize)
 {
-	auto old_tok = this->current_token;
 	std::vector<Type*> arsgs;
 	for (auto ii : args)
 		arsgs.push_back(ii.type);
+
+	auto old_tok = this->current_token;
 	Function* fun = this->GetMethod(name, arsgs, Struct);
 	this->current_token = old_tok;
-	//ok, having issues with constructors, need way to tell if they are one
+
 	if (fun == 0 && Struct == 0)
 	{
-		//global function?
-		//check if its a type, if so try and find a constructor
+		//try and find something like a variable or constructor in the global namespace
 		auto type = this->root->TryLookupType(name);
-		if (type != 0 && type->type == Types::Struct)
+		if (type != 0 && type->type == Types::Struct)// If we found a type, call its constructor like a function
 		{
-			//look for a constructor
+			// Look for its constructor
 			auto range = type->data->functions.equal_range(name);
 			for (auto ii = range.first; ii != range.second; ii++)
 			{
-				if (ii->second->arguments.size() == args.size())// + 1)
+				if (ii->second->arguments.size() == args.size())
 					fun = ii->second;
 			}
 			if (fun)
@@ -739,10 +740,8 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 				std::vector<llvm::Value*> argsv;
 				int i = 1;
-
-				//add struct
-				argsv.push_back(Alloca);
-				for (auto ii : args)
+				argsv.push_back(Alloca);// add 'this' ptr
+				for (auto ii : args)// add other arguments
 					argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
 
 				fun->Load(this->root);
@@ -751,11 +750,10 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 				return CValue(type, this->root->builder.CreateLoad(Alloca));
 			}
-			else
+			else // Fake a constructor if we couldnt find one
 			{
 				type->Load(this->root);
 
-				//fake a constructor
 				return CValue(type, type->GetDefaultValue(this->root));
 			}
 		}
@@ -940,13 +938,12 @@ CValue CompilerContext::GetVariable(const std::string& name)
 
 llvm::ReturnInst* CompilerContext::Return(CValue ret)
 {
-	//try and cast if we can
 	if (this->function == 0)
 	{
 		this->root->Error("Cannot return from outside function!", *current_token);
 	}
 
-	//call destructors
+	// Call destructors
 	auto cur = this->scope;
 	do
 	{
@@ -964,6 +961,7 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 		return root->builder.CreateRetVoid();
 	}
 
+	// Try and cast to the return type if we can
 	if (ret.val)
 	{
 		ret = this->DoCast(this->function->return_type, ret);
@@ -979,19 +977,16 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	llvm::Type* tt = t->GetLLVMType();
 	if (value.type->type == Types::Float && t->type == Types::Double)
 	{
-		//lets do this
 		return CValue(t, root->builder.CreateFPExt(value.val, tt));
 	}
 	if (value.type->type == Types::Double && t->type == Types::Float)
 	{
-		//lets do this
+		// Todo warn for downcasting if implicit
 		return CValue(t, root->builder.CreateFPTrunc(value.val, tt));
 	}
 	if (value.type->type == Types::Double || value.type->type == Types::Float)
 	{
 		//float to int
-		//if (t->type == Types::Int || t->type == Types::Short || t->type == Types::Char || t->type == Types::Long)
-		//	return CValue(t, root->builder.CreateFPToSI(value.val, tt));
 		if (t->IsSignedInteger())
 			return CValue(t, root->builder.CreateFPToSI(value.val, tt));
 		else if (t->IsInteger())
@@ -1003,15 +998,16 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	{
 		//int to float
 		if (t->type == Types::Double || t->type == Types::Float)
+		{
 			if (value.type->IsSignedInteger())
 				return CValue(t, root->builder.CreateSIToFP(value.val, tt));
 			else
 				return CValue(t, root->builder.CreateUIToFP(value.val, tt));
+		}
 		if (t->type == Types::Bool)
 			return CValue(t, root->builder.CreateIsNotNull(value.val));
 		if (t->type == Types::Pointer)
 		{
-			//auto ty1 = value.val->getType()->getContainedType(0);
 			llvm::ConstantInt* ty = llvm::dyn_cast<llvm::ConstantInt>(value.val);
 			if (Explicit == false && (ty == 0 || ty->getSExtValue() != 0))
 				root->Error("Cannot cast a non-zero integer value to pointer implicitly.", *this->current_token);
@@ -1026,7 +1022,6 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	}
 	if (value.type->type == Types::Pointer)
 	{
-		//pointer to bool
 		if (t->type == Types::Bool)
 			return CValue(t, root->builder.CreateIsNotNull(value.val));
 
@@ -1044,7 +1039,6 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		{
 			if (t->type == Types::Pointer)
 			{
-				//pointer to pointer cast;
 				return CValue(t, root->builder.CreatePointerCast(value.val, t->GetLLVMType(), "ptr2ptr"));
 			}
 			else if (t->IsInteger())
@@ -1055,14 +1049,11 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 	}
 	if (value.type->type == Types::Array)
 	{
-		//array to pointer
-		if (t->type == Types::Pointer)
+		if (t->type == Types::Pointer)// array to pointer
 		{
 			if (t->base == value.type->base)
 			{
-				//lets just try it
-				//fixme later
-				//ok, this doesnt work because the value is getting loaded beforehand!!!
+				//ok for now lets not allow this, users can just access the ptr field
 				/*std::vector<llvm::Value*> arr = { root->builder.getInt32(0), root->builder.getInt32(0) };
 
 				this->f->dump();
@@ -1322,21 +1313,9 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 CValue CompilerContext::Load(const std::string& name)
 {
 	CValue value = GetVariable(name);
-	if (value.type->type == Types::Function)
+	if (value.type->type == Types::Function || value.type->type == Types::Int)// last case is for constants
 		return value;
-	//this is out of date
-	//else if (value.type->type == Types::Pointer && value.type->base->type == Types::Array)//load it as a pointer
-	//{
-	//auto type = value.type->base->GetPointerType();
-	//auto loc = this->root->builder.CreatePointerCast(value.val, type->GetLLVMType());
-	//return CValue(type, loc);
-	//}
-	else if (value.type->type == Types::Int)
-	{
-		//todo wtf is this
-		//its a constant
-		return value;
-	}
+
 	return CValue(value.type->base, root->builder.CreateLoad(value.val, name.c_str()), value.val);
 }
 
@@ -1407,7 +1386,7 @@ void CompilerContext::Destruct(CValue pointer, llvm::Value* arr_size)
 		if (fun == 0)
 			return;
 		fun->Load(this->root);
-		if (arr_size == 0)//size == 0)
+		if (arr_size == 0)
 		{//just one element, construct it
 			this->root->builder.CreateCall(fun->f, { pointer.val });
 		}

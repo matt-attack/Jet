@@ -17,13 +17,13 @@ namespace Jet
 	class Source;
 	class Compiler;
 
-	class LocalExpression : public Expression
+	class LetExpression : public Expression
 	{
 		Token token, equals;
 		std::vector<std::pair<Token, Token>>* _names;
 		std::vector<std::pair<Token, Expression*>>* _right;
 	public:
-		LocalExpression(Token token, Token equals, std::vector<std::pair<Token, Token>>* names, std::vector<std::pair<Token, Expression*>>* right)
+		LetExpression(Token token, Token equals, std::vector<std::pair<Token, Token>>* names, std::vector<std::pair<Token, Expression*>>* right)
 		{
 			this->equals = equals;
 			this->token = token;
@@ -31,7 +31,7 @@ namespace Jet
 			this->_right = right;
 		}
 
-		~LocalExpression()
+		~LetExpression()
 		{
 			if (this->_right)
 				for (auto ii : *this->_right)
@@ -94,7 +94,7 @@ namespace Jet
 				if (_right && i < _right->size())
 				{
 					if ((*_right)[i].first.text.length())
-						(*_right)[i].first.Print(output, source);// output += " ="; fixme
+						(*_right)[i].first.Print(output, source);
 					(*_right)[i++].second->Print(output, source);
 				}
 			}

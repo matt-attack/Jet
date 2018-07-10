@@ -75,7 +75,6 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 	{
 		nc->function->return_type = context->root->LookupType(this->ret_type.text, false);
 
-
 		for (auto ii : *this->args)
 			nc->TCRegisterLocal(ii.name.text, context->root->LookupType(ii.type.text)->GetPointerType());
 	}
@@ -91,8 +90,6 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 		{
 			str->data->struct_members.push_back({ name, ty->base->name, ty->base });
 		};
-
-
 
 		this->block->TypeCheck(nc);
 
@@ -122,7 +119,7 @@ std::string FunctionExpression::GetRealName()
 	if (name.text.length() > 0)
 		fname = name.text;
 	else
-		fname = "_lambda_id_" + std::to_string(uuid++);
+		fname = "_lambda_id_" + std::to_string(uuid++);// Todo fix this returning a different value each time
 	auto Struct = dynamic_cast<StructExpression*>(this->parent);
 	if (this->Struct.text.length() > 0)
 		return "__" + this->Struct.text + "_" + fname;
@@ -164,7 +161,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	bool is_lambda = name.text.length() == 0;
 	if (this->captures)
-		is_lambda = false;
+		is_lambda = false;//todo this seems wrong...
 
 	//if we have specifier we are not lambda, just inline function
 
@@ -211,8 +208,8 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 					break;
 			}
 			//todo: ok, this is the wrong way to get the function arg type needed
-			CValue fun = call->left->Compile(context);
-			Type* type = fun.type->function->args[i];
+			//CValue fun = call->left->Compile(context);
+			Type* type = call->left->TypeCheck(context); //fun.type->function->args[i];
 
 			if (type->type == Types::Function)
 			{
@@ -277,7 +274,6 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		for (auto ii : argsv)
 			args.push_back(ii.first);
 
-		//fix the function<> type
 		lambda_type = context->root->LookupType("function<" + context->root->GetFunctionType(ret, args)->ToString() + ">");
 		lambda = context->root->builder.CreateAlloca(lambda_type->GetLLVMType());
 
@@ -398,7 +394,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		{
 			if (returned == true)
 			{
-				auto temp = inst.getNodePtr();// getNodePtrUnchecked();
+				auto temp = inst.getNodePtr();
 				inst++;
 				temp->getIterator()->eraseFromParent();//this could be broken
 			}
@@ -608,7 +604,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		}
 
 		//add the position and return variables to the context
-		str->data->struct_members.push_back({ "position", "char*", context->root->CharPointerType/*LookupType("char*")*/ });
+		str->data->struct_members.push_back({ "position", "char*", context->root->CharPointerType });
 		str->data->struct_members.push_back({ "return", this->ret_type.text, context->root->LookupType(this->ret_type.text) });
 
 		//add arguments to context
@@ -708,6 +704,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	}
 	context->root->AdvanceTypeLookup(&fun->return_type, this->ret_type.text, &this->ret_type);
 
+	// Reserve space for the arguments + this if we apply to a struct
 	fun->arguments.reserve(this->args->size() + (Struct.length() > 0 ? 1 : 0));
 
 
@@ -747,7 +744,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	}
 }
 
-CValue LocalExpression::Compile(CompilerContext* context)
+CValue LetExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&(*_names)[0].second);
 
@@ -774,7 +771,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 		}
 		else
 		{
-			context->root->AddGlobal(this->_names->front().second.text, type, cval);
+			context->root->AddGlobal(this->_names->front().second.text, type, 0, cval);
 		}
 
 		return CValue();
@@ -808,7 +805,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 			auto ty = context->function->arguments[0].first->base;
 			auto var_ptr = context->function->generator.variable_geps[context->function->generator.var_num++];
 
-			//todo lets make sure the type determining code gets run for all cases
 			if (this->_right)
 			{
 				val = context->DoCast(type, val);
@@ -851,8 +847,7 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				auto str_type = context->root->GetArrayType(type->base);
 				type = str_type;
 				//alloc the struct for it
-				auto str = TmpB.CreateAlloca(str_type->GetLLVMType(), TmpB.getInt32(1), aname);
-				Alloca = str;
+				Alloca = TmpB.CreateAlloca(str_type->GetLLVMType(), TmpB.getInt32(1), aname);
 				//allocate the array
 
 				//get the array size
@@ -861,11 +856,11 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				auto size = TmpB.getInt32(l);//need to figure out better way to get size
 				auto arr = TmpB.CreateAlloca(type->base->GetLLVMType(), size, aname + ".array");
 				//store size
-				auto size_p = TmpB.CreateGEP(str, { TmpB.getInt32(0), TmpB.getInt32(0) });
+				auto size_p = TmpB.CreateGEP(Alloca, { TmpB.getInt32(0), TmpB.getInt32(0) });
 				TmpB.CreateStore(size, size_p);
 
 				//store pointer
-				auto pointer_p = TmpB.CreateGEP(str, { TmpB.getInt32(0), TmpB.getInt32(1) });
+				auto pointer_p = TmpB.CreateGEP(Alloca, { TmpB.getInt32(0), TmpB.getInt32(1) });
 				TmpB.CreateStore(arr, pointer_p);
 			}
 			else if (type->GetBaseType()->type == Types::Trait)
@@ -889,7 +884,6 @@ CValue LocalExpression::Compile(CompilerContext* context)
 				context->Store(alloc, val, true);
 			}
 		}
-		//todo setup vtables on globals and call constructors
 		else if (this->_right)
 		{
 			//need to move allocas outside of the loop and into the main body
@@ -995,8 +989,22 @@ CValue StructExpression::Compile(CompilerContext* context)
 
 void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* context)
 {
-	//dont need these if we have no memers and no base class
+	//dont need these if we have no members and no base class
 	if (this->base_type.text.length() == 0 && this->members.size() == 0)
+		return;
+
+	//only do this if we have a virtual function or we have a parent 
+	// (can figure out how to not add extra when parent doesnt require us to have it later)
+	bool has_virtual = false;
+	for (auto ii : this->members)
+	{
+		if (ii.type == StructMember::FunctionMember && ii.function->token.type == TokenType::Virtual)
+		{
+			has_virtual = true;
+			break;
+		}
+	}
+	if (this->base_type.text.length() == 0 && has_virtual == false)
 		return;
 
 	bool has_destructor = false;
@@ -1023,19 +1031,17 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 		fun->arguments = { { str->GetPointerType(), "this" } };
 		fun->f = 0;
 		fun->expression = 0;
-		fun->type = (FunctionType*)-1;
+		fun->type = (FunctionType*)-1;//indicates this is autogenerated
 		str->data->functions.insert({ strname, fun });//register function in _Struct
 	}
 	if (has_destructor == false)
 	{
-		//ok, need to only add it if it is needed
-
 		auto fun = new Function("__" + str->data->name + "_~" + strname, false);//
 		fun->return_type = &VoidType;
 		fun->arguments = { { str->GetPointerType(), "this" } };
 		fun->f = 0;
 		fun->expression = 0;
-		fun->type = (FunctionType*)-1;
+		fun->type = (FunctionType*)-1;//indicates this is autogenerated
 
 		str->data->functions.insert({ "~" + strname, fun });
 	}
@@ -1043,15 +1049,19 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 
 void StructExpression::AddConstructors(CompilerContext* context)
 {
+	// This fills in autogenerated constructors with ones that initialize vtables
+
 	auto Struct = this->GetName();
 	//need to initialize virtual tables
 	Type* str = context->root->LookupType(Struct);
 	std::string strname = str->data->template_base ? str->data->template_base->name : str->data->name;
-	//todo: dont add constructor if none is needed
+
 	for (auto ii : str->data->functions)
 	{
 		//need to identify if its a autogenerated fun
-		if (ii.second->expression == 0 && ii.second->type == (FunctionType*)-1 && ii.second->name.length() > strname.length() + 2 && ii.second->name.substr(2, strname.length()) == strname)
+		if (ii.second->expression == 0 && ii.second->type == (FunctionType*)-1 
+			&& ii.second->name.length() > strname.length() + 2 
+			&& ii.second->name.substr(2, strname.length()) == strname)
 		{
 			//its probably a constructor/destructor we need to fill in
 			auto res = ii.second->name.find('~');
@@ -1064,8 +1074,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				std::vector<std::pair<Type*, std::string>> argsv;
 				argsv.push_back({ str->GetPointerType(), "this" });
 
-				//context->CurrentToken(&this->ret_type);
-				auto ret = &VoidType;// context->root->LookupType("void");
+				auto ret = &VoidType;
 
 				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? str : 0, false);// , this->varargs);
 				ii.second->f = function->function->f;
@@ -1146,7 +1155,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				std::vector<std::pair<Type*, std::string>> argsv;
 				argsv.push_back({ str->GetPointerType(), "this" });
 
-				auto ret = &VoidType;// context->root->LookupType("void");
+				auto ret = &VoidType;
 
 				CompilerContext* function = context->AddFunction(ii.second->name, ret, argsv, Struct.length() > 0 ? str : 0, false);// , this->varargs);
 				ii.second->f = function->function->f;

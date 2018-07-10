@@ -90,7 +90,6 @@ CValue IfExpression::Compile(CompilerContext* context)
 		//statement body
 		context->root->builder.SetInsertPoint(ThenBB);
 		ii->block->Compile(context);
-		//if (context->root->builder.GetInsertBlock()->getTerminator() == 0)
 		context->root->builder.CreateBr(EndBB);//branch to end
 
 		pos++;
@@ -428,7 +427,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 	context->CurrentToken(&this->open);
 	auto ret = context->Call(fname, argsv, stru, devirtualize);
 
-	//destruct if my parent doesnt use me
+	//destruct if my parent doesnt use me and todo if I have a destructor
 	if (ret.type->type == Types::Struct && dynamic_cast<BlockExpression*>(this->parent))
 	{
 		//need to escalate to a pointer

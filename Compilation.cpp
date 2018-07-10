@@ -294,7 +294,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	}
 
 	//spin off children and lets compile this!
-	compilation->module = new llvm::Module("hi.im.jet", compilation->context);
+	compilation->module = new llvm::Module(project->project_name, compilation->context);
 	compilation->debug = new llvm::DIBuilder(*compilation->module, true);
 
 	bool emit_debug = debug > 0;
@@ -328,7 +328,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	//build converted headers and add their source
 	for (auto hdr : project->headers)
 	{
-		std::string two = hdr;// argv[2];
+		std::string two = hdr;
 		std::string outfile = two + ".jet";
 		//if the header already exists, dont regenerate
 		FILE* hdr = fopen(outfile.c_str(), "r");
@@ -1095,168 +1095,10 @@ void Compilation::AdvanceTypeLookup(Jet::Type** dest, const std::string& name, T
 
 Jet::Type* Compilation::TryLookupType(const std::string& name)
 {
-	auto pos = name.find_first_of("::");
-	if (pos != -1)
-	{
-		//navigate to correct namespace
-		std::string ns = name.substr(0, pos);
-		auto res = this->ns->members.find(ns);
-		auto old = this->ns;
-		this->ns = res->second.ns;
-		auto out = this->TryLookupType(name.substr(pos + 2));
-		this->ns = old;
-
-		return out;
-	}
-
-	int i = 0;
-	while (IsLetter(name[i]) || IsNumber(name[i]))
-	{
-		i++;
-	};
-	std::string base = name.substr(0, i);
-
-	//look through namespaces to find the base type
-	auto curns = this->ns;
-	auto res = this->ns->members.find(base);
-	while (res == curns->members.end())
-	{
-		curns = curns->parent;
-		if (curns == 0)
-			break;
-
-		res = curns->members.find(base);
-	}
-
-	if (curns)
-		res = curns->members.find(name);
-
-	auto type = (curns != 0 && res != curns->members.end() && res->second.type == SymbolType::Type) ? res->second.ty : 0;
-
-	if (type == 0)
-	{
-		//time to handle pointers yo
-		if (name.length() == 0)
-		{
-			//Error("Missing type specifier, could not infer type", *this->current_function->current_token);
-		}
-		/*else if (name[name.length() - 1] == '*')
-		{
-		//its a pointer
-		auto t = this->LookupType(name.substr(0, name.length() - 1), load);
-
-		if (t->pointer_type)
-		return t->pointer_type;
-
-		type = new Type;
-		type->name = name;
-		type->base = t;
-		type->type = Types::Pointer;
-		t->pointer_type = type;
-		if (load)
-		type->Load(this);
-		else
-		type->ns = type->base->ns;
-		type->base->ns->members.insert({ name, type });
-		}
-		else if (name[name.length() - 1] == ']')
-		{
-		//its an array
-		int p = name.find_first_of('[');
-
-		auto len = name.substr(p + 1, name.length() - p - 2);
-
-		auto tname = name.substr(0, p);
-		auto t = this->LookupType(tname, load);
-
-		type = new Type;
-		type->name = name;
-		type->base = t;
-		type->type = Types::Array;
-		type->size = std::stoi(len);//cheat for now
-		curns->members.insert({ name, type });
-		}*/
-		else if (name[name.length() - 1] == '>')
-		{
-			//its a template
-			//get first bit, then we can instatiate it
-			int p = name.find_first_of('<');
-
-			std::string base = name.substr(0, p);
-
-			//parse types
-			std::vector<Type*> types;
-			p++;
-			do
-			{
-				//lets cheat for the moment ok
-				std::string subtype = ParseType(name.c_str(), p);
-
-				Type* t = this->LookupType(subtype, false);
-				types.push_back(t);
-			} while (name[p++] != '>');
-
-			//look up the base, and lets instantiate it
-			auto t = this->LookupType(base, false);
-
-			type = t->Instantiate(this, types);
-		}
-		/*else if (name[name.length() - 1] == ')')
-		{
-		//work from back to start
-		int p = 0;
-		int sl = 0;
-		int bl = 0;
-		for (p = name.length() - 1; p >= 0; p--)
-		{
-		switch (name[p])
-		{
-		case '(':
-		bl++;
-		break;
-		case ')':
-		bl--;
-		break;
-		case '<':
-		sl--;
-		break;
-		case '>':
-		sl++;
-		break;
-		}
-		if (sl == 0 && bl == 0)
-		break;
-		}
-
-		std::string ret_type = name.substr(0, p);
-		auto rtype = this->LookupType(ret_type, load);
-
-		std::vector<Type*> args;
-		//parse types
-		p++;
-		while (name[p] != ')')
-		{
-		//lets cheat for the moment ok
-		std::string subtype = ParseType(name.c_str(), p);
-
-		Type* t = this->LookupType(subtype, load);
-		args.push_back(t);
-		if (name[p] == ',')
-		p++;
-		}
-		curns = global;
-		type = this->GetFunctionType(rtype, args);
-		}
-		else
-		{
-		Error("Reference To Undefined Type '" + name + "'", *this->current_function->current_token);
-		}*/
-	}
-	return type;
+	return this->LookupType(name, false, false);
 }
 
-
-Jet::Type* Compilation::LookupType(const std::string& name, bool load)
+Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_error)
 {
 	unsigned int i = 0;
 	while (IsLetter(name[i]) || IsNumber(name[i]))
@@ -1270,10 +1112,15 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 		std::string ns = name.substr(0, i);
 		auto res = this->ns->members.find(ns);
 		if (res == this->ns->members.end())
-			this->Error("Namespace " + ns + " not found", *this->current_function->current_token);
+		{
+			if (do_error)
+				this->Error("Namespace " + ns + " not found", *this->current_function->current_token);
+			else
+				return 0;
+		}
 		auto old = this->ns;
 		this->ns = res->second.ns;
-		auto out = this->LookupType(name.substr(i + 2), load);
+		auto out = this->LookupType(name.substr(i + 2), load, do_error);
 		this->ns = old;
 
 		return out;
@@ -1310,12 +1157,15 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 		//time to handle pointers yo
 		if (name.length() == 0)
 		{
-			Error("Missing type specifier, could not infer type", *this->current_function->current_token);
+			if (do_error)
+				Error("Missing type specifier, could not infer type", *this->current_function->current_token);
+			else
+				return 0;
 		}
 		else if (name[name.length() - 1] == '*')
 		{
 			//its a pointer
-			auto t = this->LookupType(name.substr(0, name.length() - 1), load);
+			auto t = this->LookupType(name.substr(0, name.length() - 1), load, do_error);
 
 			if (t->pointer_type)
 				return t->pointer_type;
@@ -1343,7 +1193,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			auto len = name.substr(p + 1, name.length() - p - 2);
 
 			auto tname = name.substr(0, p);
-			auto t = this->LookupType(tname, load);
+			auto t = this->LookupType(tname, load, do_error);
 
 			if (len.length())
 			{
@@ -1372,12 +1222,12 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 				//lets cheat for the moment ok
 				std::string subtype = ParseType(name.c_str(), p);
 
-				Type* t = this->LookupType(subtype, load);
+				Type* t = this->LookupType(subtype, load, do_error);
 				types.push_back(t);
 			} while (name[p++] != '>');
 
 			//look up the base, and lets instantiate it
-			auto t = this->LookupType(base, false);
+			auto t = this->LookupType(base, false, do_error);
 
 			type = t->Instantiate(this, types);
 		}
@@ -1409,7 +1259,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 			}
 
 			std::string ret_type = name.substr(0, p);
-			auto rtype = this->LookupType(ret_type, load);
+			auto rtype = this->LookupType(ret_type, load, do_error);
 
 			std::vector<Type*> args;
 			//parse types
@@ -1419,7 +1269,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 				//lets cheat for the moment ok
 				std::string subtype = ParseType(name.c_str(), p);
 
-				Type* t = this->LookupType(subtype, load);
+				Type* t = this->LookupType(subtype, load, do_error);
 				args.push_back(t);
 				if (name[p] == ',')
 					p++;
@@ -1429,7 +1279,10 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load)
 		}
 		else
 		{
-			Error("Reference To Undefined Type '" + name + "'", *this->current_function->current_token);
+			if (do_error)
+				Error("Reference To Undefined Type '" + name + "'", *this->current_function->current_token);
+			else
+				return 0;
 		}
 	}
 
@@ -1454,44 +1307,29 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 	if (global != this->ns->members.end())
 		Error("Global variable '" + name + "' already exists in " + this->ns->name, *this->current_function->current_token);
 
-	if (init == 0)
+	llvm::Constant* initializer;
+	llvm::Type* type;
+	Type* my_type, *ret_type;
+	if (size == 0)
 	{
-		std::vector<llvm::Constant*> arr;
-		arr.push_back(t->GetDefaultValue(this));
-		init = llvm::ConstantArray::get(llvm::ArrayType::get(t->GetLLVMType(), size), arr);// llvm::dyn_cast<llvm::ArrayType>(this->GetLLVMType()), arr);
+		initializer = init ? init : t->GetDefaultValue(this);
+		type = t->GetLLVMType();
+		my_type = t->GetPointerType();
+		ret_type = t;
 	}
-	
-	llvm::Constant* initializer = init;// ? init : t->GetDefaultValue(this);
-	auto ng = new llvm::GlobalVariable(*module, llvm::ArrayType::get(t->GetLLVMType(), size)/*t->GetLLVMType()*/, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
-	//this->debug->createAutoVariable(this->debug_info.file, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
-	this->ns->members.insert({ name, Symbol(new CValue(this->GetInternalArrayType(t, size)->GetPointerType(), ng)) });
+	else
+	{
+		initializer = init;
+		type = llvm::ArrayType::get(t->GetLLVMType(), size);
+		ret_type = my_type = this->GetInternalArrayType(t, size)->GetPointerType();
+	}
+	auto ng = new llvm::GlobalVariable(*module, type, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
 
-	//ok for arrays we need to create two globals. one that holds a pointer to the other global
-	//if it has a constructor, make sure to call it
-	//this->globals[name] = 
-	return CValue(this->GetInternalArrayType(t, size)->GetPointerType(), ng);
-}
-
-CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, llvm::Constant* init, bool intern)
-{
-	auto global = this->ns->members.find(name);
-	if (global != this->ns->members.end())
-		Error("Global variable '" + name + "' already exists in " + this->ns->name, *this->current_function->current_token);
-
-	llvm::Constant* initializer = init ? init : t->GetDefaultValue(this);
-	auto ng = new llvm::GlobalVariable(*module, t->GetLLVMType(), false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
-	//this->debug->createAutoVariable(this->debug_info.file, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
-	/*DIGlobalVariableExpression *createGlobalVariableExpression(
-		DIScope *Context, StringRef Name, StringRef LinkageName, DIFile *File,
-		unsigned LineNo, DIType *Ty, bool isLocalToUnit,
-		DIExpression *Expr = nullptr, MDNode *Decl = nullptr,
-		uint32_t AlignInBits = 0);*/
 	this->debug->createGlobalVariableExpression(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
-	this->ns->members.insert({ name, Symbol(new CValue(t->GetPointerType(), ng)) });
+	this->ns->members.insert({ name, Symbol(new CValue(my_type, ng)) });
 
 	//if it has a constructor, make sure to call it
-	//this->globals[name] = 
-	return CValue(t, ng);
+	return CValue(ret_type, ng);
 }
 
 void Compilation::Error(const std::string& string, Token token)
@@ -1515,7 +1353,6 @@ Jet::Type* Compilation::GetArrayType(Jet::Type* base)
 
 	Type* t = new Type(base->name + "[]", Types::Array, base);
 	t->ns = this->ns;
-	//ok, fix this and make it work right
 	this->array_types[base] = t;
 	return t;
 }
@@ -1529,7 +1366,6 @@ Jet::Type* Compilation::GetInternalArrayType(Jet::Type* base, unsigned int size)
 	Type* t = new Type(base->name + "[" + std::to_string(size) + "]", Types::InternalArray, base);
 	t->size = size;
 	t->ns = this->ns;
-	//ok, fix this and make it work right
 	this->internal_array_types[std::pair<Jet::Type*, unsigned int>(base, size)] = t;
 	return t;
 }
@@ -1565,7 +1401,7 @@ Jet::Type* Compilation::GetInternalArrayType(Jet::Type* base, unsigned int size)
 		}
 	}
 
-	//then verify if it is correct
+	// if we didnt find it cached, make it
 	if (found == false)
 	{
 		auto t = new FunctionType;
@@ -1584,7 +1420,7 @@ Jet::Type* Compilation::GetInternalArrayType(Jet::Type* base, unsigned int size)
 		type->ns = global;
 		type->name = type->ToString();
 
-		global->members.insert({ type->name, type });
+		global->members.insert({ type->name, type });// all raw function types go in global namespace
 
 		function_types.insert({ key, type });
 		return type;
@@ -1638,14 +1474,11 @@ Jet::Function* Compilation::GetFunction(const std::string& name)
 
 Jet::Symbol Compilation::GetVariableOrFunction(const std::string& name)
 {
-	auto r = this->ns->members.find(name);
-	if (r != this->ns->members.end() && (r->second.type == SymbolType::Function || r->second.type == SymbolType::Variable))
-		return r->second;
 	//try lower one
-	auto next = this->ns->parent;
+	auto next = this->ns;
 	while (next)
 	{
-		r = next->members.find(name);
+		auto r = next->members.find(name);
 		if (r != next->members.end() && (r->second.type == SymbolType::Function || r->second.type == SymbolType::Variable))
 			return r->second;
 
