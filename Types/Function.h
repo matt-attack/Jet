@@ -5,6 +5,8 @@
 #include <string>
 #include <map>
 
+#include "Types.h"
+
 namespace llvm
 {
 	class Type;
@@ -114,6 +116,8 @@ namespace Jet
 		{
 			delete this->context;
 		}
+
+		CValue Call(CompilerContext* context, std::vector<CValue>& argsv, bool devirtualize);
 
 		bool IsCompatible(Function* f)
 		{

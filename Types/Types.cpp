@@ -1366,6 +1366,8 @@ int Type::GetSize()
 		return 4;//todo: use correct size for 64 bit when that happens
 	case Types::Array:
 		return 8;//pointer + integer todo need to use pointer size here too
+	case Types::InternalArray:
+		return this->base->GetSize()*this->size;
 	}
 	return 4;//todo
 }

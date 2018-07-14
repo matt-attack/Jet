@@ -431,13 +431,13 @@ CValue CallExpression::Compile(CompilerContext* context)
 	if (ret.type->type == Types::Struct && dynamic_cast<BlockExpression*>(this->parent))
 	{
 		//need to escalate to a pointer
-		auto TheFunction = context->function->f;
+		/*auto TheFunction = context->function->f;
 		llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 			TheFunction->getEntryBlock().begin());
 		auto alloc = TmpB.CreateAlloca(ret.type->GetLLVMType(), 0, "return_pass_tmp");
-		context->root->builder.CreateStore(ret.val, alloc);
+		context->root->builder.CreateStore(ret.val, alloc);*/
 
-		context->Destruct(CValue(ret.type->GetPointerType(),alloc), 0);
+		context->Destruct(CValue(ret.type->GetPointerType(), ret.pointer), 0);
 	}
 
 	return ret;

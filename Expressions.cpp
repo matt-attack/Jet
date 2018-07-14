@@ -414,24 +414,6 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	context->CurrentToken(oldtok);
 
 	context->Store(loc, right);
-
-	/*right = context->DoCast(loc.type->base, right);
-
-	if (loc.type->base->type == Types::Struct)
-	{
-		auto funiter = left.type->data->functions.find("=");
-		//todo: search through multimap to find one with the right number of args
-		if (funiter != left.type->data->functions.end() && funiter->second->arguments.size() == 2)
-		{
-			Function* fun = funiter->second;
-			fun->Load(context->root);
-			std::vector<llvm::Value*> argsv = { lhsptr.val, right.val };
-			return CallFunction(this, fun, argsv, false);
-			//ok, need to use proper function call here to include virtuals
-			//return CValue(fun->return_type, this->root->builder.CreateCall(fun->f, { lhsptr.val, right.val }, "operator_overload"));
-		}
-	}
-	context->root->builder.CreateStore(right.val, loc.val);*/
 }
 
 CValue StringExpression::Compile(CompilerContext* context)

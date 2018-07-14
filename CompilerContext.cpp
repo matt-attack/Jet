@@ -132,7 +132,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		switch (operation)
 		{
 		case TokenType::Asterisk:
-			return CValue(value.type->base, this->root->builder.CreateLoad(value.val));
+			return CValue(value.type->base, this->root->builder.CreateLoad(value.val), value.val);
 		case TokenType::Increment:
 			return CValue(value.type, this->root->builder.CreateGEP(value.val, root->builder.getInt32(1)));
 		case TokenType::Decrement:
@@ -153,126 +153,6 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		}
 	}
 	this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
-}
-
-CValue CallFunction(CompilerContext* context, Function* fun, std::vector<CValue>& argsv, bool devirtualize)
-{
-	bool use_virtual = true;
-
-	//virtual function calls for generators fail, need to devirtualize them
-	// this shouldnt matter, all generators shouldnt be virtual
-	if (fun->is_generator)
-		devirtualize = true;
-
-	//convert to an array of args
-	std::vector<llvm::Value*> arg_vals;
-	for (auto ii : argsv)
-		arg_vals.push_back(ii.val);
-
-	std::vector<int> to_convert;
-	int i = 0;
-	for (auto& ii : argsv)
-	{
-		if (ii.val->getType()->isStructTy() && ii.type->type != Types::Array)
-		{
-			//convert it to a pointer yo
-			auto TheFunction = context->function->f;
-			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-				TheFunction->getEntryBlock().begin());
-			auto alloc = TmpB.CreateAlloca(ii.val->getType(), 0, "arg_pass_tmp");
-			alloc->setAlignment(4);
-
-			//construct it
-			context->Construct(CValue(ii.type->GetPointerType(), alloc), 0);
-
-			//need to promote from value types to get this to work
-			//ok, need to not do this for =
-			//extract the types from the function
-			auto type = fun->arguments[i].first;
-			if (type->type == Types::Struct)
-			{
-				auto funiter = type->data->functions.find("=");
-				//todo: search through multimap to find one with the right number of args
-				if (funiter != type->data->functions.end() && funiter->second->arguments.size() == 2)
-				{
-					llvm::Value* pointer = alloc;// val.pointer;
-
-					Function* fun = funiter->second;
-					fun->Load(context->root);
-					if (ii.pointer == 0)
-						context->root->Error("Cannot convert to reference", *context->current_token);
-
-					auto pt = type->GetPointerType();
-					std::vector<CValue> argsv = { CValue(pt, alloc), CValue(pt, ii.pointer) };
-
-					CallFunction(context, fun, argsv, true);
-				}
-				else if (type->data->is_class)
-				{
-					context->root->Error("Cannot copy class '" + type->data->name + "' unless it has a copy operator.", *context->current_token);
-				}
-				else
-				{
-					context->root->builder.CreateStore(ii.val, alloc);
-				}
-			}
-			else
-			{
-				context->root->builder.CreateStore(ii.val, alloc);
-			}
-
-			arg_vals[i] = alloc;
-			to_convert.push_back(i);
-		}
-		i++;
-	}
-
-	//if we are the upper level of the inheritance tree, devirtualize
-	//if we are a virtual call, do that
-	if (fun->is_virtual && devirtualize == false)
-	{
-		//ok, load the virtual table, then load the pointer to it
-		auto gep = context->root->builder.CreateGEP(argsv[0].val, { context->root->builder.getInt32(0), context->root->builder.getInt32(fun->virtual_table_location) }, "get_vtable");
-
-		//then load it
-		llvm::Value* ptr = context->root->builder.CreateLoad(gep);
-
-		//get the correct offset
-		ptr = context->root->builder.CreateGEP(ptr, { context->Integer(fun->virtual_offset).val }, "get_offset_in_vtable");
-
-		//load it
-		ptr = context->root->builder.CreateLoad(ptr);
-
-		//then cast it to the correct function type
-		auto func = context->root->builder.CreatePointerCast(ptr, fun->GetType(context->root)->GetLLVMType());
-
-		//then call it
-		auto call = context->root->builder.CreateCall(func, arg_vals);
-		//call->setCallingConv(fun->f->getCallingConv());
-
-		//add attributes
-		for (auto ii : to_convert)
-		{
-			auto& ctext = context->root->builder.getContext();
-			call->addParamAttr(ii + 1, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
-			call->addParamAttr(ii + 1, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-		}
-
-		return CValue(fun->return_type, call);
-	}
-	else
-	{
-		auto call = context->root->builder.CreateCall(fun->f, arg_vals);
-		call->setCallingConv(fun->f->getCallingConv());
-		//add attributes
-		for (auto ii : to_convert)
-		{
-			auto& ctext = context->root->builder.getContext();
-			call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
-			call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-		}
-		return CValue(fun->return_type, call);
-	}
 }
 
 void CompilerContext::Store(CValue loc, CValue val, bool RVO)
@@ -303,7 +183,7 @@ void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 			fun->Load(this->root);
 			std::vector<CValue> argsv = { loc, CValue(loc.type, pointer) };
 
-			CallFunction(this, fun, argsv, true);
+			fun->Call(this, argsv, true);
 
 			if (pointer != val.pointer)
 			{
@@ -313,9 +193,32 @@ void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 			return;
 		}
 	}
-
+	
 	auto vall = this->DoCast(loc.type->base, val);
 
+	// Handle copying
+	if (loc.type->base->type == Types::Struct)
+	{
+		if (vall.val)
+		{
+			llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(vall.val);
+			I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
+		}
+		auto dptr = root->builder.CreatePointerCast(loc.val, root->CharPointerType->GetLLVMType());
+		auto sptr = root->builder.CreatePointerCast(vall.pointer, root->CharPointerType->GetLLVMType());
+		root->builder.CreateMemCpy(dptr, sptr, loc.type->base->GetSize(), 1);
+		return;
+	}
+	else if (loc.type->base->type == Types::InternalArray)
+	{
+		llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(vall.val);
+		I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
+		auto dptr = root->builder.CreatePointerCast(loc.val, root->CharPointerType->GetLLVMType());
+		auto sptr = root->builder.CreatePointerCast(vall.pointer, root->CharPointerType->GetLLVMType());
+		root->builder.CreateMemCpy(dptr, sptr, loc.type->base->GetSize(), 1);
+		return;
+	}
+	
 	root->builder.CreateStore(vall.val, loc.val);
 }
 
@@ -361,7 +264,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 				Function* fun = funiter->second;
 				fun->Load(this->root);
 				std::vector<CValue> argsv = { lhsptr, right };
-				return CallFunction(this, fun, argsv, true);//for now lets keep these operators non-virtual
+				return fun->Call(this, argsv, true);//for now lets keep these operators non-virtual
 			}
 		}
 	}
@@ -748,11 +651,22 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 				this->root->builder.CreateCall(fun->f, argsv);
 
-				return CValue(type, this->root->builder.CreateLoad(Alloca));
+				return CValue(type, this->root->builder.CreateLoad(Alloca), Alloca);
 			}
 			else // Fake a constructor if we couldnt find one
 			{
 				type->Load(this->root);
+
+				if (type->type == Types::Struct)
+				{
+					auto TheFunction = this->function->f;
+					llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+						TheFunction->getEntryBlock().begin());
+					auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
+
+					//store defaults here...
+					return CValue(type, this->root->builder.CreateLoad(Alloca), Alloca);
+				}
 
 				return CValue(type, type->GetDefaultValue(this->root));
 			}
@@ -819,12 +733,9 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 	fun->Load(this->root);
 
-	if (args.size() != fun->f->arg_size())
-	{
-		//todo: fixme this isnt a very reliable fix
-		if (fun->arguments[0].second != "this")//if we are not a constructor
-			this->root->Error("Function expected " + std::to_string(fun->f->arg_size()) + " arguments, got " + std::to_string(args.size()), *this->current_token);
-
+	//todo: fixme this isnt a very reliable fix
+	if (args.size() + (fun->return_type->type == Types::Struct ? 1 : 0) != fun->f->arg_size() && fun->arguments.size() > 0 && fun->arguments[0].second == "this")
+	{	
 		//ok, we allocate, call then 
 		//allocate thing
 		auto type = fun->arguments[0].first->base;
@@ -850,12 +761,16 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 		return CValue(type, this->root->builder.CreateLoad(Alloca));
 	}
+	else if (args.size() != fun->f->arg_size() && fun->return_type->type != Types::Struct)
+	{
+		this->root->Error("Function expected " + std::to_string(fun->f->arg_size()) + " arguments, got " + std::to_string(args.size()), *this->current_token);
+	}
 
 	std::vector<CValue> argsv;
 	for (unsigned int i = 0; i < args.size(); i++)
 		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]));//try and cast to the correct type if we can
 
-	return CallFunction(this, fun, argsv, devirtualize);
+	return fun->Call(this, argsv, devirtualize);
 }
 
 void CompilerContext::SetDebugLocation(const Token& t)
@@ -958,6 +873,17 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 
 	if (ret.type->type == Types::Void)
 	{
+		return root->builder.CreateRetVoid();
+	}
+	else if (ret.type->type == Types::Struct)
+	{
+		llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(ret.val);
+		I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
+
+		//do a memcpy
+		auto dptr = root->builder.CreatePointerCast(this->function->f->arg_begin(), this->root->CharPointerType->GetLLVMType());
+		auto sptr = root->builder.CreatePointerCast(ret.pointer, this->root->CharPointerType->GetLLVMType());
+		root->builder.CreateMemCpy(dptr, sptr, ret.type->GetSize(), 1);
 		return root->builder.CreateRetVoid();
 	}
 

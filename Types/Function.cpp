@@ -15,9 +15,13 @@ void Function::Load(Compilation* compiler)
 
 	if (this->return_type->type == Types::Invalid)
 		this->return_type = compiler->LookupType(this->return_type->name);
-	
+
 	std::vector<llvm::Type*> args;
 	std::vector<llvm::Metadata*> ftypes;
+	if (this->return_type->type == Types::Struct)
+	{
+		args.push_back(return_type->GetPointerType()->GetLLVMType());
+	}
 	for (auto& type : this->arguments)
 	{
 		if (type.first->type == Types::Invalid)
@@ -33,7 +37,15 @@ void Function::Load(Compilation* compiler)
 			args[args.size() - 1] = args[args.size() - 1]->getPointerTo();
 	}
 
-	llvm::FunctionType *ft = llvm::FunctionType::get(this->return_type->GetLLVMType(), args, false);
+	llvm::FunctionType *ft;
+	if (this->return_type->type == Types::Struct)
+	{
+		ft = llvm::FunctionType::get(VoidType.GetLLVMType(), args, false);
+	}
+	else
+	{
+		ft = llvm::FunctionType::get(this->return_type->GetLLVMType(), args, false);
+	}
 
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
 	//need to add way to specify calling convention
@@ -63,6 +75,12 @@ void Function::Load(Compilation* compiler)
 
 	//alloc args
 	auto AI = f->arg_begin();
+	if (this->return_type->type == Types::Struct)
+	{
+		AI->setName("return");
+		AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::StructRet));
+		++AI;
+	}
 	for (unsigned Idx = 0, e = arguments.size(); Idx != e; ++Idx, ++AI)
 	{
 		auto aname = this->arguments[Idx].second;
@@ -136,6 +154,144 @@ Type* Function::GetType(Compilation* compiler)
 	std::vector<Type*> args;
 	for (unsigned int i = 0; i < this->arguments.size(); i++)
 		args.push_back(this->arguments[i].first);
-	
+
 	return compiler->GetFunctionType(return_type, args);
+}
+
+CValue Function::Call(CompilerContext* context, std::vector<CValue>& argsv, bool devirtualize)
+{
+	bool use_virtual = true;
+
+	//virtual function calls for generators fail, need to devirtualize them
+	// this shouldnt matter, all generators shouldnt be virtual
+	if (this->is_generator)
+		devirtualize = true;
+
+	//convert to an array of args
+	std::vector<llvm::Value*> arg_vals;
+	if (this->return_type->type == Types::Struct)
+	{
+		auto TheFunction = context->function->f;
+		llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+			TheFunction->getEntryBlock().begin());
+		auto alloc = TmpB.CreateAlloca(this->return_type->GetLLVMType(), 0, "return_pass_tmp");
+		//alloc->setAlignment(4);
+		arg_vals.push_back(alloc);
+	}
+	for (auto ii : argsv)
+		arg_vals.push_back(ii.val);
+
+	std::vector<int> to_convert;
+	int i = 0;
+	if (this->return_type->type == Types::Struct)
+	{
+		i = 1;
+	}
+	for (auto& ii : argsv)
+	{
+		if (ii.val->getType()->isStructTy() && ii.type->type != Types::Array)
+		{
+			//convert it to a pointer yo
+			auto TheFunction = context->function->f;
+			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+				TheFunction->getEntryBlock().begin());
+			auto alloc = TmpB.CreateAlloca(ii.val->getType(), 0, "arg_pass_tmp");
+			alloc->setAlignment(4);
+
+			//construct it
+			context->Construct(CValue(ii.type->GetPointerType(), alloc), 0);
+
+			//need to promote from value types to get this to work
+			//ok, need to not do this for =
+			//extract the types from the function
+			auto type = this->arguments[i].first;
+			if (type->type == Types::Struct)
+			{
+				auto funiter = type->data->functions.find("=");
+				//todo: search through multimap to find one with the right number of args
+				if (funiter != type->data->functions.end() && funiter->second->arguments.size() == 2)
+				{
+					llvm::Value* pointer = alloc;// val.pointer;
+
+					Function* fun = funiter->second;
+					fun->Load(context->root);
+					if (ii.pointer == 0)
+						context->root->Error("Cannot convert to reference", *context->current_token);
+
+					auto pt = type->GetPointerType();
+					std::vector<CValue> argsv = { CValue(pt, alloc), CValue(pt, ii.pointer) };
+
+					fun->Call(context, argsv, true);
+				}
+				else if (type->data->is_class)
+				{
+					context->root->Error("Cannot copy class '" + type->data->name + "' unless it has a copy operator.", *context->current_token);
+				}
+				else
+				{
+					auto dptr = context->root->builder.CreatePointerCast(ii.val, context->root->CharPointerType->GetLLVMType());
+					auto sptr = context->root->builder.CreatePointerCast(alloc, context->root->CharPointerType->GetLLVMType());
+					context->root->builder.CreateMemCpy(dptr, sptr, type->GetSize(), 1);
+				}
+			}
+			else
+			{
+				throw 7;//how does this even get hit
+				//todo memcpy
+				//context->root->builder.CreateStore(ii.val, alloc);
+			}
+
+			arg_vals[i] = alloc;
+			to_convert.push_back(i);
+		}
+		i++;
+	}
+
+	//if we are the upper level of the inheritance tree, devirtualize
+	//if we are a virtual call, do that
+	llvm::CallInst* call;
+	if (this->is_virtual && devirtualize == false)
+	{
+		//ok, load the virtual table, then load the pointer to it
+		auto gep = context->root->builder.CreateGEP(argsv[0].val, 
+			{ context->root->builder.getInt32(0), context->root->builder.getInt32(this->virtual_table_location) }, 
+			"get_vtable");
+
+		//then load it
+		llvm::Value* ptr = context->root->builder.CreateLoad(gep);
+
+		//get the correct offset
+		ptr = context->root->builder.CreateGEP(ptr, { context->Integer(this->virtual_offset).val }, "get_offset_in_vtable");
+
+		//load it
+		ptr = context->root->builder.CreateLoad(ptr);
+
+		//then cast it to the correct function type
+		auto func = context->root->builder.CreatePointerCast(ptr, this->GetType(context->root)->GetLLVMType());
+
+		//then call it
+		call = context->root->builder.CreateCall(func, arg_vals);
+		//call->setCallingConv(fun->f->getCallingConv());
+	}
+	else
+	{
+		call = context->root->builder.CreateCall(this->f, arg_vals);
+		call->setCallingConv(this->f->getCallingConv());
+	}
+
+	//add attributes
+	for (auto ii : to_convert)
+	{
+		auto& ctext = context->root->builder.getContext();
+		call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
+		call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
+	}
+
+	if (this->return_type->type == Types::Struct)
+	{
+		auto& ctext = context->root->builder.getContext();
+		call->addParamAttr(0, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::StructRet));
+		return CValue(this->return_type, 0, arg_vals[0]);
+	}
+	return CValue(this->return_type, call);
 }
