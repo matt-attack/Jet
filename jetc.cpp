@@ -683,12 +683,21 @@ std::string exec_path(const char *argv0)
 }
 #endif
 
+#include <llvm/Support/ErrorHandling.h>
+#include <llvm-c/ErrorHandling.h>
+
 std::string executable_path;
 int main(int argc, char* argv[])
 {
 #ifdef _WIN32
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
+
+	//fix llvm being super dumb and calling exit...
+	LLVMInstallFatalErrorHandler([](const char* reason)
+	{
+		throw 7;
+	});
 
 	executable_path = exec_path(argv[0]);
 
