@@ -437,7 +437,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		if (argsv.size() > 1)
 		{
 			auto AI = func->function->f->arg_begin();
-			AI++;
+			AI++;//skip the return value argument
 			for (unsigned int i = 1; i < argsv.size(); i++)
 			{
 				auto ptr = context->root->builder.CreateGEP(alloc, { context->root->builder.getInt32(0), context->root->builder.getInt32(2 + i - 1) });
@@ -449,7 +449,6 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		auto sptr = context->root->builder.CreatePointerCast(alloc, context->root->CharPointerType->GetLLVMType());
 		auto dptr = context->root->builder.CreatePointerCast(func->function->f->arg_begin(), context->root->CharPointerType->GetLLVMType());
 		context->root->builder.CreateMemCpy(dptr, sptr, str->GetSize(), 1);
-		//context->root->builder.CreateRet(context->root->builder.CreateLoad(alloc));
 
 		context->root->builder.CreateRetVoid();
 

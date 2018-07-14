@@ -4,16 +4,23 @@ class OptionVar
 {
 	std::string name;
 	std::string value;
+	bool take_value;
 public:
 	OptionVar()
 	{
 
 	}
 
-	OptionVar(const char* name, const char* def)
+	OptionVar(const char* name, const char* def, bool take_value)
 	{
 		this->name = name;
 		this->value = def;
+		this->take_value = take_value;
+	}
+
+	bool ShouldTake()
+	{
+		return this->take_value;
 	}
 
 	bool GetBool()
@@ -58,10 +65,10 @@ public:
 		return vars[name];
 	}
 
-	void AddOption(const char* name, const char* def)
+	void AddOption(const char* name, const char* def, bool take_value = true)
 	{
 		if (vars.find(name) == vars.end())
-			vars[name] = OptionVar(name, def);
+			vars[name] = OptionVar(name, def, take_value);
 	}
 
 	void Parse(const std::string& aargs)
@@ -114,13 +121,22 @@ public:
 				
 				std::string value;
 				if (i + 1 < argc)
-					value = args[++i];
+					value = args[i+1];
 
 				auto find = vars.find(option);
 				if (find != vars.end())
+				{
+					if (vars[option].ShouldTake())
+						i++;
+					else
+						value = true;
 					vars[option].SetValue(value);
+				}
 				else
-					vars[option] = OptionVar(option.c_str(), value.c_str());
+				{
+					printf("WARNING: Argument/flag '%s' does not exist\n", option.c_str());
+					vars[option] = OptionVar(option.c_str(), value.c_str(), true);
+				}
 			}
 			else if (args[i][0] == '-')
 			{
@@ -141,7 +157,7 @@ public:
 				else
 				{
 					printf("WARNING: Argument/flag '%s' does not exist\n", option.c_str());
-					vars[option] = OptionVar(option.c_str(), value.c_str());
+					vars[option] = OptionVar(option.c_str(), value.c_str(), true);
 				}
 			}
 			else

@@ -400,7 +400,9 @@ CValue CallExpression::Compile(CompilerContext* context)
 			self = context->root->builder.CreateLoad(self);
 		}
 		else
+		{
 			devirtualize = true;//if we arent using -> we dont need a virtual call, right?
+		}
 
 		//push in the this pointer argument kay
 		argsv.push_back(CValue(stru->GetPointerType(), self));
@@ -418,8 +420,6 @@ CValue CallExpression::Compile(CompilerContext* context)
 		return CValue(lhs.type->function->return_type, context->root->builder.CreateCall(lhs.val, argts));
 	}
 
-	//need to pass all structs as pointers
-
 	//build arg list
 	for (auto ii : *this->args)
 		argsv.push_back(ii.first->Compile(context));
@@ -430,13 +430,6 @@ CValue CallExpression::Compile(CompilerContext* context)
 	//destruct if my parent doesnt use me and todo if I have a destructor
 	if (ret.type->type == Types::Struct && dynamic_cast<BlockExpression*>(this->parent))
 	{
-		//need to escalate to a pointer
-		/*auto TheFunction = context->function->f;
-		llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-			TheFunction->getEntryBlock().begin());
-		auto alloc = TmpB.CreateAlloca(ret.type->GetLLVMType(), 0, "return_pass_tmp");
-		context->root->builder.CreateStore(ret.val, alloc);*/
-
 		context->Destruct(CValue(ret.type->GetPointerType(), ret.pointer), 0);
 	}
 

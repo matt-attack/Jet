@@ -42,7 +42,7 @@ void Jet::SetupDefaultCommandOptions(OptionParser* parser)
 	parser->AddOption("target", "");
 	parser->AddOption("linker", "");
 	parser->AddOption("debug", "2");
-	parser->AddOption("ir", "0");
+	parser->AddOption("ir", "0", false);
 }
 
 //this reads the options out of the parser and applys them 
