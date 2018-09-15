@@ -23,6 +23,14 @@ CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
 	{
 		return p->GetElementPointer(context);
 	}
+	else
+	{
+		auto g = dynamic_cast<GroupExpression*>(right);
+		if (g)
+		{
+			return GetPtrToExprValue(context, g->GetInside());
+		}
+	}
 	context->root->Error("Not Implemented", *context->current_token);
 }
 
@@ -346,7 +354,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			}
 		}
 		//maybe this case shouldnt happen
-		else if (lhs.type->base->type == Types::InternalArray && this->member.text.length() == 0)//or pointer!!(later)
+		/*else if (lhs.type->base->type == Types::InternalArray && this->member.text.length() == 0)//or pointer!!(later)
 		{
 			//throw 7;
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
@@ -355,9 +363,10 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 			//lhs.val = context->root->builder.CreateLoad(lhs.val);
 			//llllload my index
 			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
-			
+			loc->dump();
+			loc->getType()->dump();
 			return CValue(lhs.type->base->GetPointerType(), loc);
-		}
+		}*/
 		else if (lhs.type->base->type == Types::InternalArray
 			&& this->member.text.length() == 0)
 		{

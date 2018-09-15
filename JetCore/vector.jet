@@ -18,7 +18,7 @@ struct function<Any T>
 //[testattribute]
 fun void ttttt()
 {
-	puts("im a function pointer");
+	//puts("im a function pointer");
 }
 
 fun bool TestWhere(int x)
@@ -53,7 +53,7 @@ trait IEnumerable<T>
 
 fun int IEnumerable::DoStuff()
 {
-	puts("helloooooo");
+	//puts("helloooooo");
 	return sizeof(T);
 	//printf("Hi %d", sizeof(T));
 }
@@ -63,7 +63,7 @@ fun void IEnumerable::Print()
 	let eenum = this->GetEnumerator();
 	while (eenum.MoveNext() == 1)
 	{
-		puts("Got one!");
+		//puts("Got one!");
 	}
 }
 
@@ -158,22 +158,17 @@ struct VectorIterator<Any TTT>
 struct vector<Any TT>
 {
 	TT[] data;
-	int max_size;
 	int cur_size; 
 	
 	fun void vector()
 	{
-		puts("constructor a");
 		this->cur_size = 0;
-		this->data = new TT[4];//
-		//this->data = <TT*>malloc(sizeof(TT)*4);
-		this->max_size = 4;
+		this->data = new TT[4];
 	}
 	
 	fun void ~vector()
 	{
-		puts("destructor");
-		//free(<char*>this->data);
+		free this->data;
 	}
 	
 	fun VectorIterator<TT> GetEnumerator()
@@ -188,13 +183,13 @@ struct vector<Any TT>
 	fun void push_back(TT v)
 	{
 		puts("pushed back");
-		if (this->cur_size >= this->max_size)
+		if (this->cur_size >= this->data.size)
 		{
 			//resize
 			puts("resizing");
 			this->resize(this->cur_size*2);
 		}
-		
+
 		this->data[this->cur_size++] = v;
 	}
 	
@@ -210,18 +205,15 @@ struct vector<Any TT>
 	
 	fun void resize(uint size)
 	{
-		//todo
-		let ne = new TT[size];//<TT*>malloc(sizeof(TT)*size);
+		let ne = new TT[size];
 
-		puts("malloced");
 		//copy
 		for (let int i = 0; i < this->cur_size; i++)
 		{
 			ne[i] = this->data[i];
 		}
-		puts("copied data");
+		
 		free this->data;
 		this->data = ne;
-		this->max_size = size;
 	}
 }

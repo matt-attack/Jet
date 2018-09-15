@@ -1323,7 +1323,7 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 		type = llvm::ArrayType::get(t->GetLLVMType(), size);
 		ret_type = my_type = this->GetInternalArrayType(t, size)->GetPointerType();
 	}
-	auto ng = new llvm::GlobalVariable(*module, type, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakAnyLinkage/*ExternalLinkage*/, initializer, name);
+	auto ng = new llvm::GlobalVariable(*module, type, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::ExternalLinkage/*ExternalLinkage*/, initializer, name);
 
 	this->debug->createGlobalVariableExpression(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
 	this->ns->members.insert({ name, Symbol(new CValue(my_type, ng)) });

@@ -1300,6 +1300,11 @@ namespace Jet
 			this->end = end;
 		}
 
+		Expression* GetInside()
+		{
+			return this->expr;
+		}
+
 		void SetParent(Expression* parent)
 		{
 			this->parent = parent;
