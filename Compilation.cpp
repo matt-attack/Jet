@@ -96,7 +96,8 @@ Compilation::Compilation(JetProject* proj) : builder(llvm_context_jet), context(
 	ns->members.insert({ "uchar", new Type("uchar", Types::UChar) });
 	this->BoolType = new Type("bool", Types::Bool);
 	ns->members.insert({ "bool", this->BoolType });
-	ns->members.insert({ "void", new Type("void", Types::Void) });
+	// NEED TO BE SURE NOT TO FREE THIS
+	ns->members.insert({ "void", &VoidType });// new Type("void", Types::Void) });
 
 	for (auto ii : ns->members)
 	{
