@@ -4,28 +4,28 @@ class OptionVar
 {
 	std::string name;
 	std::string value;
-	bool take_value;
+	bool is_flag;
 public:
 	OptionVar()
 	{
 
 	}
 
-	OptionVar(const char* name, const char* def, bool take_value)
+	OptionVar(const char* name, const char* def, bool is_flag)
 	{
 		this->name = name;
 		this->value = def;
-		this->take_value = take_value;
+		this->is_flag = is_flag;
 	}
 
-	bool ShouldTake()
+	bool IsFlag()
 	{
-		return this->take_value;
+		return this->is_flag;
 	}
 
 	bool GetBool()
 	{
-		return false;
+		return this->value == "1" || this->value == "true" || this->value == "True" || this->value == "TRUE";
 	}
 
 	int GetInt()
@@ -65,10 +65,10 @@ public:
 		return vars[name];
 	}
 
-	void AddOption(const char* name, const char* def, bool take_value = true)
+	void AddOption(const char* name, const char* def, bool is_flag)
 	{
 		if (vars.find(name) == vars.end())
-			vars[name] = OptionVar(name, def, take_value);
+			vars[name] = OptionVar(name, def, is_flag);
 	}
 
 	void Parse(const std::string& aargs)
@@ -126,10 +126,10 @@ public:
 				auto find = vars.find(option);
 				if (find != vars.end())
 				{
-					if (vars[option].ShouldTake())
+					if (value.length() && value[0] != '-')
 						i++;
 					else
-						value = true;
+						value = "true";
 					vars[option].SetValue(value);
 				}
 				else
@@ -153,7 +153,16 @@ public:
 
 				auto find = vars.find(option);
 				if (find != vars.end())
-					vars[option].SetValue(value);
+				{
+					if (value == "" && find->second.IsFlag())
+					{
+						vars[option].SetValue("true");
+					}
+					else
+					{
+						vars[option].SetValue(value);
+					}
+				}
 				else
 				{
 					printf("WARNING: Argument/flag '%s' does not exist\n", option.c_str());

@@ -35,27 +35,27 @@ using namespace Jet;
 //this adds all the available options to the parser for jet
 void Jet::SetupDefaultCommandOptions(OptionParser* parser)
 {
-	parser->AddOption("o", "0");
-	parser->AddOption("f", "0");
-	parser->AddOption("t", "0");
-	parser->AddOption("r", "0");
-	parser->AddOption("target", "");
-	parser->AddOption("linker", "");
-	parser->AddOption("debug", "2");
-	parser->AddOption("ir", "0", false);
+	parser->AddOption("o", "0", true);
+	parser->AddOption("f", "0", true);
+	parser->AddOption("t", "0", true);
+	parser->AddOption("r", "0", true);
+	parser->AddOption("target", "", false);
+	parser->AddOption("linker", "", false);
+	parser->AddOption("debug", "2", false);
+	parser->AddOption("ir", "0", true);
 }
 
 //this reads the options out of the parser and applys them 
 void CompilerOptions::ApplyOptions(OptionParser* parser)
 {
 	this->optimization = parser->GetOption("o").GetInt();
-	this->force = parser->GetOption("f").GetString().length() == 0;
-	this->time = parser->GetOption("t").GetString().length() == 0;
-	this->run = parser->GetOption("r").GetString().length() == 0;
+	this->force = parser->GetOption("f").GetBool();
+	this->time = parser->GetOption("t").GetBool();
+	this->run = parser->GetOption("r").GetBool();
 	this->target = parser->GetOption("target").GetString();
 	this->linker = parser->GetOption("linker").GetString();
 	this->debug = parser->GetOption("debug").GetInt();
-	this->output_ir = parser->GetOption("ir").GetString().length() == 0;
+	this->output_ir = parser->GetOption("ir").GetBool();
 }
 
 void Jet::Diagnostic::Print()
@@ -591,6 +591,7 @@ void Compiler::UpdateProjectList(JetProject* project)
 
 		//append our name
 		std::ofstream file(db_filename, std::ios_base::app);
+
 		file << project->project_name << "|" << curpath << '|' << project->version << '\n';
 	}
 }

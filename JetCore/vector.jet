@@ -43,7 +43,7 @@ trait IEnumerator<TT>
 	fun TT Current();
 	
 	fun void Reset();
-	fun int MoveNext();
+	fun bool MoveNext();
 }
 
 trait IEnumerable<T>
@@ -143,7 +143,7 @@ struct VectorIterator<Any TTT>
 		this->position = 0;
 	}
 	
-	fun int MoveNext()
+	fun bool MoveNext()
 	{
 		this->position++;
 		let res = 0;

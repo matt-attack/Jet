@@ -1,5 +1,6 @@
-lib:
+lib: JetCore
+version: 0.0.1
 requires: jetc
 files: core.jet string.jet map.jet vector.jet
-libs: "C:\Program Files (x86)\Windows Kits\8.1\Lib\winv6.3\um\x86\kernel32.lib"
+libs: "C:\MinGW\lib\libkernel32.a"
 defines: TEST

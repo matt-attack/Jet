@@ -182,7 +182,8 @@ CValue Function::Call(CompilerContext* context, std::vector<CValue>& argsv, bool
 		arg_vals.push_back(ii.val);
 
 	std::vector<int> to_convert;
-	int i = 0;
+	int i = 0; int ai = 0;
+	//if we return a struct, it is actually passed through an argument
 	if (this->return_type->type == Types::Struct)
 	{
 		i = 1;
@@ -204,7 +205,7 @@ CValue Function::Call(CompilerContext* context, std::vector<CValue>& argsv, bool
 			//need to promote from value types to get this to work
 			//ok, need to not do this for =
 			//extract the types from the function
-			auto type = this->arguments[i].first;
+			auto type = this->arguments[ai].first;
 			if (type->type == Types::Struct)
 			{
 				auto funiter = type->data->functions.find("=");
@@ -229,8 +230,9 @@ CValue Function::Call(CompilerContext* context, std::vector<CValue>& argsv, bool
 				}
 				else
 				{
-					auto dptr = context->root->builder.CreatePointerCast(ii.val, context->root->CharPointerType->GetLLVMType());
-					auto sptr = context->root->builder.CreatePointerCast(alloc, context->root->CharPointerType->GetLLVMType());
+					//was ii.val, but this makes more sense
+					auto sptr = context->root->builder.CreatePointerCast(ii.pointer, context->root->CharPointerType->GetLLVMType());
+					auto dptr = context->root->builder.CreatePointerCast(alloc, context->root->CharPointerType->GetLLVMType());
 					context->root->builder.CreateMemCpy(dptr, sptr, type->GetSize(), 1);
 				}
 			}
@@ -245,6 +247,7 @@ CValue Function::Call(CompilerContext* context, std::vector<CValue>& argsv, bool
 			to_convert.push_back(i);
 		}
 		i++;
+		ai++;
 	}
 
 	//if we are the upper level of the inheritance tree, devirtualize
