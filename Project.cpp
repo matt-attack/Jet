@@ -180,13 +180,37 @@ bool JetProject::_Load(const std::string& projectdir)
 
 	this->is_executable = true;
 	int current_block = 0;
-	this->project_name = GetNameFromPath(realpath);
 	auto doc = ParseConfig(pf);
 	auto root = doc->sections[""];
-	if (root->children.find("lib") != root->children.end())
+	if (root->children.find("lib") != root->children.end() 
+		&& root->children.find("lib")->second->size() > 0)
+	{
+		this->project_name = root->children["lib"]->at(0);
 		is_executable = false;
+	}
+	else if (root->children.find("bin") != root->children.end()
+		     && root->children.find("bin")->second->size() > 0)
+	{
+		this->project_name = root->children["bin"]->at(0);
+		is_executable = true;
+	}
+	else
+	{
+		// we didnt have a project name, fail
+		printf("Error: Project didn't have a name. Add a bin or lib tag with the project name.\n");
+		return false;
+	}
 
-	if (root->children.find("version") != root->children.end())
+	// error if we have a bin and lib tag
+	if (root->children.find("lib") != root->children.end()
+		&& root->children.find("bin") != root->children.end())
+	{ 
+		printf("Error: Project cannot be both a bin and a library. Remove either the bin or the lib tag.\n");
+		return false;
+	}
+
+	if (root->children.find("version") != root->children.end()
+		&& root->children.find("version")->second->size() > 0)
 		this->version = root->children["version"]->at(0);
 
 	if (root->children["files"])
