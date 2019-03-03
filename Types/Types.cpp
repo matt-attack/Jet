@@ -16,7 +16,7 @@ llvm::Value* CValue::GetReference()
 		return this->pointer;
 
 	//need to make our own copy for this somehow...
-
+	throw 7;
 }
 
 Type* Type::GetPointerType()
@@ -575,7 +575,6 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	str->expression = this->data->expression;
 
 
-
 	Type* t = new Type(str->name, Types::Struct, str);
 	t->ns = this->ns;
 
@@ -599,10 +598,10 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 
 		return t;// goto exit;
 	}
-	//else if (has_trait_template_arg == true)
-	//	t->ns->members.insert({ realname, t });
-	else //if (has_trait_template_arg == false)
+	else
+	{
 		t->ns->members.insert({ realname, t });
+	}
 
 	//build members
 	for (auto ii : this->data->expression->members)
@@ -684,6 +683,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	//remove myself from my ns if im a trait
 	if (has_trait_template_arg)
 	{
+		//todo do I need this? it was commented out
 		//t->ns->members.erase(t->ns->members.find(realname));
 	}
 
@@ -764,7 +764,7 @@ std::string Type::ToString()
 	case (int)Types::InternalArray:
 		return this->base->ToString() + "[" + std::to_string(this->size) + "]";
 	case (int)Types::Array:
-		return this->base->ToString() + "[]";// +std::to_string(this->size) + "]";
+		return this->base->ToString() + "[]";
 	case (int)Types::Bool:
 		return "bool";
 	case (int)Types::Char:

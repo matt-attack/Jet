@@ -71,16 +71,7 @@ namespace Jet
 		
 		std::map<std::string, Source*> GetSources();
 
-		static JetProject* Load(const std::string& projectdir)
-		{
-			JetProject* p = new JetProject;
-			p->_Load(projectdir);
-			if (p->opened)
-				return p;
-			else
-				delete p;
-			return 0;
-		}
+		static JetProject* Load(const std::string& projectdir);
 
 		const std::vector<std::string>& ResolveDependencies();
 	};

@@ -254,7 +254,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	int deps = project->dependencies.size();
 	for (int i = 0; i < deps; i++)
 	{
-		auto ii = resolved_deps[i];// project->dependencies[i];
+		auto ii = resolved_deps[i];
 
 		if (resolved_deps[i].length() == 0)
 		{
@@ -269,7 +269,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			for (auto ii : lib_symbols)
 				delete[] ii.second;
 
-			diagnostics->Error("Dependency compilation '" + ii + "' failed: could not find symbol file!", "project.jp");
+			diagnostics->Error("Dependency include of '" + ii + "' failed: could not find symbol file!", "project.jp");
 
 			//restore working directory
 			chdir(olddir);
@@ -547,8 +547,6 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 
 			compilation->current_function = global;
 
-			//ok, I only need one of these, fixme
-			//debug_info.cu = debug->createCompileUnit(dwarf::DW_LANG_C, result.first, "../", "Jet Compiler", false, "", 0, "");
 			compilation->debug_info.file = compilation->debug->createFile(result.first,
 				compilation->debug_info.cu->getDirectory());
 			compilation->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, compilation->debug_info.file));
@@ -947,8 +945,10 @@ void Compilation::SetTarget(const std::string& triple)
 		MCPU = "";
 	}
 	else
+	{
 		if (TheTriple.getTriple().empty())
 			TheTriple.setTriple(llvm::sys::getDefaultTargetTriple());
+	}
 
 	//ok, now for linux builds...
 	//TheTriple = llvm::Triple("i686", "pc", "linux", "gnu");
@@ -979,6 +979,7 @@ void Compilation::SetTarget(const std::string& triple)
 	std::string FeaturesStr;
 	llvm::CodeGenOpt::Level OLvl = llvm::CodeGenOpt::Default;
 	Options.MCOptions.AsmVerbose = false;// llvm::AsmVerbose;
+	Options.DebuggerTuning = llvm::DebuggerKind::GDB;
 	//llvm::TargetMachine Target(*(llvm::Target*)TheTarget, TheTriple.getTriple(), MCPU, FeaturesStr, Options);
 	auto RelocModel = llvm::Reloc::Static;//this could be problematic
 	auto CodeModel = llvm::CodeModel::Medium;
@@ -1107,6 +1108,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 		i++;
 	};
 
+	// Handle namespaces recursively
 	if (name.length() > i && name[i] == ':' && name[i + 1] == ':')
 	{
 		//navigate to correct namespace
@@ -1126,6 +1128,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 
 		return out;
 	}
+
 	std::string base = name.substr(0, i);
 
 	//look through namespaces to find the base type
@@ -1335,14 +1338,8 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 
 void Compilation::Error(const std::string& string, Token token)
 {
-	//Diagnostic error;
-	//error.severity = 0;
-	//error.token = token;
-	//error.message = string;
-	//error.line = current_source->GetLine(token.line);
-	//error.file = current_source->filename;
 	this->diagnostics->Error(string, token);
-	//this->errors.push_back(error);
+
 	throw 7;
 }
 
@@ -1457,14 +1454,11 @@ void Compilation::ResolveTypes()
 
 Jet::Function* Compilation::GetFunction(const std::string& name)
 {
-	auto r = this->ns->members.find(name);
-	if (r != this->ns->members.end() && r->second.type == SymbolType::Function)
-		return r->second.fn;
-	//try lower one
-	auto next = this->ns->parent;
+	//search up the namespace tree for the function
+	auto next = this->ns;
 	while (next)
 	{
-		r = next->members.find(name);
+		auto r = next->members.find(name);
 		if (r != next->members.end() && r->second.type == SymbolType::Function)
 			return r->second.fn;
 
@@ -1475,7 +1469,7 @@ Jet::Function* Compilation::GetFunction(const std::string& name)
 
 Jet::Symbol Compilation::GetVariableOrFunction(const std::string& name)
 {
-	//try lower one
+	//search up the namespace tree for this variable or function
 	auto next = this->ns;
 	while (next)
 	{
@@ -1488,6 +1482,7 @@ Jet::Symbol Compilation::GetVariableOrFunction(const std::string& name)
 	return Symbol();
 }
 
+// For the racer, pretty broken atm
 Jet::Function* Compilation::GetFunctionAtPoint(const char* file, int line)
 {
 	for (auto ii : this->functions)

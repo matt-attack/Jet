@@ -56,7 +56,7 @@ namespace Jet
 		static std::vector<ProjectInfo> GetProjectList();
 
 		//returns if was successful, errored, or if there was a rebuild
-		//0 = error, 1 = success, 2 = recompiled, but successful
+		//0 = error, 1 = success, 2 = successful, was recompiled
 		int Compile(const char* projectfile, CompilerOptions* options = 0, const std::string& config = "", OptionParser* parser = 0);
 	};
 

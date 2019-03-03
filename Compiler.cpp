@@ -153,6 +153,9 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 		CloseHandle(pi.hThread);
 	});
 	x.detach();
+#else
+	// todo run for linux
+	printf("WARNING: Running your program from the compiler is not yet supported in linux.");
 #endif
 	//system(path.c_str());
 
@@ -162,7 +165,7 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 extern std::string executable_path;
 int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std::string& confg_name, OptionParser* parser)
 {
-	JetProject* project = JetProject::Load(projectdir);
+	std::unique_ptr<JetProject> project = std::unique_ptr<JetProject>(JetProject::Load(projectdir));
 	if (project == 0)
 		return 0;
 
@@ -184,9 +187,16 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 
 		if (resolved_deps[i].length() == 0)
 		{
-			printf("Project: %s could not be found!", ii.c_str());
-			delete project;
+			printf("Dependency: %s could not be found!\nMake sure to build it at least once so we can find it.\n", ii.c_str());
+
+			//make sure to restore old cwd
+			chdir(olddir);
+
 			return 0;
+		}
+		else
+		{
+			printf("Dependency \"%s\" resolved to %s.\n", ii.c_str(), resolved_deps[i].c_str());
 		}
 
 		ii = resolved_deps[i];
@@ -202,7 +212,7 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 		auto success = compiler.Compile(ii.c_str());
 		if (success == 0)
 		{
-			printf("Dependency compilation failed, stopping compilation");
+			printf("Dependency compilation failed, stopping compilation.");
 
 			//restore working directory
 			chdir(olddir);
@@ -217,11 +227,7 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 	printf("\nCompiling Project: %s\n", projectdir);
 
 	//read in buildtimes
-#if 0 //def false//_WIN32
-	std::vector<std::pair<int, int>> buildtimes;
-#else
 	std::vector<int> buildtimes;
-#endif
 	std::ifstream rebuild("build/rebuild.txt");
 	std::string compiler_version;
 	if (rebuild.is_open())
@@ -265,7 +271,7 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 
 	//lets look at the .jlib modification time
 	//this need to use the correct paths from the located dependencies
-	for (auto ii : resolved_deps)//project->dependencies)
+	for (auto ii : resolved_deps)
 	{
 		std::string path = ii;
 		path += "/build/symbols.jlib";
@@ -304,12 +310,16 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 			printf("WARNING: Build Configuration Name: '%s' Does Not Exist, Defaulting To '%s'\n", config_name.c_str(), project->configurations.begin()->name.c_str());
 		}
 		else if (found == false)
+		{
 			printf("WARNING: Build Configuration Name: '%s' Does Not Exist\n", config_name.c_str());
+		}
 	}
 	else
 	{
 		if (project->configurations.size() > 0)
+		{
 			configuration = *project->configurations.begin();
+		}
 	}
 
 	//read in config from command and stuff
@@ -354,8 +364,15 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 				{
 					printf("No Changes Detected, Compiling Skipped\n");
 
-					if (options.run)
-						ExecuteProject(project, projectdir);
+					if (options.run && project->IsExecutable())
+					{
+						ExecuteProject(project.get(), projectdir);
+						Sleep(50);//give it a moment to run, for some reason derps up without this
+					}
+					else if (options.run)
+					{
+						printf("Warning: Ignoring run option because program is not executable.\n");
+					}
 
 					//restore working directory
 					chdir(olddir);
@@ -371,15 +388,17 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 	if (jlib) fclose(jlib);
 	if (output) fclose(output);
 
-	//running prebuild
+	//Run prebuild commands
 	if (configuration.prebuild.length() > 0)
+	{
 		printf("%s", exec(configuration.prebuild.c_str()).c_str());
+	}
 
 	DiagnosticBuilder diagnostics([](Diagnostic& msg)
 	{
 		msg.Print();
 	});
-	Compilation* compilation = Compilation::Make(project, &diagnostics, options.time, options.debug);
+	Compilation* compilation = Compilation::Make(project.get(), &diagnostics, options.time, options.debug);
 
 error:
 
@@ -431,15 +450,19 @@ error:
 		//ok now lets add it to the project cache, lets be sure to always save a backup though and need to get current path of the jetc 
 		if (executable_path.length())
 		{
-			this->UpdateProjectList(project);
+			this->UpdateProjectList(project.get());
 		}
 
 		if (options.run && project->IsExecutable())
 		{
-			ExecuteProject(project, projectdir);
+			ExecuteProject(project.get(), projectdir);
 			Sleep(50);//give it a moment to run, for some reason derps up without this
 		}
-		//todo: need to look at compilation time of dependencies to see if we need to rebuild
+		else if (options.run)
+		{
+			printf("Warning: Ignoring run option because program is not executable.\n");
+		}
+
 		delete compilation;
 
 		//restore working directory
@@ -454,17 +477,19 @@ error:
 	return 1;
 }
 
-
-std::vector<Compiler::ProjectInfo> Compiler::GetProjectList()
+std::string GetProjectDatabasePath()
 {
 	//ok, now we need to remove our executable name from this
 	int pos = executable_path.find_last_of('\\');
 	if (pos == -1)
 		pos = executable_path.find_last_of('/');
 	std::string path = executable_path.substr(0, pos);
-	std::string db_filename = path + "/project_database.txt";
+	return path + "/project_database.txt";
+}
 
-	std::ifstream file(db_filename, std::ios_base::binary);
+std::vector<Compiler::ProjectInfo> Compiler::GetProjectList()
+{
+	std::ifstream file(GetProjectDatabasePath(), std::ios_base::binary);
 	bool found = false;
 	std::string line;
 
@@ -491,68 +516,25 @@ std::vector<Compiler::ProjectInfo> Compiler::GetProjectList()
 
 std::string Compiler::FindProject(const std::string& project_name, const std::string& desired_version)
 {
-	//ok, now we need to remove our executable name from this
-	//printf("Executable Path: %s\n", executable_path.c_str());
-	int pos = executable_path.find_last_of('\\');
-	if (pos == -1)
-		pos = executable_path.find_last_of('/');
-	std::string path = executable_path.substr(0, pos);
-	std::string db_filename = path + "/project_database.txt";
-
-	std::ifstream file(db_filename, std::ios_base::binary);
-	bool found = false;
-	std::string line;
-	while (std::getline(file, line))
+	auto projects = GetProjectList();
+	for (auto ii : projects)
 	{
-		std::istringstream iss(line);
-		std::string name, path, version;
-
-		//there is three parts, name, path and version separated by | and delimited by lines
-		int first = line.find_first_of('|');
-		int last = line.find_last_of('|');
-		if (first == -1 || first == last)
-			continue;//invalid line
-
-		name = line.substr(0, first);
-		path = line.substr(first + 1, last - 1 - first);
-		version = line.substr(last + 1, line.length() - last);
-
-		//todo if no version is specified, we want the newest version
-		if (name == project_name)
+		//todo also check version
+		if (ii.name == project_name)
 		{
-			//if (path != curpath)
-			//{
-			//	printf("TWO PACKAGES WITH THE SAME NAME EXIST, THIS CAN CAUSE ISSUES!\n");
-			//}
-
-			/*if (version != desired_version)
-			{
-				//if the path is right, but the version changed we need to edit the version
-				printf("PACKAGE VERSION MISMATCH NEED TO HANDLE THIS\n");
-			}*/
-
-			return path;
-
-			//we found it, lets return the path
-			found = true;
-			break;
+			return ii.path;
 		}
 	}
+
 	return "";
 }
 
 void Compiler::UpdateProjectList(JetProject* project)
 {
-	//ok, now we need to remove our executable name from this
-	int pos = executable_path.find_last_of('\\');
-	if (pos == -1)
-		pos = executable_path.find_last_of('/');
-	std::string path = executable_path.substr(0, pos);
-	std::string db_filename = path + "/project_database.txt";
-
 	char curpath[500];
 	getcwd(curpath, 500);//todo escape our filename and project name and make parser above able to read it out
 
+	std::string db_filename = GetProjectDatabasePath();
 	//ok, lets scan through the database to see if we are in it
 	//todo: break this search out into a function
 	std::ifstream file(db_filename, std::ios_base::binary);

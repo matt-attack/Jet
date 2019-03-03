@@ -10,7 +10,12 @@ struct A
 {
 	int a_val;
 	
-	fun void hi()
+	virtual void hi()
+	{
+		puts("I'm A\n");
+	}
+	
+	virtual void hi2()
 	{
 		puts("I'm A\n");
 	}
@@ -18,7 +23,8 @@ struct A
 
 struct B: A
 {
-	fun void hi()
+	char p;
+	virtual void hi()
 	{
 		puts("I'm B\n");
 	}
@@ -26,7 +32,13 @@ struct B: A
 
 struct C: B
 {
-	fun void hi()
+	int q;
+	virtual void hi()
+	{
+		puts("I'm C\n");
+	}
+	
+	virtual void hi2()
 	{
 		puts("I'm C\n");
 	}
@@ -44,9 +56,15 @@ fun int main()
 	
 	let A* bp = &b;
 	bp->hi();
+	bp->hi2();
 	
 	let B* cp = &c;
 	cp->hi();
+	cp->hi2();
+	
+	let A* cp2 = &c;
+	cp2->hi();
+	cp2->hi2();
 
 	getchar();
 	return 0;

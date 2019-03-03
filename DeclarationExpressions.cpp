@@ -502,7 +502,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	context->CurrentToken(&this->token);
 	if (lambda)//return the lambda if we are one
-		return CValue(lambda_type, context->root->builder.CreateLoad(lambda));
+		return CValue(lambda_type, context->root->builder.CreateLoad(lambda), lambda);
 	else
 		return CValue(function_context->function->GetType(context->root), function_context->function->f);
 }

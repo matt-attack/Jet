@@ -284,7 +284,13 @@ const std::vector<std::string>& JetProject::ResolveDependencies()
 			//ok, search for the p/ackage using our database, we didnt give a path to one
 			std::string path = Compiler::FindProject(dep, "0.0.0");//todo, can optimize this so we dont read the file n times lolol
 			
-			printf("Project \"%s\" resolved to %s\n", dep.c_str(), path.c_str());
+			//if (path.length() == 0)
+			//{
+				// we failed to find this project
+			//	printf("Project \"%s\" was not resolved.\nMake sure to build it first so the compiler knows where to find it.", dep.c_str());
+			//}
+
+			//printf("Project \"%s\" resolved to %s\n", dep.c_str(), path.c_str());
 
 			//if we couldnt find it there will just be a blank string that we can handle down later
 			this->resolved_deps.push_back(path);
@@ -295,4 +301,15 @@ const std::vector<std::string>& JetProject::ResolveDependencies()
 		}
 	}
 	return this->resolved_deps;
+}
+
+JetProject* JetProject::Load(const std::string& projectdir)
+{
+	JetProject* p = new JetProject;
+	p->_Load(projectdir);
+	if (p->opened)
+		return p;
+	else
+		delete p;
+	return 0;
 }
