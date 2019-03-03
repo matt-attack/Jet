@@ -144,9 +144,13 @@ Type* IndexExpression::GetBaseType(Compilation* compiler)
 CValue IndexExpression::GetBaseElementPointer(CompilerContext* context)
 {
 	if (auto name = dynamic_cast<NameExpression*>(left))
+	{
 		return context->GetVariable(name->GetName());
+	}
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
+	{
 		return index->GetElementPointer(context);
+	}
 	else if (auto call = dynamic_cast<CallExpression*>(left))
 	{
 		//store the value then return the pointer to it
@@ -171,12 +175,16 @@ Type* GetMemberType(CompilerContext* context, Type* type, const std::string& nam
 		//check methods
 		auto method = type->GetMethod(name, {}, context, true);
 		if (method == 0)
+		{
 			context->root->Error("Struct Member '" + name + "' of Struct '" + type->data->name + "' Not Found", token);
+		}
 		return method->GetType(context->root);
 	}
 
 	if (index >= type->data->struct_members.size())
+	{
 		context->root->Error("Struct Member '" + name + "' of Struct '" + type->data->name + "' Not Found", token);
+	}
 
 	return type->data->struct_members[index].type;
 }
@@ -191,12 +199,20 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 	{
 		CValue lhs;
 		if (p)
+		{
 			if (tc)
+			{
 				lhs.type = context->TCGetVariable(p->GetName());
+			}
 			else
+			{
 				lhs = context->GetVariable(p->GetName());
+			}
+		}
 		else if (i)
+		{
 			lhs.type = i->GetType(context, tc)->GetPointerType();
+		}
 
 		if (string && lhs.type->type == Types::Struct)
 		{
@@ -292,7 +308,9 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		context->CurrentToken(old);
 	}
 	else if (i)
+	{
 		lhs = i->GetElementPointer(context);
+	}
 
 	if (index == 0 && this->token.type == TokenType::Pointy)
 	{
@@ -353,20 +371,6 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 				return CValue(lhs.type->base->base->GetPointerType()->GetPointerType(), alloca);
 			}
 		}
-		//maybe this case shouldnt happen
-		/*else if (lhs.type->base->type == Types::InternalArray && this->member.text.length() == 0)//or pointer!!(later)
-		{
-			//throw 7;
-			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
-
-			//loadme!!!
-			//lhs.val = context->root->builder.CreateLoad(lhs.val);
-			//llllload my index
-			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
-			loc->dump();
-			loc->getType()->dump();
-			return CValue(lhs.type->base->GetPointerType(), loc);
-		}*/
 		else if (lhs.type->base->type == Types::InternalArray
 			&& this->member.text.length() == 0)
 		{
@@ -394,6 +398,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		{
 			auto stru = lhs.type->base->data;
 
+			// todo maybe wrap finding this function into a function
 			auto funiter = stru->functions.find("[]");
 			//todo: search through multimap to find one with the right number of args
 			if (funiter != stru->functions.end() && funiter->second->arguments.size() == 2)
@@ -456,8 +461,9 @@ CValue NumberExpression::Compile(CompilerContext* context)
 	}
 
 	//ok, lets get the type from what kind of constant it is
+	// todo need to make this use the correct type based on size and stuff, float double or int/long
 	if (isint)
-		return context->Integer(std::stoi(this->token.text));
+		return context->Integer(std::stol(this->token.text));
 	else
 		return context->Float(::atof(token.text.c_str()));
 }

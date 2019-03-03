@@ -71,7 +71,9 @@ CValue IfExpression::Compile(CompilerContext* context)
 	llvm::BasicBlock *EndBB = llvm::BasicBlock::Create(context->context, "endif");
 	llvm::BasicBlock *ElseBB = 0;
 	if (hasElse)
+	{
 		ElseBB = llvm::BasicBlock::Create(context->context, "else");
+	}
 
 	llvm::BasicBlock *NextBB = 0;
 	for (auto& ii : this->branches)
@@ -115,7 +117,7 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	context->CurrentToken(&token);
 
 	CValue value = this->var->Compile(context);
-	if (value.type->type != Types::Int)
+	if (value.type->type != Types::Int)// todo need to make this work with other integer types
 		context->root->Error("Argument to Case Statement Must Be an Integer", token);
 
 	this->switch_end = llvm::BasicBlock::Create(context->context, "switchend");
@@ -260,10 +262,10 @@ CValue YieldExpression::Compile(CompilerContext* context)
 	auto bb = llvm::BasicBlock::Create(context->context, "yield");
 	context->function->f->getBasicBlockList().push_back(bb);
 
-	//add the new block to the indirect branch list
+	//add the new block to the generator's indirect branch list
 	context->function->generator.ibr->addDestination(bb);
 
-	//store the current location into the generator context
+	//store the current location into the generator context so we can jump back
 	auto data = context->Load("_context");
 	auto br = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 	auto ba = llvm::BlockAddress::get(bb);
@@ -280,7 +282,7 @@ CValue YieldExpression::Compile(CompilerContext* context)
 		context->root->builder.CreateStore(value.val, br);
 	}
 
-	//return 1 to say we are not finished yielding
+	//return 1 to say the function isnt done yet, we havent returned, just yielded
 	context->root->builder.CreateRet(context->root->builder.getInt1(true));
 
 	//start inserting in new block
