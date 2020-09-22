@@ -62,8 +62,8 @@ void Jet::Diagnostic::Print()
 {
 	if (token.type != TokenType::InvalidToken)
 	{
-		int startrow = token.column;
-		int endrow = token.column + token.text.length();
+		unsigned int startrow = token.column;
+		unsigned int endrow = token.column + token.text.length();
 
 		std::string code = this->line;
 		std::string underline = "";
@@ -165,7 +165,7 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 extern std::string executable_path;
 int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std::string& confg_name, OptionParser* parser)
 {
-	std::unique_ptr<JetProject> project = std::unique_ptr<JetProject>(JetProject::Load(projectdir));
+	std::unique_ptr<JetProject> project(JetProject::Load(projectdir));
 	if (project == 0)
 		return 0;
 
@@ -398,7 +398,8 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 	{
 		msg.Print();
 	});
-	Compilation* compilation = Compilation::Make(project.get(), &diagnostics, options.time, options.debug);
+
+	std::unique_ptr<Compilation> compilation(Compilation::Make(project.get(), &diagnostics, options.time, options.debug));
 
 error:
 
@@ -413,8 +414,6 @@ error:
 	else if (compilation->GetErrors().size() > 0)
 	{
 		printf("Compiling Failed: %d Errors Found\n", compilation->GetErrors().size());
-
-		delete compilation;
 
 		//restore working directory
 		chdir(olddir);
@@ -435,7 +434,7 @@ error:
 #if 0 //_WIN32
 			int len = sprintf(str, "%i,%i\n", ii.first, ii.second);
 #else
-			int len = sprintf(str, "%i\n", ii);
+			int len = sprintf(str, "%li\n", ii);
 #endif
 			rebuild.write(str, len);
 		}
@@ -463,14 +462,10 @@ error:
 			printf("Warning: Ignoring run option because program is not executable.\n");
 		}
 
-		delete compilation;
-
 		//restore working directory
 		chdir(olddir);
 		return 2;
 	}
-
-	delete compilation;
 
 	//restore working directory
 	chdir(olddir);

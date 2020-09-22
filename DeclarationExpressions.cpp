@@ -847,31 +847,38 @@ CValue LetExpression::Compile(CompilerContext* context)
 
 			if (type->type == Types::Struct && type->data->templates.size() > 0)
 				context->root->Error("Missing template arguments for type '" + type->ToString() + "'", ii.first);
-			else if (type->type == Types::Array || type->type == Types::InternalArray)
+			else if (type->type == Types::InternalArray)
 			{
-				if (this->_right && type->size)
+				if (this->_right)
+				{
 					context->root->Error("Cannot assign to a sized array type!", ii.second);
-				if (type->size)
-					needs_destruction = true;
+				}
+
+				needs_destruction = true;
+				Alloca = TmpB.CreateAlloca(type->GetLLVMType(), TmpB.getInt32(1), aname);
+			}
+			else if (type->type == Types::Array)
+			{
+				//if (type->size)
+				//	needs_destruction = true;
+
+				int length = 0;// type->size;
 
 				auto str_type = context->root->GetArrayType(type->base);
-				type = str_type;
+				//type = str_type;
 				//alloc the struct for it
 				Alloca = TmpB.CreateAlloca(str_type->GetLLVMType(), TmpB.getInt32(1), aname);
+
 				//allocate the array
-
-				//get the array size
-				int l = std::atoi(ii.first.text.substr(ii.first.text.find_last_of('[') + 1).c_str());
-
-				auto size = TmpB.getInt32(l);//need to figure out better way to get size
+				auto size = TmpB.getInt32(length);
 				auto arr = TmpB.CreateAlloca(type->base->GetLLVMType(), size, aname + ".array");
 				//store size
 				auto size_p = TmpB.CreateGEP(Alloca, { TmpB.getInt32(0), TmpB.getInt32(0) });
 				TmpB.CreateStore(size, size_p);
 
-				//store pointer
-				auto pointer_p = TmpB.CreateGEP(Alloca, { TmpB.getInt32(0), TmpB.getInt32(1) });
-				TmpB.CreateStore(arr, pointer_p);
+				//store pointer (todo write zero?)
+				//auto pointer_p = TmpB.CreateGEP(Alloca, { TmpB.getInt32(0), TmpB.getInt32(1) });
+				//TmpB.CreateStore(arr, pointer_p);
 			}
 			else if (type->GetBaseType()->type == Types::Trait)
 			{
@@ -932,7 +939,9 @@ CValue LetExpression::Compile(CompilerContext* context)
 		if (this->_right == 0)
 		{
 			if (type->type == Types::Struct)
+			{
 				context->Construct(CValue(type->GetPointerType(), Alloca), 0);
+			}
 			else if (type->type == Types::Array && type->base->type == Types::Struct)
 			{
 				//todo lets move this junk into construct so we dont have to do this in multiple places
@@ -1423,7 +1432,9 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		else
 		{
 			if (this->templates == 0)//todo need to get rid of this to fix things
+			{
 				ii.function->CompileDeclarations(context);
+			}
 			else
 			{
 				//this is just for templated structs for typechecking
@@ -1432,7 +1443,9 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 				context->root->AdvanceTypeLookup(&func->return_type, ii.function->ret_type.text, &ii.function->ret_type);
 				func->arguments.push_back({ 0, "this" });
 				for (unsigned int i = 0; i < ii.function->args->size(); i++)
+				{
 					func->arguments.push_back({ 0, ii.function->args->at(i).name.text });
+				}
 
 				context->root->typecheck = false;
 				str->data->functions.insert({ ii.function->GetName(), func });
@@ -1459,7 +1472,10 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 		context->root->traits[name.text] = t;
 	}
 	else
+	{
 		context->root->Error("Type '" + name.text + "' already exists", token);
+	}
+
 	t->valid = true;
 	t->name = this->name.text;
 	t->parent = context->root->ns;

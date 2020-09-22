@@ -82,7 +82,8 @@ Compilation::Compilation(JetProject* proj) : builder(llvm_context_jet), context(
 	this->global = this->ns;
 
 	//insert basic types
-	ns->members.insert({ "float", new Type("float", Types::Float) });
+	this->FloatType = new Type("float", Types::Float);
+	ns->members.insert({ "float", this->FloatType });
 	this->DoubleType = new Type("double", Types::Double);
 	ns->members.insert({ "double", this->DoubleType });
 	ns->members.insert({ "long", new Type("long", Types::Long) });
@@ -1323,13 +1324,14 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 	}
 	else
 	{
-		initializer = init;
+		auto new_type = this->GetInternalArrayType(t, size);
+		initializer = init ? init : new_type->GetDefaultValue(this);
 		type = llvm::ArrayType::get(t->GetLLVMType(), size);
-		ret_type = my_type = this->GetInternalArrayType(t, size)->GetPointerType();
+		ret_type = my_type = new_type->GetPointerType();
 	}
-	auto ng = new llvm::GlobalVariable(*module, type, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::ExternalLinkage/*ExternalLinkage*/, initializer, name);
+	auto ng = new llvm::GlobalVariable(*module, type, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::CommonLinkage/*ExternalLinkage*/, initializer, name);
 
-	this->debug->createGlobalVariableExpression(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), false);
+	this->debug->createGlobalVariableExpression(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), !intern);
 	this->ns->members.insert({ name, Symbol(new CValue(my_type, ng)) });
 
 	//if it has a constructor, make sure to call it

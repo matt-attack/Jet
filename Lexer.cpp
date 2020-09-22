@@ -504,6 +504,11 @@ Token Lexer::Next()
 				while (true)
 				{
 					char c = src->PeekChar();
+					if (c == 'f')
+					{
+						num += src->ConsumeChar();
+						break;
+					}
 					if (!(c == '.' || IsNumber(c)))
 						break;
 

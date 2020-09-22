@@ -82,7 +82,12 @@ namespace Jet
 			delete this->scope;
 		}
 
-		CValue Float(double value)
+		CValue Float(float value)
+		{
+			return CValue(root->FloatType, llvm::ConstantFP::get(root->context, llvm::APFloat(value)));
+		}
+
+		CValue Double(double value)
 		{
 			return CValue(root->DoubleType, llvm::ConstantFP::get(root->context, llvm::APFloat(value)));
 		}

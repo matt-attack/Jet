@@ -82,10 +82,17 @@ Token ParseType(Parser* parser, bool parse_arrays = true)
 
 			if (auto s = dynamic_cast<NumberExpression*>(size))
 			{
-				if (s->GetIntValue() <= 0)
+				auto n = s->GetValue();
+				if (n.type != NumberExpression::Number::Int)
+				{
+					parser->Error("Cannot size array with a non integer value", tok);
+				}
+				else if (n.data.i <= 0)
+				{
 					parser->Error("Cannot size array with a zero or negative size", tok);
+				}
 
-				out += "[" + std::to_string((int)s->GetIntValue()) + "]";
+				out += "[" + std::to_string(n.data.i) + "]";
 			}
 			else
 			{
@@ -627,10 +634,17 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 
 			if (auto s = dynamic_cast<NumberExpression*>(size))
 			{
-				if (s->GetIntValue() <= 0)
+				auto n = s->GetValue();
+				if (n.type != NumberExpression::Number::Int)
+				{
+					parser->Error("Cannot size array with a non integer value", token);
+				}
+				else if (n.data.i <= 0)
+				{
 					parser->Error("Cannot size array with a zero or negative size", token);
+				}
 
-				type.text += "[" + std::to_string((int)s->GetIntValue()) + "]";
+				type.text += "[" + std::to_string(n.data.i) + "]";
 			}
 			else
 			{
@@ -688,6 +702,8 @@ bool IsValidFunctionNameToken(TokenType op)
 	else if (op == TokenType::Equals)
 		return true;
 	else if (op == TokenType::Assign)
+		return true;
+	else if (op == TokenType::AddAssign)
 		return true;
 
 	return false;
@@ -1058,10 +1074,17 @@ Expression* LocalParselet::parse(Parser* parser, Token token)
 
 			if (auto s = dynamic_cast<NumberExpression*>((Expression*)size))
 			{
-				if (s->GetIntValue() <= 0)
+				auto n = s->GetValue();
+				if (n.type != NumberExpression::Number::Int)
+				{
+					parser->Error("Cannot size array with a non integer value", token);
+				}
+				else if (n.data.i <= 0)
+				{
 					parser->Error("Cannot size array with a zero or negative size", token);
+				}
 
-				type.text += "[" + std::to_string((int)s->GetIntValue()) + "]";
+				type.text += "[" + std::to_string(n.data.i) + "]";
 			}
 			else
 			{

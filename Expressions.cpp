@@ -312,6 +312,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		lhs = i->GetElementPointer(context);
 	}
 
+	// handle -> operator
 	if (index == 0 && this->token.type == TokenType::Pointy)
 	{
 		if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && lhs.type->base->base->type == Types::Struct)
@@ -374,14 +375,12 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		else if (lhs.type->base->type == Types::InternalArray
 			&& this->member.text.length() == 0)
 		{
-			//throw 7;
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
 
-			//loadme!!!
-			//lhs.val = context->root->builder.CreateLoad(lhs.val);
-			//llllload my index
+			//lhs.val->dump();
 			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
-
+			//lhs.val->getType()->dump();
+			//loc->getType()->dump();
 			return CValue(lhs.type->base->base->GetPointerType(), loc);
 		}
 		else if (lhs.type->base->type == Types::Pointer
@@ -435,37 +434,85 @@ CValue StringExpression::Compile(CompilerContext* context)
 	return context->String(this->value);
 }
 
-CValue NumberExpression::Compile(CompilerContext* context)
+NumberExpression::Number NumberExpression::GetValue()
 {
 	bool isint = true;
 	bool ishex = false;
-	for (int i = 0; i < this->token.text.length(); i++)
+	bool isfloat = false;
+	for (unsigned int i = 0; i < this->token.text.length(); i++)
 	{
 		if (this->token.text[i] == '.')
 			isint = false;
 	}
 
-	if (token.text.length() >= 3)
+	if (token.text.back() == 'f')
+	{
+		isfloat = true;
+	}
+	else if (token.text.length() >= 3)
 	{
 		std::string substr = token.text.substr(2);
 		if (token.text[1] == 'x')
 		{
 			unsigned long long num = std::stoull(substr, nullptr, 16);
-			return context->Integer(num);
+			Number n;
+			n.type = Number::Int;
+			n.data.i = num;
+			return n;
 		}
 		else if (token.text[1] == 'b')
 		{
 			unsigned long long num = std::stoull(substr, nullptr, 2);
-			return context->Integer(num);
+			Number n;
+			n.type = Number::Int;
+			n.data.i = num;
+			return n;
 		}
 	}
 
 	//ok, lets get the type from what kind of constant it is
-	// todo need to make this use the correct type based on size and stuff, float double or int/long
+	//get type from the constant
+	//this is pretty terrible, come back later
+
+	Number n;
 	if (isint)
-		return context->Integer(std::stol(this->token.text));
+	{
+		n.type = Number::Int;
+		n.data.i = std::stoi(this->token.text);
+	}
+	else if (isfloat)
+	{
+		n.type = Number::Float;
+		n.data.f = atof(token.text.substr(0, token.text.length() - 1).c_str());
+	}
 	else
-		return context->Float(::atof(token.text.c_str()));
+	{
+		n.type = Number::Double;
+		n.data.d = atof(token.text.c_str());
+	}
+	return n;
+}
+
+CValue NumberExpression::Compile(CompilerContext* context)
+{
+	Number n = this->GetValue();
+	if (n.type == Number::Double)
+	{
+		return context->Double(n.data.d);
+	}
+	else if (n.type == Number::Float)
+	{
+		return context->Float(n.data.f);
+	}
+	else if (n.type == Number::Int)
+	{
+		// todo handle different sizes of integers? Everything is 32 bit now
+		return context->Integer(n.data.i);
+	}
+	else
+	{
+		context->root->Error("Compiler error: unhandled NumberExpression GetValue() type.", this->token);// compiler error
+	}
 }
 
 CValue AssignExpression::Compile(CompilerContext* context)
@@ -501,11 +548,11 @@ CValue OperatorAssignExpression::Compile(CompilerContext* context)
 
 	auto res = context->BinaryOperation(token.type, lhs, lhsptr, rhs);
 
-	//insert store here
 	if (auto storable = dynamic_cast<IStorableExpression*>(this->left))
 		storable->CompileStore(context, res);
 	else
 		context->root->Error("Cannot store into this type.", this->token);
+
 	return CValue();
 }
 
@@ -540,8 +587,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 
 		return CValue(context->root->BoolType, phi);
 	}
-
-	if (this->_operator.type == TokenType::Or)
+	else if (this->_operator.type == TokenType::Or)
 	{
 		auto else_block = llvm::BasicBlock::Create(context->context, "lor.shortcircuitelse");
 		auto end_block = llvm::BasicBlock::Create(context->context, "lor.endshortcircuit");
@@ -566,6 +612,7 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		return CValue(context->root->BoolType, phi);
 	}
 
+	// Handle non-short-circuiting binary operations
 	auto lhs = this->left->Compile(context);
 	CValue lhsptr;
 	if (lhs.type->type == Types::Struct)
@@ -617,9 +664,13 @@ CValue NewExpression::Compile(CompilerContext* context)
 			Type* ty = ptr.type->base;
 			Function* fun = 0;
 			if (ty->data->template_base)
+			{
 				fun = ty->GetMethod(ty->data->template_base->name, arg_types, context);
+			}
 			else
+			{
 				fun = ty->GetMethod(ty->data->name, arg_types, context);
+			}
 
 			if (fun == 0)
 			{
@@ -631,7 +682,9 @@ CValue NewExpression::Compile(CompilerContext* context)
 				{
 					err += ii->ToString();
 					if (i++ < (arg_types.size() - 1))
+					{
 						err += ',';
+					}
 				}
 				err += ") not found!";
 				context->root->Error(err, this->token);
@@ -640,13 +693,15 @@ CValue NewExpression::Compile(CompilerContext* context)
 			context->root->builder.CreateCall(fun->f, llvm_args);
 		}
 		else
+		{
 			context->root->Error("Cannot construct non-struct type!", this->token);
+		}
 
 		//handle constructor args
 		return ptr;
 	}
-	context->Construct(ptr, this->size ? arr_size : 0);
 
+	context->Construct(ptr, this->size ? arr_size : 0);
 
 	//ok now stick it in an array if we specified size
 	if (this->size)
@@ -675,19 +730,25 @@ CValue FreeExpression::Compile(CompilerContext* context)
 
 	auto pointer = this->pointer->Compile(context);
 
-	if (pointer.type->type != Types::Pointer && pointer.type->type != Types::Array)
+	if (pointer.type->type == Types::InternalArray)
+	{
+		context->root->Error("Cannot free this type of array.", this->token);
+	}
+	else if (pointer.type->type != Types::Pointer && pointer.type->type != Types::Array)
+	{
 		context->root->Error("Cannot free a non pointer/array type!", this->token);
+	}
 
 	//extract the pointer from the array if we are one
 	if (pointer.type->type == Types::Array)
 	{
 		auto ptr = context->root->builder.CreateExtractValue(pointer.val, 1);
-		pointer = CValue(pointer.type->base->GetPointerType(), ptr);	
+		pointer = CValue(pointer.type->base->GetPointerType(), ptr);
 	}
 
 	//get to the root of the pointer (remove the offset for the size)
 	llvm::Value* charptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
-	llvm::Value* rootptr = context->root->builder.CreateGEP(charptr, { context->root->builder.getInt32(-4) });
+	llvm::Value* rootptr = context->root->builder.CreateGEP(charptr, { context->root->builder.getInt32(-4) });// todo make this smarter about 64 bit
 
 	//run destructors
 	if (pointer.type->base->type == Types::Struct)
@@ -695,9 +756,13 @@ CValue FreeExpression::Compile(CompilerContext* context)
 		Type* ty = pointer.type->base;
 		Function* fun = 0;
 		if (ty->data->template_base)
+		{
 			fun = ty->GetMethod("~" + ty->data->template_base->name, { pointer.type }, context);
+		}
 		else
+		{
 			fun = ty->GetMethod("~" + ty->data->name, { pointer.type }, context);
+		}
 
 		if (fun)
 		{

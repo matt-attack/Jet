@@ -360,73 +360,24 @@ namespace Jet
 			this->token = token;
 		}
 
-		long int GetIntValue()
+		struct Number
 		{
-			bool isint = true;
-			bool ishex = false;
-			for (unsigned int i = 0; i < this->token.text.length(); i++)
+			enum type
 			{
-				if (this->token.text[i] == '.')
-					isint = false;
-			}
-
-			if (token.text.length() >= 3)
+				Float,
+				Double,
+				Int
+			};
+			type type;
+			union
 			{
-				std::string substr = token.text.substr(2);
-				if (token.text[1] == 'x')
-				{
-					unsigned long long num = std::stoull(substr, nullptr, 16);
-					return num;
-				}
-				else if (token.text[1] == 'b')
-				{
-					unsigned long long num = std::stoull(substr, nullptr, 2);
-					return num;
-				}
-			}
+				double d;
+				float f;
+				long long int i;
+			} data;
+		};
 
-			//ok, lets get the type from what kind of constant it is
-			//get type from the constant
-			//todo this is pretty terrible, come back later
-			if (isint)
-				return std::stoi(this->token.text);
-			else
-				return ::atof(token.text.c_str());
-		}
-
-		double GetValue()
-		{
-			bool isint = true;
-			bool ishex = false;
-			for (unsigned int i = 0; i < this->token.text.length(); i++)
-			{
-				if (this->token.text[i] == '.')
-					isint = false;
-			}
-
-			if (token.text.length() >= 3)
-			{
-				std::string substr = token.text.substr(2);
-				if (token.text[1] == 'x')
-				{
-					unsigned long long num = std::stoull(substr, nullptr, 16);
-					return num;
-				}
-				else if (token.text[1] == 'b')
-				{
-					unsigned long long num = std::stoull(substr, nullptr, 2);
-					return num;
-				}
-			}
-
-			//ok, lets get the type from what kind of constant it is
-			//get type from the constant
-			//this is pretty terrible, come back later
-			if (isint)
-				return std::stoi(this->token.text);
-			else
-				return ::atof(token.text.c_str());
-		}
+		Number GetValue();
 
 		CValue Compile(CompilerContext* context);
 

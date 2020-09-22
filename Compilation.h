@@ -116,6 +116,7 @@ namespace Jet
 
 		//these are some of the basic types
 		Type* DoubleType;
+		Type* FloatType;
 		Type* IntType;
 		Type* BoolType;
 		Type* CharPointerType;

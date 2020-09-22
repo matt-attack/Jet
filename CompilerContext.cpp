@@ -18,7 +18,6 @@ using namespace Jet;
 
 CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, Type* member, bool lambda)
 {
-	auto iter = root->ns->GetFunction(fname);
 	Function* func = 0;
 	if (member)
 	{
@@ -31,37 +30,24 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 		{
 			//printf("found option for %s with %i args\n", fname.c_str(), ii->second->argst.size());
 			if (ii->second->arguments.size() == args.size())
+			{
 				func = ii->second;
+			}
 		}
 	}
-	else if (iter == 0 && member == false)
+	else
 	{
-		//no function exists
-		func = new Function(fname, lambda);
-		func->return_type = ret;
-		func->arguments = args;
+		func = root->ns->GetFunction(fname);
+		if (!func)
+		{
+			//no function exists, create it
+			func = new Function(fname, lambda);
+			func->return_type = ret;
+			func->arguments = args;
 
-		auto n = new CompilerContext(this->root, this);
-		n->function = func;
-		func->context = n;
-		func->Load(this->root);
-
-		if (member == false)
-			this->root->ns->members.insert({ fname, func });
-
-		llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->function->f);
-		root->builder.SetInsertPoint(bb);
-		func->loaded = true;
-
-		return n;
-	}
-	else if (func == 0)
-	{
-		//select the right one
-		func = root->ns->GetFunction(fname/*, args*/);
-
-		if (func == 0)
-			this->root->Error("Function '" + fname + "' not found", *this->root->current_function->current_token);
+			if (member == false)
+				this->root->ns->members.insert({ fname, func });
+		}
 	}
 
 	func->Load(this->root);
@@ -971,6 +957,36 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 			{
 				return CValue(t, root->builder.CreatePtrToInt(value.val, t->GetLLVMType(), "ptr2int"));
 			}
+		}
+	}
+	if (value.type->type == Types::InternalArray)
+	{
+		if (t->type == Types::Array && t->base == value.type->base)
+		{
+			// construct an array and use that 
+			auto str_type = root->GetArrayType(value.type->base);
+
+			//alloc the struct for it
+			auto Alloca = root->builder.CreateAlloca(str_type->GetLLVMType(), root->builder.getInt32(1), "into_array");
+
+			auto size = root->builder.getInt32(value.type->size);
+
+			//store size
+			auto size_p = root->builder.CreateGEP(Alloca, { root->builder.getInt32(0), root->builder.getInt32(0) });
+			root->builder.CreateStore(size, size_p);
+
+			//store data pointer
+			auto data_p = root->builder.CreateGEP(Alloca, { root->builder.getInt32(0), root->builder.getInt32(1) });
+
+			auto data_v = root->builder.CreateGEP(value.pointer, { root->builder.getInt32(0), root->builder.getInt32(0) });
+			//value.val->dump();
+			//value.val->getType()->dump();
+			//value.pointer->dump();
+			//value.pointer->getType()->dump();
+			root->builder.CreateStore(data_v, data_p);
+
+			// todo do we need this load?
+			return CValue(t, this->root->builder.CreateLoad(Alloca));
 		}
 	}
 	if (value.type->type == Types::Array)

@@ -262,18 +262,18 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 	llvm::CallInst* call;
 	if (this->is_virtual && devirtualize == false)
 	{
-		//ok, load the virtual table, then load the pointer to it
+		// calculate the offset to the virtual table pointer in the struct
 		auto gep = context->root->builder.CreateGEP(argsv[0].val, 
 			{ context->root->builder.getInt32(0), context->root->builder.getInt32(this->virtual_table_location) }, 
 			"get_vtable");
 
-		//then load it
+		// then load that pointer to get the vtable pointer
 		llvm::Value* ptr = context->root->builder.CreateLoad(gep);
 
-		//get the correct offset
+		// index into the vtable for this particular function
 		ptr = context->root->builder.CreateGEP(ptr, { context->Integer(this->virtual_offset).val }, "get_offset_in_vtable");
 
-		//load it
+		// load the function pointer from the vtable
 		ptr = context->root->builder.CreateLoad(ptr);
 
 		//then cast it to the correct function type
