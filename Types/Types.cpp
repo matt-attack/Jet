@@ -1131,6 +1131,27 @@ Namespace::~Namespace()
 	}
 }
 
+const std::string& Namespace::GetQualifiedName()
+{
+	if (qualified_name_.length())
+	{
+		return qualified_name_;
+	}
+
+	if (this->parent)
+	{
+		qualified_name_ = this->parent->GetQualifiedName();
+		if (qualified_name_.length())
+			qualified_name_ += "::";
+		qualified_name_ += name;
+	}
+	else
+	{
+		qualified_name_ = name;
+	}
+	return qualified_name_;
+}
+
 //todo, condense the data later using numeric identifiers and a list rather than whole name on each also could sort by file
 void add_location(Token token, std::string& data, Compilation* compilation)
 {

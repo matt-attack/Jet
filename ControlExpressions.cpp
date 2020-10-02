@@ -355,7 +355,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		ii.block->Compile(context);
 
 		//need to do this without destructing args
-		context->scope->named_values[ii.name.text] = CValue();
+		context->scope->named_values[ii.name.text] = { CValue(), false };
 		context->PopScope();
 
 		//branch to end

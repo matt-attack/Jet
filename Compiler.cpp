@@ -65,6 +65,12 @@ void Jet::Diagnostic::Print()
 		unsigned int startrow = token.column;
 		unsigned int endrow = token.column + token.text.length();
 
+		// Handle an end token
+		if (end.type != TokenType::InvalidToken)
+		{
+			endrow = end.column + end.text.length();
+		}
+
 		std::string code = this->line;
 		std::string underline = "";
 		for (unsigned int i = 0; i < code.length(); i++)

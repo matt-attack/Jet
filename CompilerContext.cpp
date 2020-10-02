@@ -16,40 +16,10 @@
 
 using namespace Jet;
 
-CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, Type* member, bool lambda)
+static unsigned int uuid = 5;
+
+CompilerContext* CompilerContext::StartFunctionDefinition(Function* func)
 {
-	Function* func = 0;
-	if (member)
-	{
-		//ok, if member just pass the type so we dont have to do this crap
-		int i = member->name.length() + 2;
-		std::string fname2 = fname.substr(++i, fname.length() - i);
-
-		auto range = member->data->functions.equal_range(fname2);
-		for (auto ii = range.first; ii != range.second; ii++)
-		{
-			//printf("found option for %s with %i args\n", fname.c_str(), ii->second->argst.size());
-			if (ii->second->arguments.size() == args.size())
-			{
-				func = ii->second;
-			}
-		}
-	}
-	else
-	{
-		func = root->ns->GetFunction(fname);
-		if (!func)
-		{
-			//no function exists, create it
-			func = new Function(fname, lambda);
-			func->return_type = ret;
-			func->arguments = args;
-
-			if (member == false)
-				this->root->ns->members.insert({ fname, func });
-		}
-	}
-
 	func->Load(this->root);
 
 	auto n = new CompilerContext(this->root, this);
@@ -57,10 +27,6 @@ CompilerContext* CompilerContext::AddFunction(const std::string& fname, Type* re
 	func->context = n;
 	llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->function->f);
 	root->builder.SetInsertPoint(bb);
-
-	// Do not export lambdas
-	if (lambda)
-		func->do_export = false;
 
 	return n;
 }
@@ -192,7 +158,7 @@ void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 		}
 		auto dptr = root->builder.CreatePointerCast(loc.val, root->CharPointerType->GetLLVMType());
 		auto sptr = root->builder.CreatePointerCast(vall.pointer, root->CharPointerType->GetLLVMType());
-		root->builder.CreateMemCpy(dptr, sptr, loc.type->base->GetSize(), 1);
+		root->builder.CreateMemCpy(dptr, 0, sptr, 0, loc.type->base->GetSize());// todo properly handle alignment
 		return;
 	}
 	else if (loc.type->base->type == Types::InternalArray)
@@ -201,7 +167,7 @@ void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 		I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
 		auto dptr = root->builder.CreatePointerCast(loc.val, root->CharPointerType->GetLLVMType());
 		auto sptr = root->builder.CreatePointerCast(vall.pointer, root->CharPointerType->GetLLVMType());
-		root->builder.CreateMemCpy(dptr, sptr, loc.type->base->GetSize(), 1);
+		root->builder.CreateMemCpy(dptr, 0, sptr, 0, loc.type->base->GetSize());// todo properly handle alignment
 		return;
 	}
 	
@@ -435,7 +401,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 	if (Struct == 0)
 	{
 		//global function?
-		auto iter = this->root->GetFunction(name);
+		auto iter = this->root->GetFunction(name, args);
 		if (iter == 0)
 		{
 			//check if its a type, if so try and find a constructor
@@ -765,7 +731,7 @@ void CompilerContext::SetDebugLocation(const Token& t)
 	this->root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope));
 }
 
-CValue CompilerContext::GetVariable(const std::string& name)
+CValue CompilerContext::GetVariable(const std::string& name, bool* is_const)
 {
 	auto cur = this->scope;
 	CValue value;
@@ -774,7 +740,11 @@ CValue CompilerContext::GetVariable(const std::string& name)
 		auto iter = cur->named_values.find(name);
 		if (iter != cur->named_values.end())
 		{
-			value = iter->second;
+			value = iter->second.value;
+			if (is_const)
+			{
+				*is_const = iter->second.is_const;
+			}
 			break;
 		}
 		cur = cur->prev;
@@ -782,6 +752,10 @@ CValue CompilerContext::GetVariable(const std::string& name)
 
 	if (value.type->type == Types::Void)
 	{
+		if (is_const)
+		{
+			*is_const = false;
+		}
 		auto sym = this->root->GetVariableOrFunction(name);
 		if (sym.type != SymbolType::Invalid)
 		{
@@ -869,7 +843,7 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 		//do a memcpy
 		auto dptr = root->builder.CreatePointerCast(this->function->f->arg_begin(), this->root->CharPointerType->GetLLVMType());
 		auto sptr = root->builder.CreatePointerCast(ret.pointer, this->root->CharPointerType->GetLLVMType());
-		root->builder.CreateMemCpy(dptr, sptr, ret.type->GetSize(), 1);
+		root->builder.CreateMemCpy(dptr, 0, sptr, 0, ret.type->GetSize());// todo properly handle alignment
 		return root->builder.CreateRetVoid();
 	}
 
@@ -912,20 +886,40 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		if (t->type == Types::Double || t->type == Types::Float)
 		{
 			if (value.type->IsSignedInteger())
+			{
 				return CValue(t, root->builder.CreateSIToFP(value.val, tt));
+			}
 			else
+			{
 				return CValue(t, root->builder.CreateUIToFP(value.val, tt));
+			}
 		}
 		if (t->type == Types::Bool)
+		{
 			return CValue(t, root->builder.CreateIsNotNull(value.val));
+		}
 		if (t->type == Types::Pointer)
 		{
 			llvm::ConstantInt* ty = llvm::dyn_cast<llvm::ConstantInt>(value.val);
 			if (Explicit == false && (ty == 0 || ty->getSExtValue() != 0))
+			{
 				root->Error("Cannot cast a non-zero integer value to pointer implicitly.", *this->current_token);
+			}
 
 			return CValue(t, root->builder.CreateIntToPtr(value.val, t->GetLLVMType()));
 		}
+
+		// This turned out to be hard....
+		/*// Disallow implicit casts to smaller types
+		if (!Explicit && t->GetSize() < value.type->GetSize())
+		{
+			// for now just ignore literals
+			llvm::ConstantInt* is_literal = llvm::dyn_cast<llvm::ConstantInt>(value.val);
+			if (!is_literal)
+			{
+				root->Error("Cannot implicitly cast from '" + value.type->ToString() + "' to a smaller integer type: '" + t->ToString() + "'.", *this->current_token);
+			}
+		}*/
 
 		if (t->IsSignedInteger())
 			return CValue(t, root->builder.CreateSExtOrTrunc(value.val, tt));
@@ -1174,12 +1168,13 @@ Scope* CompilerContext::PushScope()
 
 void Scope::Destruct(CompilerContext* context, llvm::Value* ignore)
 {
-	for (auto ii : this->named_values)
+	for (auto& ii : this->named_values)
 	{
-		if (ii.second.val == ignore)
+		auto& value = ii.second.value;
+		if (value.val == ignore)
 			continue;//dont destruct what we are returning
-		if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Struct)
-			context->Destruct(ii.second, 0);
+		if (value.type->type == Types::Pointer && value.type->base->type == Types::Struct)
+			context->Destruct(value, 0);
 		//else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
 		//	context->Destruct(CValue(ii.second.type->base, ii.second.val), context->root->builder.getInt32(ii.second.type->base->size));
 	}

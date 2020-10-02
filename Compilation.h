@@ -48,6 +48,7 @@ namespace Jet
 
 		}
 
+		void Error(const std::string& text, const Token& start, const Token& end);
 		void Error(const std::string& text, const Token& token);
 		void Error(const std::string& text, const std::string& file, int line = -1);
 
@@ -147,6 +148,7 @@ namespace Jet
 		}
 
 		void Error(const std::string& string, Token token);
+		void Error(const std::string& string, const Token& start, const Token& end);
 
 		//generates and outputs an exe or lib file
 		void Assemble(const std::string& target = "", const std::string& linker = "", int olevel = 0, bool time = false, bool output_ir = false);
@@ -169,10 +171,7 @@ namespace Jet
 			return this->GetFunction(name);
 		}
 
-		Function* GetFunction(const std::string& name, const std::vector<Type*>& args)
-		{
-			return this->GetFunction(name);
-		}
+		Function* GetFunction(const std::string& name, const std::vector<Type*>& args);
 
 
 		Function* GetFunction(const std::string& name);

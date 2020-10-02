@@ -222,6 +222,11 @@ namespace Jet
 		}
 
 		void OutputMetadata(std::string& data, Compilation* comp);
+
+		const std::string& GetQualifiedName();
+
+	private:
+		std::string qualified_name_;
 	};
 
 	struct Function;

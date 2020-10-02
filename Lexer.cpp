@@ -105,6 +105,7 @@ public:
 		keywords["for"] = TokenType::For;
 
 		keywords["let"] = TokenType::Let;
+		keywords["const"] = TokenType::Const;
 		keywords["break"] = TokenType::Break;
 		keywords["continue"] = TokenType::Continue;
 
@@ -144,7 +145,7 @@ public:
 		operators["#endif"] = TokenType::EndIfMacro;
 
 		operators["//!@!"] = TokenType::LocationMacro;
-		//keywords["const"] = TokenType::Const;
+		
 
 		//keywords["operator"] = TokenType::Operator;
 
@@ -496,8 +497,9 @@ Token Lexer::Next()
 		}
 		else if (IsNumber(c))//number
 		{
-			//finish adding different literal types
-			if (c != '0')
+			char next_char = src->PeekChar();
+			// Check if it is a standard integer or floating point number
+			if (c != '0' || next_char == '.')
 			{
 				std::string num;
 				num += c;
@@ -524,7 +526,7 @@ Token Lexer::Next()
 				//ok, its possibly some kind of non base ten literal
 				std::string num;
 				num += c;
-				char c = src->PeekChar();
+				char c = next_char;
 				num += c;
 				switch (c)
 				{

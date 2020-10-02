@@ -317,6 +317,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 
 	//add default defines
 	auto defines = project->defines;
+	// todo dont hardcode this so we can do cross compilation (eventually)
 #ifdef _WIN32
 	defines["WINDOWS"] = true;
 #else
@@ -465,8 +466,6 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			//this fixes some errors, need to resolve them later
 			compilation->debug_info.file = compilation->debug->createFile("temp",
 				compilation->debug_info.cu->getDirectory());
-
-			//compilation->ResolveTypes();
 		}
 		compilation->ResolveTypes();
 		compilation->compiling_includes = false;
@@ -896,14 +895,14 @@ void Compilation::Optimize(int level)
 	// Provide basic AliasAnalysis support for GVN.
 	//OurFPM.add(llvm::createBasicAliasAnalysisPass());
 	// Do simple "peephole" optimizations and bit-twiddling optzns.
-	OurFPM.add(llvm::createInstructionCombiningPass());
+	//OurFPM.add(llvm::createInstructionCombiningPass());
 	// Reassociate expressions.
 	OurFPM.add(llvm::createReassociatePass());
 
-	OurFPM.add(llvm::createInstructionSimplifierPass());
+	//OurFPM.add(llvm::createInstructionSimplifierPass());
 
 	// Promote allocas to registers
-	OurFPM.add(llvm::createPromoteMemoryToRegisterPass());
+	//OurFPM.add(llvm::createPromoteMemoryToRegisterPass());
 	// Eliminate Common SubExpressions.
 	//OurFPM.add(llvm::createGVNPass());
 	// Simplify the control flow graph (deleting unreachable blocks, etc).
@@ -997,7 +996,7 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level, bo
 	llvm::raw_fd_ostream strr("build/" + project_name + ".o", ec, llvm::sys::fs::OpenFlags::F_None);
 	//ok, watch out for unsupported calling conventions, need way to specifiy code for windows/linux/cpu
 	//add pass to emit the object file
-	target->addPassesToEmitFile(MPM, strr, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
+	target->addPassesToEmitFile(MPM, strr, 0, llvm::TargetMachine::CodeGenFileType::CGFT_ObjectFile, false);
 
 	//std::error_code ecc;
 	//llvm::raw_fd_ostream strrr("build/" + project_name + ".s", ecc, llvm::sys::fs::OpenFlags::F_RW);
@@ -1329,18 +1328,25 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 		type = llvm::ArrayType::get(t->GetLLVMType(), size);
 		ret_type = my_type = new_type->GetPointerType();
 	}
-	auto ng = new llvm::GlobalVariable(*module, type, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::CommonLinkage/*ExternalLinkage*/, initializer, name);
+	auto ng = new llvm::GlobalVariable(*module, type, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakODRLinkage/*ExternalLinkage*/, initializer, name);
 
 	this->debug->createGlobalVariableExpression(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), !intern);
 	this->ns->members.insert({ name, Symbol(new CValue(my_type, ng)) });
 
-	//if it has a constructor, make sure to call it
+	//todo if it has a constructor, make sure to call it in the initializers...
 	return CValue(ret_type, ng);
 }
 
 void Compilation::Error(const std::string& string, Token token)
 {
 	this->diagnostics->Error(string, token);
+
+	throw 7;
+}
+
+void Compilation::Error(const std::string& string, const Token& start, const Token& end)
+{
+	this->diagnostics->Error(string, start, end);
 
 	throw 7;
 }
@@ -1469,6 +1475,29 @@ Jet::Function* Compilation::GetFunction(const std::string& name)
 	return 0;
 }
 
+Function* Compilation::GetFunction(const std::string& name, const std::vector<Type*>& args)
+{
+	//search down the namespace tree for the function
+	auto next = this->ns;
+	while (next)
+	{
+		auto r = next->members.equal_range(name);
+		for (auto it = r.first; it != r.second; it++)
+		{
+			if (it->second.type == SymbolType::Function)
+			{
+				if (it->second.fn->arguments.size() == args.size())
+				{
+					return it->second.fn;
+				}
+			}
+		}
+
+		next = next->parent;
+	}
+	return 0;
+}
+
 Jet::Symbol Compilation::GetVariableOrFunction(const std::string& name)
 {
 	//search up the namespace tree for this variable or function
@@ -1559,6 +1588,29 @@ void DiagnosticBuilder::Error(const std::string& text, const Token& token)
 		auto current_source = token.GetSource((Compilation*)compilation);
 
 		error.line = current_source->GetLine(token.line);
+		error.file = current_source->filename;
+	}
+	error.severity = 0;
+
+	if (this->callback)
+		this->callback(error);
+
+	//try and remove exceptions from build system
+	this->diagnostics.push_back(error);
+}
+
+void DiagnosticBuilder::Error(const std::string& text, const Token& start_token, const Token& end_token)
+{
+	Diagnostic error;
+	error.token = start_token;
+	error.end = end_token;
+	error.message = text;
+
+	if (start_token.type != TokenType::InvalidToken)
+	{
+		auto current_source = start_token.GetSource((Compilation*)compilation);
+
+		error.line = current_source->GetLine(start_token.line);
 		error.file = current_source->filename;
 	}
 	error.severity = 0;

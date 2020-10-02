@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 2.8.7)
 project(Jet)
 
 
-find_package(LLVM 6.0.0 REQUIRED CONFIG HINTS C:/users/space/desktop/llvm/llvm-6.0.0.src)
+find_package(LLVM 7.0.0 REQUIRED CONFIG HINTS C:/users/space/desktop/llvm/llvm-7.0.0.src)
 #find_package(Clang REQUIRED CONFIG HINTS C:/Users/space/Desktop/cfe-3.7.1.src)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
