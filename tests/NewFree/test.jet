@@ -10,14 +10,14 @@ struct t
 {
 	fun void t()
 	{
-		count++;
+		//count++;
 		//puts("created\n");
 	}
-	fun void ~t()
+	/*fun void ~t()
 	{
-		count--;
+		//count--;
 		//puts("killed\n");
-	}
+	}*/
 }
 
 fun int main() 

@@ -6,7 +6,7 @@ extern fun int puts(char* str);
 
 extern fun char getchar();
 
-struct function<Any T>
+/*struct function<Any T>
 {
 	T ptr;
 	char data[64];
@@ -36,7 +36,7 @@ fun void IEnumerable::Print()
 	{
 		puts("Got one!");
 	}
-}
+}*/
 
 fun void IEnumerator::Test()
 {
@@ -122,9 +122,30 @@ fun WhereIterable<T, IEnumerable> IEnumerable::Where(function<bool(T)> fn)
 	return x;
 }
 
+struct testv
+{
+  int i[20];
+}
+
+fun testv RetTest(int i)
+{
+  let testv t;
+  return t;
+}
+
+struct qqq
+{
+
+fun testv RetTest(testv i)
+{
+  let testv t;
+  return t;
+}
+}
+
 fun int main() 
 {
-	let x = power(2, 20);
+	/*let x = power(2, 20);
 	let p = 0;
 	while (x.MoveNext())
 	{
@@ -136,28 +157,41 @@ fun int main()
 	else
 		puts("pass");
 	x.Reset();
+	let vector<int> tt;
+	let i = 0;
    	while (x.MoveNext())
 	{
 		p = x.Current();
+		tt.push_back(p);
 		printf("Number %i\n", x.Current());
+		i++;
+	}
+	
+	if (i != tt.size())
+	{
+	  puts("fail");
 	}
     x.Reset();
 	x.Test();
-	x.Test();
+	x.Test();*/
 	
-	let fn = [](int x) -> bool { return x > 5; };
-	if (fn(5))
-	  puts("fail");
+	//let iter = tt.GetEnumerator();
+	//iter.Test();
+	
+	let ppx = RetTest(5);
+	
+	let qqq jk;
+	let testv qqqq;
+	let psada = jk.RetTest(qqqq);
+	
+	//let fn = [](int x) -> bool { return x > 4000; };
+	//if (fn(5))
+	//  puts("fail");
 	  
-	//let where = x.Where(fn);
-	let t = test(5);
-	while (t.MoveNext())
-	{
-		p = t.Current();
-		//printf("%i\n", t.Current());
-	}
-	if (p != 3)
-		puts("fail");
+	getchar();
+	  
+	//let where = tt.Where(fn);
+    //where.Test();
 		
 	getchar();
 	

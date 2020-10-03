@@ -1,0 +1,10 @@
+bin: LargeCopy
+requires:
+files: test.jet
+libs: "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\ucrt\x86\ucrt.lib"
+"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\ucrt\x86\libucrt.lib"
+       "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\um\x86\kernel32.lib"
+	    "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.13.26128\lib\x86\msvcrt.lib"
+
+[debug]
+config: "-f --linker ld"

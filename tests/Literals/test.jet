@@ -1,0 +1,89 @@
+
+extern fun int printf(char* h, int h);
+extern fun char* malloc(int x);
+
+extern fun int puts(char* str);
+extern fun char getchar();
+
+// okay, lets come up with a test infrastructure
+// try and implement it mostly in this
+
+struct Test
+{
+  char* name;
+  void() function;
+}
+
+let vector<Test> tests;
+
+fun void add_test(char* name, void() function)
+{
+  let Test t;
+  t.name = name;
+  t.function = function;
+  tests.push_back(t);
+}
+
+fun void EXPECT(bool condition, char* message)
+{
+  if (condition)
+  {
+    return;// we're good!
+  }
+  // we failed.... add this to the test
+  //puts("
+  
+}
+
+fun void run_tests()
+{
+  for (let i = 0; i < tests.size(); i++)
+  {
+  
+  }
+}
+
+fun int main() 
+{
+    // lets test some numeric literals!
+	let binary = 0b11111111;
+	let hex = 0xFF;
+	let numeric = 255;
+	
+	if (hex != 255)
+	{
+	  puts("Hex didnt work!");
+	}
+	if (binary != 255)
+	{
+	  puts("Hex didnt work!");
+	}
+	if (numeric != hex)
+	{
+	  puts("Numeric and hex were not equal!");
+	}
+	
+	// Test floating point literals
+	let f1 = 10.7f;
+	let f2 = 0.7f; //this one has broken the lexer before
+	let d = 0.7;
+	
+	let x = 7;
+	x += 2;
+	
+	let char y = 7;
+	
+	x += y;
+	
+	//y = x;
+	
+	y = 23.0f;
+	
+	y = 2*y;
+	y = y*2;
+	y = (2+2);
+	//y = x*2;
+	getchar();
+	
+	return 0;
+}

@@ -4,6 +4,8 @@ extern fun char* malloc(int x);
 
 extern fun int puts(char* str);
 
+extern fun char getchar();
+
 namespace Tests::Hello
 {
 	struct A
@@ -11,18 +13,41 @@ namespace Tests::Hello
 		int a_val;
 	}
 
-	struct B: A
+	struct B//: A
 	{
 		int b_val;
+	}
+	
+	fun void test()
+	{
+	    puts("I am in the A namespace!");
 	}
 }
 
 namespace Tests
 {
-	struct C: Hello::B
+	struct C
 	{
 		int c_val;
 		Apple apple;
+	}
+}
+
+namespace nsB
+{
+    struct A
+	{
+	    int a_val2;
+	}
+	
+	struct B
+	{
+	    int b_val2;
+	}
+	
+	fun void test()
+	{
+	    puts("I am in the B namespace!");
 	}
 }
 
@@ -35,11 +60,18 @@ struct Apple
 
 fun int main() 
 {
-	let Tests::C x;
+	let Tests::C z;
+	
+	let Tests::Hello::A x;
 	let Tests::Hello::B y;
-	let Tests::Hello::A z;
 	x.a_val = 1;
-	x.b_val = 2;
-	x.c_val = 3;
+	y.b_val = 1;
+	
+	let nsB::A a;
+	let nsB::B b;
+	a.a_val2 = 1;
+	b.b_val2 = 1;
+	
+	getchar();
 	return 0;
 }

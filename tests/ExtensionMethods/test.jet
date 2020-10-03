@@ -3,16 +3,35 @@ extern fun int printf(char* h, int h);
 extern fun char* malloc(int x);
 
 extern fun int puts(char* str);
+extern fun char getchar();
+
+fun void _chkstk()
+{
+
+}
 
 
 struct B
 {
 	int b_val;
-	
+	int q;
+	char[5000] aarr;
+	D d;
 	fun void T()
 	{
 	
 	}
+}
+
+struct D
+{
+	char[8000] data;
+}
+
+fun D test()
+{
+	let D p;
+	return p;
 }
 
 fun void B::Extension()
@@ -22,9 +41,24 @@ fun void B::Extension()
 
 fun int main() 
 { 
-	let x = B();
+	let B x;
+	let B y;
+	let B z;
+	let B a;
+	//let B y;
+	//let B y;
+	//x = B();
+	//x = y;
+	//x.d = y.d;
 	
+	//let D q = test();
+	
+	//x.aarr = y.aarr;
 	x.Extension();
+	x.Extension();
+	
+	getchar();
+	getchar();
 	
 	return 0;
 }
