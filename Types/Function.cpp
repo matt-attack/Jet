@@ -95,6 +95,7 @@ void Function::Load(Compilation* compiler)
 	int line = this->expression ? this->expression->token.line : 0;
 	llvm::DISubprogram* sp = compiler->debug->createFunction(unit, this->name, mangled_name, unit, line, functiontype, false, true, line, llvm::DINode::DIFlags::FlagPublic, false, nullptr);// , f);
 
+	// this catches duplicates or incorrect functions
 	assert(sp->describes(f));
 	this->scope = sp;
 	compiler->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
@@ -265,7 +266,7 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 					//was ii.val, but this makes more sense
 					auto sptr = context->root->builder.CreatePointerCast(ii.pointer, context->root->CharPointerType->GetLLVMType());
 					auto dptr = context->root->builder.CreatePointerCast(alloc, context->root->CharPointerType->GetLLVMType());
-					context->root->builder.CreateMemCpy(dptr, 1, sptr, type->GetSize(), 1);// todo properly handle alignment
+					context->root->builder.CreateMemCpy(dptr, 0, sptr, 0, type->GetSize());// todo properly handle alignment
 				}
 			}
 			else

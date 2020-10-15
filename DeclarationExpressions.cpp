@@ -279,6 +279,17 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	}
 	else
 	{
+		// create the function if this was a lambda
+		if (this->name.text.length() == 0)
+		{
+			myself = new Function(this->GetFunctionNamePrefix(), false);
+			myself->expression = this;
+			myself->is_virtual = false;
+			myself->arguments = argsv;
+			myself->return_type = ret;
+			context->root->functions.push_back(myself);
+		}
+
 		function_context = context->StartFunctionDefinition(myself);//this->GetFunctionNamePrefix(), ret, argsv, struct_name.length() > 0 ? argsv[0].first->base : 0, is_lambda, myself);
 	}
 
@@ -432,7 +443,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		//then return the newly created iterator object by storing it into the first arg
 		auto sptr = context->root->builder.CreatePointerCast(alloc, context->root->CharPointerType->GetLLVMType());
 		auto dptr = context->root->builder.CreatePointerCast(func->function->f->arg_begin(), context->root->CharPointerType->GetLLVMType());
-		context->root->builder.CreateMemCpy(dptr, 1, sptr, str->GetSize(), 1);// todo properly handle alignment
+		context->root->builder.CreateMemCpy(dptr, 0, sptr, 0, str->GetSize());// todo properly handle alignment
 
 		context->root->builder.CreateRetVoid();
 
@@ -499,7 +510,11 @@ std::string FunctionExpression::GetFunctionNamePrefix()
 	else
 		fname = "_lambda_";
 
+	auto str = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
+
 	const auto& ns = this->GetNamespaceQualifier();
+	if (str.length())
+		fname = str + "_" + fname;
 	if (ns.length() > 0)
 		return ns + "_" + fname;
 	return fname;
@@ -517,11 +532,12 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	std::string name_prefix = this->GetFunctionNamePrefix();
 
 	bool advlookup = true;
+	auto str = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
+
 	Function* fun = new Function(name_prefix, false);
 	fun->expression = this;
 	fun->is_virtual = (this->token.type == TokenType::Virtual);
 	context->root->functions.push_back(fun);
-	auto str = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
 	myself = fun;
 
 	if (auto attr = dynamic_cast<AttributeExpression*>(this->parent))
@@ -578,6 +594,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			func->arguments = { { 0, "_context" } };
 			func->arguments.resize(1);
 			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
+			context->root->functions.push_back(func);
 
 			auto n = new CompilerContext(context->root, context);
 			n->function = func;
@@ -592,6 +609,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			func->arguments = { { 0, "_context" } };
 			func->arguments.resize(1);
 			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
+			context->root->functions.push_back(func);
 
 			auto n = new CompilerContext(context->root, context);
 			n->function = func;
@@ -604,6 +622,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 			auto func = new Function(name_prefix + "_generator_current", name.text.length() == 0);
 			func->return_type = &VoidType;
 			context->root->AdvanceTypeLookup(&func->return_type, this->ret_type.text, &this->ret_type);
+			context->root->functions.push_back(func);
 
 			func->arguments = { { 0, "_context" } };
 			func->arguments.resize(1);
@@ -703,7 +722,10 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 {
 	std::string fname = name.text;
 
-	Function* fun = new Function(fname, false, true);// all externs are C functions for now
+	// todo come up with a better way to handle c externs
+	bool is_c = (token.text == "extern_c");
+
+	Function* fun = new Function(fname, false, is_c);
 
 	if (auto attr = dynamic_cast<AttributeExpression*>(this->parent))
 	{
@@ -724,6 +746,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	fun->f = 0;
 	if (Struct.length() > 0)
 	{
+		// todo this seems wrong
 		fun->name = "__" + Struct + "_" + fname;//mangled name
 
 		//add to struct
