@@ -109,7 +109,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 
 void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 {
-	if (loc.type->base->type == Types::Struct && RVO == false)
+	if (loc.type->base->type == Types::Struct && RVO == false && val.type->type == Types::Struct && loc.type->base == val.type)
 	{
 		if (loc.type->base->data->is_class == true)
 			this->root->Error("Cannot copy class '" + loc.type->base->data->name + "' unless it has a copy operator.", *this->current_token);
@@ -563,7 +563,9 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 {
 	std::vector<Type*> arsgs;
 	for (auto ii : args)
+	{
 		arsgs.push_back(ii.type);
+	}
 
 	auto old_tok = this->current_token;
 	Function* fun = this->GetMethod(name, arsgs, Struct);

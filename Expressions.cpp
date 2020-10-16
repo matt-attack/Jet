@@ -178,11 +178,19 @@ CValue IndexExpression::GetBaseElementPointer(CompilerContext* context)
 	}
 	else if (auto call = dynamic_cast<CallExpression*>(left))
 	{
-		//store the value then return the pointer to it
+		//return a modifiable pointer to the value
 		auto val = call->Compile(context);
-		auto alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType());
-
-		return CValue(val.type->GetPointerType(), alloca);
+		if (val.pointer)
+		{
+			return CValue(val.type->GetPointerType(), val.pointer);
+		}
+		else
+		{
+			// need to copy it in this case
+			auto alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType());
+			context->root->builder.CreateStore(val.val, alloca);
+			return CValue(val.type->GetPointerType(), alloca);
+		}
 	}
 	context->root->Error("Could not handle Get Base Element Pointer", token);
 }
