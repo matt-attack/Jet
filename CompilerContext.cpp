@@ -57,14 +57,29 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 	}
 	else if (value.type->IsInteger())//value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
 	{
+		const auto& type = value.type->type;
 		//integer probably
 		switch (operation)
 		{
 		case TokenType::Increment:
-			res = root->builder.CreateAdd(value.val, root->builder.getInt32(1));
+			if (type == Types::Int || type == Types::UInt)
+				res = root->builder.CreateAdd(value.val, root->builder.getInt32(1));
+			else if (type == Types::Short || type == Types::UShort)
+				res = root->builder.CreateAdd(value.val, root->builder.getInt16(1));
+			else if (type == Types::Char || type == Types::UChar)
+				res = root->builder.CreateAdd(value.val, root->builder.getInt8(1));
+			else if (type == Types::Long || type == Types::ULong)
+				res = root->builder.CreateAdd(value.val, root->builder.getInt64(1));
 			break;
 		case TokenType::Decrement:
-			res = root->builder.CreateSub(value.val, root->builder.getInt32(1));
+			if (type == Types::Int || type == Types::UInt)
+				res = root->builder.CreateSub(value.val, root->builder.getInt32(1));
+			else if (type == Types::Short || type == Types::UShort)
+				res = root->builder.CreateSub(value.val, root->builder.getInt16(1));
+			else if (type == Types::Char || type == Types::UChar)
+				res = root->builder.CreateSub(value.val, root->builder.getInt8(1));
+			else if (type == Types::Long || type == Types::ULong)
+				res = root->builder.CreateSub(value.val, root->builder.getInt64(1));
 			break;
 		case TokenType::Minus:
 			res = root->builder.CreateNeg(value.val);

@@ -392,9 +392,11 @@ CValue CallExpression::Compile(CompilerContext* context)
 	{
 		//im a struct yo
 		fname = index->member.text;
-		stru = index->GetBaseType(context);
-		assert(stru->loaded);
-		llvm::Value* self = index->GetBaseElementPointer(context).val;
+		//stru = index->GetBaseType(context);
+		//assert(stru->loaded);
+		auto left = index->GetBaseElementPointer(context);
+		stru = left.type->base;
+		llvm::Value* self = left.val;
 		if (index->token.type == TokenType::Pointy)
 		{
 			if (stru->type != Types::Pointer && stru->type != Types::Array)
