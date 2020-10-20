@@ -16,8 +16,6 @@
 
 using namespace Jet;
 
-static unsigned int uuid = 5;
-
 CompilerContext* CompilerContext::StartFunctionDefinition(Function* func)
 {
 	func->Load(this->root);
@@ -55,10 +53,9 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 
 		return CValue(value.type, res);
 	}
-	else if (value.type->IsInteger())//value.type->type == Types::Int || value.type->type == Types::Short || value.type->type == Types::Char)
+	else if (value.type->IsInteger())
 	{
 		const auto& type = value.type->type;
-		//integer probably
 		switch (operation)
 		{
 		case TokenType::Increment:
@@ -107,7 +104,6 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		default:
 			this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->base->ToString() + "'", *current_token);
 		}
-
 	}
 	else if (value.type->type == Types::Bool)
 	{
@@ -376,9 +372,11 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 		case TokenType::XorAssign:
 			res = root->builder.CreateXor(left.val, right.val);
 			break;
+		case TokenType::ShlAssign:
 		case TokenType::LeftShift:
 			res = root->builder.CreateShl(left.val, right.val);
 			break;
+		case TokenType::ShrAssign:
 		case TokenType::RightShift:
 			res = root->builder.CreateLShr(left.val, right.val);
 			break;

@@ -973,7 +973,7 @@ namespace Jet
 				{
 					ii->Compile(context);
 				}
-				catch (...)
+				catch (int i)
 				{
 
 				}

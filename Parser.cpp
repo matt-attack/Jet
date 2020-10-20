@@ -37,7 +37,8 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	this->Register(TokenType::AndAssign, new OperatorAssignParselet());
 	this->Register(TokenType::OrAssign, new OperatorAssignParselet());
 	this->Register(TokenType::XorAssign, new OperatorAssignParselet());
-
+	this->Register(TokenType::ShlAssign, new OperatorAssignParselet());
+	this->Register(TokenType::ShrAssign, new OperatorAssignParselet());
 
 	//prefix stuff
 	this->Register(TokenType::Increment, new PrefixOperatorParselet(Precedence::PREFIX));

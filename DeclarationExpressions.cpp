@@ -235,8 +235,11 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		}
 	}
 
-	for (auto ii : *this->args)
+	for (auto& ii : *this->args)
+	{
+		context->CurrentToken(&ii.type);
 		argsv.push_back({ context->root->LookupType(ii.type.text), ii.name.text });
+	}
 
 	context->CurrentToken(&this->ret_type);
 
@@ -255,7 +258,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	{
 		//allocate the function object
 		std::vector<Type*> args;
-		for (auto ii : argsv)
+		for (auto& ii : argsv)
 			args.push_back(ii.first);
 
 		lambda_type = context->root->LookupType("function<" + context->root->GetFunctionType(ret, args)->ToString() + ">");
@@ -347,7 +350,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		//add arguments
 		int i = 0;
-		for (auto ii : *this->args)
+		for (auto& ii : *this->args)
 		{
 			auto ptr = data.val;
 			auto val = function_context->root->builder.CreateGEP(ptr, { function_context->root->builder.getInt32(0), function_context->root->builder.getInt32(2 + i++) });

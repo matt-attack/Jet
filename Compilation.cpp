@@ -1100,7 +1100,7 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 	return this->LookupType(name, false, false);
 }
 
-Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_error)
+Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_error, int start_index)
 {
 	unsigned int i = 0;
 	while (IsLetter(name[i]) || IsNumber(name[i]))
@@ -1117,13 +1117,20 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 		if (res == this->ns->members.end())
 		{
 			if (do_error)
-				this->Error("Namespace " + ns + " not found", *this->current_function->current_token);
+			{
+				// Make a new token for this error
+				Token relevant_token = *this->current_function->current_token;
+				relevant_token.text = relevant_token.text.substr(0, i);
+				this->Error("Namespace '" + ns + "' not found", relevant_token);
+			}
 			else
+			{
 				return 0;
+			}
 		}
 		auto old = this->ns;
 		this->ns = res->second.ns;
-		auto out = this->LookupType(name.substr(i + 2), load, do_error);
+		auto out = this->LookupType(name.substr(i + 2), load, do_error, start_index + i + 2);
 		this->ns = old;
 
 		return out;
@@ -1169,7 +1176,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 		else if (name[name.length() - 1] == '*')
 		{
 			//its a pointer
-			auto t = this->LookupType(name.substr(0, name.length() - 1), load, do_error);
+			auto t = this->LookupType(name.substr(0, name.length() - 1), load, do_error, start_index);
 
 			if (t->pointer_type)
 				return t->pointer_type;
@@ -1197,7 +1204,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 			auto len = name.substr(p + 1, name.length() - p - 2);
 
 			auto tname = name.substr(0, p);
-			auto t = this->LookupType(tname, load, do_error);
+			auto t = this->LookupType(tname, load, do_error, start_index);
 
 			if (len.length())
 			{
@@ -1223,15 +1230,15 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 			p++;
 			do
 			{
-				//lets cheat for the moment ok
+				int cur_index = start_index + p;
 				std::string subtype = ParseType(name.c_str(), p);
 
-				Type* t = this->LookupType(subtype, load, do_error);
+				Type* t = this->LookupType(subtype, load, do_error, cur_index);
 				types.push_back(t);
 			} while (name[p++] != '>');
 
 			//look up the base, and lets instantiate it
-			auto t = this->LookupType(base, false, do_error);
+			auto t = this->LookupType(base, false, do_error, start_index);
 
 			type = t->Instantiate(this, types);
 		}
@@ -1263,7 +1270,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 			}
 
 			std::string ret_type = name.substr(0, p);
-			auto rtype = this->LookupType(ret_type, load, do_error);
+			auto rtype = this->LookupType(ret_type, load, do_error, start_index);
 
 			std::vector<Type*> args;
 			//parse types
@@ -1271,9 +1278,10 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 			while (name[p] != ')')
 			{
 				//lets cheat for the moment ok
+				int cur_index = start_index + p;
 				std::string subtype = ParseType(name.c_str(), p);
 
-				Type* t = this->LookupType(subtype, load, do_error);
+				Type* t = this->LookupType(subtype, load, do_error, cur_index);
 				args.push_back(t);
 				if (name[p] == ',')
 					p++;
@@ -1284,7 +1292,16 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 		else
 		{
 			if (do_error)
-				Error("Reference To Undefined Type '" + name + "'", *this->current_function->current_token);
+			{
+				Token tok = *this->current_function->current_token;
+				if (start_index > 0)
+				{
+					// need to create a special token as we are into a type
+					tok.text = tok.text.substr(start_index, name.length());
+					tok.column += start_index;
+				}
+				Error("Reference To Undefined Type '" + name + "'", tok);
+			}
 			else
 				return 0;
 		}

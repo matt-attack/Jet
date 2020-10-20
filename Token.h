@@ -38,6 +38,8 @@ namespace Jet
 		AndAssign,
 		OrAssign,
 		XorAssign,
+		ShrAssign,
+		ShlAssign,
 
 		NotEqual,
 		Equals,

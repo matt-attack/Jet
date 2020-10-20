@@ -65,6 +65,8 @@ public:
 		operators["&="] = TokenType::AndAssign;
 		operators["|="] = TokenType::OrAssign;
 		operators["^="] = TokenType::XorAssign;
+		operators["<<="] = TokenType::ShlAssign;
+		operators[">>="] = TokenType::ShrAssign;
 
 		//boolean logic
 		operators["!="] = TokenType::NotEqual;
@@ -148,8 +150,6 @@ public:
 		operators["//!@!"] = TokenType::LocationMacro;
 		
 
-		//keywords["operator"] = TokenType::Operator;
-
 		for (auto ii = operators.begin(); ii != operators.end(); ii++)
 		{
 			TokenToString[ii->second] = ii->first;
@@ -171,6 +171,7 @@ public:
 			TokenToString[ii.second] = ii.first;
 
 		TokenToString[TokenType::Name] = "name";
+		TokenToString[TokenType::Number] = "number";
 	}
 };
 
