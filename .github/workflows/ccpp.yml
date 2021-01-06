@@ -8,7 +8,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: install
-      run: apt install llvm-7-dev
+      run: sudo apt install llvm-7-dev
     - name: cmake configure
       run: cmake .
     - name: cmake build
