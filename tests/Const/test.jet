@@ -1,9 +1,9 @@
 
-extern fun int printf(char* h, int h);
-extern fun char* malloc(int x);
+extern_c fun int printf(char* h, int h);
+extern_c fun char* malloc(int x);
 
-extern fun int puts(char* str);
-extern fun char getchar();
+extern_c fun int puts(char* str);
+extern_c fun char getchar();
 
 let int global_mut = 7;
 //const int global_const = 7;// this errors (for now)

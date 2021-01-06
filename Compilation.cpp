@@ -591,7 +591,6 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		}
 	}
 
-	//figure out how to get me working with multiple definitions
 	// Generate initializers.
 	if (project->IsExecutable())
 	{

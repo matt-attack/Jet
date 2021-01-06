@@ -18,11 +18,12 @@ using namespace Jet;
 
 CompilerContext* CompilerContext::StartFunctionDefinition(Function* func)
 {
-	func->Load(this->root);
-
 	auto n = new CompilerContext(this->root, this);
 	n->function = func;
 	func->context = n;
+
+	func->Load(this->root);
+
 	llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->function->f);
 	root->builder.SetInsertPoint(bb);
 
