@@ -1,0 +1,15 @@
+name: C/C++ CI
+
+on: [push]
+
+jobs: 
+  linux-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: install
+      run: apt install llvm-7-dev
+    - name: cmake configure
+      run: cmake .
+    - name: cmake build
+      run: cmake --build .
