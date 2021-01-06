@@ -122,7 +122,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		std::vector<llvm::Metadata*> ftypes;
 		int offset = 0;
 		auto list = { compiler->IntType, this->base->GetPointerType() };
-		char* names[] = { "size", "ptr" };
+		const char* names[] = { "size", "ptr" };
 		int i = 0;
 		for (auto type : list)
 		{

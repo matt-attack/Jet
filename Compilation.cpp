@@ -166,14 +166,14 @@ class StackTime
 public:
 	long long start;
 	long long rate;
-	char* name;
+	const char* name;
 
-	StackTime(char* name, bool enable = true);
+	StackTime(const char* name, bool enable = true);
 
 	~StackTime();
 };
 
-StackTime::StackTime(char* name, bool time)
+StackTime::StackTime(const char* name, bool time)
 {
 	this->name = name;
 	this->enable = time;
@@ -730,20 +730,17 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 
 		if (used_linker.find("link.exe") == -1)
 		{
-			std::string cmd = linker + " ";// "ld ";//"gcc -L. -g ";//-e_jet_initializer
+			std::string cmd = linker + " ";
 
 			//set entry
             
-			// eventually we should add a way to do no c stdlib, but lets do this for now
-			// todo also handle targets
-			// for musl
+			// Set the dynamic linker correctly (for linux)
 			std::string stdlib = real_target.substr(real_target.find_last_of('-')+1);
-			printf("Stdlib: %s", stdlib.c_str());
-			if (target_stdlib == "musl")
+			if (target_stdlib == "musl" && target_platform == "linux")
 			{
-				cmd += " --dynamic-linker=/lib/ld-musl-" + target_arch + ".so.1";
+				cmd += "--dynamic-linker=/lib/ld-musl-" + target_arch + ".so.1 ";
 			}
-			else
+			else if (target_platform == "linux")
 			{
 				std::string arch = target_arch;
 				for (auto& c: arch)
@@ -752,21 +749,29 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 				}
 				if (target_arch.find("64") == -1)
 				{
-					cmd += " --dynamic-linker=/lib/ld-" + target_platform + "-" + arch + ".so.3";
+					cmd += "--dynamic-linker=/lib/ld-" + target_platform + "-" + arch + ".so.3 ";
 				}
 				else
 				{
-					cmd += " --dynamic-linker=/lib64/ld-" + target_platform + "-" + arch + ".so.2";
+					cmd += "--dynamic-linker=/lib64/ld-" + target_platform + "-" + arch + ".so.2 ";
 				}
 			}
-			cmd += " -L/lib/" + target_arch + "-" + target_platform + "-" + target_stdlib;
 
 			// always link in C for the moment, eventually have a way to avoid this
-			cmd += " -lc";
-			cmd += " /usr/lib/" + target_arch + "-" + target_platform + "-" + target_stdlib + "/crt1.o ";
-			if (target_stdlib == "gnu")
+			if (target_platform == "linux")
 			{
-				cmd += " /usr/lib/" + target_arch + "-" + target_platform + "-gnu/libc_nonshared.a ";
+				cmd += "-L/lib/" + target_arch + "-" + target_platform + "-" + target_stdlib + " ";
+				cmd += "-lc ";
+				cmd += "/usr/lib/" + target_arch + "-" + target_platform + "-" + target_stdlib + "/crt1.o ";
+				if (target_stdlib == "gnu")
+				{
+					cmd += "/usr/lib/" + target_arch + "-" + target_platform + "-gnu/libc_nonshared.a ";
+				}
+			}
+			else
+			{
+				// todo link in C for windows (maybe this works)
+				//cmd += " -lc ";
 			}
 
 			// for when we dont use C
@@ -814,7 +819,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 			//	implement basic containers
 			printf("\n%s\n", cmd.c_str());
 			auto res = exec(cmd.c_str());
-			printf(res.c_str());
+			printf("%s", res.c_str());
 		}
 		else
 		{
@@ -858,7 +863,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 
 
 			auto res = exec(cmd.c_str());
-			printf(res.c_str());
+			printf("%s", res.c_str());
 		}
 	}
 	else
@@ -883,7 +888,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 			//can use llvm-ar or just ar
 			std::string cm = ar + " x " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
 			auto res = exec(cm.c_str());
-			printf(res.c_str());
+			printf("%s", res.c_str());
 
 			//get a list of the extracted files
 			cm = ar + " t " + ii + "/build/lib" + GetNameFromPath(ii) + ".a";
@@ -905,15 +910,17 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 		}
 
 		auto res = exec(cmd.c_str());
-		printf(res.c_str());
+		printf("%s", res.c_str());
 
 		//delete temporary files
 		for (auto ii : temps)
+		{
 #ifndef _WIN32
 			remove(ii.c_str());
 #else
 			DeleteFileA(ii.c_str());
 #endif
+		}
 	}
 
 	//restore working directory
@@ -1058,7 +1065,6 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level, bo
 	//llvm::formatted_raw_ostream oo2(strrr);
 
 	//target->addPassesToEmitFile(MPM, strrr, llvm::TargetMachine::CodeGenFileType::CGFT_AssemblyFile, false);
-
 	MPM.run(*module);
 
 	//auto mod = JITHelper->getModuleForNewFunction();

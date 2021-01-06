@@ -164,12 +164,9 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 	});
 	x.detach();
 #else
-	// todo run for linux
-	printf("WARNING: Running your program from the compiler is not yet supported in linux.");
+	std::string cmd = "gnome-terminal -- build/" + project->project_name;
+	system(cmd.c_str());
 #endif
-	//system(path.c_str());
-
-	//spawnl(P_NOWAIT, "cmd.exe", "cmd.exe", path.c_str(), 0);
 }
 
 extern std::string executable_path;
