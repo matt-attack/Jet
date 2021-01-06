@@ -414,6 +414,8 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	if (this->is_generator)
 	{
+		context->root->builder.SetCurrentDebugLocation(0);
+
 		//compile the other function necessary for an iterator
 		auto func = context->StartFunctionDefinition(myself);//this->GetFunctionNamePrefix(), 0, { argsv.front() }, struct_name.length() > 0 ? argsv[0].first : 0, is_lambda, myself);
 
