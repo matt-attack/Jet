@@ -420,7 +420,7 @@ error:
 	}
 	else if (compilation->GetErrors().size() > 0)
 	{
-		printf("Compiling Failed: %d Errors Found\n", compilation->GetErrors().size());
+		printf("Compiling Failed: %zi Errors Found\n", compilation->GetErrors().size());
 
 		//restore working directory
 		chdir(olddir);
