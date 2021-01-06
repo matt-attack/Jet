@@ -848,6 +848,12 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 
 	if (ret.type->type == Types::Void)
 	{
+		// Only allow this if the function return type is void
+		if (this->function->return_type->type != Types::Void)
+		{
+			this->root->Error("Cannot return void in function returning '"
+								+ this->function->return_type->ToString() + "'!", *current_token);
+		}
 		return root->builder.CreateRetVoid();
 	}
 	else if (ret.type->type == Types::Struct)

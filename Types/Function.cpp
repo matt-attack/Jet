@@ -110,7 +110,6 @@ void Function::Load(Compilation* compiler)
 		// this catches duplicates or incorrect functions
 		assert(sp->describes(f));
 		this->scope = sp;
-		compiler->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
 
 		f->setSubprogram(sp);
 	}
