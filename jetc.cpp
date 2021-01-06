@@ -19,7 +19,12 @@
 #include <streambuf>
 #include <math.h>
 #include <functional>
+
+#ifdef _WIN32
 #include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 using namespace Jet;
 
@@ -604,7 +609,7 @@ void DoCommand(int argc, char* argv[])
 	{
 		std::string name = argv[2];
 
-		mkdir(name.c_str());
+		mkdir(name.c_str(), 0x755);
 
 		//insert a project file and a main code file
 
@@ -680,6 +685,20 @@ std::string exec_path(const char *argv0)
 		//return executable_path_fallback(argv0);
 	}
 	return buf;
+}
+#else
+
+#include <unistd.h>
+std::string exec_path(const char* argv0)
+{
+  char dest[PATH_MAX];
+  memset(dest,0,sizeof(dest)); // readlink does not null terminate!
+  if (readlink("/proc/self/exe", dest, PATH_MAX) == -1) {
+    perror("readlink");
+  } else {
+    //printf("%s\n", dest);
+  }
+  return dest;
 }
 #endif
 

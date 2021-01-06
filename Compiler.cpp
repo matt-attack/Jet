@@ -22,14 +22,18 @@ using namespace Jet;
 
 #ifdef _WIN32
 #include <Windows.h>
-
+#include <process.h>
 #include <sys/stat.h>
 #else
 #include <sys/types.h>
 #include <unistd.h>
+
+void Sleep(int duration)
+{
+    usleep(duration*1000);
+}
 #endif
 
-#include <process.h>
 #include <thread>
 
 //this adds all the available options to the parser for jet

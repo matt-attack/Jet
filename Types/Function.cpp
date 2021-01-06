@@ -16,6 +16,10 @@ std::string mangle(const std::string& name, bool is_lambda, const std::vector<st
 	{
 		return name;
 	}
+	if (name == "_init")
+	{
+		return name;
+	}
 	if (is_lambda)
 	{
 		return name + std::to_string(uuid++);
@@ -26,6 +30,11 @@ std::string mangle(const std::string& name, bool is_lambda, const std::vector<st
 	}
 	// todo actually mangle
 	return name + "_" + std::to_string(arguments.size());
+}
+
+Function::~Function()
+{
+	delete this->context;
 }
 
 void Function::Load(Compilation* compiler)
@@ -89,16 +98,22 @@ void Function::Load(Compilation* compiler)
 		break;
 	}
 
-	llvm::DIFile* unit = compiler->debug_info.file;
+	// dont add debug info for externs (todo also handle jet externs)
+	if (!is_c_function)
+	{
+		llvm::DIFile* unit = compiler->debug_info.file;
 
-	auto functiontype = compiler->debug->createSubroutineType(compiler->debug->getOrCreateTypeArray(ftypes));
-	int line = this->expression ? this->expression->token.line : 0;
-	llvm::DISubprogram* sp = compiler->debug->createFunction(unit, this->name, mangled_name, unit, line, functiontype, false, true, line, llvm::DINode::DIFlags::FlagPublic, false, nullptr);// , f);
+		auto functiontype = compiler->debug->createSubroutineType(compiler->debug->getOrCreateTypeArray(ftypes));
+		int line = this->expression ? this->expression->token.line : 0;
+		llvm::DISubprogram* sp = compiler->debug->createFunction(unit, this->name, mangled_name, unit, line, functiontype, false, true, line, llvm::DINode::DIFlags::FlagPublic, false, nullptr);// , f);
 
-	// this catches duplicates or incorrect functions
-	assert(sp->describes(f));
-	this->scope = sp;
-	compiler->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
+		// this catches duplicates or incorrect functions
+		assert(sp->describes(f));
+		this->scope = sp;
+		compiler->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
+
+		f->setSubprogram(sp);
+	}
 
 	//alloc args
 	auto AI = f->arg_begin();

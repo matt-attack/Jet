@@ -190,7 +190,8 @@ namespace Jet
 				module->dump();
 		}
 
-		void SetTarget(const std::string& triple);//make this customizable later
+		// returns the target used
+		std::string SetTarget(const std::string& triple);//make this customizable later
 	};
 
 }

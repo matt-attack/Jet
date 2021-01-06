@@ -117,10 +117,7 @@ namespace Jet
 			this->is_generator = false;
 		}
 
-		~Function()
-		{
-			delete this->context;
-		}
+		~Function();
 
 		CValue Call(CompilerContext* context, const std::vector<CValue>& argsv, bool devirtualize);
 

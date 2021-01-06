@@ -329,9 +329,9 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		defines["RELEASE"] = true;
 
 	//build converted headers and add their source
-	for (auto hdr : project->headers)
+	for (const auto& hdr_name : project->headers)
 	{
-		std::string two = hdr;
+		std::string two = hdr_name;
 		std::string outfile = two + ".jet";
 		//if the header already exists, dont regenerate
 		FILE* hdr = fopen(outfile.c_str(), "r");
@@ -592,17 +592,18 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 	}
 
 	//figure out how to get me working with multiple definitions
-	/*auto init = global->AddFunction("_jet_initializer", compilation->ns->members.find("int")->second.ty, {}, false, false);
-	if (project->IsExecutable())
+	
+	/*if (project->IsExecutable())
 	{
-	//this->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, init->function->scope.get()));
-	//init->Call("puts", { init->String("hello from initializer") });
+      auto init = global->AddFunction("_init", compilation->ns->members.find("void")->second.ty, {}, false, false);
+	  //this->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(0, 0, init->function->scope.get()));
+	  //init->Call("puts", { init->String("hello from initializer") });
 
-	//todo: put intializers here
-	if (project->IsExecutable())
-	init->Call("main", {});
-	}
-	init->Return(global->Integer(0));*/
+	  //todo: put intializers here
+	  //if (project->IsExecutable())
+	  //init->Call("main", {});
+	  init->Return();
+	}*/
 
 error:
 
@@ -686,7 +687,12 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 	//add string
 	//linux i686-pc-linux-gnu
 	//raspbian arm-pc-linux-gnueabif"armv6-linux-gnueabihf"
-	this->SetTarget(target);
+	std::string real_target = this->SetTarget(target);
+
+	// now lets split apart the target to get the arch, OS and stdlib (ignoring the second bit)
+	std::string target_arch = real_target.substr(0, real_target.find_first_of('-'));
+	std::string target_platform = "linux";// for the moment
+	std::string target_stdlib = real_target.substr(real_target.find_last_of('-')+1);
 
 	debug->finalize();
 
@@ -727,10 +733,48 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 			std::string cmd = linker + " ";// "ld ";//"gcc -L. -g ";//-e_jet_initializer
 
 			//set entry
-			cmd += "--entry _main ";
+            
+			// eventually we should add a way to do no c stdlib, but lets do this for now
+			// todo also handle targets
+			// for musl
+			std::string stdlib = real_target.substr(real_target.find_last_of('-')+1);
+			printf("Stdlib: %s", stdlib.c_str());
+			if (target_stdlib == "musl")
+			{
+				cmd += " --dynamic-linker=/lib/ld-musl-" + target_arch + ".so.1";
+			}
+			else
+			{
+				std::string arch = target_arch;
+				for (auto& c: arch)
+				{
+					if (c == '_') c = '-';
+				}
+				if (target_arch.find("64") == -1)
+				{
+					cmd += " --dynamic-linker=/lib/ld-" + target_platform + "-" + arch + ".so.3";
+				}
+				else
+				{
+					cmd += " --dynamic-linker=/lib64/ld-" + target_platform + "-" + arch + ".so.2";
+				}
+			}
+			cmd += " -L/lib/" + target_arch + "-" + target_platform + "-" + target_stdlib;
+
+			// always link in C for the moment, eventually have a way to avoid this
+			cmd += " -lc";
+			cmd += " /usr/lib/" + target_arch + "-" + target_platform + "-" + target_stdlib + "/crt1.o ";
+			if (target_stdlib == "gnu")
+			{
+				cmd += " /usr/lib/" + target_arch + "-" + target_platform + "-gnu/libc_nonshared.a ";
+			}
+
+			// for when we dont use C
+			//cmd += "--entry _main ";
 
 			cmd += "\"build/" + project->project_name + ".o\" ";
-			cmd += "-o \"build/" + project->project_name + ".exe\" ";
+			std::string extension = target_platform == "linux" ? "" : ".exe";
+			cmd += "-o \"build/" + project->project_name + extension + "\" ";
 			//todo need to make sure to link in deps of deps also fix linking
 			//need to link each dependency
 			for (auto ii : project->ResolveDependencies())
@@ -923,16 +967,18 @@ void Compilation::Optimize(int level)
 	}
 }
 
-#include <llvm\Support\ARMEHABI.h>
-void Compilation::SetTarget(const std::string& triple)
+//#include <llvm\Support\ARMEHABI.h>
+std::string Compilation::SetTarget(const std::string& triple)
 {
 	llvm::InitializeNativeTarget();
 	llvm::InitializeNativeTargetAsmParser();
 	llvm::InitializeNativeTargetAsmPrinter();
-	//LLVMInitializeARMTarget();
-	//LLVMInitializeARMAsmPrinter();
-	//LLVMInitializeARMTargetMC();
-	//LLVMInitializeARMTargetInfo();
+	//LLVMInitializeAllTargets();
+	LLVMInitializeARMTargetInfo();
+	LLVMInitializeARMTarget();
+	LLVMInitializeARMTargetMC();
+	LLVMInitializeARMAsmPrinter();
+	LLVMInitializeARMAsmParser();
 	//LLVMInitializeMSP430Target();
 	//llvm::initializeTarget()
 
@@ -949,6 +995,13 @@ void Compilation::SetTarget(const std::string& triple)
 		if (TheTriple.getTriple().empty())
 			TheTriple.setTriple(llvm::sys::getDefaultTargetTriple());
 	}
+
+	printf("Assembling as %s\n", TheTriple.str().c_str());
+
+
+	//std::error_code ec;
+	//llvm::raw_fd_ostream strr("build/targets", ec, llvm::sys::fs::OpenFlags::F_None);
+	//llvm::TargetRegistry::printRegisteredTargetsForVersion(strr);
 
 	//ok, now for linux builds...
 	//TheTriple = llvm::Triple("i686", "pc", "linux", "gnu");
@@ -986,6 +1039,8 @@ void Compilation::SetTarget(const std::string& triple)
 	this->target = TheTarget->createTargetMachine(TheTriple.getTriple(), MCPU, FeaturesStr, Options, RelocModel, CodeModel, OLvl);
 
 	module->setDataLayout(this->target->createDataLayout());
+
+	return TheTriple.str().c_str();
 }
 
 void Compilation::OutputPackage(const std::string& project_name, int o_level, bool time)
@@ -1396,9 +1451,9 @@ Jet::Type* Compilation::GetInternalArrayType(Jet::Type* base, unsigned int size)
 
 ::Jet::Type* Compilation::GetFunctionType(::Jet::Type* return_type, const std::vector<::Jet::Type*>& args)
 {
-	int key = (int)return_type;
+	int key = (uintptr_t)return_type;
 	for (auto arg : args)
-		key ^= (int)arg;
+		key ^= (uintptr_t)arg;
 
 	bool found = false;
 	Type* res = 0;
