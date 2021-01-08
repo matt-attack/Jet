@@ -65,6 +65,8 @@ public:
 		operators["&="] = TokenType::AndAssign;
 		operators["|="] = TokenType::OrAssign;
 		operators["^="] = TokenType::XorAssign;
+		operators["<<="] = TokenType::ShlAssign;
+		operators[">>="] = TokenType::ShrAssign;
 
 		//boolean logic
 		operators["!="] = TokenType::NotEqual;
@@ -105,6 +107,7 @@ public:
 		keywords["for"] = TokenType::For;
 
 		keywords["let"] = TokenType::Let;
+		keywords["const"] = TokenType::Const;
 		keywords["break"] = TokenType::Break;
 		keywords["continue"] = TokenType::Continue;
 
@@ -124,6 +127,7 @@ public:
 
 		keywords["union"] = TokenType::Union;
 		keywords["extern"] = TokenType::Extern;
+		keywords["extern_c"] = TokenType::Extern;
 		keywords["struct"] = TokenType::Struct;
 		keywords["class"] = TokenType::Class;
 		keywords["namespace"] = TokenType::Namespace;
@@ -144,9 +148,7 @@ public:
 		operators["#endif"] = TokenType::EndIfMacro;
 
 		operators["//!@!"] = TokenType::LocationMacro;
-		//keywords["const"] = TokenType::Const;
-
-		//keywords["operator"] = TokenType::Operator;
+		
 
 		for (auto ii = operators.begin(); ii != operators.end(); ii++)
 		{
@@ -169,6 +171,7 @@ public:
 			TokenToString[ii.second] = ii.first;
 
 		TokenToString[TokenType::Name] = "name";
+		TokenToString[TokenType::Number] = "number";
 	}
 };
 
@@ -496,8 +499,9 @@ Token Lexer::Next()
 		}
 		else if (IsNumber(c))//number
 		{
-			//finish adding different literal types
-			if (c != '0')
+			char next_char = src->PeekChar();
+			// Check if it is a standard integer or floating point number
+			if (c != '0' || next_char == '.')
 			{
 				std::string num;
 				num += c;
@@ -524,7 +528,7 @@ Token Lexer::Next()
 				//ok, its possibly some kind of non base ten literal
 				std::string num;
 				num += c;
-				char c = src->PeekChar();
+				char c = next_char;
 				num += c;
 				switch (c)
 				{

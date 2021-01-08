@@ -19,16 +19,28 @@ namespace Jet
 
 	class LetExpression : public Expression
 	{
+		bool is_const;
 		Token token, equals;
-		std::vector<std::pair<Token, Token>>* _names;
+
+	public:
+		struct TypeNamePair
+		{
+			Token type;
+			Token name;
+		};
+
+	private:
+		std::vector<TypeNamePair>* _names;
 		std::vector<std::pair<Token, Expression*>>* _right;
 	public:
-		LetExpression(Token token, Token equals, std::vector<std::pair<Token, Token>>* names, std::vector<std::pair<Token, Expression*>>* right)
+		LetExpression(Token token, Token equals, std::vector<TypeNamePair>* names, std::vector<std::pair<Token, Expression*>>* right)
 		{
 			this->equals = equals;
 			this->token = token;
 			this->_names = names;
 			this->_right = right;
+
+			is_const = (token.type == TokenType::Const);
 		}
 
 		~LetExpression()
@@ -57,15 +69,18 @@ namespace Jet
 		{
 			//register the local
 			int i = 0;
-			for (auto ii : *this->_names)
+			for (auto& ii : *this->_names)
 			{
-				if (ii.first.text.length())
-					context->TCRegisterLocal(ii.second.text, context->root->LookupType(ii.first.text, false)->GetPointerType());
+				if (ii.type.text.length())
+				{
+					context->CurrentToken(&ii.type);
+					context->TCRegisterLocal(ii.name.text, context->root->LookupType(ii.type.text, false)->GetPointerType());
+				}
 				else
 				{
 					//type inference
 					auto ty = (*this->_right)[i].second->TypeCheck(context);
-					context->TCRegisterLocal(ii.second.text, ty->GetPointerType());
+					context->TCRegisterLocal(ii.name.text, ty->GetPointerType());
 				}
 				i++;
 			}
@@ -80,9 +95,9 @@ namespace Jet
 
 			for (auto ii : *_names)
 			{
-				if (ii.first.text.length() > 0)
-					ii.first.Print(output, source);
-				ii.second.Print(output, source);
+				if (ii.type.text.length() > 0)
+					ii.type.Print(output, source);
+				ii.name.Print(output, source);
 			}
 
 			if (this->_right)
@@ -178,7 +193,6 @@ namespace Jet
 
 	class NamespaceExpression : public Expression
 	{
-		Token name;
 		Token token;
 		BlockExpression* block;
 		std::vector<std::pair<Token, Token>>* names;
@@ -256,6 +270,26 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+		// returns the namespace that we create, if any
+		std::string namespaceprefix_;
+		virtual const char* GetNamespace()
+		{
+			if (namespaceprefix_.length())
+			{
+				return namespaceprefix_.c_str();
+			}
+
+			for (int i = 0; i < names->size(); i++)
+			{
+				namespaceprefix_ += (*names)[i].first.text;
+				if (i != names->size() - 1)
+				{
+					namespaceprefix_ += "__";
+				}
+			}
+			return namespaceprefix_.c_str();
+		}
 	};
 
 	struct FunctionArg
@@ -286,6 +320,8 @@ namespace Jet
 		std::vector<std::pair<Token, Token>>* templates;
 		Token open_bracket, close_bracket;
 		Token oper;
+
+		Function* myself;
 	public:
 
 		ScopeExpression* GetBlock()
@@ -319,9 +355,9 @@ namespace Jet
 			delete captures;
 		}
 
-		std::string GetRealName();
+		std::string GetFunctionNamePrefix();
 
-		std::string GetName()
+		const std::string& GetName()
 		{
 			return this->name.text;
 		}
@@ -707,6 +743,15 @@ namespace Jet
 				else if (ii.type == StructMember::DefinitionMember)
 					ii.definition->Visit(visitor);
 			}
+		}
+
+		// returns the namespace that we create, if any
+		std::string namespaceprefix_;
+		virtual const char* GetNamespace()
+		{
+			namespaceprefix_ = "_";
+			namespaceprefix_ += this->name.text;
+			return namespaceprefix_.c_str();
 		}
 	};
 	

@@ -2,20 +2,26 @@
 extern fun int printf(char* h, int h);
 extern fun char* malloc(int x);
 
+extern fun void free(char* x);
+
 extern fun int puts(char* str);
+
 extern fun char getchar();
 
-enum Test
+//fun void _chkstk() {}
+
+fun char* memcpy(char* x, char* y, int size)
 {
-	EnumA = 1,
-	EnumB = 2
+	return 0;
 }
 
 fun int main() 
 {
-	printf("%i\n", EnumA);
-	printf("%i\n", EnumB);
+	let int[5000] y;
+		
+	let y_copy = y;
 	
 	getchar();
-	return EnumB;
+	
+	return 0;
 }

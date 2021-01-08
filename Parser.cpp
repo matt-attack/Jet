@@ -37,7 +37,8 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	this->Register(TokenType::AndAssign, new OperatorAssignParselet());
 	this->Register(TokenType::OrAssign, new OperatorAssignParselet());
 	this->Register(TokenType::XorAssign, new OperatorAssignParselet());
-
+	this->Register(TokenType::ShlAssign, new OperatorAssignParselet());
+	this->Register(TokenType::ShrAssign, new OperatorAssignParselet());
 
 	//prefix stuff
 	this->Register(TokenType::Increment, new PrefixOperatorParselet(Precedence::PREFIX));
@@ -106,6 +107,7 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	this->Register(TokenType::Default, new DefaultParselet());
 
 	this->Register(TokenType::Let, new LocalParselet());
+	this->Register(TokenType::Const, new LocalParselet());
 
 	this->Register(TokenType::Extern, new ExternParselet());
 	this->Register(TokenType::Struct, new StructParselet());
@@ -124,7 +126,6 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 
 	this->Register(TokenType::Typedef, new TypedefParselet());
 
-	//this->Register(TokenType::Const, new ConstParselet());
 	//this->Register(TokenType::Null, new NullParselet());
 
 	this->Register(TokenType::Yield, new YieldParselet());

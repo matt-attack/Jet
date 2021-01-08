@@ -1054,7 +1054,7 @@ Expression* ReturnParselet::parse(Parser* parser, Token token)
 
 Expression* LocalParselet::parse(Parser* parser, Token token)
 {
-	UniquePtr<std::vector<std::pair<Token, Token>>*> names = new std::vector < std::pair<Token, Token> > ;
+	UniquePtr<std::vector<LetExpression::TypeNamePair>*> names = new std::vector < LetExpression::TypeNamePair > ;
 
 	do
 	{

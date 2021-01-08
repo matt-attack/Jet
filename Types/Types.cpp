@@ -122,7 +122,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		std::vector<llvm::Metadata*> ftypes;
 		int offset = 0;
 		auto list = { compiler->IntType, this->base->GetPointerType() };
-		char* names[] = { "size", "ptr" };
+		const char* names[] = { "size", "ptr" };
 		int i = 0;
 		for (auto type : list)
 		{
@@ -1129,6 +1129,27 @@ Namespace::~Namespace()
 		if (ii.second.type == SymbolType::Namespace)
 			delete ii.second.ns;
 	}
+}
+
+const std::string& Namespace::GetQualifiedName()
+{
+	if (qualified_name_.length())
+	{
+		return qualified_name_;
+	}
+
+	if (this->parent)
+	{
+		qualified_name_ = this->parent->GetQualifiedName();
+		if (qualified_name_.length())
+			qualified_name_ += "::";
+		qualified_name_ += name;
+	}
+	else
+	{
+		qualified_name_ = name;
+	}
+	return qualified_name_;
 }
 
 //todo, condense the data later using numeric identifiers and a list rather than whole name on each also could sort by file

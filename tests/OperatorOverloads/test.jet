@@ -47,7 +47,7 @@ struct B
 	//int* data;
 	fun int* operator[](int index)
 	{
-		return &this->data[index];
+		return &(this->data[index]);
 	}
 	
 }
@@ -78,7 +78,7 @@ fun int main()
 	else
 		puts("pass\n");
 	
-	printf("%i", q[5]);
-	//getchar();
+	//printf("%i", q[5]);
+	getchar();
 	return 0;
 }

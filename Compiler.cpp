@@ -22,14 +22,18 @@ using namespace Jet;
 
 #ifdef _WIN32
 #include <Windows.h>
-
+#include <process.h>
 #include <sys/stat.h>
 #else
 #include <sys/types.h>
 #include <unistd.h>
+
+void Sleep(int duration)
+{
+    usleep(duration*1000);
+}
 #endif
 
-#include <process.h>
 #include <thread>
 
 //this adds all the available options to the parser for jet
@@ -60,10 +64,21 @@ void CompilerOptions::ApplyOptions(OptionParser* parser)
 
 void Jet::Diagnostic::Print()
 {
+#ifndef _WIN32
+	const char* m_type = "\x1B[31merror\x1B[0m";
+#else
+	const char* m_type = "error";
+#endif
 	if (token.type != TokenType::InvalidToken)
 	{
 		unsigned int startrow = token.column;
 		unsigned int endrow = token.column + token.text.length();
+
+		// Handle an end token
+		if (end.type != TokenType::InvalidToken)
+		{
+			endrow = end.column + end.text.length();
+		}
 
 		std::string code = this->line;
 		std::string underline = "";
@@ -76,12 +91,14 @@ void Jet::Diagnostic::Print()
 			else
 				underline += ' ';
 		}
-		printf("[error] %s %d:%d to %d:%d: %s\n[error] >>>%s\n[error] >>>%s\n\n", this->file.c_str(), token.line, startrow, token.line, endrow, message.c_str(), code.c_str(), underline.c_str());
+		printf("[%s] %s %d:%d to %d:%d: %s\n", m_type, this->file.c_str(), token.line, startrow, token.line, endrow, message.c_str());
+		printf("[%s] >>>%s\n", m_type, code.c_str());
+		printf("[%s] >>>%s\n\n", m_type, underline.c_str());
 	}
 	else
 	{
 		//just print something out, it was probably a build system error, not one that occurred in the code
-		printf("[error] %s: %s\n", this->file.c_str(), message.c_str());
+		printf("[%s] %s: %s\n", m_type, this->file.c_str(), message.c_str());
 	}
 }
 
@@ -154,12 +171,9 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 	});
 	x.detach();
 #else
-	// todo run for linux
-	printf("WARNING: Running your program from the compiler is not yet supported in linux.");
+	std::string cmd = "gnome-terminal -- build/" + project->project_name;
+	system(cmd.c_str());
 #endif
-	//system(path.c_str());
-
-	//spawnl(P_NOWAIT, "cmd.exe", "cmd.exe", path.c_str(), 0);
 }
 
 extern std::string executable_path;
@@ -413,63 +427,61 @@ error:
 	}
 	else if (compilation->GetErrors().size() > 0)
 	{
-		printf("Compiling Failed: %d Errors Found\n", compilation->GetErrors().size());
+		printf("Compiling Failed: %zi Errors Found\n", compilation->GetErrors().size());
 
 		//restore working directory
 		chdir(olddir);
 		return 0;
 	}
-	else
+
+	compilation->Assemble(options.target, options.linker, options.optimization, options.time, options.output_ir);
+
+	if (compilation->GetErrors().size() > 0)
 	{
-		compilation->Assemble(options.target, options.linker, options.optimization, options.time, options.output_ir);
+		goto error;
+	}
 
-		//output build times
-		std::ofstream rebuild("build/rebuild.txt");
-		//output compiler version
-		rebuild.write(__TIME__, strlen(__TIME__));
-		rebuild.write("\n", 1);
-		for (auto ii : modifiedtimes)
-		{
-			char str[150];
+	//output build times
+	std::ofstream rebuild_out("build/rebuild.txt");
+	//output compiler version
+	rebuild_out.write(__TIME__, strlen(__TIME__));
+	rebuild_out.write("\n", 1);
+	for (auto ii : modifiedtimes)
+	{
+		char str[150];
 #if 0 //_WIN32
-			int len = sprintf(str, "%i,%i\n", ii.first, ii.second);
+		int len = sprintf(str, "%i,%i\n", ii.first, ii.second);
 #else
-			int len = sprintf(str, "%li\n", ii);
+		int len = sprintf(str, "%li\n", ii);
 #endif
-			rebuild.write(str, len);
-		}
-		//todo: output for dependencies too
+		rebuild_out.write(str, len);
+	}
 
-		printf("Project built successfully.\n\n");
+	printf("Project built successfully.\n\n");
 
-		//running postbuild
-		if (configuration.postbuild.length() > 0)
-			printf("%s", exec(configuration.postbuild.c_str()).c_str());
+	//running postbuild
+	if (configuration.postbuild.length() > 0)
+		printf("%s", exec(configuration.postbuild.c_str()).c_str());
 
-		//ok now lets add it to the project cache, lets be sure to always save a backup though and need to get current path of the jetc 
-		if (executable_path.length())
-		{
-			this->UpdateProjectList(project.get());
-		}
+	//ok now lets add it to the project cache, lets be sure to always save a backup though and need to get current path of the jetc 
+	if (executable_path.length())
+	{
+		this->UpdateProjectList(project.get());
+	}
 
-		if (options.run && project->IsExecutable())
-		{
-			ExecuteProject(project.get(), projectdir);
-			Sleep(50);//give it a moment to run, for some reason derps up without this
-		}
-		else if (options.run)
-		{
-			printf("Warning: Ignoring run option because program is not executable.\n");
-		}
-
-		//restore working directory
-		chdir(olddir);
-		return 2;
+	if (options.run && project->IsExecutable())
+	{
+		ExecuteProject(project.get(), projectdir);
+		Sleep(50);//give it a moment to run, for some reason derps up without this
+	}
+	else if (options.run)
+	{
+		printf("Warning: Ignoring run option because program is not executable.\n");
 	}
 
 	//restore working directory
 	chdir(olddir);
-	return 1;
+	return 2;
 }
 
 std::string GetProjectDatabasePath()

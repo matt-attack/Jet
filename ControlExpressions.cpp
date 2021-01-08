@@ -276,8 +276,10 @@ CValue YieldExpression::Compile(CompilerContext* context)
 		//compile the yielded value
 		auto value = right->Compile(context);
 
+		auto dest_type = data.type->base->data->struct_members[1].type;
+
 		//store result into the generator context
-		value = context->DoCast(data.type->base->data->struct_members[1].type, value);//cast to the correct type
+		value = context->DoCast(dest_type, value);//cast to the correct type
 		br = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 		context->root->builder.CreateStore(value.val, br);
 	}
@@ -355,7 +357,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		ii.block->Compile(context);
 
 		//need to do this without destructing args
-		context->scope->named_values[ii.name.text] = CValue();
+		context->scope->named_values[ii.name.text] = { CValue(), false };
 		context->PopScope();
 
 		//branch to end
@@ -390,9 +392,11 @@ CValue CallExpression::Compile(CompilerContext* context)
 	{
 		//im a struct yo
 		fname = index->member.text;
-		stru = index->GetBaseType(context);
-		assert(stru->loaded);
-		llvm::Value* self = index->GetBaseElementPointer(context).val;
+		//stru = index->GetBaseType(context);
+		//assert(stru->loaded);
+		auto left = index->GetBaseElementPointer(context);
+		stru = left.type->base;
+		llvm::Value* self = left.val;
 		if (index->token.type == TokenType::Pointy)
 		{
 			if (stru->type != Types::Pointer && stru->type != Types::Array)

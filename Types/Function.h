@@ -55,6 +55,7 @@ namespace Jet
 		FunctionType* type;
 		CallingConvention calling_convention;
 
+		// the prefix for the mangled function name
 		std::string name;
 
 		std::vector<std::pair<Type*, std::string>> arguments;
@@ -81,6 +82,9 @@ namespace Jet
 			llvm::StructType* storage_type;//for lambdas
 		} lambda;
 
+		// Mangling related settings
+		bool is_c_function = false;
+
 		//virtual stuff
 		bool is_virtual = false;
 		int virtual_offset = -1;
@@ -97,12 +101,13 @@ namespace Jet
 
 		bool loaded;
 
-		Function(const std::string& name, bool is_lambda)
+		Function(const std::string& name, bool is_lambda, bool is_c_function = false)
 		{
 			this->calling_convention = CallingConvention::Default;
-			this->do_export = true;
+			this->do_export = !is_lambda;
 			this->name = name;
 			this->generator.var_num = 0;
+			this->is_c_function = is_c_function;
 			context = 0;
 			f = 0;
 			this->is_lambda = is_lambda;
@@ -112,10 +117,7 @@ namespace Jet
 			this->is_generator = false;
 		}
 
-		~Function()
-		{
-			delete this->context;
-		}
+		~Function();
 
 		CValue Call(CompilerContext* context, const std::vector<CValue>& argsv, bool devirtualize);
 

@@ -8,6 +8,35 @@
 
 using namespace Jet;
 
+static unsigned int uuid = 5;
+std::string mangle(const std::string& name, bool is_lambda, const std::vector<std::pair<Type*, std::string>>& arguments, bool is_c_function)
+{
+	// handle main
+	if (name == "main")
+	{
+		return name;
+	}
+	if (name == "_init")
+	{
+		return name;
+	}
+	if (is_lambda)
+	{
+		return name + std::to_string(uuid++);
+	}
+	if (is_c_function)
+	{
+		return name;
+	}
+	// todo actually mangle
+	return name + "_" + std::to_string(arguments.size());
+}
+
+Function::~Function()
+{
+	delete this->context;
+}
+
 void Function::Load(Compilation* compiler)
 {
 	if (this->loaded)
@@ -52,7 +81,10 @@ void Function::Load(Compilation* compiler)
 		ft = llvm::FunctionType::get(this->return_type->GetLLVMType(), args, false);
 	}
 
-	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, compiler->module);
+	// todo need to know if this is a C function, if it is we shouldnt mangle
+	const auto mangled_name = mangle(name, this->is_lambda, arguments, is_c_function);
+
+	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, mangled_name, compiler->module);
 	switch (this->calling_convention)
 	{
 	case CallingConvention::StdCall:
@@ -66,15 +98,21 @@ void Function::Load(Compilation* compiler)
 		break;
 	}
 
-	llvm::DIFile* unit = compiler->debug_info.file;
+	// dont add debug info for externs (todo also handle jet externs)
+	if (!is_c_function && context)
+	{
+		llvm::DIFile* unit = compiler->debug_info.file;
 
-	auto functiontype = compiler->debug->createSubroutineType(compiler->debug->getOrCreateTypeArray(ftypes));
-	int line = this->expression ? this->expression->token.line : 0;
-	llvm::DISubprogram* sp = compiler->debug->createFunction(unit, this->name, this->name, unit, line, functiontype, false, true, line, llvm::DINode::DIFlags::FlagPublic, false, nullptr);// , f);
+		auto functiontype = compiler->debug->createSubroutineType(compiler->debug->getOrCreateTypeArray(ftypes));
+		int line = this->expression ? this->expression->token.line : 0;
+		llvm::DISubprogram* sp = compiler->debug->createFunction(unit, this->name, mangled_name, unit, line, functiontype, false, true, line, llvm::DINode::DIFlags::FlagPublic, false, nullptr);// , f);
 
-	assert(sp->describes(f));
-	this->scope = sp;
-	compiler->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(5, 1, 0));
+		// this catches duplicates or incorrect functions
+		assert(sp->describes(f));
+		this->scope = sp;
+
+		f->setSubprogram(sp);
+	}
 
 	//alloc args
 	auto AI = f->arg_begin();
@@ -242,7 +280,7 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 					//was ii.val, but this makes more sense
 					auto sptr = context->root->builder.CreatePointerCast(ii.pointer, context->root->CharPointerType->GetLLVMType());
 					auto dptr = context->root->builder.CreatePointerCast(alloc, context->root->CharPointerType->GetLLVMType());
-					context->root->builder.CreateMemCpy(dptr, sptr, type->GetSize(), 1);
+					context->root->builder.CreateMemCpy(dptr, 0, sptr, 0, type->GetSize());// todo properly handle alignment
 				}
 			}
 			else

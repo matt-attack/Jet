@@ -48,7 +48,7 @@ Lets start by making a source file named "main.jet" and adding it to the list of
 
 Inside this file put:
 ```cpp
-extern fun int puts(char* text);
+extern_c fun int puts(char* text);
 
 fun int main()
 {

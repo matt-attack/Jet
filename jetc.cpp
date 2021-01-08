@@ -19,7 +19,12 @@
 #include <streambuf>
 #include <math.h>
 #include <functional>
+
+#ifdef _WIN32
 #include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 using namespace Jet;
 
@@ -482,7 +487,7 @@ void MakeDocs(Compilation* compilation)
 	of << out;
 }
 
-void DoCommand(int argc, char* argv[])
+void DoCommand(int argc, const char* argv[])
 {
 	std::string cmd = argc > 1 ? argv[1] : "";
 	if (cmd == "projects")
@@ -515,7 +520,7 @@ void DoCommand(int argc, char* argv[])
 		if (parser.commands.size())
 			config = parser.commands.front();
 
-		std::vector<char*> programs = { "OperatorOverloads", "SmartPointerTest", "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors", "Enums" };
+		std::vector<const char*> programs = { "OperatorOverloads", "SmartPointerTest", "Globals", "NewFree", "Namespaces", "Inheritance", "ExtensionMethods", "Generators", "IfStatements", "Unions", "ForLoop", "OperatorPrecedence", "DefaultConstructors", "Enums" };
 
 
 		for (auto ii : programs)
@@ -604,7 +609,7 @@ void DoCommand(int argc, char* argv[])
 	{
 		std::string name = argv[2];
 
-		mkdir(name.c_str());
+		mkdir(name.c_str(), 0x755);
 
 		//insert a project file and a main code file
 
@@ -681,13 +686,27 @@ std::string exec_path(const char *argv0)
 	}
 	return buf;
 }
+#else
+
+#include <unistd.h>
+std::string exec_path(const char* argv0)
+{
+  char dest[PATH_MAX];
+  memset(dest,0,sizeof(dest)); // readlink does not null terminate!
+  if (readlink("/proc/self/exe", dest, PATH_MAX) == -1) {
+    perror("readlink");
+  } else {
+    //printf("%s\n", dest);
+  }
+  return dest;
+}
 #endif
 
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm-c/ErrorHandling.h>
 
 std::string executable_path;
-int main(int argc, char* argv[])
+int main(int argc, const char* argv[])
 {
 #ifdef _WIN32
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -726,7 +745,7 @@ int main(int argc, char* argv[])
 
 		//split the string
 		{
-			char* args[400] = {};
+			const char* args[400] = {};
 			int numargs = 0;
 			int i = 0; bool inquotes = false;
 

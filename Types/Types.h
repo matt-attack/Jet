@@ -39,7 +39,7 @@ namespace Jet
 		llvm::Value* GetReference();
 	};
 
-	enum class Types
+	enum class Types: char
 	{
 		Void,//valid really only as a return type
 		Double,//64 bit float
@@ -162,7 +162,7 @@ namespace Jet
 	};
 
 
-	enum class SymbolType
+	enum class SymbolType: char
 	{
 		Invalid,
 		Namespace,
@@ -222,6 +222,11 @@ namespace Jet
 		}
 
 		void OutputMetadata(std::string& data, Compilation* comp);
+
+		const std::string& GetQualifiedName();
+
+	private:
+		std::string qualified_name_;
 	};
 
 	struct Function;

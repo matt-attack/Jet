@@ -20,7 +20,7 @@ namespace llvm
 }
 namespace Jet
 {
-	std::string exec(const char* cmd);
+	std::string exec(const char* cmd, int* error_code = 0);
 
 	struct Diagnostic
 	{
@@ -48,6 +48,7 @@ namespace Jet
 
 		}
 
+		void Error(const std::string& text, const Token& start, const Token& end);
 		void Error(const std::string& text, const Token& token);
 		void Error(const std::string& text, const std::string& file, int line = -1);
 
@@ -133,7 +134,7 @@ namespace Jet
 		void AdvanceTypeLookup(Type** dest, const std::string& name, Token* location);
 
 
-		Type* LookupType(const std::string& name, bool load = true, bool error = true);
+		Type* LookupType(const std::string& name, bool load = true, bool error = true, int start_index = 0);
 		Type* TryLookupType(const std::string& name);
 
 		//Give size of zero for non-array
@@ -147,6 +148,7 @@ namespace Jet
 		}
 
 		void Error(const std::string& string, Token token);
+		void Error(const std::string& string, const Token& start, const Token& end);
 
 		//generates and outputs an exe or lib file
 		void Assemble(const std::string& target = "", const std::string& linker = "", int olevel = 0, bool time = false, bool output_ir = false);
@@ -169,10 +171,7 @@ namespace Jet
 			return this->GetFunction(name);
 		}
 
-		Function* GetFunction(const std::string& name, const std::vector<Type*>& args)
-		{
-			return this->GetFunction(name);
-		}
+		Function* GetFunction(const std::string& name, const std::vector<Type*>& args);
 
 
 		Function* GetFunction(const std::string& name);
@@ -191,7 +190,8 @@ namespace Jet
 				module->dump();
 		}
 
-		void SetTarget(const std::string& triple);//make this customizable later
+		// returns the target used
+		std::string SetTarget(const std::string& triple);//make this customizable later
 	};
 
 }

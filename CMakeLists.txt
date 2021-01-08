@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 2.8.7)
 project(Jet)
 
 
-find_package(LLVM 6.0.0 REQUIRED CONFIG HINTS C:/users/space/desktop/llvm/llvm-6.0.0.src)
+find_package(LLVM 7.0.0 REQUIRED CONFIG HINTS C:/users/space/desktop/llvm/llvm-7.0.0.src)
 #find_package(Clang REQUIRED CONFIG HINTS C:/Users/space/Desktop/cfe-3.7.1.src)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
@@ -19,10 +19,10 @@ message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 include_directories(${LLVM_INCLUDE_DIRS})# ${CLANG_INCLUDE_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
-get_cmake_property(_variableNames VARIABLES)
-foreach (_variableName ${_variableNames})
-    message(STATUS "${_variableName}=${${_variableName}}")
-endforeach()
+#get_cmake_property(_variableNames VARIABLES)
+#foreach (_variableName ${_variableNames})
+#    message(STATUS "${_variableName}=${${_variableName}}")
+#endforeach()
 
 include_directories("${PROJECT_BINARY_DIR}" )#  "C:/Users/Matthew/Desktop/cfe-3.7.1.src/include")
 
@@ -49,27 +49,6 @@ add_executable(Jet
 
 source_group(Types REGULAR_EXPRESSION Types/*)
 
-add_library(Racer
-	SHARED
-	
-	racer.cpp
-
-	Compiler.cpp
-	CompilerContext.cpp
-	Expressions.cpp
-	ControlExpressions.cpp
-	DeclarationExpressions.cpp
-	Parser.cpp
-	Parselets.cpp
-	Source.cpp
-	Types/Types.cpp
-	Types/Function.cpp
-	Lexer.cpp
-	Token.cpp
-	Project.cpp
-	Compilation.cpp
-	)
-
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
@@ -84,9 +63,8 @@ endif()
 # target_compile_features(Racer PRIVATE cxx_range_for)
 # target_compile_features(Jet PRIVATE cxx_range_for)
 
-llvm_map_components_to_libnames(llvm_libs support core mcjit native ipo)
+llvm_map_components_to_libnames(llvm_libs support core mcjit native ipo ARM)
 
 # Link against LLVM libraries
 target_link_libraries(Jet ${llvm_libs})# "C:/Users/Matthew/Desktop/cfe-3.7.1.src/Debug/lib/libclang.lib")
 
-target_link_libraries(Racer ${llvm_libs})

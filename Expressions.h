@@ -19,6 +19,7 @@ namespace Jet
 
 	class Expression// : public SyntaxNode
 	{
+		std::string qualified_namespace_;// cache
 	public:
 		Token semicolon;
 		Expression()
@@ -37,6 +38,8 @@ namespace Jet
 			this->parent = parent;
 		}
 
+		const std::string& GetNamespaceQualifier();
+
 		virtual CValue Compile(CompilerContext* context) = 0;
 
 		virtual void CompileDeclarations(CompilerContext* context) = 0;
@@ -48,6 +51,8 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context) = 0;
 
 		virtual void Visit(ExpressionVisitor* visitor) = 0;//visits all subexpressions
+
+		virtual const char* GetNamespace() { return 0; }// returns the namespace that we create, if any
 	};
 
 	class IStorableExpression
@@ -69,7 +74,7 @@ namespace Jet
 			this->templates = templates;
 		}
 
-		std::string GetName()
+		std::string GetName() const
 		{
 			if (this->templates)
 			{
@@ -498,7 +503,7 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context);
 
-		CValue GetElementPointer(CompilerContext* context);
+		CValue GetElementPointer(CompilerContext* context, bool for_store = false);
 		CValue GetBaseElementPointer(CompilerContext* context);
 
 		Type* GetType(CompilerContext* context, bool tc = false);
@@ -968,7 +973,7 @@ namespace Jet
 				{
 					ii->Compile(context);
 				}
-				catch (...)
+				catch (int i)
 				{
 
 				}

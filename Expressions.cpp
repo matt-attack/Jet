@@ -34,6 +34,31 @@ CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
 	context->root->Error("Not Implemented", *context->current_token);
 }
 
+const std::string& Expression::GetNamespaceQualifier()
+{
+	if (qualified_namespace_.length())
+	{
+		return qualified_namespace_;
+	}
+
+	// go down the tree and build up a qualified namespace
+	if (!this->parent)
+	{
+		return qualified_namespace_;//no parent, no problem
+	}
+
+	qualified_namespace_ = this->parent->GetNamespaceQualifier();
+
+	const char* ns = GetNamespace();
+	if (ns)
+	{
+		qualified_namespace_ += "__";
+		qualified_namespace_ += ns;
+	}
+	
+	return qualified_namespace_;
+}
+
 CValue PrefixExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->_operator);
@@ -127,7 +152,7 @@ Type* IndexExpression::GetBaseType(Compilation* compiler)
 				{
 					auto res = curscope->named_values.find(p->GetName());
 					if (res != curscope->named_values.end())
-						return res->second.type;
+						return res->second.value.type;
 				} while (curscope = curscope->prev);
 				break;
 			}
@@ -153,11 +178,19 @@ CValue IndexExpression::GetBaseElementPointer(CompilerContext* context)
 	}
 	else if (auto call = dynamic_cast<CallExpression*>(left))
 	{
-		//store the value then return the pointer to it
+		//return a modifiable pointer to the value
 		auto val = call->Compile(context);
-		auto alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType());
-
-		return CValue(val.type->GetPointerType(), alloca);
+		if (val.pointer)
+		{
+			return CValue(val.type->GetPointerType(), val.pointer);
+		}
+		else
+		{
+			// need to copy it in this case
+			auto alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType());
+			context->root->builder.CreateStore(val.val, alloca);
+			return CValue(val.type->GetPointerType(), alloca);
+		}
 	}
 	context->root->Error("Could not handle Get Base Element Pointer", token);
 }
@@ -294,7 +327,7 @@ CValue GetStructElement(CompilerContext* context, const std::string& name, const
 	return CValue(type->data->struct_members[index].type->GetPointerType(), loc);
 }
 
-CValue IndexExpression::GetElementPointer(CompilerContext* context)
+CValue IndexExpression::GetElementPointer(CompilerContext* context, bool for_store)
 {
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
@@ -323,7 +356,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		}
 
 		//todo: improve these error messages
-		context->root->Error("Cannot index type '" + lhs.type->base->name + "'", this->token);
+		context->root->Error("Cannot dereference type '" + lhs.type->base->name + "'", this->token);
 	}
 	else if ((p || i) && lhs.type->type == Types::Pointer)
 	{
@@ -358,12 +391,22 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		{
 			if (this->member.text == "size")
 			{
+				if (for_store)
+				{
+					context->root->Error("Cannot modify fixed array size", this->token);
+				}
+
 				auto loc = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType());
 				context->root->builder.CreateStore(context->root->builder.getInt32(lhs.type->base->size), loc);
 				return CValue(context->root->IntType->GetPointerType(), loc);
 			}
 			else if (this->member.text == "ptr")
 			{
+				if (for_store)
+				{
+					context->root->Error("Cannot modify fixed array ptr", this->token);
+				}
+
 				//just return a pointer to myself
 				auto loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 
@@ -377,10 +420,8 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 		{
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
 
-			//lhs.val->dump();
 			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
-			//lhs.val->getType()->dump();
-			//loc->getType()->dump();
+
 			return CValue(lhs.type->base->base->GetPointerType(), loc);
 		}
 		else if (lhs.type->base->type == Types::Pointer
@@ -409,7 +450,14 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context)
 				return CValue(fun->return_type, context->root->builder.CreateCall(fun->f, { lhs.val, right.val }, "operator_overload"));
 			}
 		}
-		context->root->Error("Cannot index type '" + lhs.type->ToString() + "'", this->token);
+		if (this->token.type == TokenType::LeftBracket)
+		{
+			context->root->Error("Cannot index type '" + lhs.type->base->ToString() + "'", this->token, this->close_bracket);
+		}
+		else
+		{
+			context->root->Error("Cannot index type '" + lhs.type->base->ToString() + "'", this->token);
+		}
 	}
 
 	context->root->Error("Unimplemented", this->token);
@@ -422,7 +470,7 @@ void IndexExpression::CompileStore(CompilerContext* context, CValue right)
 	context->CurrentToken(&token);
 	context->SetDebugLocation(this->token);
 	//todo: do not allow store into .size on arrays
-	auto loc = this->GetElementPointer(context);
+	auto loc = this->GetElementPointer(context, true);
 
 	context->CurrentToken(oldtok);
 

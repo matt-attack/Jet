@@ -75,7 +75,7 @@ public:
 	{
 		char* command = new char[aargs.size()+1];
 		strcpy(command, aargs.c_str());
-		char* args[400] = {};
+		const char* args[400] = {};
 		int numargs = 0;
 		int i = 0; bool inquotes = false;
 
@@ -111,7 +111,7 @@ public:
 		delete[] command;
 	}
 
-	void Parse(int argc, char ** args)
+	void Parse(int argc, const char ** args)
 	{
 		for (int i = 1; i < argc; i++)
 		{

@@ -1,18 +1,20 @@
 
-extern fun int printf(char* h, int h);
-extern fun char* malloc(int x);
+extern_c fun int printf(char* h, int h);
+extern_c fun char* malloc(int x);
 
-extern fun void free(char* x);
+extern_c fun void free(char* x);
 
-extern fun int puts(char* str);
+extern_c fun int puts(char* str);
 
-extern fun char getchar();
+extern_c fun char getchar();
+
+fun void _chkstk() {}
 
 /* array internal format looks like so:
 struct<Any T> Array
 {
 	int size;
-	T* values;
+	T* ptr;
 }
 
 internally implemented as passing this struct arround
@@ -23,63 +25,115 @@ trait Any
 {
 }
 
-struct __Array<Any T>
+/*struct __Array<Any T>
 {
 	int size;
 	T* values;
+}*/
+
+struct ArrayUser
+{
+  int[6] array;
+  int test;
 }
 
-fun void test(int[] array)
+let int[10] global;
+
+fun void test_function(int[] array, int desired_size)
 {
 	for (let i = 0; i < array.size; i++)
-		puts("one\n");
-		//array[i] = 5;
+	{
+		printf("Value %i\n", array[i]);
+	}
+	
+	// check that the size is good
+	if (array.size != desired_size)
+	{
+		puts("ERROR: The array size does not match in the function!\n");
+	}
 }
 
-//ok virtual texturing
-//indirection texture that is per 32x32 section of verts that gives x and y offset into indirection texture as well as a scale
-//this is used to get texture from virtual page table which is 4k by 2k
-//can later compress this to make it faster
+fun void test_static_local_array()
+{
+	let desired_size = 50;
+	let int[50] y;
+	
+	// Tests illegally mutating the static array. The following lines should error:
+	//y.size = 4;
+	//y.ptr = 0;
+	
+	// The following lines should work
+	y.ptr[0] = 42;
+	y[0] = 42;
+	let yptr = y.ptr;
+	let ysize = y.size;
+	
+	// Make sure we can assign to each value
+	for (let i = 0; i < y.size; i++)
+	{
+		// Use each method just in case
+		y[i] = i;
+		y.ptr[i] = i;
+		
+		if (y[i] != i || y.ptr[i] != i)
+		{
+			puts("ERROR: Value read does not match assigned!");
+		}
+	}
+	
+	// Make sure the size is correct
+	if (y.size != desired_size)
+	{
+		puts("ERROR: The array size is incorrect!\n");
+	}
+	
+	// Make sure we can use it as an argument
+	test_function(y, y.size);
+	
+	// Try copying then check the size and values
+	let y_copy = y;
+	
+	if (y_copy.size != desired_size)
+	{
+		puts("ERROR: The copied array size is incorrect!\n");
+	}
+}
+
+fun void assign_test()
+{
+	let int[5000] y;
+	
+	/*for (let i = 0; i < y.size; i++)
+	{
+		y[i] = i;
+	}*/
+		
+	let y_copy = y;
+	
+	/*if (y_copy.size != y.size)
+	{
+		puts("ERROR: The copied array size is incorrect!\n");
+	}*/
+	puts("Finished copy");
+	
+	/*for (let i = 0; i < y_copy.size; i++)
+	{
+		// Use each method just in case
+		if (y_copy[i] != y[i])
+		{
+			puts("ERROR: Value in the copy doesnt match original!");
+		}
+		puts("1");
+	}*/
+}
 
 fun int main() 
 {
-	let int[5] y;	
-	for (let i = 0; i < y.size; i++)
-	{
-		//puts("one\n");
-		y[i] = 5;
-	}
+    test_static_local_array();
 	
+	assign_test();
 	
-	test(y);
-	
-	let x = new int[25];
-	for (let i = 0; i < x.size; i++)
-	{
-		x[i] = 5;
-		puts("two\n");
-	}
-	
-	test(x);
-	//x.ptr = <int*>0;
-	
-	//free x;
-	//free y;
-	
-	x[5] = 0;
-	x[24] = 5;
-	y[4] = 5;
-	
-	for (let i = 0; i < x.size; i++)
-	{
-		x[i] = 5;
-		puts("two\n");
-	}
-	free x;
-	
-	//free y;
-	
-	//getchar();
+	getchar();
 	
 	return 0;
 }

@@ -24,7 +24,12 @@ namespace Jet
 {
 	struct Scope
 	{
-		std::map<std::string, CValue> named_values;
+		struct NamedValue
+		{
+			CValue value;
+			bool is_const;
+		};
+		std::map<std::string, NamedValue> named_values;
 
 		//used for struct arrays
 		std::vector<CValue> to_destruct;
@@ -112,13 +117,13 @@ namespace Jet
 			return CValue(this->root->CharPointerType, res);
 		}
 
-		void RegisterLocal(const std::string& name, CValue val, bool needs_destruction = false)
+		void RegisterLocal(const std::string& name, CValue val, bool needs_destruction = false, bool is_const = false)
 		{
 			if (this->scope->named_values.find(name) != this->scope->named_values.end())
 				this->root->Error("Variable '" + name + "' already defined", *this->current_token);
 			if (needs_destruction)
 				this->scope->to_destruct.push_back(val);
-			this->scope->named_values[name] = val;
+			this->scope->named_values[name] = { val, is_const };
 		}
 
 		std::function<void(const std::string& name, Type* ty)> local_reg_callback;
@@ -129,7 +134,7 @@ namespace Jet
 			this->tscope->named_values[name] = ty;
 		}
 
-		CValue GetVariable(const std::string& name);
+		CValue GetVariable(const std::string& name, bool* is_const = 0);
 
 		Type* TCGetVariable(const std::string& name)
 		{
@@ -218,18 +223,17 @@ namespace Jet
 			return value;
 		}
 
-		llvm::StoreInst* Store(const std::string& name, CValue val)
+		void Store(const std::string& name, CValue val)
 		{
 			//for each scope
-			CValue value = GetVariable(name);
+			bool is_const = false;
+			CValue value = GetVariable(name, &is_const);
 
+			if (is_const)
+			{
+				this->root->Error("Cannot assign to const variable!", *current_token);
+			}
 			this->Store(value, val);
-			//return 0;
-			//val = this->DoCast(value.type->base, val);
-
-			//check if there is an operator
-			return 0;
-			//return root->builder.CreateStore(val.val, value.val);
 		}
 
 		void Store(CValue loc, CValue val, bool rvo = false);
@@ -337,7 +341,7 @@ namespace Jet
 		CValue DoCast(Type* t, CValue value, bool Explicit = false);
 		bool CheckCast(Type* src, Type* dest, bool Explicit = false, bool Throw = true);
 
-		CompilerContext* AddFunction(const std::string& fname, Type* ret, const std::vector<std::pair<Type*, std::string>>& args, Type* member, bool lambda);
+		CompilerContext* StartFunctionDefinition(Function* function);
 
 		Function* GetMethod(const std::string& name, const std::vector<Type*>& args, Type* Struct = 0);
 		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0, bool devirtualize = false);
