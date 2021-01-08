@@ -1029,7 +1029,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 		else if (Explicit && t->type == Types::Function)
 			return CValue(t, this->root->builder.CreateBitOrPointerCast(value.val, tt));
 	}
-	if (t->type == Types::Union && value.type->type == Types::Struct)
+	if (t->type == Types::Union)
 	{
 		for (unsigned int i = 0; i < t->_union->members.size(); i++)
 		{

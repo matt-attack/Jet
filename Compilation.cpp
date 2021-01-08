@@ -51,7 +51,7 @@ using namespace Jet;
 #endif
 
 
-std::string Jet::exec(const char* cmd) {
+std::string Jet::exec(const char* cmd, int* error_code) {
 #ifdef _WIN32
 	FILE* pipe = _popen(cmd, "r");
 #else
@@ -65,10 +65,14 @@ std::string Jet::exec(const char* cmd) {
 			result += buffer;
 	}
 #ifdef _WIN32
-	_pclose(pipe);
+	auto res = _pclose(pipe);
 #else
-	pclose(pipe);
+	auto res = pclose(pipe);
 #endif 
+	if (error_code)
+	{
+		*error_code = WEXITSTATUS(res);
+	}
 	return result;
 }
 
@@ -832,8 +836,15 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 			//rename _context into this in generators, figure out why passing by value into async doesnt work
 			//	implement basic containers
 			printf("\n%s\n", cmd.c_str());
-			auto res = exec(cmd.c_str());
+			int code;
+			auto res = exec(cmd.c_str(), &code);
 			printf("%s", res.c_str());
+
+			if (code)
+			{
+				this->diagnostics->Error("Linking failed.", Token());
+				return;
+			}
 		}
 		else
 		{

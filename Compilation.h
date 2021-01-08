@@ -20,7 +20,7 @@ namespace llvm
 }
 namespace Jet
 {
-	std::string exec(const char* cmd);
+	std::string exec(const char* cmd, int* error_code = 0);
 
 	struct Diagnostic
 	{
