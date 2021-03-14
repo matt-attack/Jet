@@ -223,19 +223,6 @@ namespace Jet
 			return value;
 		}
 
-		void Store(const std::string& name, CValue val)
-		{
-			//for each scope
-			bool is_const = false;
-			CValue value = GetVariable(name, &is_const);
-
-			if (is_const)
-			{
-				this->root->Error("Cannot assign to const variable!", *current_token);
-			}
-			this->Store(value, val);
-		}
-
 		void Store(CValue loc, CValue val, bool rvo = false);
 
 		CValue Load(const std::string& name);

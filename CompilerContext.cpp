@@ -1272,10 +1272,13 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 CValue CompilerContext::Load(const std::string& name)
 {
 	CValue value = GetVariable(name);
-	if (value.type->type == Types::Function || value.type->type == Types::Int)// last case is for constants
-		return value;
 
-	return CValue(value.type->base, root->builder.CreateLoad(value.val, name.c_str()), value.val);
+    // Perform a load if its not a value type already
+    if (!value.val)
+    {
+      value.val = root->builder.CreateLoad(value.pointer, name.c_str());
+    }
+    return value;
 }
 
 void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)

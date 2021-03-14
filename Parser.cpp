@@ -20,7 +20,7 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 
 	//this->Register(TokenType::Colon, new MemberParselet());
 	this->Register(TokenType::Dot, new MemberParselet());
-	this->Register(TokenType::Pointy, new PointerMemberParselet());
+	//this->Register(TokenType::Pointy, new PointerMemberParselet());
 
 	this->Register(TokenType::Scope, new ScopeParselet());
 	//this->Register(TokenType::LeftBrace, new ObjectParselet());

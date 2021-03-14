@@ -65,8 +65,9 @@ void Function::Load(Compilation* compiler)
 		//add debug stuff
 		ftypes.push_back(type.first->GetDebugType(compiler));
 
-		// pass struct arguments by pointer as well
-		if (/*this->calling_convention == CallingConvention::StdCall &&*/ type.first->type == Types::Struct)
+		// pass struct arguments and references by pointer
+		if (/*this->calling_convention == CallingConvention::StdCall &&*/
+            type.first->type == Types::Struct)
 			args[args.size() - 1] = args[args.size() - 1]->getPointerTo();
 	}
 
@@ -134,8 +135,8 @@ void Function::Load(Compilation* compiler)
 		// add attributes for structs being passed in by pointer
 		if (/*this->calling_convention == CallingConvention::StdCall &&*/ this->arguments[Idx].first->type == Types::Struct)
 		{
-			AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::ByVal));
-			AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::Alignment, 4));
+			//AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::ByVal));
+			//AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::Alignment, 4));
 		}
 
 		//auto D = compiler->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, this->scope, aname, compiler->debug_info.file, line,
@@ -241,7 +242,7 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 		if (ii.val->getType()->isStructTy() && ii.type->type != Types::Array)
 		{
 			//convert it to a pointer yo
-			auto TheFunction = context->function->f;
+			/*auto TheFunction = context->function->f;
 			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 				TheFunction->getEntryBlock().begin());
 			auto alloc = TmpB.CreateAlloca(ii.val->getType(), 0, "arg_pass_tmp");
@@ -286,9 +287,12 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 			else
 			{
 				throw 7;//how does this even get hit
-			}
+			}*/
 
-			arg_vals[i] = alloc;
+            if (ii.pointer == 0)
+				context->root->Error("Cannot convert to reference", *context->current_token);
+
+			arg_vals[i] = ii.pointer;
 			to_convert.push_back(i);
 		}
 		i++;
@@ -330,9 +334,9 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 	//add attributes
 	for (auto ii : to_convert)
 	{
-		auto& ctext = context->root->builder.getContext();
-		call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
-		call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
+		//auto& ctext = context->root->builder.getContext();
+		//call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
+		//call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
 	}
 
 	if (ptr_struct_return)

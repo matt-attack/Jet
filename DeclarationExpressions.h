@@ -305,6 +305,7 @@ namespace Jet
 		friend class Type;
 		friend struct Function;
 		friend struct Struct;
+
 		Token name;
 		std::vector<FunctionArg>* args;
 		std::vector<Token>* captures;

@@ -101,6 +101,9 @@ Token ParseType(Parser* parser, bool parse_arrays = true)
 		}
 	}
 
+	while (parser->MatchAndConsume(TokenType::Asterisk))//parse pointers
+		out += '*';
+
 	Token ret;
 	ret.column = name.column;
 	ret.line = name.line;

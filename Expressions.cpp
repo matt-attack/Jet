@@ -17,11 +17,21 @@ CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
 	auto p = dynamic_cast<IndexExpression*>(right);
 	if (i)
 	{
-		return context->GetVariable(i->GetName());
+        CValue var = context->GetVariable(i->GetName());
+        if (!var.pointer)
+        {
+          context->root->Error("Cannot get pointer", *context->current_token);
+        }
+		return CValue(var.type->GetPointerType(), var.pointer);
 	}
 	else if (p)
 	{
-		return p->GetElementPointer(context);
+        CValue element = p->GetElement(context);
+        if (element.pointer)
+        {
+		    return CValue(element.type->GetPointerType(), element.pointer);
+        }
+        context->root->Error("Cannot get pointer", *context->current_token);
 	}
 	else
 	{
@@ -110,10 +120,35 @@ CValue IndexExpression::Compile(CompilerContext* context)
 	context->CurrentToken(&token);
 	context->SetDebugLocation(this->token);
 	
-	auto loc = this->GetElementPointer(context);
-	if (loc.type->type == Types::Function)
-		return loc;
-	return CValue(loc.type->base, context->root->builder.CreateLoad(loc.val), loc.val);
+	auto elm = this->GetElement(context);
+	if (elm.type->type == Types::Function)
+		return elm;
+
+    if (!elm.val)
+    {
+        return CValue(elm.type, context->root->builder.CreateLoad(elm.pointer), elm.pointer);
+    }
+	return elm;
+}
+
+void IndexExpression::CompileStore(CompilerContext* context, CValue right)
+{
+	auto oldtok = context->current_token;
+	context->CurrentToken(&token);
+	context->SetDebugLocation(this->token);
+
+    // We can only store into elements we can get a pointer to
+	auto element = this->GetElement(context, true);
+    if (!element.pointer)
+    {
+      context->root->Error("Cannot store into type", token);
+    }
+    // turn it into a pointer CValue for the store
+    element = CValue(element.type->GetPointerType(), element.pointer);
+
+	context->CurrentToken(oldtok);
+
+	context->Store(element, right);
 }
 
 //ok, idea
@@ -174,7 +209,12 @@ CValue IndexExpression::GetBaseElementPointer(CompilerContext* context)
 	}
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
 	{
-		return index->GetElementPointer(context);
+        CValue elm = index->GetElement(context);
+        if (!elm.pointer)
+        {
+          context->root->Error("Could not get pointer to element", token);
+        }
+		return CValue(elm.type->GetPointerType(), elm.pointer);
 	}
 	else if (auto call = dynamic_cast<CallExpression*>(left))
 	{
@@ -324,70 +364,99 @@ CValue GetStructElement(CompilerContext* context, const std::string& name, const
 	std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->root->builder.getInt32(index) };
 
 	auto loc = context->root->builder.CreateGEP(lhs, iindex, "index");
-	return CValue(type->data->struct_members[index].type->GetPointerType(), loc);
+	return CValue(type->data->struct_members[index].type, 0, loc);
 }
 
-CValue IndexExpression::GetElementPointer(CompilerContext* context, bool for_store)
+// Returns either the value or pointer to the element.
+// Pointer is preferred, but some things are values and have no pointer to them
+CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 {
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
 
+    // First get the left hand side
 	CValue lhs;
 	if (p)
 	{
 		auto old = context->current_token;
 		context->CurrentToken(&p->token);
-		lhs = context->GetVariable(p->GetName());
+        bool is_const = false;
+		lhs = context->GetVariable(p->GetName(), &is_const);
+        if (is_const && for_store && lhs.type->type == Types::Struct)
+        {
+           context->root->Error("Cannot store into const value '" + p->GetName() + "'", p->token);
+        }
 		context->CurrentToken(old);
 	}
 	else if (i)
 	{
-		lhs = i->GetElementPointer(context);
+		lhs = i->GetElement(context, for_store);
 	}
 
-	// handle -> operator
-	if (index == 0 && this->token.type == TokenType::Pointy)
-	{
-		if (lhs.type->type == Types::Pointer && lhs.type->base->type == Types::Pointer && lhs.type->base->base->type == Types::Struct)
+    // Now index into it using the index or member name
+	if ((p || i) && lhs.type->type == Types::Struct)
+    {
+        if (this->member.text.length())
+        {
+            return GetStructElement(context, this->member.text, this->member, lhs.type, lhs.pointer);
+        }
+    }
+    else if ((p || i) && lhs.type->type == Types::Array)
+    {
+        if (this->member.text.length() == 0)//or pointer!!(later)
 		{
-			lhs.val = context->root->builder.CreateLoad(lhs.val);
+			auto indexv = context->DoCast(context->root->IntType, index->Compile(context));
+            std::vector<unsigned int> iindex = { 1 };
+            auto pointer = context->root->builder.CreateExtractValue(lhs.val, iindex);
+			auto loc = context->root->builder.CreateGEP(pointer, indexv.val, "index");
+			return CValue(lhs.type->base, 0, loc);
+		}
+		else
+		{
+            if (for_store && !lhs.pointer)
+            {
+              context->root->Error("Cannot modify constant array", this->token);
+            }
 
-			return GetStructElement(context, this->member.text, this->member, lhs.type->base->base, lhs.val);
+            // if we have a pointer, we can actually GEP
+            if (lhs.pointer)
+            {
+			    if (this->member.text == "size")
+			    {
+				    auto loc = context->root->builder.CreateGEP(lhs.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+			  	    return CValue(context->root->IntType, 0, loc);
+			    }
+			    else if (this->member.text == "ptr")
+			    {
+				    auto loc = context->root->builder.CreateGEP(lhs.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+				    return CValue(lhs.type->base->GetPointerType(), 0, loc);
+			    }
+            }
+            // otherwise just extract the values
+            else
+            {
+			    if (this->member.text == "size")
+			    {
+                    std::vector<unsigned int> iindex = { 0 };
+                    auto size = context->root->builder.CreateExtractValue(lhs.val, iindex);
+				    return CValue(context->root->IntType, size);
+			    }
+			    else if (this->member.text == "ptr")
+			    {
+                    std::vector<unsigned int> iindex = { 1 };
+                    auto ptr = context->root->builder.CreateExtractValue(lhs.val, iindex);
+				    return CValue(lhs.type->base->GetPointerType(), ptr);
+			    }
+            }
 		}
+    }
+    else if ((p || i) && lhs.type->type == Types::InternalArray)
+    {
+        // Note, we _always_ have the pointer to an internal array type.
+        // They only exist as locals and struct members (and we have no true value only structs)
 
-		//todo: improve these error messages
-		context->root->Error("Cannot dereference type '" + lhs.type->base->name + "'", this->token);
-	}
-	else if ((p || i) && lhs.type->type == Types::Pointer)
-	{
-		if (this->member.text.length() && lhs.type->base->type == Types::Struct)
-		{
-			return GetStructElement(context, this->member.text, this->member, lhs.type->base, lhs.val);
-		}
-		else if (lhs.type->base->type == Types::Array && this->member.text.length() == 0)//or pointer!!(later)
-		{
-			auto indexv = index->Compile(context);
-			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, indexv).val };
-			auto first_loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
-			first_loc = context->root->builder.CreateLoad(first_loc);
-			auto loc = context->root->builder.CreateGEP(first_loc/*lhs.val*/, context->DoCast(context->root->IntType, indexv).val/*iindex*/, "index");
-			auto typ = lhs.type->base->base->GetPointerType();
-			return CValue(typ, loc);
-		}
-		else if (lhs.type->base->type == Types::Array)
-		{
-			if (this->member.text == "size")
-			{
-				auto loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
-				return CValue(context->root->IntType->GetPointerType(), loc);
-			}
-			else if (this->member.text == "ptr")
-			{
-				auto loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
-				return CValue(lhs.type->base->base->GetPointerType()->GetPointerType(), loc);
-			}
-		}
-		else if (lhs.type->base->type == Types::InternalArray && this->member.text.length() != 0)//or pointer!!(later)
+        // If accessing size or ptr return values for them since we dont actually store these
+		if (this->member.text.length() != 0)
 		{
 			if (this->member.text == "size")
 			{
@@ -396,9 +465,7 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context, bool for_sto
 					context->root->Error("Cannot modify fixed array size", this->token);
 				}
 
-				auto loc = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType());
-				context->root->builder.CreateStore(context->root->builder.getInt32(lhs.type->base->size), loc);
-				return CValue(context->root->IntType->GetPointerType(), loc);
+				return CValue(context->root->IntType, context->root->builder.getInt32(lhs.type->size));
 			}
 			else if (this->member.text == "ptr")
 			{
@@ -407,33 +474,53 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context, bool for_sto
 					context->root->Error("Cannot modify fixed array ptr", this->token);
 				}
 
-				//just return a pointer to myself
-				auto loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+				//just return a pointer to myself cast by GEP to the base type
+				auto loc = context->root->builder.CreateGEP(lhs.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 
-				auto alloca = context->root->builder.CreateAlloca(loc->getType());
-				context->root->builder.CreateStore(loc, alloca);
-				return CValue(lhs.type->base->base->GetPointerType()->GetPointerType(), alloca);
+				return CValue(lhs.type->base->GetPointerType(), loc);
 			}
 		}
-		else if (lhs.type->base->type == Types::InternalArray
-			&& this->member.text.length() == 0)
+        // Indexing into it
+        else
 		{
 			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
 
-			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "index");
+			auto loc = context->root->builder.CreateGEP(lhs.pointer, iindex, "array_index");
 
-			return CValue(lhs.type->base->base->GetPointerType(), loc);
+			return CValue(lhs.type->base, 0, loc);
 		}
-		else if (lhs.type->base->type == Types::Pointer
-			&& this->member.text.length() == 0)
+    }
+	else if ((p || i) && lhs.type->type == Types::Pointer)
+	{
+        // Auto dereference struct pointers
+		if (this->member.text.length() && lhs.type->base->type == Types::Struct)
+		{
+			return GetStructElement(context, this->member.text, this->member, lhs.type->base, lhs.val);
+		}
+        // Auto dereference array pointers if accessing size or ptr to give the same behavior as structs
+		else if (this->member.text.length() && lhs.type->base->type == Types::Array)
+		{
+			if (this->member.text == "size")
+			{
+				auto loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+				return CValue(context->root->IntType, 0, loc);
+			}
+			else if (this->member.text == "ptr")
+			{
+				auto loc = context->root->builder.CreateGEP(lhs.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+				return CValue(lhs.type->base->base->GetPointerType(), 0, loc);
+			}
+        }
+        // If we have a pointer, allow indexing it C style
+		else if (this->member.text.length() == 0)
 		{
 			std::vector<llvm::Value*> iindex = { context->DoCast(context->root->IntType, index->Compile(context)).val };
 
-			auto val = context->root->builder.CreateLoad(lhs.val);
-			auto loc = context->root->builder.CreateGEP(val, iindex, "index");
+			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "pointer_index");
 
-			return CValue(lhs.type->base->base->GetPointerType(), loc);
+			return CValue(lhs.type->base, 0, loc);
 		}
+		/*
 		else if (lhs.type->base->type == Types::Struct && this->member.text.length() == 0)
 		{
 			auto stru = lhs.type->base->data;
@@ -449,32 +536,18 @@ CValue IndexExpression::GetElementPointer(CompilerContext* context, bool for_sto
 				//todo: casting
 				return CValue(fun->return_type, context->root->builder.CreateCall(fun->f, { lhs.val, right.val }, "operator_overload"));
 			}
-		}
-		if (this->token.type == TokenType::LeftBracket)
+		}*/
+		/*if (this->token.type == TokenType::LeftBracket)
 		{
 			context->root->Error("Cannot index type '" + lhs.type->base->ToString() + "'", this->token, this->close_bracket);
 		}
 		else
 		{
 			context->root->Error("Cannot index type '" + lhs.type->base->ToString() + "'", this->token);
-		}
+		}*/
 	}
 
-	context->root->Error("Unimplemented", this->token);
-}
-
-
-void IndexExpression::CompileStore(CompilerContext* context, CValue right)
-{
-	auto oldtok = context->current_token;
-	context->CurrentToken(&token);
-	context->SetDebugLocation(this->token);
-	//todo: do not allow store into .size on arrays
-	auto loc = this->GetElementPointer(context, true);
-
-	context->CurrentToken(oldtok);
-
-	context->Store(loc, right);
+	context->root->Error("Unimplemented GEP for " + lhs.type->ToString(), this->token);
 }
 
 CValue StringExpression::Compile(CompilerContext* context)

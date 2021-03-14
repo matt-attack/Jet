@@ -301,7 +301,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 	if (i)
 		val = context->GetVariable(i->GetName());
 	else if (p)
-		val = p->GetElementPointer(context);
+		val = p->GetElement(context);
 
 	if (val.type->base->type != Types::Union)
 		context->root->Error("Cannot match with a non-union", token);
@@ -309,7 +309,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 	auto endbb = llvm::BasicBlock::Create(context->context, "match.end");
 
 	//from val get the type
-	auto key = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+	auto key = context->root->builder.CreateGEP(val.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 	auto sw = context->root->builder.CreateSwitch(context->root->builder.CreateLoad(key), endbb, this->cases.size());
 
 	for (auto ii : this->cases)

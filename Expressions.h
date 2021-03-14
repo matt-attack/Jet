@@ -106,7 +106,17 @@ namespace Jet
 			//need to do cast if necessary
 			context->CurrentToken(&token);
 
-			context->Store(token.text, right);
+			//for each scope
+			bool is_const = false;
+			CValue dest = context->GetVariable(token.text, &is_const);
+
+			if (is_const)
+			{
+				context->root->Error("Cannot assign to const variable '" + token.text + "'", token);
+			}
+
+            // convert the dest to a pointer
+			context->Store(CValue(dest.type->GetPointerType(), dest.pointer), right);
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
@@ -501,20 +511,19 @@ namespace Jet
 			delete index;
 		}
 
-		CValue Compile(CompilerContext* context);
-
-		CValue GetElementPointer(CompilerContext* context, bool for_store = false);
+        // Returns a CValue with either the pointer or value of the element.
+		CValue GetElement(CompilerContext* context, bool for_store = false);
 		CValue GetBaseElementPointer(CompilerContext* context);
 
 		Type* GetType(CompilerContext* context, bool tc = false);
 		Type* GetBaseType(CompilerContext* context, bool tc = false);
 		Type* GetBaseType(Compilation* compiler);
 
-		void CompileStore(CompilerContext* context, CValue right);
+		virtual CValue Compile(CompilerContext* context);
+		virtual void CompileStore(CompilerContext* context, CValue right);
+		virtual void CompileDeclarations(CompilerContext* context) {};
 
-		void CompileDeclarations(CompilerContext* context) {};
-
-		void Print(std::string& output, Source* source)
+		virtual void Print(std::string& output, Source* source)
 		{
 			this->left->Print(output, source);
 			token.Print(output, source);
@@ -779,7 +788,7 @@ namespace Jet
 			{
 				auto loc = this->right->Compile(context);
 
-				context->Store(loc, right);
+				context->Store(CValue(loc.type->GetPointerType(), loc.pointer), right);
 				//right = context->DoCast(loc.type->base, right);
 
 				//add = operator here

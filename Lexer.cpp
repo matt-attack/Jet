@@ -91,7 +91,7 @@ public:
 		operators["/*"] = TokenType::CommentBegin;
 		operators["*/"] = TokenType::CommentEnd;
 
-		//dereference member
+		//used for lambda returns
 		operators["->"] = TokenType::Pointy;
 
 		operators["!<"] = TokenType::TemplateBegin;

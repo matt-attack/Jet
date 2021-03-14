@@ -300,7 +300,7 @@ void Type::Load(Compilation* compiler)
 
 		//allocate a struct type with the right size
 		auto char_t = llvm::IntegerType::get(compiler->context, 8);
-		auto id_t = llvm::IntegerType::get(compiler->context, 32);
+		auto id_t = llvm::IntegerType::get(compiler->context, 32);// For the moment use a 32 bit tag
 		auto base = llvm::ArrayType::get(char_t, size);
 		this->_union->type = llvm::StructType::get(compiler->context, { id_t, base }, true);
 	}

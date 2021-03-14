@@ -316,16 +316,14 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		auto arg_name = argsv[i].second;
 
+        int offset = 0;
+        offset += struct_name.length() > 0 ? 1 : 0;
+        offset += this->is_generator ? 1 : 0;
+
 		llvm::IRBuilder<> TmpB(&function_context->function->f->getEntryBlock(), function_context->function->f->getEntryBlock().begin());
-		//need to alloca pointer to struct if this is a struct type
-		llvm::AllocaInst* Alloca = TmpB.CreateAlloca(argsv[i].first->GetLLVMType(), 0, arg_name);
-		llvm::Value* storeval = AI;
-		if (argsv[i].first->type == Types::Struct)
-			storeval = function_context->root->builder.CreateLoad(AI);
-
-		// Store the initial value into the alloca.
-		function_context->root->builder.CreateStore(storeval, Alloca);
-
+        // for now pass all structs by pointer/reference
+        // eventually can do this based on size
+        llvm::Value* storage = AI;
 		AI->setName(arg_name);
 
 		//insert debug declarations
@@ -333,13 +331,24 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			context->root->debug_info.file, this->token.line,
 			argsv[i].first->GetDebugType(context->root));
 
-		llvm::Instruction* call = context->root->debug->insertDeclare(Alloca, local, context->root->debug->createExpression(),
+		llvm::Instruction* call = context->root->debug->insertDeclare(storage, local, context->root->debug->createExpression(),
 			llvm::DebugLoc::get(this->token.line, this->token.column, function_context->function->scope),
 			context->root->builder.GetInsertBlock());
 		call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function_context->function->scope));
+        auto type = argsv[i].first;//argsv[i].first->type == Types::Struct ? argsv[i].first : argsv[i].first->GetPointerType();
 
-		// Add arguments to variable symbol table.
-		function_context->RegisterLocal(arg_name, CValue(argsv[i].first->GetPointerType(), Alloca));
+		// Add arguments to variable symbol table. These are always const.
+        function_context->CurrentToken(&(*this->args)[i - offset].name);
+        if (type->type == Types::Struct)
+        {
+            // all structs are passed by pointer
+		    function_context->RegisterLocal(arg_name, CValue(type, 0, storage), false, true);
+        }
+        else
+        {
+            // everything else passed by value
+            function_context->RegisterLocal(arg_name, CValue(type, storage), false, true);
+        }
 	}
 
 	llvm::BasicBlock* yieldbb;//location of starting point in generator function
@@ -830,7 +839,8 @@ CValue LetExpression::Compile(CompilerContext* context)
 
 	bool needs_destruction = false;
 	int i = 0;
-	for (auto ii : *this->_names) {
+	for (auto ii : *this->_names)
+    {
 		auto aname = ii.name.text;
 
 		Type* type = 0;
@@ -874,7 +884,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 
 			//still need to do store
 			// todo this probably needs to support things with destructors..
-			context->RegisterLocal(aname, CValue(type->GetPointerType(), var_ptr), false, is_const);
+			context->RegisterLocal(aname, CValue(type, 0, var_ptr), false, is_const);
 			continue;
 		}
 		else if (ii.type.text.length() > 0)//type was specified
@@ -977,7 +987,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 			Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
 		declare->setDebugLoc(llvm::DebugLoc::get(ii.name.line, ii.name.column, context->function->scope));
 
-		context->RegisterLocal(aname, CValue(type->GetPointerType(), Alloca), needs_destruction, is_const);
+		context->RegisterLocal(aname, CValue(type, 0, Alloca), needs_destruction, is_const);
 
 		//construct it!
 		if (this->_right == 0)
