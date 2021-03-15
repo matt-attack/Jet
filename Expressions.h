@@ -788,7 +788,7 @@ namespace Jet
 			{
 				auto loc = this->right->Compile(context);
 
-				context->Store(CValue(loc.type->GetPointerType(), loc.pointer), right);
+				context->Store(CValue(loc.type, loc.val), right);
 				//right = context->DoCast(loc.type->base, right);
 
 				//add = operator here
