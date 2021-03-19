@@ -221,7 +221,7 @@ Type* IndexExpression::GetBaseType(Compilation* compiler)
 	compiler->Error("wat", token);
 }
 
-CValue IndexExpression::GetBaseElementPointer(CompilerContext* context)
+CValue IndexExpression::GetBaseElement(CompilerContext* context)
 {
 	if (auto name = dynamic_cast<NameExpression*>(left))
 	{
@@ -229,30 +229,14 @@ CValue IndexExpression::GetBaseElementPointer(CompilerContext* context)
 	}
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
 	{
-        CValue elm = index->GetElement(context);
-        if (!elm.pointer)
-        {
-          context->root->Error("Could not get pointer to element", token);
-        }
-		return CValue(elm.type->GetPointerType(), elm.pointer);
+		return index->GetElement(context);
 	}
 	else if (auto call = dynamic_cast<CallExpression*>(left))
 	{
 		//return a modifiable pointer to the value
-		auto val = call->Compile(context);
-		if (val.pointer)
-		{
-			return CValue(val.type->GetPointerType(), val.pointer);
-		}
-		else
-		{
-			// need to copy it in this case
-			auto alloca = context->root->builder.CreateAlloca(val.type->GetLLVMType());
-			context->root->builder.CreateStore(val.val, alloca);
-			return CValue(val.type->GetPointerType(), alloca);
-		}
+		return call->Compile(context);
 	}
-	context->root->Error("Could not handle Get Base Element Pointer", token);
+	context->root->Error("Could not handle Get Base Element", token);
 }
 
 Type* GetMemberType(CompilerContext* context, Type* type, const std::string& name, const Token& token)

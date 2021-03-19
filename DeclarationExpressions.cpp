@@ -363,7 +363,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		{
 			auto ptr = data.val;
 			auto val = function_context->root->builder.CreateGEP(ptr, { function_context->root->builder.getInt32(0), function_context->root->builder.getInt32(2 + i++) });
-			function_context->RegisterLocal(ii.name.text, CValue(function_context->root->LookupType(ii.type.text)->GetPointerType(), val));
+			function_context->RegisterLocal(ii.name.text, CValue(function_context->root->LookupType(ii.type.text), 0, val));
 		}
 
 		//add local vars

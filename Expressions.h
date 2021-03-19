@@ -513,7 +513,7 @@ namespace Jet
 
         // Returns a CValue with either the pointer or value of the element.
 		CValue GetElement(CompilerContext* context, bool for_store = false);
-		CValue GetBaseElementPointer(CompilerContext* context);
+		CValue GetBaseElement(CompilerContext* context);
 
 		Type* GetType(CompilerContext* context, bool tc = false);
 		Type* GetBaseType(CompilerContext* context, bool tc = false);

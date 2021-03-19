@@ -646,12 +646,14 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 			if (var.type->type != Types::Function && (var.type->type != Types::Pointer || var.type->base->type != Types::Function))
 			{
-				if (var.type->type == Types::Pointer && var.type->base->type == Types::Struct && var.type->base->data->template_base && var.type->base->data->template_base->name == "function")
+				if (var.type->type == Types::Struct && var.type->data->template_base && var.type->data->template_base->name == "function")
 				{
-					auto function_ptr = this->root->builder.CreateGEP(var.val, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) }, "fptr");
+                    // its a struct so theres always a pointer
+                    assert(var.pointer);
+					auto function_ptr = this->root->builder.CreateGEP(var.pointer, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) }, "fptr");
 
 					//get the template param to examine the type
-					auto type = var.type->base->data->members.begin()->second.ty;// .find("T")->second.ty;
+					auto type = var.type->data->members.begin()->second.ty;// .find("T")->second.ty;
 
 					if (args.size() != type->function->args.size())
 						this->root->Error("Too many args in function call got " + std::to_string(args.size()) + " expected " + std::to_string(type->function->args.size()), *this->current_token);
@@ -661,7 +663,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 						argsv.push_back(this->DoCast(type->function->args[i], args[i]).val);//try and cast to the correct type if we can
 
 					//add the data
-					auto data_ptr = this->root->builder.CreateGEP(var.val, { this->root->builder.getInt32(0), this->root->builder.getInt32(1) });
+					auto data_ptr = this->root->builder.CreateGEP(var.pointer, { this->root->builder.getInt32(0), this->root->builder.getInt32(1) });
 					data_ptr = this->root->builder.CreateGEP(data_ptr, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) });
 					argsv.push_back(data_ptr);
 

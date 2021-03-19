@@ -392,26 +392,35 @@ CValue CallExpression::Compile(CompilerContext* context)
 	{
 		//im a struct yo
 		fname = index->member.text;
-		//stru = index->GetBaseType(context);
-		//assert(stru->loaded);
-		auto left = index->GetBaseElementPointer(context);
-		stru = left.type->base;
-		llvm::Value* self = left.val;
-		if (index->token.type == TokenType::Pointy)
-		{
-			if (stru->type != Types::Pointer && stru->type != Types::Array)
-				context->root->Error("Cannot dereference type " + stru->ToString(), this->open);
 
-			stru = stru->base;
-			self = context->root->builder.CreateLoad(self);
-		}
-		else
-		{
-			devirtualize = true;//if we arent using -> we dont need a virtual call, right?
-		}
+		auto left = index->GetBaseElement(context);
 
-		//push in the this pointer argument kay
-		argsv.push_back(CValue(stru->GetPointerType(), self));
+        // now find the struct (dereference up to one time)
+        if (left.type->type == Types::Struct)
+        {
+          // okay, pointer must be filled out
+          assert(left.pointer);
+          stru = left.type;
+
+          argsv.push_back(CValue(stru->GetPointerType(), left.pointer));
+        }
+        else if (left.type->type == Types::Pointer &&
+                 left.type->base->type == Types::Struct)
+        {
+          auto val = left.val;
+          if (!val)
+          {
+            val = context->root->builder.CreateLoad(val);
+          }
+          assert(val);
+          stru = left.type->base;
+
+          argsv.push_back(CValue(left.type, val));
+        }
+        else
+        {
+          context->root->Error("Could not calculate this pointer", *context->current_token);
+        }
 	}
 	else
 	{

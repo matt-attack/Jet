@@ -1,10 +1,10 @@
 
-extern fun int printf(char* h, int h);
-extern fun char* malloc(int x);
+extern_c fun int printf(char* h, int h);
+extern_c fun char* malloc(int x);
 
-extern fun int puts(char* str);
+extern_c fun int puts(char* str);
 
-extern fun char getchar();
+extern_c fun char getchar();
 
 struct function<Any T>
 {
@@ -31,7 +31,7 @@ trait IEnumerable<T>
 
 fun void IEnumerable::Print()
 {
-	let enumer = this->GetEnumerator();
+	let enumer = this.GetEnumerator();
 	while (enumer.MoveNext())// == 1)
 	{
 		puts("Got one!");
@@ -40,10 +40,10 @@ fun void IEnumerable::Print()
 
 fun void IEnumerator::Test()
 {
-	while (this->MoveNext())// == 1)
+	while (this.MoveNext())// == 1)
 	{
 		puts("testing");
-        printf("Number %i\n", this->Current()); 
+        printf("Number %i\n", this.Current()); 
 	}
 }
 
