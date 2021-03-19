@@ -739,7 +739,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	// todo come up with a better way to handle c externs
 	bool is_c = (token.text == "extern_c");
 
-	Function* fun = new Function(fname, false, is_c);
+	Function* fun = new Function(fname, false, is_c, true);
 
 	if (auto attr = dynamic_cast<AttributeExpression*>(this->parent))
 	{

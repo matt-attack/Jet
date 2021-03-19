@@ -85,6 +85,8 @@ namespace Jet
 		// Mangling related settings
 		bool is_c_function = false;
 
+        bool is_extern;
+
 		//virtual stuff
 		bool is_virtual = false;
 		int virtual_offset = -1;
@@ -101,7 +103,7 @@ namespace Jet
 
 		bool loaded;
 
-		Function(const std::string& name, bool is_lambda, bool is_c_function = false)
+		Function(const std::string& name, bool is_lambda, bool is_c_function = false, bool is_extern = false)
 		{
 			this->calling_convention = CallingConvention::Default;
 			this->do_export = !is_lambda;
@@ -115,6 +117,7 @@ namespace Jet
 			loaded = false;
 			template_base = 0;
 			this->is_generator = false;
+            this->is_extern = is_extern;
 		}
 
 		~Function();

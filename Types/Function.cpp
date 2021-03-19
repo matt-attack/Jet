@@ -100,7 +100,7 @@ void Function::Load(Compilation* compiler)
 	}
 
 	// dont add debug info for externs (todo also handle jet externs)
-	if (!is_c_function && context)
+	if (!is_c_function && !is_extern)
 	{
 		llvm::DIFile* unit = compiler->debug_info.file;
 

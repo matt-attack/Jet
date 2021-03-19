@@ -779,24 +779,7 @@ namespace Jet
 
 		virtual Type* TypeCheck(CompilerContext* context);
 
-		void CompileStore(CompilerContext* context, CValue right)
-		{
-			if (_operator.type != TokenType::Asterisk)
-				context->root->Error("Cannot store into this expression!", _operator);
-
-			if (this->_operator.type == TokenType::Asterisk)
-			{
-				auto loc = this->right->Compile(context);
-
-				context->Store(CValue(loc.type, loc.val), right);
-				//right = context->DoCast(loc.type->base, right);
-
-				//add = operator here
-				//context->root->builder.CreateStore(right.val, loc.val);
-				return;
-			}
-			context->root->Error("Unimplemented!", _operator);
-		}
+		void CompileStore(CompilerContext* context, CValue right);
 
 		CValue Compile(CompilerContext* context);
 

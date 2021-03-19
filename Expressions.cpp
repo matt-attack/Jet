@@ -88,6 +88,24 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 	return res;
 }
 
+void PrefixExpression::CompileStore(CompilerContext* context, CValue right)
+{
+	if (_operator.type != TokenType::Asterisk)
+    {
+		context->root->Error("Cannot store into this expression!", _operator);
+    }
+
+	if (this->_operator.type == TokenType::Asterisk)
+	{
+		auto loc = this->right->Compile(context);
+
+		context->Store(CValue(loc.type, loc.val), right);
+
+		return;
+	}
+	context->root->Error("Unimplemented!", _operator);
+}
+
 CValue SizeofExpression::Compile(CompilerContext* context)
 {
 	auto t = context->root->LookupType(type.text);
@@ -122,7 +140,9 @@ CValue IndexExpression::Compile(CompilerContext* context)
 	
 	auto elm = this->GetElement(context);
 	if (elm.type->type == Types::Function)
+    {
 		return elm;
+    }
 
     if (!elm.val)
     {
@@ -392,16 +412,20 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 	{
 		lhs = i->GetElement(context, for_store);
 	}
+    else
+    {
+	    context->root->Error("Expected condition in GEP", this->token);
+    }
 
     // Now index into it using the index or member name
-	if ((p || i) && lhs.type->type == Types::Struct)
+	if (lhs.type->type == Types::Struct)
     {
         if (this->member.text.length())
         {
             return GetStructElement(context, this->member.text, this->member, lhs.type, lhs.pointer);
         }
     }
-    else if ((p || i) && lhs.type->type == Types::Array)
+    else if (lhs.type->type == Types::Array)
     {
         if (this->member.text.length() == 0)//or pointer!!(later)
 		{
@@ -450,7 +474,7 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
             }
 		}
     }
-    else if ((p || i) && lhs.type->type == Types::InternalArray)
+    else if (lhs.type->type == Types::InternalArray)
     {
         // Note, we _always_ have the pointer to an internal array type.
         // They only exist as locals and struct members (and we have no true value only structs)
@@ -469,10 +493,10 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 			}
 			else if (this->member.text == "ptr")
 			{
-				if (for_store)
+				/*if (for_store)
 				{
 					context->root->Error("Cannot modify fixed array ptr", this->token);
-				}
+				}*/
 
 				//just return a pointer to myself cast by GEP to the base type
 				auto loc = context->root->builder.CreateGEP(lhs.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
@@ -490,7 +514,7 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 			return CValue(lhs.type->base, 0, loc);
 		}
     }
-	else if ((p || i) && lhs.type->type == Types::Pointer)
+	else if (lhs.type->type == Types::Pointer)
 	{
         // Auto dereference struct pointers
 		if (this->member.text.length() && lhs.type->base->type == Types::Struct)
