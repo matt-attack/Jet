@@ -1,6 +1,6 @@
 
 cmake_minimum_required(VERSION 2.8.7)
-project(Jet)
+project(jet)
 
 find_package(LLVM 7.0.0 REQUIRED CONFIG HINTS C:/users/space/desktop/llvm/llvm-7.0.0.src)
 
@@ -12,7 +12,7 @@ add_definitions(${LLVM_DEFINITIONS})
 
 include_directories("${PROJECT_BINARY_DIR}" )
 
-add_executable(Jet 
+add_executable(jet 
 	jetc.cpp
 	
 	Compiler.cpp
@@ -30,7 +30,7 @@ add_executable(Jet
 	Project.cpp
 	Compilation.cpp
 )
-target_compile_features(Jet PRIVATE cxx_range_for)
+target_compile_features(jet PRIVATE cxx_range_for)
 
 #source_group(Types REGULAR_EXPRESSION Types/*)
 
@@ -48,5 +48,5 @@ endif()
 llvm_map_components_to_libnames(llvm_libs support core mcjit native ipo ARM)
 
 # Link against LLVM libraries
-target_link_libraries(Jet ${llvm_libs})# "C:/Users/Matthew/Desktop/cfe-3.7.1.src/Debug/lib/libclang.lib")
+target_link_libraries(jet ${llvm_libs})# "C:/Users/Matthew/Desktop/cfe-3.7.1.src/Debug/lib/libclang.lib")
 
