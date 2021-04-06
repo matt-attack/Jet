@@ -1195,10 +1195,11 @@ void Scope::Destruct(CompilerContext* context, llvm::Value* ignore)
 	for (auto& ii : this->named_values)
 	{
 		auto& value = ii.second.value;
-		if (value.val == ignore)
+		if (value.val == ignore && ignore)
 			continue;//dont destruct what we are returning
-		if (value.type->type == Types::Pointer && value.type->base->type == Types::Struct)
-			context->Destruct(value, 0);
+
+		if (ii.second.value.type->type == Types::Struct)// && value.type->base->type == Types::Struct)
+			context->Destruct(ii.second.value, 0);
 		//else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
 		//	context->Destruct(CValue(ii.second.type->base, ii.second.val), context->root->builder.getInt32(ii.second.type->base->size));
 	}
@@ -1337,25 +1338,26 @@ void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
 	}
 }
 
-void CompilerContext::Destruct(CValue pointer, llvm::Value* arr_size)
+void CompilerContext::Destruct(CValue reference, llvm::Value* arr_size)
 {
-	if (pointer.type->base->type == Types::Struct)
+    bool is_array = reference.type->type == Types::Array;
+	if ((reference.type->type == Types::Struct || is_array) && reference.pointer)
 	{
-		Type* ty = pointer.type->base;
+		Type* ty = reference.type;
 		Function* fun = 0;
 		if (ty->data->template_base)
-			fun = ty->GetMethod("~" + ty->data->template_base->name, { pointer.type }, this);
+			fun = ty->GetMethod("~" + ty->data->template_base->name, { ty->GetPointerType() }, this);
 		else
-			fun = ty->GetMethod("~" + ty->data->name, { pointer.type }, this);
+			fun = ty->GetMethod("~" + ty->data->name, { ty->GetPointerType() }, this);
 		if (fun == 0)
 			return;
 		fun->Load(this->root);
 		if (arr_size == 0)
-		{//just one element, construct it
-			this->root->builder.CreateCall(fun->f, { pointer.val });
+		{   //just one element, destruct it
+			this->root->builder.CreateCall(fun->f, { reference.pointer });
 		}
 		else
-		{//construct each child element
+		{   //destruct each child element
 			llvm::Value* counter = this->root->builder.CreateAlloca(this->root->IntType->GetLLVMType(), 0, "newcounter");
 			this->root->builder.CreateStore(this->Integer(0).val, counter);
 
@@ -1370,14 +1372,14 @@ void CompilerContext::Destruct(CValue pointer, llvm::Value* arr_size)
 			this->root->builder.CreateCondBr(res, end, body);
 
 			this->root->builder.SetInsertPoint(body);
-			if (pointer.type->type == Types::Array)
+			if (is_array)//false)//pointer.type->type == Types::Array)
 			{
-				auto elementptr = this->root->builder.CreateGEP(pointer.val, { this->root->builder.getInt32(0), cval });
+				auto elementptr = this->root->builder.CreateGEP(reference.pointer, { this->root->builder.getInt32(0), cval });
 				this->root->builder.CreateCall(fun->f, { elementptr });
 			}
 			else
 			{
-				auto elementptr = this->root->builder.CreateGEP(pointer.val, { cval });
+				auto elementptr = this->root->builder.CreateGEP(reference.pointer, { cval });
 				this->root->builder.CreateCall(fun->f, { elementptr });
 			}
 

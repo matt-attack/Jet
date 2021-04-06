@@ -410,7 +410,7 @@ CValue CallExpression::Compile(CompilerContext* context)
           auto val = left.val;
           if (!val)
           {
-            val = context->root->builder.CreateLoad(val);
+            val = context->root->builder.CreateLoad(left.pointer);
           }
           assert(val);
           stru = left.type->base;
