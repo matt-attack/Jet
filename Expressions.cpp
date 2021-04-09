@@ -69,6 +69,95 @@ const std::string& Expression::GetNamespaceQualifier()
 	return qualified_namespace_;
 }
 
+CValue SliceExpression::Compile(CompilerContext* context)
+{
+    CValue lval = left->Compile(context);
+
+    llvm::Value* ival;
+    if (index)
+    {
+      ival = context->DoCast(context->root->IntType, index->Compile(context)).val;
+    }
+    else
+    {
+      ival = context->root->builder.getInt32(0);
+    }
+
+    llvm::Value* lenval;
+    if (length)
+    {
+      lenval = context->DoCast(context->root->IntType, length->Compile(context)).val;
+    }
+    else
+    {
+      if (lval.type->type == Types::Array)
+      {
+        if (lval.val)
+        {
+          std::vector<unsigned int> iindex = { 0 };
+          lenval = context->root->builder.CreateExtractValue(lval.val, iindex);
+        }
+        else
+        {
+		  auto loc = context->root->builder.CreateGEP(lval.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+		  lenval = context->root->builder.CreateLoad(loc);
+        }
+      }
+      else if (lval.type->type == Types::InternalArray)
+      {
+        lenval = context->root->builder.getInt32(lval.type->size);
+      }
+
+      // Subtract the initial index from the old length to get the correct size
+      lenval = context->root->builder.CreateSub(lenval, ival);
+    }
+
+    if (lval.type->type != Types::Array && lval.type->type != Types::InternalArray)
+    {
+      context->root->Error("Cannot slice non-array type '" + lval.type->ToString() + "'", token);
+
+      return CValue();
+    }
+
+    // Now alloca the array
+    Type* t = context->root->GetArrayType(lval.type->base);
+    llvm::Value* alloca = context->root->builder.CreateAlloca(t->GetLLVMType());
+
+    // Now construct by getting the pointer, then the length
+    llvm::Value* ptr;
+    if (lval.type->type == Types::Array)
+    {
+      //context->root->Error("Unhandled for now", token);
+      if (lval.val)
+      {
+        std::vector<unsigned int> iindex = { 1 };
+        ptr = context->root->builder.CreateExtractValue(lval.val, iindex);
+      }
+      else
+      {
+		ptr = context->root->builder.CreateGEP(lval.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+      }
+    }
+    else if (lval.type->type == Types::InternalArray)
+    {
+      // the ptr already is an internal array one, now do a gep to the right index
+      //context->root->Error("Unhandled for now", token);
+      ptr = context->root->builder.CreateGEP(lval.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+    }
+
+    // now add the index
+    ptr = context->root->builder.CreateGEP(ptr, ival);
+
+    // store it into the struct
+    auto ptrloc = context->root->builder.CreateGEP(alloca, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+    context->root->builder.CreateStore(ptr, ptrloc);
+
+    auto lenloc = context->root->builder.CreateGEP(alloca, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+    context->root->builder.CreateStore(lenval, lenloc);
+
+    return CValue(t, context->root->builder.CreateLoad(alloca), alloca);
+}
+
 CValue PrefixExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&this->_operator);

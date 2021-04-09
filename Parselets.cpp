@@ -1165,7 +1165,39 @@ return new ArrayExpression(std::move(inits));
 
 Expression* IndexParselet::parse(Parser* parser, Expression* left, Token token)
 {
+    // handle starting a slice at the beginning
+    if (parser->Match(TokenType::Colon))
+    {
+      auto colon = parser->Consume();
+
+      UniquePtr<Expression*> length = parser->ParseExpression();
+
+      auto cb = parser->Consume(TokenType::RightBracket);
+
+      return new SliceExpression(left, token, 0, colon, length.Release(), cb);
+    }
+
 	UniquePtr<Expression*> index = parser->ParseExpression();
+
+    if (parser->Match(TokenType::Colon))
+    {
+      auto colon = parser->Consume();
+
+      UniquePtr<Expression*> length;
+      if (parser->Match(TokenType::RightBracket))
+      {
+        // Default slice going to the end of the array
+      }
+      else
+      {
+        length = parser->ParseExpression();
+      }
+
+      auto cb = parser->Consume(TokenType::RightBracket);
+
+      return new SliceExpression(left, token, index.Release(), colon, length.Release(), cb);
+    }
+
 	auto cb = parser->Consume(TokenType::RightBracket);
 
 	return new IndexExpression(left, index.Release(), token, cb);

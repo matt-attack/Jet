@@ -557,6 +557,78 @@ namespace Jet
 		}
 	};
 
+	class SliceExpression : public Expression
+	{
+
+	public:
+		Expression* index;
+        Expression* length;
+		Expression* left;
+		Token token, colon, close_bracket;
+
+		SliceExpression(Expression* left, Token t, Expression* index, Token colon, Expression* length, Token cb)
+		{
+			this->token = t;
+			this->left = left;
+			this->index = index;
+            this->colon = colon;
+            this->length = length;
+			this->close_bracket = cb;
+		}
+
+		~SliceExpression()
+		{
+			delete left;
+			delete index;
+            delete length;
+		}
+
+		virtual CValue Compile(CompilerContext* context);
+		virtual void CompileDeclarations(CompilerContext* context) {};
+
+		virtual void Print(std::string& output, Source* source)
+		{
+			this->left->Print(output, source);
+			token.Print(output, source);
+            if (index)
+                index->Print(output, source);
+            colon.Print(output, source);
+            if (length)
+                length->Print(output, source);
+			/*if (token.type == TokenType::Dot || token.type == TokenType::Pointy)
+				member.Print(output, source);
+			else if (token.type == TokenType::LeftBracket)
+			{
+				index->Print(output, source);
+				close_bracket.Print(output, source);// output += ']'; fix me!
+			}*/
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context)
+		{
+			//auto loc = this->GetElementPointer(context);
+			/*context->current_token = &this->token;
+			auto type = this->GetType(context, true);
+			if (type->type == Types::Function)
+				return type;
+			return type;// ->base;*/
+            // todo
+            return 0;
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor)
+		{
+			visitor->Visit(this);
+
+			if (index)
+				index->Visit(visitor);
+			if (left)
+				left->Visit(visitor);
+			if (length)
+				length->Visit(visitor);
+		}
+	};
+
 	class AssignExpression : public Expression
 	{
 		Token token;

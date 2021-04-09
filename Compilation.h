@@ -157,11 +157,13 @@ namespace Jet
 		//racer stuff
 		Function* GetFunctionAtPoint(const char* file, int line);
 
+		Type* GetArrayType(Type* base);
+
 	private:
 
 		Type* GetFunctionType(Type* return_type, const std::vector<Type*>& args);
 		std::map<Type*, Type*> array_types;
-		Type* GetArrayType(Type* base);
+
 		std::map<std::pair<Type*, unsigned int>, Type*> internal_array_types;
 		Type* GetInternalArrayType(Type* base, unsigned int size);
 

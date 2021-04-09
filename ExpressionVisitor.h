@@ -41,6 +41,7 @@ namespace Jet
 	class UnionExpression;
 	class FreeExpression;
 	class EnumExpression;
+    class SliceExpression;
 	class ExpressionVisitor
 	{
 	public:
@@ -53,6 +54,7 @@ namespace Jet
 		virtual void Visit(StringExpression* exp) {};
 
 		virtual void Visit(IndexExpression* exp) {};
+        virtual void Visit(SliceExpression* exp) {};
 
 		virtual void Visit(AssignExpression* exp) {};
 		virtual void Visit(OperatorAssignExpression* exp) {};
