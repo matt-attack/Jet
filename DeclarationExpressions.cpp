@@ -908,7 +908,6 @@ CValue LetExpression::Compile(CompilerContext* context)
 					context->root->Error("Cannot assign to a sized array type!", ii.name);
 				}
 
-				needs_destruction = true;
 				Alloca = TmpB.CreateAlloca(type->GetLLVMType(), TmpB.getInt32(1), aname);
 			}
 			else if (type->type == Types::Array)
@@ -987,7 +986,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 			Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
 		declare->setDebugLoc(llvm::DebugLoc::get(ii.name.line, ii.name.column, context->function->scope));
 
-		context->RegisterLocal(aname, CValue(type, 0, Alloca), needs_destruction, is_const);
+		context->RegisterLocal(aname, CValue(type, 0, Alloca), true, is_const);
 
 		//construct it!
 		if (this->_right == 0)

@@ -1192,28 +1192,28 @@ Scope* CompilerContext::PushScope()
 
 void Scope::Destruct(CompilerContext* context, llvm::Value* ignore)
 {
-	for (auto& ii : this->named_values)
-	{
-		auto& value = ii.second.value;
-		if (value.val == ignore && ignore)
-			continue;//dont destruct what we are returning
-
-		if (ii.second.value.type->type == Types::Struct)// && value.type->base->type == Types::Struct)
-			context->Destruct(ii.second.value, 0);
-		//else if (ii.second.type->type == Types::Pointer && ii.second.type->base->type == Types::Array && ii.second.type->base->base->type == Types::Struct)
-		//	context->Destruct(CValue(ii.second.type->base, ii.second.val), context->root->builder.getInt32(ii.second.type->base->size));
-	}
-
-	for (auto ii : this->to_destruct)
-	{
-		if (ii.type->type == Types::Pointer && ii.type->base->type == Types::Array && ii.type->base->base->type == Types::Struct)
+    // Destruct in backwards order
+    for (int i = to_destruct.size() - 1; i >= 0; i--)
+    {
+        const auto& ii = to_destruct[i];
+        if (ii.type->type == Types::Struct)
+        {
+			context->Destruct(ii, 0);
+        }
+        else if (ii.type->type == Types::InternalArray && ii.type->base->type == Types::Struct)
+        {
+            auto loc = context->root->builder.CreateGEP(ii.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+            context->Destruct(CValue(ii.type->base, 0, loc),
+                              context->root->builder.getInt32(ii.type->size));
+        }
+		else if (ii.type->type == Types::Array && ii.type->base->type == Types::Struct)
 		{
 			auto loc = context->root->builder.CreateGEP(ii.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 			auto size = context->root->builder.CreateLoad(loc);
 
 			auto ptr = context->root->builder.CreateGEP(ii.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 			ptr = context->root->builder.CreateLoad(ptr);
-			context->Destruct(CValue(ii.type->base->GetPointerType() , ptr), size);
+			context->Destruct(CValue(ii.type->base->GetPointerType(), ptr), size);
 		}
 	}
 	this->destructed = true;
