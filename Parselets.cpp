@@ -148,6 +148,16 @@ Token ParseTrait(Parser* parser)
 
 Expression* NameParselet::parse(Parser* parser, Token token)
 {
+    // parse namespaces
+    bool namespaced = false;
+    while (parser->MatchAndConsume(TokenType::Scope))
+    {
+      Token name = parser->Consume(TokenType::Name);
+      token.text += "::";
+      token.text += name.text;
+      namespaced = true;
+    }
+
 	if (parser->Match(TokenType::TemplateBegin))
 	{
 		//check if the token after the next this is a , or a > if it is, then im a template
@@ -179,9 +189,9 @@ Expression* NameParselet::parse(Parser* parser, Token token)
 		//actually, just treat me as a nameexpression, that should work
 		//idk, but what to do with the template stuff
 		//ok need to use these templates
-		return new NameExpression(token, templates);
+		return new NameExpression(token, templates, namespaced);
 	}
-	return new NameExpression(token);
+	return new NameExpression(token, namespaced);
 }
 
 Expression* AssignParselet::parse(Parser* parser, Expression* left, Token token)

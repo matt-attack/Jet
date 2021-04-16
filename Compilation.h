@@ -134,7 +134,7 @@ namespace Jet
 		void AdvanceTypeLookup(Type** dest, const std::string& name, Token* location);
 
 
-		Type* LookupType(const std::string& name, bool load = true, bool error = true, int start_index = 0);
+		Type* LookupType(const std::string& name, bool load = true, bool error = true, int start_index = 0, bool first_level = true);
 		Type* TryLookupType(const std::string& name);
 
 		//Give size of zero for non-array
@@ -177,7 +177,10 @@ namespace Jet
 
 
 		Function* GetFunction(const std::string& name);
+
+    public:
 		Symbol GetVariableOrFunction(const std::string& name);
+    private:
 
 		void ResolveTypes();
 

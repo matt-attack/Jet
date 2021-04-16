@@ -847,23 +847,7 @@ namespace Jet
 			return 0;
 		}
 
-		void CompileDeclarations(CompilerContext* context)
-		{
-			int last_value;//todo: use correct 64 bit type here
-			for (auto ii : this->values)
-			{
-				int cur_value;
-				if (ii.value.text.length())
-					cur_value = std::atoi(ii.value.text.c_str());//todo: fixme and use actual parsing
-				else
-				{
-					//set it to be one greater than the last
-					cur_value = last_value + 1;
-				}
-				context->root->ns->members.insert({ ii.name.text, new CValue(context->Integer(cur_value)) });
-				last_value = cur_value;
-			}
-		}
+		void CompileDeclarations(CompilerContext* context);
 
 		void Print(std::string& output, Source* source)
 		{

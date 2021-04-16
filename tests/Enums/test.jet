@@ -1,9 +1,9 @@
 
-extern fun int printf(char* h, int h);
-extern fun char* malloc(int x);
+extern_c fun int printf(char* h, int h);
+extern_c fun char* malloc(int x);
 
-extern fun int puts(char* str);
-extern fun char getchar();
+extern_c fun int puts(char* str);
+extern_c fun char getchar();
 
 enum Test
 {
@@ -13,9 +13,12 @@ enum Test
 
 fun int main() 
 {
-	printf("%i\n", EnumA);
-	printf("%i\n", EnumB);
+	printf("%i\n", Test::EnumA);
+	printf("%i\n", Test::EnumB);
+
+	printf("Max %i\n", Test::max);
+	printf("Min %i\n", Test::min);
 	
 	getchar();
-	return EnumB;
+	return Test::EnumB;
 }

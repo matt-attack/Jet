@@ -12,6 +12,39 @@ using namespace Jet;
 #include <llvm/IR/DIBuilder.h>
 #include <llvm/IR/DerivedTypes.h>
 
+void EnumExpression::CompileDeclarations(CompilerContext* context)
+{
+	// Namespace the enum with the name
+	context->CurrentToken(&name);
+	context->AddAndSetNamespace(name.text);
+
+	int min_value = std::numeric_limits<int>::max();
+	int max_value = -1;
+
+	int last_value;//todo: use correct 64 bit type here
+	for (auto ii : this->values)
+	{
+		int cur_value;
+		if (ii.value.text.length())
+			cur_value = std::atoi(ii.value.text.c_str());//todo: fixme and use actual parsing
+		else
+		{
+			//set it to be one greater than the last
+			cur_value = last_value + 1;
+		}
+		context->root->ns->members.insert({ ii.name.text, new CValue(context->Integer(cur_value)) });
+        min_value = std::min(min_value, cur_value);
+        max_value = std::max(max_value, cur_value);
+		last_value = cur_value;
+	}
+
+	// Add max and min values if they dont overlap
+	context->root->ns->members.insert({ "min", new CValue(context->Integer(min_value)) });
+	context->root->ns->members.insert({ "max", new CValue(context->Integer(max_value)) });
+
+	context->PopNamespace();
+}
+
 Type* FunctionExpression::TypeCheck(CompilerContext* context)
 {
 	bool is_lambda = name.text.length() == 0;

@@ -141,7 +141,6 @@ CValue SliceExpression::Compile(CompilerContext* context)
     else if (lval.type->type == Types::InternalArray)
     {
       // the ptr already is an internal array one, now do a gep to the right index
-      //context->root->Error("Unhandled for now", token);
       ptr = context->root->builder.CreateGEP(lval.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
     }
 
@@ -748,6 +747,94 @@ CValue AssignExpression::Compile(CompilerContext* context)
 CValue NameExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&token);
+
+    if (namespaced)
+    {
+        // go into this namespace
+        auto old_ns = context->root->ns;
+
+        // First find the top level namespace indicated by this
+        Namespace* new_ns = 0;
+		Namespace* cur_ns = context->root->ns;
+
+        int cur_pos = 0;
+
+        bool first = true;
+        do
+        {
+            int len = 0;
+	        while (cur_pos+len < token.text.length() &&
+                   (IsLetter(token.text[cur_pos+len]) || IsNumber(token.text[cur_pos + len])))
+	        {
+		        len++;
+	        }
+            if (cur_pos+len >= token.text.length()-1)
+            {
+                break;// stop before we hit the last bit
+            }
+
+            std::string ns = token.text.substr(cur_pos, len);
+
+		    // Try and find this first namespace by recursively going up
+            // If this is not the top level, only check the current namespace
+            new_ns = 0;
+		    do
+		    {
+			    auto res = cur_ns->members.find(ns);
+			    if (res != cur_ns->members.end())
+			    {
+			    	new_ns = res->second.ns;
+			    	break;
+			    }
+			    cur_ns = cur_ns->parent;
+		    }
+		    while (cur_ns && first);
+
+            first = false;
+            if (!new_ns)
+            {
+                context->root->Error("Could not find namespace '" + ns + "'", this->token);
+            }
+            cur_ns = new_ns;
+            cur_pos += len + 2;
+        }
+        while (true);
+
+        context->root->ns = new_ns;
+
+
+        // Get the variable or function from the namespace
+        auto sym = context->root->GetVariableOrFunction(token.text.substr(cur_pos));
+
+        // now leave it
+        context->root->ns = old_ns;
+
+		if (sym.type != SymbolType::Invalid)
+		{
+			if (sym.type == SymbolType::Function)
+			{
+				auto function = sym.fn;
+				function->Load(context->root);
+				return CValue(function->GetType(context->root), function->f);
+			}
+			else if (sym.type == SymbolType::Variable)
+			{
+				//variable
+				Jet::CValue val = *sym.val;
+                // then return, getting value if necessary
+                if (!val.val)
+                {
+                    val.val = context->root->builder.CreateLoad(val.pointer);
+                }
+                return val;
+			}
+		}
+        else
+        {
+            context->root->Error("Undeclared identifier '" + this->token.text + "'", this->token);
+        }
+    }
+
 
 	return context->Load(token.text);
 }

@@ -31,7 +31,6 @@ namespace Jet
 		};
 		std::map<std::string, NamedValue> named_values;
 
-		//used for struct arrays
 		std::vector<CValue> to_destruct;
 
 		std::vector<Scope*> next;
@@ -228,6 +227,22 @@ namespace Jet
 		CValue Load(const std::string& name);
 
 		void SetDebugLocation(const Token& t);
+
+		void AddAndSetNamespace(const std::string& name)
+		{
+			auto res = this->root->ns->members.find(name);
+			if (res != this->root->ns->members.end())
+			{
+				this->root->Error("Namespace '" + name + "' already exists", *this->current_token);
+				return;
+			}
+
+			//create new one
+			auto ns = new Namespace(name, this->root->ns);
+
+			this->root->ns->members.insert({ name, Symbol(ns) });
+			this->root->ns = ns;
+		}
 
 		void SetNamespace(const std::string& name)
 		{

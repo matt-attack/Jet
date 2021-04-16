@@ -65,13 +65,22 @@ namespace Jet
 	{
 
 	public:
+        bool namespaced;
 		Token token;
 		std::vector<Token>* templates;
 
-		NameExpression(Token name, std::vector<Token>* templates = 0)
+		NameExpression(Token name, bool namespaced)
 		{
 			this->token = name;
 			this->templates = templates;
+            this->namespaced = namespaced;
+		}
+
+		NameExpression(Token name, std::vector<Token>* templates, bool namespaced)
+		{
+			this->token = name;
+			this->templates = templates;
+            this->namespaced = namespaced;
 		}
 
 		std::string GetName() const

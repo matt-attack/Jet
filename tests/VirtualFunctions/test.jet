@@ -1,10 +1,10 @@
 
-extern fun int printf(char* h, int h);
-extern fun char* malloc(int x);
+extern_c fun int printf(char* h, int h);
+extern_c fun char* malloc(int x);
 
-extern fun int puts(char* str);
+extern_c fun int puts(char* str);
 
-extern fun char getchar();
+extern_c fun char getchar();
 
 struct A
 {
@@ -44,7 +44,7 @@ struct C: B
 	}
 }
 
-fun int main() 
+fun int main()
 {
 	let B b;
 	let A a;
@@ -55,16 +55,16 @@ fun int main()
 	c.hi();
 	
 	let A* bp = &b;
-	bp->hi();
-	bp->hi2();
+	bp.hi();
+	bp.hi2();
 	
 	let B* cp = &c;
-	cp->hi();
-	cp->hi2();
+	cp.hi();
+	cp.hi2();
 	
 	let A* cp2 = &c;
-	cp2->hi();
-	cp2->hi2();
+	cp2.hi();
+	cp2.hi2();
 
 	getchar();
 	return 0;

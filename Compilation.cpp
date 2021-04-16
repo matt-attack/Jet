@@ -1186,7 +1186,7 @@ Jet::Type* Compilation::TryLookupType(const std::string& name)
 	return this->LookupType(name, false, false);
 }
 
-Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_error, int start_index)
+Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_error, int start_index, bool first_level)
 {
 	unsigned int i = 0;
 	while (IsLetter(name[i]) || IsNumber(name[i]))
@@ -1199,14 +1199,40 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 	{
 		//navigate to correct namespace
 		std::string ns = name.substr(0, i);
-		auto res = this->ns->members.find(ns);
-		if (res == this->ns->members.end())
+        Namespace* new_ns = 0;
+
+		// Try and find this first namespace by recursively going up
+        // If this is not the top level, only check the current namespace
+		Namespace* cur_ns = this->ns;
+		do
+		{
+			auto res = cur_ns->members.find(ns);
+			if (res != cur_ns->members.end())
+			{
+				new_ns = res->second.ns;
+				break;
+			}
+			cur_ns = cur_ns->parent;
+		}
+		while (cur_ns && first_level);
+
+        if (new_ns)
+        {
+			auto old = this->ns;
+			this->ns = new_ns;
+			auto out = this->LookupType(name.substr(i + 2), load, do_error, start_index + i + 2, false);
+			this->ns = old;
+
+			return out;
+		}
+		else
 		{
 			if (do_error)
 			{
 				// Make a new token for this error
 				Token relevant_token = *this->current_function->current_token;
 				relevant_token.text = relevant_token.text.substr(0, i);
+                relevant_token.column += start_index;
 				this->Error("Namespace '" + ns + "' not found", relevant_token);
 			}
 			else
@@ -1214,12 +1240,6 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 				return 0;
 			}
 		}
-		auto old = this->ns;
-		this->ns = res->second.ns;
-		auto out = this->LookupType(name.substr(i + 2), load, do_error, start_index + i + 2);
-		this->ns = old;
-
-		return out;
 	}
 
 	std::string base = name.substr(0, i);
@@ -1245,7 +1265,9 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 	}
 
 	if (curns)
+	{
 		res = curns->members.find(name);
+	}
 
 	auto type = (curns != 0 && res != curns->members.end() && res->second.type == SymbolType::Type) ? res->second.ty : 0;
 
