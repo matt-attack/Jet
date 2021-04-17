@@ -1249,7 +1249,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 	auto res = this->ns->members.find(base);
 	if (name.back() != ')')
 	{
-		while (res == curns->members.end())
+		while (res == curns->members.end() && first_level)
 		{
 			curns = curns->parent;
 			if (curns == 0)
@@ -1585,57 +1585,170 @@ void Compilation::ResolveTypes()
 	this->ns = oldns;
 }
 
-Jet::Function* Compilation::GetFunction(const std::string& name)
-{
-	//search up the namespace tree for the function
-	auto next = this->ns;
-	while (next)
-	{
-		auto r = next->members.find(name);
-		if (r != next->members.end() && r->second.type == SymbolType::Function)
-			return r->second.fn;
-
-		next = next->parent;
-	}
-	return 0;
-}
-
 Function* Compilation::GetFunction(const std::string& name, const std::vector<Type*>& args)
 {
-	//search down the namespace tree for the function
 	auto next = this->ns;
-	while (next)
-	{
-		auto r = next->members.equal_range(name);
-		for (auto it = r.first; it != r.second; it++)
-		{
-			if (it->second.type == SymbolType::Function)
-			{
-				if (it->second.fn->arguments.size() == args.size())
-				{
-					return it->second.fn;
-				}
-			}
-		}
+    bool namespaced = name.find_first_of(':') != std::string::npos;
+    if (namespaced)
+    {
+        // First find the top level namespace indicated by this
+        Namespace* new_ns = 0;
+		Namespace* cur_ns = this->ns;
 
-		next = next->parent;
-	}
+        int cur_pos = 0;
+
+        bool first = true;
+        do
+        {
+            int len = 0;
+	        while (cur_pos+len < name.length() &&
+                   (IsLetter(name[cur_pos+len]) || IsNumber(name[cur_pos + len])))
+	        {
+		        len++;
+	        }
+            if (cur_pos+len >= name.length()-1)
+            {
+                break;// stop before we hit the last bit
+            }
+
+            std::string ns = name.substr(cur_pos, len);
+
+		    // Try and find this first namespace by recursively going up
+            // If this is not the top level, only check the current namespace
+            new_ns = 0;
+		    do
+		    {
+			    auto res = cur_ns->members.find(ns);
+			    if (res != cur_ns->members.end())
+			    {
+			    	new_ns = res->second.ns;
+			    	break;
+			    }
+			    cur_ns = cur_ns->parent;
+		    }
+		    while (cur_ns && first);
+
+            first = false;
+            if (!new_ns)
+            {
+                Error("Could not find namespace '" + ns + "'", *current_function->current_token);
+            }
+            cur_ns = new_ns;
+            cur_pos += len + 2;
+        }
+        while (true);
+
+        auto r = new_ns->members.equal_range(name);
+	    for (auto it = r.first; it != r.second; it++)
+		{
+		    if (it->second.type == SymbolType::Function)
+		    {
+		    	if (it->second.fn->arguments.size() == args.size())
+		    	{
+		    		return it->second.fn;
+		    	}
+		    }
+	    }
+    }
+    else
+    {
+	    // Search down the namespace tree for the function if its not namespaced
+	    do
+	    {
+		    auto r = next->members.equal_range(name);
+	    	for (auto it = r.first; it != r.second; it++)
+		    {
+		    	if (it->second.type == SymbolType::Function)
+		    	{
+		    		if (it->second.fn->arguments.size() == args.size())
+		    		{
+		    			return it->second.fn;
+		    		}
+		    	}
+	    	}
+
+    		next = next->parent;
+    	}
+        while (next && !namespaced);
+    }
 	return 0;
 }
 
 Jet::Symbol Compilation::GetVariableOrFunction(const std::string& name)
 {
-	//search up the namespace tree for this variable or function
-	auto next = this->ns;
-	while (next)
-	{
-		auto r = next->members.find(name);
-		if (r != next->members.end() && (r->second.type == SymbolType::Function || r->second.type == SymbolType::Variable))
-			return r->second;
+    bool namespaced = name.find_first_of(':') != std::string::npos;
+    if (namespaced)
+    {
+        // First find the top level namespace indicated by this
+        Namespace* new_ns = 0;
+		Namespace* cur_ns = this->ns;
 
-		next = next->parent;
-	}
-	return Symbol();
+        int cur_pos = 0;
+
+        bool first = true;
+        do
+        {
+            int len = 0;
+	        while (cur_pos+len < name.length() &&
+                   (IsLetter(name[cur_pos+len]) || IsNumber(name[cur_pos + len])))
+	        {
+		        len++;
+	        }
+            if (cur_pos+len >= name.length()-1)
+            {
+                break;// stop before we hit the last bit
+            }
+
+            std::string ns = name.substr(cur_pos, len);
+
+		    // Try and find this first namespace by recursively going up
+            // If this is not the top level, only check the current namespace
+            new_ns = 0;
+		    do
+		    {
+			    auto res = cur_ns->members.find(ns);
+			    if (res != cur_ns->members.end())
+			    {
+			    	new_ns = res->second.ns;
+			    	break;
+			    }
+			    cur_ns = cur_ns->parent;
+		    }
+		    while (cur_ns && first);
+
+            first = false;
+            if (!new_ns)
+            {
+                Error("Could not find namespace '" + ns + "'", *current_function->current_token);
+            }
+            cur_ns = new_ns;
+            cur_pos += len + 2;
+        }
+        while (true);
+
+        auto r = new_ns->members.find(name.substr(cur_pos));
+		if (r != new_ns->members.end() && (r->second.type == SymbolType::Function || r->second.type == SymbolType::Variable))
+        {
+			return r->second;
+        }
+    }
+    else
+    {
+	    //search up the namespace tree for this variable or function
+	    auto next = this->ns;
+	    do
+	    {
+		    auto r = next->members.find(name);
+	    	if (r != next->members.end() && (r->second.type == SymbolType::Function || r->second.type == SymbolType::Variable))
+            {
+		    	return r->second;
+            }
+
+	    	next = next->parent;
+    	}
+        while (next && !namespaced);
+    }	
+    return Symbol();
 }
 
 // For the racer, pretty broken atm

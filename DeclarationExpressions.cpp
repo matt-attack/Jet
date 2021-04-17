@@ -26,7 +26,9 @@ void EnumExpression::CompileDeclarations(CompilerContext* context)
 	{
 		int cur_value;
 		if (ii.value.text.length())
+		{
 			cur_value = std::atoi(ii.value.text.c_str());//todo: fixme and use actual parsing
+		}
 		else
 		{
 			//set it to be one greater than the last
@@ -39,8 +41,14 @@ void EnumExpression::CompileDeclarations(CompilerContext* context)
 	}
 
 	// Add max and min values if they dont overlap
-	context->root->ns->members.insert({ "min", new CValue(context->Integer(min_value)) });
-	context->root->ns->members.insert({ "max", new CValue(context->Integer(max_value)) });
+    if (context->root->ns->members.find("min") == context->root->ns->members.end())
+    {
+		context->root->ns->members.insert({ "min", new CValue(context->Integer(min_value)) });
+    }
+    if (context->root->ns->members.find("max") == context->root->ns->members.end())
+    {
+		context->root->ns->members.insert({ "max", new CValue(context->Integer(min_value)) });
+    }
 
 	context->PopNamespace();
 }

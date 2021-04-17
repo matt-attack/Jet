@@ -167,16 +167,7 @@ namespace Jet
 		std::map<std::pair<Type*, unsigned int>, Type*> internal_array_types;
 		Type* GetInternalArrayType(Type* base, unsigned int size);
 
-
-		Function* GetFunction(const std::string& name, const std::vector<CValue>& args)
-		{
-			return this->GetFunction(name);
-		}
-
 		Function* GetFunction(const std::string& name, const std::vector<Type*>& args);
-
-
-		Function* GetFunction(const std::string& name);
 
     public:
 		Symbol GetVariableOrFunction(const std::string& name);
