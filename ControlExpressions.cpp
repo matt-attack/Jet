@@ -303,7 +303,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 	else if (p)
 		val = p->GetElement(context);
 
-	if (val.type->base->type != Types::Union)
+	if (val.type->type != Types::Union)
 		context->root->Error("Cannot match with a non-union", token);
 
 	auto endbb = llvm::BasicBlock::Create(context->context, "match.end");
@@ -312,6 +312,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 	auto key = context->root->builder.CreateGEP(val.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 	auto sw = context->root->builder.CreateSwitch(context->root->builder.CreateLoad(key), endbb, this->cases.size());
 
+    const Type* union_type = val.type;
 	for (auto ii : this->cases)
 	{
 		context->PushScope();
@@ -332,14 +333,14 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		}
 
 		unsigned int pi = 0;//find what index it is
-		for (auto mem : val.type->base->_union->members)
+		for (auto mem : union_type->_union->members)
 		{
 			if (mem->name == ii.type.text)
 				break;
 			pi++;
 		}
 
-		if (pi >= val.type->base->_union->members.size())
+		if (pi >= union_type->_union->members.size())
 			context->root->Error("Type '" + ii.type.text + "' not in union, cannot match to it.", ii.type);
 
 		//add bb for case
@@ -349,9 +350,9 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		sw->addCase(i, bb);
 
 		//add local
-		auto ptr = context->root->builder.CreateGEP(val.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
-		ptr = context->root->builder.CreatePointerCast(ptr, val.type->base->_union->members[pi]->GetPointerType()->GetLLVMType());
-		context->RegisterLocal(ii.name.text, CValue(val.type->base->_union->members[pi]->GetPointerType(), ptr));
+		auto ptr = context->root->builder.CreateGEP(val.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+		ptr = context->root->builder.CreatePointerCast(ptr, union_type->_union->members[pi]->GetPointerType()->GetLLVMType());
+		context->RegisterLocal(ii.name.text, CValue(union_type->_union->members[pi]->GetPointerType(), ptr));
 
 		//build internal
 		ii.block->Compile(context);
