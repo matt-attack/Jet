@@ -72,7 +72,7 @@ namespace Jet
 		NameExpression(Token name, bool namespaced)
 		{
 			this->token = name;
-			this->templates = templates;
+			this->templates = 0;
             this->namespaced = namespaced;
 		}
 
