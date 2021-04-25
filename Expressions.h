@@ -424,21 +424,6 @@ namespace Jet
 		}
 	};
 
-	/*class NullExpression: public Expression
-	{
-	public:
-	NullExpression()
-	{
-	}
-
-	void print()
-	{
-	printf("Null");
-	}
-
-	void Compile(CompilerContext* context);
-	};*/
-
 	class StringExpression : public Expression
 	{
 		Token token;

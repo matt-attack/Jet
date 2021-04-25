@@ -47,7 +47,7 @@ void EnumExpression::CompileDeclarations(CompilerContext* context)
     }
     if (context->root->ns->members.find("max") == context->root->ns->members.end())
     {
-		context->root->ns->members.insert({ "max", new CValue(context->Integer(min_value)) });
+		context->root->ns->members.insert({ "max", new CValue(context->Integer(max_value)) });
     }
 
 	context->PopNamespace();
