@@ -1,0 +1,28 @@
+
+extern_c fun int printf(char* h, int h);
+extern_c fun char* malloc(int x);
+
+extern_c fun int puts(char* str);
+extern_c fun char getchar();
+
+extern_c fun void exit(int status);
+
+let int global_mut = 7;
+//const int global_const = 7;// this errors (for now)
+
+fun int main()
+{
+    // A basic checkout of const
+	let x = 5;
+	const y = 5;
+	
+	// Not allowed!
+	y = x;
+	y += 5;
+	y *= 2;
+	y -= 7;
+
+    exit(0);
+	
+	return 0;
+}

@@ -1,0 +1,19 @@
+
+Compiling Project: tests/ConstErrors
+[error] test/test.jet 20:1 to 20:2: Cannot assign to const variable 'y'
+[error] >>>	y = x;
+[error] >>>	~     
+
+[error] test/test.jet 21:1 to 21:2: Cannot assign to const variable 'y'
+[error] >>>	y += 5;
+[error] >>>	~      
+
+[error] test/test.jet 22:1 to 22:2: Cannot assign to const variable 'y'
+[error] >>>	y *= 2;
+[error] >>>	~      
+
+[error] test/test.jet 23:1 to 23:2: Cannot assign to const variable 'y'
+[error] >>>	y -= 7;
+[error] >>>	~      
+
+Compiling Failed: 4 Errors Found

@@ -32,6 +32,11 @@ add_executable(jet
 )
 target_compile_features(jet PRIVATE cxx_range_for)
 
+add_executable(test_runner 
+	test_runner.cpp
+)
+target_compile_features(test_runner PRIVATE cxx_range_for)
+
 #source_group(Types REGULAR_EXPRESSION Types/*)
 
 include(CheckCXXCompilerFlag)

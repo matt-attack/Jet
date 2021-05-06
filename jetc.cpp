@@ -487,7 +487,7 @@ void MakeDocs(Compilation* compilation)
 	of << out;
 }
 
-void DoCommand(int argc, const char* argv[])
+int DoCommand(int argc, const char* argv[])
 {
 	std::string cmd = argc > 1 ? argv[1] : "";
 	if (cmd == "projects")
@@ -502,7 +502,7 @@ void DoCommand(int argc, const char* argv[])
 			printf("'%s' version '%s' at %s\n", proj.name.c_str(), proj.version.c_str(), proj.path.c_str());
 			//std::cout << proj.name << " " << proj.version << " " << proj.path << "\n";
 		}
-		return;
+		return 0;
 	}
 	else if (cmd == "runtests")
 	{
@@ -546,7 +546,7 @@ void DoCommand(int argc, const char* argv[])
 			if (compilation == 0)
 			{
 				delete project;
-				return;
+				return 0;
 			}
 			std::string o;
 			for (auto ii : compilation->asts)
@@ -588,7 +588,7 @@ void DoCommand(int argc, const char* argv[])
 			delete compilation;
 			delete project;
 		}
-		return;
+		return 0;
 	}
 	else if (cmd == "convert")
 	{
@@ -603,7 +603,7 @@ void DoCommand(int argc, const char* argv[])
 			o << str;
 			o.close();
 		}
-		return;
+		return 0;
 	}
 	else if (cmd == "new")
 	{
@@ -645,7 +645,7 @@ void DoCommand(int argc, const char* argv[])
 		fclose(f);
 
 		printf("Created new empty project.\n");
-		return;
+		return 0;
 	}
 	else if (cmd == "build")
 	{
@@ -662,13 +662,14 @@ void DoCommand(int argc, const char* argv[])
 
 		Jet::Compiler c;
 		if (argc >= 3)
-			c.Compile(argv[2], &options, config, &parser);
+			return c.Compile(argv[2], &options, config, &parser) == 0 ? -1 : 0;
 		else
-			c.Compile("", &options, config, &parser);
+			return c.Compile("", &options, config, &parser) == 0 ? -1 : 0;
 	}
 	else
 	{
 		printf("Unknown verb.\n");
+        return -1;
 	}
 }
 
@@ -724,9 +725,7 @@ int main(int argc, const char* argv[])
 
 	if (argc > 1)//if we get a command, just try and build the project at that path
 	{
-		DoCommand(argc, argv);
-
-		return 0;
+		return DoCommand(argc, argv);
 	}
 
 	//auto path = getenv("PATH");
