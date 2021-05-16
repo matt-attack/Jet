@@ -821,6 +821,12 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	}
 	Token cb = parser->Consume(TokenType::RightParen);
 
+    Token const_tok;
+    if (parser->Match(TokenType::Const))
+    {
+        const_tok = parser->Consume(TokenType::Const);
+    }
+
 	//check that there are a proper number of arguments if this is a operator overload
 	if (name.type != TokenType::Name)
 	{
@@ -845,7 +851,7 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 	}
 
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, name, ret_type, token.type == TokenType::Generator, arguments, block, /*varargs,*/ stru, colons, templated, 0, ob, cb, oper);
+	return new FunctionExpression(token, name, ret_type, token.type == TokenType::Generator, arguments, block, /*varargs,*/ stru, colons, templated, 0, ob, cb, oper, const_tok);
 }
 
 Expression* ExternParselet::parse(Parser* parser, Token token)
@@ -1030,7 +1036,7 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 		ret_type = ::ParseType(parser);
 
 	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, Token(), ret_type, false, arguments, block, Token(), Token(), 0, captures, ob, cb, Token());
+	return new FunctionExpression(token, Token(), ret_type, false, arguments, block, Token(), Token(), 0, captures, ob, cb, Token(), Token());
 }
 
 Expression* CallParselet::parse(Parser* parser, Expression* left, Token token)

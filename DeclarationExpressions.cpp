@@ -197,10 +197,15 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	//insert the 'this' argument if I am a member function
 	if (struct_name.length() > 0)
 	{
-		auto type = context->root->LookupType(struct_name + "*");
+		auto type = context->root->LookupType(struct_name);
 
 		argsv.push_back({ type, "this" });
 	}
+    else if (!!const_tok)
+    {
+        // Error if someone specified const
+        context->root->Error("Can only specify const for member functions", this->const_tok);
+    }
 
 	//add the context pointer as an argument if this is a generator
 	if (this->is_generator)
@@ -343,25 +348,21 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	function_context->SetDebugLocation(this->token);
 
-	//alloc args
+	// Setup arguments for the function
 	auto AI = function_context->function->f->arg_begin();
 	if (function_context->function->return_type->type == Types::Struct)
 	{
-		AI++;
+		AI++;// skip the struct return argument, its not a real argument
 	}
 	for (unsigned i = 0, e = argsv.size(); i != e; ++i, ++AI)
 	{
-		// Create an alloca for this variable.
+		// Skip actually adding all args but the first one if this is actually a generator
 		if (i > 0 && this->is_generator)
 			continue;
 
-		auto arg_name = argsv[i].second;
+		auto& arg_name = argsv[i].second;
+        auto& arg_type = argsv[i].first;
 
-        int offset = 0;
-        offset += struct_name.length() > 0 ? 1 : 0;
-        offset += this->is_generator ? 1 : 0;
-
-		llvm::IRBuilder<> TmpB(&function_context->function->f->getEntryBlock(), function_context->function->f->getEntryBlock().begin());
         // for now pass all structs by pointer/reference
         // eventually can do this based on size
         llvm::Value* storage = AI;
@@ -370,25 +371,37 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		//insert debug declarations
 		auto local = context->root->debug->createAutoVariable(function_context->function->scope, arg_name,
 			context->root->debug_info.file, this->token.line,
-			argsv[i].first->GetDebugType(context->root));
+			arg_type->GetDebugType(context->root));
 
 		llvm::Instruction* call = context->root->debug->insertDeclare(storage, local, context->root->debug->createExpression(),
 			llvm::DebugLoc::get(this->token.line, this->token.column, function_context->function->scope),
 			context->root->builder.GetInsertBlock());
 		call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function_context->function->scope));
-        auto type = argsv[i].first;//argsv[i].first->type == Types::Struct ? argsv[i].first : argsv[i].first->GetPointerType();
+
+
+        // Get the offset to apply for looking for the name token for this
+        int offset = 0;
+        offset += struct_name.length() > 0 ? 1 : 0;
+        offset += this->is_generator ? 1 : 0;
+
+        // Special case for this, always pass by pointer/reference.
+        if (struct_name.length() && i == 0)
+        {
+          function_context->RegisterLocal(arg_name, CValue(arg_type, 0, storage), false, !!const_tok);
+          continue;
+        }
 
 		// Add arguments to variable symbol table. These are always const.
         function_context->CurrentToken(&(*this->args)[i - offset].name);
-        if (type->type == Types::Struct)
+        if (arg_type->type == Types::Struct)
         {
             // all structs are passed by pointer
-		    function_context->RegisterLocal(arg_name, CValue(type, 0, storage), false, true);
+		    function_context->RegisterLocal(arg_name, CValue(arg_type, 0, storage), false, true);
         }
         else
         {
             // everything else passed by value
-            function_context->RegisterLocal(arg_name, CValue(type, storage), false, true);
+            function_context->RegisterLocal(arg_name, CValue(arg_type, storage), false, true);
         }
 	}
 

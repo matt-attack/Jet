@@ -250,7 +250,8 @@ int main(int argc, char* argv[])
         continue;
       }
       
-      printf("Build test succeeded.\n");
+      printf("Build output matches expected\n");
+      printf("Test successful.\n");
       success++;
       continue;
     }
@@ -261,7 +262,15 @@ int main(int argc, char* argv[])
     std::string executable_name = "test";
     command = "./" + test + "/build/" + executable_name;
     int code = run_command(command);
-    printf("Test complete. Return code %i\n\n", code);
+
+    if (code != 0)
+    {
+      printf("Test failed. Program returned with code %i\n\n", code);
+      failed.push_back(test);
+      continue;
+    }
+
+    printf("Test successful.\n\n");
 
     success++;
   }

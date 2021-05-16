@@ -486,7 +486,7 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 	}
     else
     {
-	    context->root->Error("Expected condition in GEP", this->token);
+	    context->root->Error("Unexpected condition in Get Element", this->token);
     }
 
     // Now index into it using the index or member name
@@ -495,6 +495,26 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
         if (this->member.text.length())
         {
             return GetStructElement(context, this->member.text, this->member, lhs.type, lhs.pointer);
+        }
+        else if (lhs.pointer)// we're indexing it
+		{
+			auto stru = lhs.type->data;
+
+			// todo maybe wrap finding this function into a function
+			auto funiter = stru->functions.find("[]");
+			//todo: search through multimap to find one with the right number of args
+			if (funiter != stru->functions.end() && funiter->second->arguments.size() == 2)
+			{
+				Function* fun = funiter->second;
+				fun->Load(context->root);
+				CValue right = index->Compile(context);
+				//todo: casting
+				return CValue(fun->return_type, context->root->builder.CreateCall(fun->f, { lhs.pointer, right.val }, "operator_overload"));
+			}
+            else
+            {
+                context->root->Error("Cannot index struct '" + lhs.type->name + "'.", this->token);
+            }
         }
     }
     else if (lhs.type->type == Types::Array)
@@ -643,7 +663,7 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 		}*/
 	}
 
-	context->root->Error("Unimplemented GEP for " + lhs.type->ToString(), this->token);
+	context->root->Error("Unimplemented Get Element for " + lhs.type->ToString(), this->token);
 }
 
 CValue StringExpression::Compile(CompilerContext* context)

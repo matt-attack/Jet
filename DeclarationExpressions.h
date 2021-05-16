@@ -311,6 +311,7 @@ namespace Jet
 		std::vector<Token>* captures;
 		ScopeExpression* block;
 		Token token;
+        Token const_tok;
 
 		Token Struct, colons;
 
@@ -330,7 +331,7 @@ namespace Jet
 			return block;
 		}
 
-		FunctionExpression(Token token, Token name, Token ret_type, bool generator, std::vector<FunctionArg>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, Token colons, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures, Token open_bracket, Token close_bracket, Token oper)
+		FunctionExpression(Token token, Token name, Token ret_type, bool generator, std::vector<FunctionArg>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, Token colons, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures, Token open_bracket, Token close_bracket, Token oper, Token const_tok)
 		{
 			this->oper = oper;
 			this->open_bracket = open_bracket;
@@ -346,6 +347,7 @@ namespace Jet
 			this->templates = templates;
 			this->captures = captures;
 			this->colons = colons;
+            this->const_tok = const_tok;
 		}
 
 		~FunctionExpression()

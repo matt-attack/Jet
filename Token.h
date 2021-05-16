@@ -177,6 +177,11 @@ namespace Jet
 			this->column = column;
 		}
 
+        bool operator!() const
+        {
+            return type == TokenType::InvalidToken;
+        }
+
 		void Print(std::string& str, Source* source) const;
 
 		Source* GetSource(Compilation* compilation) const;
