@@ -116,14 +116,7 @@ namespace Jet
 			return CValue(this->root->CharPointerType, res);
 		}
 
-		void RegisterLocal(const std::string& name, CValue val, bool needs_destruction = false, bool is_const = false)
-		{
-			if (this->scope->named_values.find(name) != this->scope->named_values.end())
-				this->root->Error("Variable '" + name + "' already defined", *this->current_token);
-			if (needs_destruction)
-				this->scope->to_destruct.push_back(val);
-			this->scope->named_values[name] = { val, is_const };
-		}
+		void RegisterLocal(const std::string& name, CValue val, bool needs_destruction = false, bool is_const = false);
 
 		std::function<void(const std::string& name, Type* ty)> local_reg_callback;
 		void TCRegisterLocal(const std::string& name, Type* ty)
@@ -312,8 +305,8 @@ namespace Jet
 
 		llvm::ReturnInst* Return(CValue ret);
 
-		Token* current_token;
-		inline void CurrentToken(Token* token)
+		const Token* current_token;
+		inline void CurrentToken(const Token* token)
 		{
 			current_token = token;
 		}

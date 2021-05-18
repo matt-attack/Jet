@@ -1284,6 +1284,29 @@ CValue CompilerContext::Load(const std::string& name)
     return value;
 }
 
+void CompilerContext::RegisterLocal(
+  const std::string& name, CValue val,
+  bool needs_destruction, bool is_const)
+{
+    // check any above scope to see if it has the same variable defined
+    auto cur_scope = this->scope;
+    do 
+    {
+        if (cur_scope->named_values.find(name) != cur_scope->named_values.end())
+        {
+            if (cur_scope == this->scope)
+		        this->root->Error("Variable '" + name + "' already defined", *this->current_token);
+            else
+                this->root->Error("Variable '" + name + "' already defined in higher scope", *this->current_token);
+        }
+        cur_scope = cur_scope->prev;
+    } while (cur_scope);
+	
+	if (needs_destruction)
+		this->scope->to_destruct.push_back(val);
+	this->scope->named_values[name] = { val, is_const };
+}
+
 void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
 {
 	if (pointer.type->base->type == Types::Struct)

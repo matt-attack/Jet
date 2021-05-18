@@ -893,7 +893,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 
 	bool needs_destruction = false;
 	int i = 0;
-	for (auto ii : *this->_names)
+	for (const auto& ii : *this->_names)
     {
 		auto aname = ii.name.text;
 
@@ -938,6 +938,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 
 			//still need to do store
 			// todo this probably needs to support things with destructors..
+            context->CurrentToken(&ii.name);
 			context->RegisterLocal(aname, CValue(type, 0, var_ptr), false, is_const);
 			continue;
 		}
@@ -1040,6 +1041,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 			Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
 		declare->setDebugLoc(llvm::DebugLoc::get(ii.name.line, ii.name.column, context->function->scope));
 
+        context->CurrentToken(&ii.name);
 		context->RegisterLocal(aname, CValue(type, 0, Alloca), true, is_const);
 
 		//construct it!
