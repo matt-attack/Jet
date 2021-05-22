@@ -84,7 +84,7 @@ namespace Jet
 
 		// Mangling related settings
 		bool is_c_function = false;
-
+        bool is_const = false;
         bool is_extern;
 
 		//virtual stuff

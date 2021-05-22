@@ -382,6 +382,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 	std::string fname;
 	Type* stru = 0;
 	bool devirtualize = false;
+    bool is_const = false;
 	if (auto name = dynamic_cast<NameExpression*>(left))
 	{
 		//ok handle what to do if im an index expression
@@ -394,7 +395,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 		//im a struct yo
 		fname = index->member.text;
 
-		auto left = index->GetBaseElement(context);
+		auto left = index->GetBaseElement(context, &is_const);
 
         // now find the struct (dereference up to one time)
         if (left.type->type == Types::Struct)
@@ -441,7 +442,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 		argsv.push_back(ii.first->Compile(context));
 
 	context->CurrentToken(&this->open);
-	auto ret = context->Call(fname, argsv, stru, devirtualize);
+	auto ret = context->Call(fname, argsv, stru, devirtualize, is_const);
 
 	//destruct if my parent doesnt use me and todo if I have a destructor
 	if (ret.type->type == Types::Struct && dynamic_cast<BlockExpression*>(this->parent))

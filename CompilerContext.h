@@ -339,7 +339,7 @@ namespace Jet
 		CompilerContext* StartFunctionDefinition(Function* function);
 
 		Function* GetMethod(const std::string& name, const std::vector<Type*>& args, Type* Struct = 0);
-		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0, bool devirtualize = false);
+		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0, bool devirtualize = false, bool is_const = false);
 
 		std::vector<std::string> captures;
 		void WriteCaptures(llvm::Value* lambda);

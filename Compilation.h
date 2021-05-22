@@ -138,7 +138,7 @@ namespace Jet
 		Type* TryLookupType(const std::string& name);
 
 		//Give size of zero for non-array
-		CValue AddGlobal(const std::string& name, Type* t, int size, llvm::Constant* init = 0, bool intern = false);
+		CValue AddGlobal(const std::string& name, Type* t, int size, llvm::Constant* init = 0, bool intern = false, bool is_const = false);
 
 		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder, bool time = false, int debug = 2);
 

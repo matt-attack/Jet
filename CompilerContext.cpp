@@ -573,7 +573,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 	}
 }
 
-CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct, bool devirtualize)
+CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct, bool devirtualize, bool is_const)
 {
 	std::vector<Type*> arsgs;
 	for (auto ii : args)
@@ -700,6 +700,11 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 	{
 		this->root->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
 	}
+
+    if (!fun->is_const && is_const)
+    {
+        this->root->Error("Cannot call non-const function '" + name + "' on const value", *this->current_token);
+    } 
 
 	fun->Load(this->root);
 

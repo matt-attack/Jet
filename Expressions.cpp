@@ -309,15 +309,19 @@ Type* IndexExpression::GetBaseType(Compilation* compiler)
 	compiler->Error("wat", token);
 }
 
-CValue IndexExpression::GetBaseElement(CompilerContext* context)
+CValue IndexExpression::GetBaseElement(CompilerContext* context, bool* is_const)
 {
+    if (is_const)
+    {
+        *is_const = false;
+    }
 	if (auto name = dynamic_cast<NameExpression*>(left))
 	{
-		return context->GetVariable(name->GetName());
+		return context->GetVariable(name->GetName(), is_const);
 	}
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
 	{
-		return index->GetElement(context);
+		return index->GetElement(context, false, is_const);
 	}
 	else if (auto call = dynamic_cast<CallExpression*>(left))
 	{
@@ -461,7 +465,7 @@ CValue GetStructElement(CompilerContext* context, const std::string& name, const
 
 // Returns either the value or pointer to the element.
 // Pointer is preferred, but some things are values and have no pointer to them
-CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
+CValue IndexExpression::GetElement(CompilerContext* context, bool for_store, bool* is_const)
 {
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
@@ -472,17 +476,21 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 	{
 		auto old = context->current_token;
 		context->CurrentToken(&p->token);
-        bool is_const = false;
-		lhs = context->GetVariable(p->GetName(), &is_const);
-        if (is_const && for_store && lhs.type->type == Types::Struct)
+        bool _is_const = false;
+		lhs = context->GetVariable(p->GetName(), &_is_const);
+        if (_is_const && for_store && lhs.type->type == Types::Struct)
         {
            context->root->Error("Cannot store into const value '" + p->GetName() + "'", p->token);
+        }
+        if (is_const)
+        {
+            *is_const = _is_const;
         }
 		context->CurrentToken(old);
 	}
 	else if (i)
 	{
-		lhs = i->GetElement(context, for_store);
+		lhs = i->GetElement(context, for_store, is_const);
 	}
     else
     {
@@ -636,31 +644,6 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 
 			return CValue(lhs.type->base, 0, loc);
 		}
-		/*
-		else if (lhs.type->base->type == Types::Struct && this->member.text.length() == 0)
-		{
-			auto stru = lhs.type->base->data;
-
-			// todo maybe wrap finding this function into a function
-			auto funiter = stru->functions.find("[]");
-			//todo: search through multimap to find one with the right number of args
-			if (funiter != stru->functions.end() && funiter->second->arguments.size() == 2)
-			{
-				Function* fun = funiter->second;
-				fun->Load(context->root);
-				CValue right = index->Compile(context);
-				//todo: casting
-				return CValue(fun->return_type, context->root->builder.CreateCall(fun->f, { lhs.val, right.val }, "operator_overload"));
-			}
-		}*/
-		/*if (this->token.type == TokenType::LeftBracket)
-		{
-			context->root->Error("Cannot index type '" + lhs.type->base->ToString() + "'", this->token, this->close_bracket);
-		}
-		else
-		{
-			context->root->Error("Cannot index type '" + lhs.type->base->ToString() + "'", this->token);
-		}*/
 	}
 
 	context->root->Error("Unimplemented Get Element for " + lhs.type->ToString(), this->token);

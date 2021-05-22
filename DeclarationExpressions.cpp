@@ -201,11 +201,6 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		argsv.push_back({ type, "this" });
 	}
-    else if (!!const_tok)
-    {
-        // Error if someone specified const
-        context->root->Error("Can only specify const for member functions", this->const_tok);
-    }
 
 	//add the context pointer as an argument if this is a generator
 	if (this->is_generator)
@@ -602,9 +597,17 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	bool advlookup = true;
 	auto str = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
 
+
+    if (!str.length() && !!const_tok)
+    {
+        // Error if someone specified const
+        context->root->Error("Can only specify const for member functions", this->const_tok);
+    }
+
 	Function* fun = new Function(name_prefix, false);
 	fun->expression = this;
 	fun->is_virtual = (this->token.type == TokenType::Virtual);
+    fun->is_const = !!const_tok;
 	context->root->functions.push_back(fun);
 	myself = fun;
 
@@ -862,11 +865,6 @@ CValue LetExpression::Compile(CompilerContext* context)
 
 		auto type = context->root->LookupType(this->_names->front().type.text);
 
-		if (is_const)
-		{
-			context->root->Error("Const global variables are not yet supported", token);
-		}
-
 		//should I add a constructor?
 		llvm::Constant* cval = 0;
 		if (this->_right && this->_right->size() > 0)
@@ -881,11 +879,16 @@ CValue LetExpression::Compile(CompilerContext* context)
 		{
 			std::string len = this->_names->front().type.text;
 			len = len.substr(len.find_first_of('[') + 1);
-			context->root->AddGlobal(this->_names->front().name.text, type->base, std::atoi(len.c_str()));
+		    if (is_const && len.c_str())
+		    {
+			    context->root->Error("Cannot declare a const global array variable.", token);
+		    }
+
+			context->root->AddGlobal(this->_names->front().name.text, type->base, std::atoi(len.c_str()), 0, false, is_const);
 		}
 		else
 		{
-			context->root->AddGlobal(this->_names->front().name.text, type, 0, cval);
+			context->root->AddGlobal(this->_names->front().name.text, type, 0, cval, false, is_const);
 		}
 
 		return CValue();

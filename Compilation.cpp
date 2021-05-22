@@ -1430,7 +1430,8 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 	return type;
 }
 
-CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, llvm::Constant* init, bool intern)
+CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, llvm::Constant* init, bool intern,
+  bool is_const)
 {
 	auto global = this->ns->members.find(name);
 	if (global != this->ns->members.end())
@@ -1443,7 +1444,7 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 	{
 		initializer = init ? init : t->GetDefaultValue(this);
 		type = t->GetLLVMType();
-		my_type = t->GetPointerType();
+		my_type = t;
 		ret_type = t;
 	}
 	else
@@ -1456,10 +1457,18 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 	auto ng = new llvm::GlobalVariable(*module, type, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakODRLinkage/*ExternalLinkage*/, initializer, name);
 
 	this->debug->createGlobalVariableExpression(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), !intern);
-	this->ns->members.insert({ name, Symbol(new CValue(my_type, ng)) });
+    if (is_const && size == 0)
+    {
+        // If its const, we can mark it as a value type
+	    this->ns->members.insert({ name, Symbol(new CValue(my_type, initializer, 0)) });
+    }
+    else
+    {
+        this->ns->members.insert({ name, Symbol(new CValue(my_type, 0, ng)) });
+    }
 
 	//todo if it has a constructor, make sure to call it in the initializers...
-	return CValue(ret_type, ng);
+	return CValue(ret_type, 0, ng);
 }
 
 void Compilation::Error(const std::string& string, Token token)
