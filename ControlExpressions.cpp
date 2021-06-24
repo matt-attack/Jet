@@ -358,7 +358,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		ii.block->Compile(context);
 
 		//need to do this without destructing args
-		context->scope->named_values[ii.name.text] = { CValue(), false };
+		context->scope->named_values[ii.name.text] = CValue();
 		context->PopScope();
 
 		//branch to end
@@ -395,7 +395,8 @@ CValue CallExpression::Compile(CompilerContext* context)
 		//im a struct yo
 		fname = index->member.text;
 
-		auto left = index->GetBaseElement(context, &is_const);
+		auto left = index->GetBaseElement(context);
+        is_const = left.is_const;
 
         // now find the struct (dereference up to one time)
         if (left.type->type == Types::Struct)

@@ -10,15 +10,6 @@ using namespace Jet;
 
 Type Jet::VoidType("void", Types::Void);
 
-llvm::Value* CValue::GetReference()
-{
-	if (this->pointer)
-		return this->pointer;
-
-	//need to make our own copy for this somehow...
-	throw 7;
-}
-
 Type* Type::GetPointerType()
 {
 	if (this->pointer_type)

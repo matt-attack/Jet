@@ -754,7 +754,7 @@ void CompilerContext::SetDebugLocation(const Token& t)
 	this->root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope));
 }
 
-CValue CompilerContext::GetVariable(const std::string& name, bool* is_const)
+CValue CompilerContext::GetVariable(const std::string& name)
 {
 	auto cur = this->scope;
 	CValue value;
@@ -763,11 +763,7 @@ CValue CompilerContext::GetVariable(const std::string& name, bool* is_const)
 		auto iter = cur->named_values.find(name);
 		if (iter != cur->named_values.end())
 		{
-			value = iter->second.value;
-			if (is_const)
-			{
-				*is_const = iter->second.is_const;
-			}
+			value = iter->second;
 			break;
 		}
 		cur = cur->prev;
@@ -775,10 +771,6 @@ CValue CompilerContext::GetVariable(const std::string& name, bool* is_const)
 
 	if (value.type->type == Types::Void)
 	{
-		if (is_const)
-		{
-			*is_const = false;
-		}
 		auto sym = this->root->GetVariableOrFunction(name);
 		if (sym.type != SymbolType::Invalid)
 		{
@@ -786,7 +778,7 @@ CValue CompilerContext::GetVariable(const std::string& name, bool* is_const)
 			{
 				auto function = sym.fn;
 				function->Load(this->root);
-				return CValue(function->GetType(this->root), function->f);
+				return CValue(function->GetType(this->root), function->f, 0, true);
 			}
 			else if (sym.type == SymbolType::Variable)
 			{
@@ -1309,7 +1301,9 @@ void CompilerContext::RegisterLocal(
 	
 	if (needs_destruction)
 		this->scope->to_destruct.push_back(val);
-	this->scope->named_values[name] = { val, is_const };
+
+    val.is_const = is_const;
+	this->scope->named_values[name] = val;
 }
 
 void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)

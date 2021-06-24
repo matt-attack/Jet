@@ -116,10 +116,9 @@ namespace Jet
 			context->CurrentToken(&token);
 
 			//for each scope
-			bool is_const = false;
-			CValue dest = context->GetVariable(token.text, &is_const);
+			CValue dest = context->GetVariable(token.text);
 
-			if (is_const || !dest.pointer)
+			if (dest.is_const || !dest.pointer)
 			{
 				context->root->Error("Cannot assign to const variable '" + token.text + "'", token);
 			}
@@ -506,8 +505,8 @@ namespace Jet
 		}
 
         // Returns a CValue with either the pointer or value of the element.
-		CValue GetElement(CompilerContext* context, bool for_store = false, bool* is_const = 0);
-		CValue GetBaseElement(CompilerContext* context, bool* is_const = 0);
+		CValue GetElement(CompilerContext* context, bool for_store = false);
+		CValue GetBaseElement(CompilerContext* context);
 
 		Type* GetType(CompilerContext* context, bool tc = false);
 		Type* GetBaseType(CompilerContext* context, bool tc = false);

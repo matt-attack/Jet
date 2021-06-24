@@ -25,6 +25,7 @@ namespace Jet
 		Type* type;
 		llvm::Value* val;
 		llvm::Value* pointer;
+        bool is_const;
 
 		CValue()
 		{
@@ -33,10 +34,10 @@ namespace Jet
 			pointer = 0;
 		}
 
-		CValue(Type* type, llvm::Value* val) : type(type), val(val), pointer(0) {}
-		CValue(Type* type, llvm::Value* val, llvm::Value* pointer) : type(type), val(val), pointer(pointer) {}
-
-		llvm::Value* GetReference();
+		CValue(Type* type, llvm::Value* val) 
+          : type(type), val(val), pointer(0), is_const(false) {}
+		CValue(Type* type, llvm::Value* val, llvm::Value* pointer, bool _is_const = false)
+          : type(type), val(val), pointer(pointer), is_const(_is_const) {}
 	};
 
 	enum class Types: char

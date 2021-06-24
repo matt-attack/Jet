@@ -24,12 +24,7 @@ namespace Jet
 {
 	struct Scope
 	{
-		struct NamedValue
-		{
-			CValue value;
-			bool is_const;
-		};
-		std::map<std::string, NamedValue> named_values;
+		std::map<std::string, CValue> named_values;
 
 		std::vector<CValue> to_destruct;
 
@@ -126,7 +121,7 @@ namespace Jet
 			this->tscope->named_values[name] = ty;
 		}
 
-		CValue GetVariable(const std::string& name, bool* is_const = 0);
+		CValue GetVariable(const std::string& name);
 
 		Type* TCGetVariable(const std::string& name)
 		{

@@ -22,14 +22,14 @@ CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
         {
           context->root->Error("Cannot get pointer", *context->current_token);
         }
-		return CValue(var.type->GetPointerType(), var.pointer);
+		return CValue(var.type->GetPointerType(), var.pointer, 0, var.is_const);
 	}
 	else if (p)
 	{
         CValue element = p->GetElement(context);
         if (element.pointer)
         {
-		    return CValue(element.type->GetPointerType(), element.pointer);
+		    return CValue(element.type->GetPointerType(), element.pointer, 0, element.is_const);
         }
         context->root->Error("Cannot get pointer", *context->current_token);
 	}
@@ -162,7 +162,15 @@ CValue PrefixExpression::Compile(CompilerContext* context)
 	context->CurrentToken(&this->_operator);
 
 	if (this->_operator.type == TokenType::BAnd)
-		return GetPtrToExprValue(context, right);
+    {
+		CValue v = GetPtrToExprValue(context, right);
+
+        // error if the value is const
+        if (v.is_const)
+            context->root->Error("Cannot get pointer to const value", _operator);
+
+        return v;
+    }
 
 	auto rhs = right->Compile(context);
 
@@ -295,7 +303,7 @@ Type* IndexExpression::GetBaseType(Compilation* compiler)
 				{
 					auto res = curscope->named_values.find(p->GetName());
 					if (res != curscope->named_values.end())
-						return res->second.value.type;
+						return res->second.type;
 				} while (curscope = curscope->prev);
 				break;
 			}
@@ -309,19 +317,15 @@ Type* IndexExpression::GetBaseType(Compilation* compiler)
 	compiler->Error("wat", token);
 }
 
-CValue IndexExpression::GetBaseElement(CompilerContext* context, bool* is_const)
+CValue IndexExpression::GetBaseElement(CompilerContext* context)
 {
-    if (is_const)
-    {
-        *is_const = false;
-    }
 	if (auto name = dynamic_cast<NameExpression*>(left))
 	{
-		return context->GetVariable(name->GetName(), is_const);
+		return context->GetVariable(name->GetName());
 	}
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
 	{
-		return index->GetElement(context, false, is_const);
+		return index->GetElement(context, false);
 	}
 	else if (auto call = dynamic_cast<CallExpression*>(left))
 	{
@@ -465,7 +469,7 @@ CValue GetStructElement(CompilerContext* context, const std::string& name, const
 
 // Returns either the value or pointer to the element.
 // Pointer is preferred, but some things are values and have no pointer to them
-CValue IndexExpression::GetElement(CompilerContext* context, bool for_store, bool* is_const)
+CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 {
 	auto p = dynamic_cast<NameExpression*>(left);
 	auto i = dynamic_cast<IndexExpression*>(left);
@@ -476,21 +480,16 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store, boo
 	{
 		auto old = context->current_token;
 		context->CurrentToken(&p->token);
-        bool _is_const = false;
-		lhs = context->GetVariable(p->GetName(), &_is_const);
-        if (_is_const && for_store && lhs.type->type == Types::Struct)
+		lhs = context->GetVariable(p->GetName());
+        if (lhs.is_const && for_store && lhs.type->type == Types::Struct)
         {
            context->root->Error("Cannot store into const value '" + p->GetName() + "'", p->token);
-        }
-        if (is_const)
-        {
-            *is_const = _is_const;
         }
 		context->CurrentToken(old);
 	}
 	else if (i)
 	{
-		lhs = i->GetElement(context, for_store, is_const);
+		lhs = i->GetElement(context, for_store);
 	}
     else
     {
