@@ -538,6 +538,12 @@ std::string Compiler::FindProject(const std::string& project_name, const std::st
 
 void Compiler::UpdateProjectList(JetProject* project)
 {
+    // dont add executable projects
+    if (project->IsExecutable())
+    {
+        return;
+    }
+
 	char curpath[500];
 	getcwd(curpath, 500);//todo escape our filename and project name and make parser above able to read it out
 
