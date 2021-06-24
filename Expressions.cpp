@@ -528,7 +528,12 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
     {
         if (this->member.text.length() == 0)//or pointer!!(later)
 		{
-			auto indexv = context->DoCast(context->root->IntType, index->Compile(context));
+            if (!lhs.val)
+            {
+                lhs.val = context->root->builder.CreateLoad(lhs.pointer, "autodereference");
+            }
+
+		    auto indexv = context->DoCast(context->root->IntType, index->Compile(context));
             std::vector<unsigned int> iindex = { 1 };
             auto pointer = context->root->builder.CreateExtractValue(lhs.val, iindex);
 			auto loc = context->root->builder.CreateGEP(pointer, indexv.val, "index");
@@ -615,6 +620,12 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
     }
 	else if (lhs.type->type == Types::Pointer)
 	{
+        // autodereference if we havent already
+        if (!lhs.val)
+        {
+            lhs.val = context->root->builder.CreateLoad(lhs.pointer, "autodereference");
+        }
+
         // Auto dereference struct pointers
 		if (this->member.text.length() && lhs.type->base->type == Types::Struct)
 		{

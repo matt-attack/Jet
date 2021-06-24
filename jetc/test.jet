@@ -3,5 +3,5 @@ fun void hello()
 
 }
 
-extern fun char getchar();
-extern fun void puts(char* x);
+extern_c fun char getchar();
+extern_c fun void puts(char* x);

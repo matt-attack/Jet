@@ -2,5 +2,5 @@ lib: JetCore
 version: 0.0.1
 requires: jetc
 files: core.jet string.jet map.jet vector.jet
-libs: "C:\MinGW\lib\libkernel32.a"
+libs: ""
 defines: TEST

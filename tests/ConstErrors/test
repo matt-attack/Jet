@@ -1,19 +1,47 @@
 
 Compiling Project: tests/ConstErrors
-[error] test/test.jet 20:1 to 20:2: Cannot assign to const variable 'y'
+[error] test/test.jet 10:6 to 10:10: Cannot store into const value 'this'
+[error] >>>      this.x = 7;
+[error] >>>      ~~~~       
+
+[error] test/test.jet 19:4 to 19:5: Cannot assign to const variable 't'
+[error] >>>    t = 0;
+[error] >>>    ~     
+
+[error] test/test.jet 24:4 to 24:5: Cannot store into const value 'x'
+[error] >>>    x.x = 5;
+[error] >>>    ~       
+
+[error] test/test.jet 36:1 to 36:2: Cannot assign to const variable 'y'
 [error] >>>	y = x;
 [error] >>>	~     
 
-[error] test/test.jet 21:1 to 21:2: Cannot assign to const variable 'y'
+[error] test/test.jet 37:1 to 37:2: Cannot assign to const variable 'y'
 [error] >>>	y += 5;
 [error] >>>	~      
 
-[error] test/test.jet 22:1 to 22:2: Cannot assign to const variable 'y'
+[error] test/test.jet 38:1 to 38:2: Cannot assign to const variable 'y'
 [error] >>>	y *= 2;
 [error] >>>	~      
 
-[error] test/test.jet 23:1 to 23:2: Cannot assign to const variable 'y'
+[error] test/test.jet 39:1 to 39:2: Cannot assign to const variable 'y'
 [error] >>>	y -= 7;
 [error] >>>	~      
 
-Compiling Failed: 4 Errors Found
+[error] test/test.jet 40:4 to 40:5: Cannot store into const value 'w'
+[error] >>>    w.x = 7;
+[error] >>>    ~       
+
+[error] test/test.jet 42:4 to 42:16: Cannot assign to const variable 'global_const'
+[error] >>>    global_const = 8;
+[error] >>>    ~~~~~~~~~~~~     
+
+[error] test/test.jet 43:4 to 43:16: Cannot assign to const variable 'global_const'
+[error] >>>    global_const += 8;
+[error] >>>    ~~~~~~~~~~~~      
+
+[error] test/test.jet 45:9 to 45:10: Cannot get pointer to const value
+[error] >>>    test(&y);
+[error] >>>         ~   
+
+Compiling Failed: 11 Errors Found

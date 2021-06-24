@@ -61,44 +61,44 @@ struct map<Any Key, Any Value>
 	fun void map()
 	{
 		puts("constructor a");
-		this->nodes = <ObjNode<Key,Value>*>malloc(sizeof(ObjNode<Key,Value>)*20);
-		this->size = 0;
-		this->node_count = 20;
+		this.nodes = <ObjNode<Key,Value>*>malloc(sizeof(ObjNode<Key,Value>)*20);
+		this.size = 0;
+		this.node_count = 20;
 		
-		for (let uint i = 0; i < this->node_count; i++)
-			this->nodes[i].next = <ObjNode<Key,Value>*>5;
+		for (let uint i = 0; i < this.node_count; i++)
+			this.nodes[i].next = <ObjNode<Key,Value>*>5;
 	}
 	
 	fun void ~map()
 	{
 		puts("destructor");
-		free(<char*>this->nodes);
+		free(<char*>this.nodes);
 	}
 	
 	fun ObjNode<Key,Value>* get_free_pos()
 	{
-		for (let uint i = 0; i < this->node_count; i++)
+		for (let uint i = 0; i < this.node_count; i++)
 		{
-			if (this->nodes[i].next == <ObjNode<Key,Value>*>5)
-				return &this->nodes[i];
+			if (this.nodes[i].next == <ObjNode<Key,Value>*>5)
+				return &this.nodes[i];
 		}
 		return 0;
 	}
 	
 	fun ObjNode<Key,Value>* find(Key k)
 	{
-		let node = &this->nodes[k%this->node_count];
-		if (node->next != <ObjNode<Key,Value>*>5)
+		let node = &this.nodes[k%this.node_count];
+		if (node.next != <ObjNode<Key,Value>*>5)
 		{
 			while (node)
 			{
-				if (node->first == k)
+				if (node.first == k)
 				{
 					return node;
 				}
 				else
 				{
-					node = node->next;
+					node = node.next;
 				}
 			}
 		}
@@ -107,26 +107,26 @@ struct map<Any Key, Any Value>
 	
 	fun void upsize()
 	{
-		let onodes = this->nodes;
-		this->nodes = <ObjNode<Key,Value>*>malloc(sizeof(ObjNode<Key,Value>)*this->node_count*2);
-		this->node_count *= 2;
-		let osize = this->size;
-		this->size = 0;
+		let onodes = this.nodes;
+		this.nodes = <ObjNode<Key,Value>*>malloc(sizeof(ObjNode<Key,Value>)*this.node_count*2);
+		this.node_count *= 2;
+		let osize = this.size;
+		this.size = 0;
 		for (let uint i = 0; i < osize; i++)
 		{
 		
 		}
-		free(<char*>this->nodes);
+		free(<char*>this.nodes);
 	}
 	
 	fun void insert(Key k, Value v)
 	{
-		let node = &this->nodes[k%this->node_count];
-		if (node->next == <ObjNode<Key,Value>*>5)
+		let node = &this.nodes[k%this.node_count];
+		if (node.next == <ObjNode<Key,Value>*>5)
 		{
-			node->first = k;
-			node->second = v;
-			node->next = 0;
+			node.first = k;
+			node.second = v;
+			node.next = 0;
 			return;
 		}
 		

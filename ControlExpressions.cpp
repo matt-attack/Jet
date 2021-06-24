@@ -410,6 +410,7 @@ CValue CallExpression::Compile(CompilerContext* context)
         else if (left.type->type == Types::Pointer &&
                  left.type->base->type == Types::Struct)
         {
+          is_const = false;
           auto val = left.val;
           if (!val)
           {

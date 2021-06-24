@@ -15,10 +15,10 @@ struct string
 #if RELEASE
 		//puts("constructed string");
 #endif
-		this->data = <char*>malloc(sizeof(char)*4);
-		this->max_size = 4;
-		this->cur_size = 1;
-		this->data[0] = 0;
+		this.data = <char*>malloc(sizeof(char)*4);
+		this.max_size = 4;
+		this.cur_size = 1;
+		this.data[0] = 0;
 	}
 	
 	/*fun void string(char* data)
@@ -33,28 +33,28 @@ struct string
 	fun void ~string()
 	{
 		//puts("freeing string");
-		free(this->data);
+		free(this.data);
 		//puts("Freed string");
 		//free(<char*>this->data);
 	}
 	
 	fun int length()
 	{
-		return this->cur_size-1;//returns length of string, not the number of free chars
+		return this.cur_size-1;//returns length of string, not the number of free chars
 	}
 	
 	fun void push_back(char v)
 	{
 		//puts("pushed back");
-		if (this->cur_size >= this->max_size-1)
+		if (this.cur_size >= this.max_size-1)
 		{
 			//resize
-			this->resize(this->cur_size*2);
+			this.resize(this.cur_size*2);
 		}
 		
-		this->data[this->cur_size-1] = v;
-		this->cur_size += 1;
-		this->data[this->cur_size-1] = 0;
+		this.data[this.cur_size-1] = v;
+		this.cur_size += 1;
+		this.data[this.cur_size-1] = 0;
 		
 		//puts(this->c_str());
 		//puts("push_back complete");
@@ -62,48 +62,48 @@ struct string
 	
 	fun void assign(char* str)
 	{	
-		this->resize(100);
+		this.resize(100);
 		let len = 0; 
 		while (str[len] != 0)
 		{
-			this->data[len] = str[len];
+			this.data[len] = str[len];
 			len++;
 		}
-		this->data[len] = 0;
-		this->cur_size = len+1;
+		this.data[len] = 0;
+		this.cur_size = len+1;
 	}
 	
 	fun char* operator[](int index)
 	{
-		return &this->data[index];
+		return &this.data[index];
 	}
 	
 	fun string operator+ (string* other)
 	{
-		return *this;
+		return this;
 	}
 	
 	fun void operator= (string* other)//this will be a constant value
 	{
 		//puts("assign");
 		//printf("%i", other.length());
-		let data = new char[other->length()+1];
-		for (let i = 0; i < other->length() + 1; i++)
-			data[i] = other->data[i];
+		let data = new char[other.length()+1];
+		for (let i = 0; i < other.length() + 1; i++)
+			data[i] = other.data[i];
 			
 		//puts("about to free");
-		free this->data;//free(this->data);
+		free this.data;//free(this->data);
 		//puts("freed");
-		this->max_size = other->length() + 1;
-		this->cur_size = this->max_size;
-		this->data = data.ptr;
+		this.max_size = other.length() + 1;
+		this.cur_size = this.max_size;
+		this.data = data.ptr;
 		//puts("assign complete");
 	}
 	//fun void operator+(
 	
 	fun char* c_str()
 	{
-		return this->data;
+		return this.data;
 	}
 	
 	fun void resize(int size)
@@ -112,15 +112,15 @@ struct string
 		let neww = new char[size];//<char*>malloc(sizeof(char)*size);
 		
 		//copy
-		for (let int i = 0; i < this->cur_size; i++)
+		for (let int i = 0; i < this.cur_size; i++)
 		{
-			neww[i] = this->data[i];
+			neww[i] = this.data[i];
 		}
 		
-		free this->data;
-		//free(<char*>this->data);
-		this->data = neww.ptr;
-		this->max_size = size;
+		free this.data;
+		//free(<char*>this.data);
+		this.data = neww.ptr;
+		this.max_size = size;
 		//puts("done rezizing");
 	}
 }

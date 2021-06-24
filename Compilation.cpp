@@ -496,11 +496,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 			BlockExpression* result = file.second->GetAST(diagnostics, defines);
 			if (diagnostics->GetErrors().size())
 			{//stop if we encountered a parsing error
-				printf("Compilation Stopped, Parser Error\n");
-				errors = 1;
-				delete compilation;
-				compilation = 0;
-				goto error;
+				continue;
 			}
 			//TraitChecker checker(compilation);
 			//result->Visit(&checker);
@@ -523,6 +519,15 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 					goto error;
 				}
 			}
+		}
+
+		if (diagnostics->GetErrors().size())
+		{//stop if we encountered a parsing error
+			printf("Compilation Stopped, Parser Error\n");
+			errors = diagnostics->GetErrors().size();
+			delete compilation;
+			compilation = 0;
+			goto error;
 		}
 	}
 

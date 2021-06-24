@@ -60,7 +60,7 @@ fun int IEnumerable::DoStuff()
 
 fun void IEnumerable::Print()
 {
-	let eenum = this->GetEnumerator();
+	let eenum = this.GetEnumerator();
 	while (eenum.MoveNext() == 1)
 	{
 		//puts("Got one!");
@@ -75,8 +75,8 @@ struct WhereIterable<Any T, IEnumerable Base>
 	fun WhereIterator<T, VectorIterator<T>> GetEnumerator()
 	{
 		let WhereIterator<T, VectorIterator<T>/*typeof(this->iterable->GetEnumerator())*/ > x;
-		x.iter = this->iterable->GetEnumerator();
-		x.fn = this->fn;
+		x.iter = this.iterable.GetEnumerator();
+		x.fn = this.fn;
 		return x;
 	}
 }
@@ -88,20 +88,20 @@ struct WhereIterator<Any T, IEnumerator Base>
 		
 	fun T Current()
 	{
-		return this->iter.Current();
+		return this.iter.Current();
 	}
 		
 	fun void Reset()
 	{
-		this->iter.Reset();
+		this.iter.Reset();
 	}
 		
 	fun int MoveNext()
 	{
-		while (this->iter.MoveNext())
+		while (this.iter.MoveNext())
 		{
-			let fn = this->fn;
-			if (fn(this->iter.Current()))
+			let fn = this.fn;
+			if (fn(this.iter.Current()))
 				return 1;
 		}
 		return 0;
@@ -118,7 +118,7 @@ fun WhereIterable<T, IEnumerable> IEnumerable::Where(function<bool(T)> fn)
 
 fun int IEnumerable::Contains(T t)
 {
-	let eenum = this->GetEnumerator();
+	let eenum = this.GetEnumerator();
 	while (eenum.MoveNext() == 1)
 	{
 		if (eenum.Current() == t)
@@ -135,19 +135,19 @@ struct VectorIterator<Any TTT>
 	
 	fun TTT Current()
 	{
-		return this->data[this->position];
+		return this.data[this.position];
 	}
 	
 	fun void Reset()
 	{
-		this->position = 0;
+		this.position = 0;
 	}
 	
 	fun bool MoveNext()
 	{
-		this->position++;
+		this.position++;
 		let res = 0;
-		if (this->position >= this->size)
+		if (this.position >= this.size)
 			res = 0;
 		else
 			res = 1;
@@ -158,49 +158,49 @@ struct VectorIterator<Any TTT>
 struct vector<Any TT>
 {
 	TT[] data;
-	int cur_size; 
+	uint cur_size; 
 	
 	fun void vector()
 	{
-		this->cur_size = 0;
-		this->data = new TT[4];
+		this.cur_size = 0;
+		this.data = new TT[4];
 	}
 	
 	fun void ~vector()
 	{
-		free this->data;
+		free this.data;
 	}
 	
 	fun VectorIterator<TT> GetEnumerator()
 	{
 		let VectorIterator<TT> iter;
 		iter.position = 0;//important to make sure it is always a valid number
-		iter.size = this->cur_size;
-		iter.data = this->data;
+		iter.size = this.cur_size;
+		iter.data = this.data;
 		return iter;
 	}
 	
 	fun void push_back(TT v)
 	{
 		puts("pushed back");
-		if (this->cur_size >= this->data.size)
+		if (this.cur_size >= this.data.size)
 		{
 			//resize
 			puts("resizing");
-			this->resize(this->cur_size*2);
+			this.resize(this.cur_size*2);
 		}
 
-		this->data[this->cur_size++] = v;
+		this.data[this.cur_size++] = v;
 	}
 	
 	fun uint size()
 	{
-		return this->cur_size;
+		return this.cur_size;
 	}
 	
 	fun TT* operator[](uint index)
 	{
-		return &this->data[index];
+		return &this.data[index];
 	}
 	
 	fun void resize(uint size)
@@ -208,12 +208,12 @@ struct vector<Any TT>
 		let ne = new TT[size];
 
 		//copy
-		for (let int i = 0; i < this->cur_size; i++)
+		for (let int i = 0; i < this.cur_size; i++)
 		{
-			ne[i] = this->data[i];
+			ne[i] = this.data[i];
 		}
 		
-		free this->data;
-		this->data = ne;
+		free this.data;
+		this.data = ne;
 	}
 }

@@ -106,7 +106,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		//if (this->data->expression)
 		//	line = this->data->expression->token.line;
 
-		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 8, llvm::DINode::DIFlags::FlagPublic, typ, 0);
+		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->name, compiler->debug_info.file, line, 1024, 8, llvm::DINode::DIFlags::FlagPublic, typ, 0);
 		this->debug_type = dt;
 
 		//now build and set elements
@@ -1166,7 +1166,10 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 			if (ii.second.fn->expression)
 				add_location(ii.second.fn->expression->token, data, compilation);
 
-			data += "extern fun " + ii.second.fn->return_type->ToString() + " ";
+            if (ii.second.fn->is_c_function)
+			    data += "extern_c fun " + ii.second.fn->return_type->ToString() + " ";
+            else
+			    data += "extern fun " + ii.second.fn->return_type->ToString() + " ";
 			data += ii.first + "(";
 			bool first = false;
 			for (auto arg : ii.second.fn->arguments)

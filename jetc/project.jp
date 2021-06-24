@@ -1,5 +1,5 @@
 lib: jetc
 requires:
 version: 0.1.0
-files: test.jet stdio.jet
-libs: "C:/MinGW/lib/libcrtdll.a"
+files: test.jet
+libs: ""

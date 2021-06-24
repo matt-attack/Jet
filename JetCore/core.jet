@@ -26,11 +26,11 @@ trait Any
 
 }
 
-[stdcall]
-extern fun int CreateThread(char* security_attributes, int stacksize, int(char*) function, char* data, int flags, int* threadid);
+//[stdcall]
+//extern_c fun int CreateThread(char* security_attributes, int stacksize, int(char*) function, char* data, int flags, int* threadid);
 
-[stdcall]
-extern fun int WaitForSingleObject(int threadid, int time);
+//[stdcall]
+//extern_c fun int WaitForSingleObject(int threadid, int time);
 
 struct Thread//<Any Function>
 {
@@ -45,35 +45,35 @@ struct Thread//<Any Function>
 	
 	fun void Thread(int(char*) fn, char* data)
 	{
-		this->thread_id = 0;
-		CreateThread(0, 0, fn, data, 0, &this->thread_id);  
+		this.thread_id = 0;
+		//CreateThread(0, 0, fn, data, 0, &this.thread_id);  
 	}
 	
 	fun void ~Thread()
 	{
-		this->Join();
+		this.Join();
 	}
 	
 	fun void Join()
 	{
-		if (this->thread_id)
-			WaitForSingleObject(this->thread_id, 0);
+		//if (this.thread_id)
+		//	WaitForSingleObject(this.thread_id, 0);
 	}
 	
 	fun void Release()
 	{
-		this->thread_id = 0;
+		this.thread_id = 0;
 	}
 }
 
-extern fun char* malloc(int size);
-extern fun void free(char* data);
+extern_c fun char* malloc(int size);
+extern_c fun void free(char* data);
 
 //extern fun void printf(int arg1);
 
 //extern fun int printf(char* h, int h);
 
-extern fun int puts(char* str);	
+extern_c fun int puts(char* str);	
 /*fun Pointy Tttt(Pointy x)
 {
 	return x;

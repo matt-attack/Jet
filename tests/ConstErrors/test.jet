@@ -1,26 +1,48 @@
-
-extern_c fun int printf(char* h, int h);
-extern_c fun char* malloc(int x);
-
-extern_c fun int puts(char* str);
-extern_c fun char getchar();
-
 extern_c fun void exit(int status);
 
+struct T
+{
+    int x;
+
+    fun void test_const() const
+    {
+      // Not allowed
+      this.x = 7;
+    }
+}
+
 let int global_mut = 7;
-//const int global_const = 7;// this errors (for now)
+const int global_const = 7;
+
+fun void test(int* t)
+{
+    t = 0;
+}
+
+fun void test2(T x)
+{
+    x.x = 5;
+}
 
 fun int main()
 {
     // A basic checkout of const
 	let x = 5;
 	const y = 5;
+    let T z;
+    const T w;
 	
 	// Not allowed!
 	y = x;
 	y += 5;
 	y *= 2;
 	y -= 7;
+    w.x = 7;
+
+    global_const = 8;
+    global_const += 8;
+
+    test(&y);
 
     exit(0);
 	
