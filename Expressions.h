@@ -17,7 +17,7 @@ namespace Jet
 	class Source;
 	class Compiler;
 
-	class Expression// : public SyntaxNode
+	class Expression
 	{
 		std::string qualified_namespace_;// cache
 	public:
@@ -39,6 +39,8 @@ namespace Jet
 		}
 
 		const std::string& GetNamespaceQualifier();
+
+        inline void ResetNamespace() { qualified_namespace_.clear(); }
 
 		virtual CValue Compile(CompilerContext* context) = 0;
 

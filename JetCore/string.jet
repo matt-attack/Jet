@@ -1,6 +1,11 @@
 
-extern fun int strlen(char* str);
-extern fun void strcpy(char* dest, char* src);
+extern_c fun int strlen(char* str);
+extern_c fun void strcpy(char* dest, char* src);
+
+fun void ttest()
+{
+  puts("hi");
+}
 
 let int v;// = 7;
 struct string
@@ -21,14 +26,14 @@ struct string
 		this.data[0] = 0;
 	}
 	
-	/*fun void string(char* data)
+	fun void string(char* data)
 	{
-		local size = strlen(data);
-		this->data = <char*>malloc(sizeof(char)*(size+2));
-		this->max_size = size+2;
-		this->cur_size = size;
-		strcpy(this->data, data);
-	}*/
+		let size = strlen(data);
+		this.data = <char*>malloc(sizeof(char)*(size+2));
+		this.max_size = size+2;
+		this.cur_size = size;
+		strcpy(this.data, data);
+	}
 	
 	fun void ~string()
 	{

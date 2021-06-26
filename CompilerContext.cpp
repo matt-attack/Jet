@@ -1051,6 +1051,41 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 			}
 		}
 	}
+    if (t->type == Types::Struct)
+    {
+        // Look for a relevant constructor
+        // for now find the exact match
+        for (auto& f: t->data->functions)
+        {
+            if (f.first != t->data->name)
+            {
+                continue;
+            }
+
+            if (f.second->arguments.size() != 2)
+            {
+                continue;
+            }
+
+            if (f.second->arguments[1].first != value.type)
+            {
+                continue;
+            }
+
+            f.second->Load(this->root);
+
+            // Okay, create the object, then construct it
+            // first alloca and store it as the pointer
+            CValue aalloca(t, 0, this->root->builder.CreateAlloca(t->GetLLVMType(), 0, "cast"), false);
+            // then call the constructor
+            std::vector<CValue> v;
+            v.push_back(aalloca);
+            v.push_back(value);
+            f.second->Call(this, v, false); 
+            printf("found constructor for type %s\n", f.second->arguments[1].first->name.c_str());
+            return aalloca;
+        }
+    }
 
 	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
 }

@@ -752,7 +752,6 @@ namespace Jet
 		std::string namespaceprefix_;
 		virtual const char* GetNamespace()
 		{
-			namespaceprefix_ = "_";
 			namespaceprefix_ += this->name.text;
 			return namespaceprefix_.c_str();
 		}
