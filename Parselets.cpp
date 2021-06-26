@@ -1378,7 +1378,8 @@ Expression* NewParselet::parse(Parser* parser, Token token)
 Expression* FreeParselet::parse(Parser* parser, Token token)
 {
 	//try and parse size expression
-	if (parser->LookAhead().type == TokenType::LeftBracket)
+    auto lat = parser->LookAhead().type;
+	if (lat == TokenType::LeftBracket)
 	{
 		auto ob = parser->Consume();
 		auto cb = parser->Consume(TokenType::RightBracket);
@@ -1390,6 +1391,10 @@ Expression* FreeParselet::parse(Parser* parser, Token token)
 		x->close_bracket = cb;
 		return x;
 	}
+    else if (lat == TokenType::LeftParen)
+    {
+        return new NameExpression(token, false);
+    }
 
 	return new FreeExpression(token, parser->ParseExpression(Precedence::ASSIGNMENT));
 }
