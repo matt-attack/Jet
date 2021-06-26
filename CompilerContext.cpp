@@ -1082,7 +1082,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
             v.push_back(aalloca);
             v.push_back(value);
             f.second->Call(this, v, false); 
-            printf("found constructor for type %s\n", f.second->arguments[1].first->name.c_str());
+            //printf("found constructor for type %s\n", f.second->arguments[1].first->name.c_str());
             return aalloca;
         }
     }
@@ -1240,10 +1240,10 @@ void Scope::Destruct(CompilerContext* context, llvm::Value* ignore)
         }
 		else if (ii.type->type == Types::Array && ii.type->base->type == Types::Struct)
 		{
-			auto loc = context->root->builder.CreateGEP(ii.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
+			auto loc = context->root->builder.CreateGEP(ii.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 			auto size = context->root->builder.CreateLoad(loc);
 
-			auto ptr = context->root->builder.CreateGEP(ii.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+			auto ptr = context->root->builder.CreateGEP(ii.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 			ptr = context->root->builder.CreateLoad(ptr);
 			context->Destruct(CValue(ii.type->base->GetPointerType(), ptr), size);
 		}

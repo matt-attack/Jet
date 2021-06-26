@@ -85,6 +85,8 @@ void Function::Load(Compilation* compiler)
 	// todo need to know if this is a C function, if it is we shouldnt mangle
 	const auto mangled_name = mangle(name, this->is_lambda, arguments, is_c_function);
 
+    //printf("mangling %s to %s\n", name.c_str(), mangled_name.c_str());
+
 	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, mangled_name, compiler->module);
 	switch (this->calling_convention)
 	{
@@ -239,7 +241,7 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 	// for every argument that is a struct, pass it by pointer instead of by value
 	for (auto& ii : argsv)
 	{
-		if (ii.val->getType()->isStructTy() && ii.type->type != Types::Array)
+		if (ii.type->type == Types::Struct || ii.type->type == Types::Union)
 		{
 			//convert it to a pointer yo
 			/*auto TheFunction = context->function->f;

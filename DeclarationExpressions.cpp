@@ -573,11 +573,7 @@ std::string FunctionExpression::GetFunctionNamePrefix()
 	else
 		fname = "_lambda_";
 
-	auto str = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
-
 	const auto& ns = this->GetNamespaceQualifier();
-	//if (str.length())// todo this duplicates the class name carried in the namespace
-	//	fname = str + "_" + fname;
 	if (ns.length() > 0)
 		return ns + "_" + fname;
 	return fname;

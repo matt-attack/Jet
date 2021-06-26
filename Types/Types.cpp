@@ -614,6 +614,8 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		StructExpression* expr = dynamic_cast<StructExpression*>(t->data->expression);
 		auto oldname = expr->name;
 		expr->name.text = t->data->name;
+        expr->namespaceprefix_ = "";
+        expr->ResetNamespace();
 
 		int start = compiler->unresolved_types.size();
 
@@ -623,7 +625,10 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
+            {
+                ii.function->ResetNamespace();
 				ii.function->CompileDeclarations(compiler->current_function);
+            }
 
 		expr->AddConstructorDeclarations(t, compiler->current_function);
 
@@ -632,7 +637,10 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
+            {
 				ii.function->DoCompile(compiler->current_function);//the context used may not be proper, but it works
+                ii.function->ResetNamespace();
+            }
 
 		expr->AddConstructors(compiler->current_function);
 
@@ -640,6 +648,8 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 		if (rp)
 			compiler->builder.SetInsertPoint(rp);
 		expr->name = oldname;
+        expr->namespaceprefix_ = "";
+        expr->ResetNamespace();
 	}
 	else
 	{
@@ -647,6 +657,9 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 
 		auto oldname = expr->name;
 		expr->name.text = t->data->name;
+        expr->namespaceprefix_ = "";
+        expr->ResetNamespace();
+
 		//need this when typechecking
 		for (auto ii : t->data->expression->members)
 			if (ii.type == StructMember::FunctionMember)
@@ -669,6 +682,8 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 			compiler->unfinished_templates.push_back(t);
 
 		expr->name = oldname;
+        expr->namespaceprefix_ = "";
+        expr->ResetNamespace();
 	}
 
 	//remove myself from my ns if im a trait
@@ -1378,7 +1393,7 @@ int Type::GetSize()
 	case Types::Double:
 		return 8;
 	case Types::Pointer:
-		return 4;//todo: use correct size for 64 bit when that happens
+		return 8;//todo: use correct size for 64 bit when that happens
 	case Types::Array:
 		return 8;//pointer + integer todo need to use pointer size here too
 	case Types::InternalArray:
