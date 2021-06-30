@@ -171,7 +171,7 @@ struct vector<Any TT>
 		free this.data;
 	}
 	
-	fun VectorIterator<TT> GetEnumerator()
+	fun VectorIterator<TT> GetEnumerator() const
 	{
 		let VectorIterator<TT> iter;
 		iter.position = 0;//important to make sure it is always a valid number
@@ -193,7 +193,7 @@ struct vector<Any TT>
 		this.data[this.cur_size++] = v;
 	}
 	
-	fun uint size()
+	fun uint size() const
 	{
 		return this.cur_size;
 	}

@@ -223,7 +223,8 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 	for (auto ii : *args)
 		arg.push_back(ii.first->TypeCheck(context));
 	
-	auto fun = context->GetMethod(fname, arg, stru);
+    bool is_constructor;
+	auto fun = context->GetMethod(fname, arg, stru, is_constructor);
 	if (fun == 0)
 	{
 		//check variables
@@ -449,7 +450,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 	//destruct if my parent doesnt use me and todo if I have a destructor
 	if (ret.type->type == Types::Struct && dynamic_cast<BlockExpression*>(this->parent))
 	{
-		context->Destruct(CValue(ret.type->GetPointerType(), ret.pointer), 0);
+		context->Destruct(ret, 0);
 	}
 
 	return ret;

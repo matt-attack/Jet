@@ -126,10 +126,11 @@ void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 		if (loc.type->base->data->is_class == true)
 			this->root->Error("Cannot copy class '" + loc.type->base->data->name + "' unless it has a copy operator.", *this->current_token);
 
+        auto stru = val.type->data;
 		// Handle equality operator if we can find it
-		auto funiter = val.type->data->functions.find("=");
+		auto fun_iter = stru->functions.find("=");
 		//todo: search through multimap to find one with the right number of args
-		if (funiter != val.type->data->functions.end() && funiter->second->arguments.size() == 2)
+		if (fun_iter != stru->functions.end() && fun_iter->second->arguments.size() == 2)
 		{
 			llvm::Value* pointer = val.pointer;
 			if (val.pointer == 0)//its a value type (return value)
@@ -143,16 +144,16 @@ void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 				this->root->builder.CreateStore(val.val, pointer);
 			}
 
-			Function* fun = funiter->second;
+			Function* fun = fun_iter->second;
 			fun->Load(this->root);
-			std::vector<CValue> argsv = { loc, CValue(loc.type, pointer) };
+			std::vector<CValue> argsv = { loc, val };
 
 			fun->Call(this, argsv, true);
 
 			if (pointer != val.pointer)
 			{
 				//destruct temp one
-				this->Destruct(CValue(val.type->GetPointerType(), pointer), 0);
+				this->Destruct(CValue(val.type, 0, pointer), 0);
 			}
 			return;
 		}
@@ -408,10 +409,14 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 	this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 }
 
-Function* CompilerContext::GetMethod(const std::string& name, const std::vector<Type*>& args, Type* Struct)
+Function* CompilerContext::GetMethod(
+  const std::string& name,
+  const std::vector<Type*>& args,
+  Type* Struct,
+  bool& is_constructor)
 {
 	Function* fun = 0;
-
+    is_constructor = false;
 	if (Struct == 0)
 	{
 		//global function?
@@ -436,6 +441,7 @@ Function* CompilerContext::GetMethod(const std::string& name, const std::vector<
 				}
 				if (fun)
 				{
+                    is_constructor = true;
 					return fun;
 				}
 			}
@@ -582,11 +588,37 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 	}
 
 	auto old_tok = this->current_token;
-	Function* fun = this->GetMethod(name, arsgs, Struct);
+    bool is_constructor;
+	Function* fun = this->GetMethod(name, arsgs, Struct, is_constructor);
 	this->current_token = old_tok;
+
+    if (is_constructor)
+    {
+        // For constructors, we alloca the struct and then call it
+        auto type = fun->arguments[0].first->base;
+		type->Load(this->root);
+
+		auto TheFunction = this->function->f;
+		llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+			TheFunction->getEntryBlock().begin());
+		auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
+
+		std::vector<llvm::Value*> argsv;
+		int i = 1;
+		argsv.push_back(Alloca);// add 'this' ptr
+		for (auto ii : args)// add other arguments
+			argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);
+
+		fun->Load(this->root);
+
+		this->root->builder.CreateCall(fun->f, argsv);
+
+		return CValue(type, 0, Alloca);
+    }
 
 	if (fun == 0 && Struct == 0)
 	{
+        this->root->Error("Unexpected control flow", *this->current_token);
 		//try and find something like a variable or constructor in the global namespace
 		auto type = this->root->TryLookupType(name);
 		if (type != 0 && type->type == Types::Struct)// If we found a type, call its constructor like a function
@@ -833,6 +865,41 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 		this->root->Error("Cannot return from outside function!", *current_token);
 	}
 
+    // If we are doing a struct return, first copy into the return value before destructing
+    if (ret.type->type == Types::Struct)
+    {
+		llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(ret.val);
+		I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
+
+        // okay, try and do a copy
+        auto copy_iter = ret.type->data->functions.end();// todo actually do and multimap
+        auto assign_iter = ret.type->data->functions.find("=");// todo multimap
+        //if we have a copy constructor , just call it
+        if (copy_iter != ret.type->data->functions.end())// if we have copy constructor (todo)
+        {
+
+        }
+        // todo wrap this into function?
+        else if (assign_iter != ret.type->data->functions.end())// if we have assignment operator
+        {
+            // if we have a constructor, call it
+            this->Construct(CValue(ret.type->GetPointerType(), this->function->f->arg_begin()), 0);
+            // next, call assign
+			Function* fun = assign_iter->second;
+			fun->Load(this->root);
+			std::vector<CValue> argsv = { CValue(ret.type->GetPointerType(), this->function->f->arg_begin()), ret };
+
+			fun->Call(this, argsv, true);
+        }
+        else // otherwise just copy
+        {
+		    //do a memcpy
+		    auto dptr = root->builder.CreatePointerCast(this->function->f->arg_begin(), this->root->CharPointerType->GetLLVMType());
+		    auto sptr = root->builder.CreatePointerCast(ret.pointer, this->root->CharPointerType->GetLLVMType());
+		    root->builder.CreateMemCpy(dptr, 0, sptr, 0, ret.type->GetSize());// todo properly handle alignment
+        }
+    }
+
 	// Call destructors
 	auto cur = this->scope;
 	do
@@ -858,13 +925,6 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 	}
 	else if (ret.type->type == Types::Struct)
 	{
-		llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(ret.val);
-		I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
-
-		//do a memcpy
-		auto dptr = root->builder.CreatePointerCast(this->function->f->arg_begin(), this->root->CharPointerType->GetLLVMType());
-		auto sptr = root->builder.CreatePointerCast(ret.pointer, this->root->CharPointerType->GetLLVMType());
-		root->builder.CreateMemCpy(dptr, 0, sptr, 0, ret.type->GetSize());// todo properly handle alignment
 		return root->builder.CreateRetVoid();
 	}
 
