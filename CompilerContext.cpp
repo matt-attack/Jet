@@ -176,13 +176,21 @@ void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 	}
 	else if (loc.type->base->type == Types::InternalArray)
 	{
-		llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(vall.val);
-		I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
+        if (vall.val)
+        {
+		    llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(vall.val);
+		    I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
+        }
 		auto dptr = root->builder.CreatePointerCast(loc.val, root->CharPointerType->GetLLVMType());
 		auto sptr = root->builder.CreatePointerCast(vall.pointer, root->CharPointerType->GetLLVMType());
 		root->builder.CreateMemCpy(dptr, 0, sptr, 0, loc.type->base->GetSize());// todo properly handle alignment
 		return;
 	}
+
+    if (!vall.val)
+    {
+        vall.val = root->builder.CreateLoad(vall.pointer);
+    }
 	
 	root->builder.CreateStore(vall.val, loc.val);
 }
@@ -222,8 +230,6 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 		if (res != token_to_string.end())
 		{
 			auto funiter = left.type->data->functions.find(res->second);
-			//todo: search through multimap to find one with the right number of args
-			//check args
 			if (funiter != left.type->data->functions.end() && funiter->second->arguments.size() == 2)
 			{
 				Function* fun = funiter->second;
@@ -236,6 +242,16 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 
 	//try to do a cast
 	right = this->DoCast(left.type, right);
+
+    if (!right.val)
+    {
+        right.val = root->builder.CreateLoad(right.pointer);
+    }
+
+    if (!left.val)
+    {
+        left.val = root->builder.CreateLoad(left.pointer);
+    }
 
 	if (left.type->type != right.type->type)
 	{
@@ -868,8 +884,11 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
     // If we are doing a struct return, first copy into the return value before destructing
     if (ret.type->type == Types::Struct)
     {
-		llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(ret.val);
-		I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
+        if (ret.val)
+        {
+		  llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(ret.val);
+		  I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
+        }
 
         // okay, try and do a copy
         auto copy_iter = ret.type->data->functions.end();// todo actually do and multimap
@@ -1366,14 +1385,7 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 
 CValue CompilerContext::Load(const std::string& name)
 {
-	CValue value = GetVariable(name);
-
-    // Perform a load if its not a value type already
-    if (!value.val)
-    {
-      value.val = root->builder.CreateLoad(value.pointer, name.c_str());
-    }
-    return value;
+    return GetVariable(name);
 }
 
 void CompilerContext::RegisterLocal(

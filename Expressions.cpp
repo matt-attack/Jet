@@ -778,11 +778,7 @@ CValue NameExpression::Compile(CompilerContext* context)
 			{
 				//variable
 				Jet::CValue val = *sym.val;
-                // then return, getting value if necessary
-                if (!val.val)
-                {
-                    val.val = context->root->builder.CreateLoad(val.pointer);
-                }
+
                 return val;
 			}
 		}
