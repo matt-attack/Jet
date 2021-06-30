@@ -224,8 +224,23 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 			{ TokenType::LessThan, "<" },
 			{ TokenType::GreaterThan, ">" },
 			{ TokenType::LessThanEqual, "<=" },
-			{ TokenType::GreaterThanEqual, ">=" }
+			{ TokenType::GreaterThanEqual, ">=" },
+			{ TokenType::Equals, "==" }
 		};
+        // special case for != (call == and then not it)
+        if (op == TokenType::NotEqual)
+        {
+			auto funiter = left.type->data->functions.find("==");
+			if (funiter != left.type->data->functions.end() && funiter->second->arguments.size() == 2)
+			{
+				Function* fun = funiter->second;
+				fun->Load(this->root);
+				std::vector<CValue> argsv = { lhsptr, right };// todo probably need to enforce the return type
+                CValue ret = fun->Call(this, argsv, true);
+                ret.val = root->builder.CreateNot(ret.val);
+				return ret;
+			}
+        }
 		auto res = token_to_string.find(op);
 		if (res != token_to_string.end())
 		{
