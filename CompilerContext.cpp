@@ -649,115 +649,64 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 	if (fun == 0 && Struct == 0)
 	{
-        this->root->Error("Unexpected control flow", *this->current_token);
-		//try and find something like a variable or constructor in the global namespace
-		auto type = this->root->TryLookupType(name);
-		if (type != 0 && type->type == Types::Struct)// If we found a type, call its constructor like a function
-		{
-			// Look for its constructor
-			auto range = type->data->functions.equal_range(name);
-			for (auto ii = range.first; ii != range.second; ii++)
-			{
-				if (ii->second->arguments.size() == args.size())
-					fun = ii->second;
-			}
-			if (fun)
-			{
-				//ok, we allocate, call then 
-				//allocate thing
-				type->Load(this->root);
+		//try to find it in variables
+		auto var = this->GetVariable(name);
 
-				auto TheFunction = this->function->f;
-				llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-					TheFunction->getEntryBlock().begin());
-				auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
+		if (var.type->type != Types::Function && (var.type->type != Types::Pointer || var.type->base->type != Types::Function))
+		{
+			if (var.type->type == Types::Struct && var.type->data->template_base && var.type->data->template_base->name == "function")
+			{
+                // its a struct so theres always a pointer
+                assert(var.pointer);
+				auto function_ptr = this->root->builder.CreateGEP(var.pointer, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) }, "fptr");
+
+				//get the template param to examine the type
+				auto type = var.type->data->members.begin()->second.ty;// .find("T")->second.ty;
+
+				if (args.size() != type->function->args.size())
+					this->root->Error("Too many args in function call got " + std::to_string(args.size()) + " expected " + std::to_string(type->function->args.size()), *this->current_token);
 
 				std::vector<llvm::Value*> argsv;
-				int i = 1;
-				argsv.push_back(Alloca);// add 'this' ptr
-				for (auto ii : args)// add other arguments
-					argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
+				for (unsigned int i = 0; i < args.size(); i++)
+					argsv.push_back(this->DoCast(type->function->args[i], args[i]).val);//try and cast to the correct type if we can
 
-				fun->Load(this->root);
+				//add the data
+				auto data_ptr = this->root->builder.CreateGEP(var.pointer, { this->root->builder.getInt32(0), this->root->builder.getInt32(1) });
+				data_ptr = this->root->builder.CreateGEP(data_ptr, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) });
+				argsv.push_back(data_ptr);
 
-				this->root->builder.CreateCall(fun->f, argsv);
+				llvm::Value* fun = this->root->builder.CreateLoad(function_ptr);
 
-				return CValue(type, this->root->builder.CreateLoad(Alloca), Alloca);
+				auto rtype = fun->getType()->getContainedType(0)->getContainedType(0);
+				std::vector<llvm::Type*> fargs;
+				for (unsigned int i = 1; i < fun->getType()->getContainedType(0)->getNumContainedTypes(); i++)
+					fargs.push_back(fun->getType()->getContainedType(0)->getContainedType(i));
+				fargs.push_back(this->root->builder.getInt8PtrTy());
+
+				auto fp = llvm::FunctionType::get(rtype, fargs, false)->getPointerTo();
+				fun = this->root->builder.CreatePointerCast(fun, fp);
+				return CValue(type->function->return_type, this->root->builder.CreateCall(fun, argsv));
 			}
-			else // Fake a constructor if we couldnt find one
-			{
-				type->Load(this->root);
-
-				if (type->type == Types::Struct)
-				{
-					auto TheFunction = this->function->f;
-					llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-						TheFunction->getEntryBlock().begin());
-					auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
-
-					//store defaults here...
-					return CValue(type, this->root->builder.CreateLoad(Alloca), Alloca);
-				}
-
-				return CValue(type, type->GetDefaultValue(this->root));
-			}
+			else
+            {
+				this->root->Error("Cannot call non-function type", *this->current_token);
+            }
 		}
-		else
+		/*if (var.type->type == Types::Pointer && var.type->base->type == Types::Function)
 		{
-			//try to find it in variables
-			auto var = this->GetVariable(name);
+			var.val = this->root->builder.CreateLoad(var.val);
+			var.type = var.type->base;
+		}*/
+        if (!var.val)
+        {
+            var.val = this->root->builder.CreateLoad(var.pointer);
+        }
 
-			if (var.type->type != Types::Function && (var.type->type != Types::Pointer || var.type->base->type != Types::Function))
-			{
-				if (var.type->type == Types::Struct && var.type->data->template_base && var.type->data->template_base->name == "function")
-				{
-                    // its a struct so theres always a pointer
-                    assert(var.pointer);
-					auto function_ptr = this->root->builder.CreateGEP(var.pointer, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) }, "fptr");
+		std::vector<llvm::Value*> argsv;
+		for (unsigned int i = 0; i < args.size(); i++)
+			argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
 
-					//get the template param to examine the type
-					auto type = var.type->data->members.begin()->second.ty;// .find("T")->second.ty;
-
-					if (args.size() != type->function->args.size())
-						this->root->Error("Too many args in function call got " + std::to_string(args.size()) + " expected " + std::to_string(type->function->args.size()), *this->current_token);
-
-					std::vector<llvm::Value*> argsv;
-					for (unsigned int i = 0; i < args.size(); i++)
-						argsv.push_back(this->DoCast(type->function->args[i], args[i]).val);//try and cast to the correct type if we can
-
-					//add the data
-					auto data_ptr = this->root->builder.CreateGEP(var.pointer, { this->root->builder.getInt32(0), this->root->builder.getInt32(1) });
-					data_ptr = this->root->builder.CreateGEP(data_ptr, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) });
-					argsv.push_back(data_ptr);
-
-					llvm::Value* fun = this->root->builder.CreateLoad(function_ptr);
-
-					auto rtype = fun->getType()->getContainedType(0)->getContainedType(0);
-					std::vector<llvm::Type*> fargs;
-					for (unsigned int i = 1; i < fun->getType()->getContainedType(0)->getNumContainedTypes(); i++)
-						fargs.push_back(fun->getType()->getContainedType(0)->getContainedType(i));
-					fargs.push_back(this->root->builder.getInt8PtrTy());
-
-					auto fp = llvm::FunctionType::get(rtype, fargs, false)->getPointerTo();
-					fun = this->root->builder.CreatePointerCast(fun, fp);
-					return CValue(type->function->return_type, this->root->builder.CreateCall(fun, argsv));
-				}
-				else
-					this->root->Error("Cannot call non-function type", *this->current_token);
-			}
-			if (var.type->type == Types::Pointer && var.type->base->type == Types::Function)
-			{
-				var.val = this->root->builder.CreateLoad(var.val);
-				var.type = var.type->base;
-			}
-
-			std::vector<llvm::Value*> argsv;
-			for (unsigned int i = 0; i < args.size(); i++)
-				argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
-
-			return CValue(var.type->function->return_type, this->root->builder.CreateCall(var.val, argsv));
-		}
-		this->root->Error("Function '" + name + "' with " + std::to_string(args.size()) + " arguments is not defined", *this->current_token);
+		return CValue(var.type->function->return_type, this->root->builder.CreateCall(var.val, argsv));
 	}
 	else if (fun == 0)
 	{
