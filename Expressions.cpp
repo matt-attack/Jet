@@ -824,10 +824,11 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 	{
 		auto else_block = llvm::BasicBlock::Create(context->context, "land.shortcircuitelse");
 		auto end_block = llvm::BasicBlock::Create(context->context, "land.endshortcircuit");
-		auto cur_block = context->root->builder.GetInsertBlock();
 
 		auto cond = this->left->Compile(context);
 		cond = context->DoCast(context->root->BoolType, cond);
+
+		auto cur_block = context->root->builder.GetInsertBlock();
 		context->root->builder.CreateCondBr(cond.val, else_block, end_block);
 
 		context->function->f->getBasicBlockList().push_back(else_block);
@@ -849,10 +850,11 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 	{
 		auto else_block = llvm::BasicBlock::Create(context->context, "lor.shortcircuitelse");
 		auto end_block = llvm::BasicBlock::Create(context->context, "lor.endshortcircuit");
-		auto cur_block = context->root->builder.GetInsertBlock();
 
 		auto cond = this->left->Compile(context);
 		cond = context->DoCast(context->root->BoolType, cond);
+
+		auto cur_block = context->root->builder.GetInsertBlock();
 		context->root->builder.CreateCondBr(cond.val, end_block, else_block);
 
 		context->function->f->getBasicBlockList().push_back(else_block);
