@@ -753,7 +753,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 
 		if (used_linker.find("link.exe") == -1)
 		{
-			std::string cmd = linker + " ";
+			std::string cmd = used_linker + " ";
 
 			//set entry
             

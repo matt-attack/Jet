@@ -648,7 +648,12 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
         // If we have a pointer, allow indexing it C style
 		else if (this->member.text.length() == 0)
 		{
-			std::vector<llvm::Value*> iindex = { context->DoCast(context->root->IntType, index->Compile(context)).val };
+            CValue indexv = context->DoCast(context->root->IntType, index->Compile(context));
+            if (!indexv.val)
+            {
+                indexv.val = context->root->builder.CreateLoad(indexv.pointer);
+            }
+			std::vector<llvm::Value*> iindex = { indexv.val };
 
 			auto loc = context->root->builder.CreateGEP(lhs.val, iindex, "pointer_index");
 

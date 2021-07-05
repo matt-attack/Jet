@@ -40,6 +40,11 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		assert(false);
 	}
 
+    if (!value.val)
+    {
+        value.val = root->builder.CreateLoad(value.pointer);
+    }
+
 	if (value.type->type == Types::Float || value.type->type == Types::Double)
 	{
 		switch (operation)
@@ -912,10 +917,13 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 	}
 
 	// Try and cast to the return type if we can
-	if (ret.val)
-	{
-		ret = this->DoCast(this->function->return_type, ret);
-	}
+	ret = this->DoCast(this->function->return_type, ret);
+
+    if (!ret.val)
+    {
+        ret.val = root->builder.CreateLoad(ret.pointer);
+    }
+
 	return root->builder.CreateRet(ret.val);
 }
 
@@ -923,6 +931,11 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 {
 	if (value.type->type == t->type && value.type->data == t->data)
 		return value;
+
+    if (!value.val)
+    {
+        value.val = root->builder.CreateLoad(value.pointer);
+    }
 
 	llvm::Type* tt = t->GetLLVMType();
 	if (value.type->type == Types::Float && t->type == Types::Double)
