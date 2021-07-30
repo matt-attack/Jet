@@ -10,16 +10,16 @@ message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
-include_directories("${PROJECT_BINARY_DIR}" )
+include_directories("${PROJECT_BINARY_DIR}" src)
 
 add_executable(jet 
 	src/tools/jetc.cpp
 	
 	src/Compiler.cpp
 	src/CompilerContext.cpp
-	src/Expressions.cpp
-	src/DeclarationExpressions.cpp
-	src/ControlExpressions.cpp
+	src/expressions/Expressions.cpp
+	src/expressions/DeclarationExpressions.cpp
+	src/expressions/ControlExpressions.cpp
 	src/Parser.cpp
 	src/Parselets.cpp
 	src/Source.cpp

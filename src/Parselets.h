@@ -2,9 +2,9 @@
 #ifndef _JET_PARSELETS_HEADER
 #define _JET_PARSELETS_HEADER
 
-#include "Expressions.h"
-#include "ControlExpressions.h"
-#include "DeclarationExpressions.h"
+#include "expressions/Expressions.h"
+#include "expressions/ControlExpressions.h"
+#include "expressions/DeclarationExpressions.h"
 #include "Token.h"
 
 #include <stdlib.h>

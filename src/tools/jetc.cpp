@@ -9,9 +9,9 @@
 
 #define CODE(code) #code
 
-#include "../Project.h"
-#include "../Compiler.h"
-#include "../Expressions.h"
+#include <Project.h>
+#include <Compiler.h>
+#include <expressions/Expressions.h>
 
 #include <iostream>
 #include <string>

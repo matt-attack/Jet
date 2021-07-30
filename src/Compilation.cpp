@@ -1,9 +1,9 @@
 #include "Compiler.h"
 #include "Project.h"
 #include "Source.h"
-#include "Expressions.h"
-#include "DeclarationExpressions.h"
-#include "ControlExpressions.h"
+#include "expressions/Expressions.h"
+#include "expressions/DeclarationExpressions.h"
+#include "expressions/ControlExpressions.h"
 #include "Lexer.h"
 #include "types/Function.h"
 

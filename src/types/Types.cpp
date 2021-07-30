@@ -1,8 +1,8 @@
 #include "Types.h"
 #include "../Compiler.h"
 #include "../CompilerContext.h"
-#include "../Expressions.h"
-#include "../DeclarationExpressions.h"
+#include <expressions/Expressions.h>
+#include <expressions/DeclarationExpressions.h>
 #include "../Lexer.h"
 #include "Function.h"
 

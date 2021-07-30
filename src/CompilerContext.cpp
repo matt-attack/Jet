@@ -3,8 +3,8 @@
 #include "types/Function.h"
 
 #include "Lexer.h"
-#include "Expressions.h"
-#include "DeclarationExpressions.h"
+#include "expressions/Expressions.h"
+#include "expressions/DeclarationExpressions.h"
 
 #ifdef _DEBUG
 #ifndef DBG_NEW
