@@ -1,7 +1,7 @@
 #include "Expressions.h"
 #include "Compiler.h"
 #include "Parser.h"
-#include "Types/Function.h"
+#include "types/Function.h"
 #include "ControlExpressions.h"
 
 using namespace Jet;

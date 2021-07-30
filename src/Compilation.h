@@ -7,7 +7,7 @@
 #include <functional>
 
 #include "Token.h"
-#include "Types/Types.h"
+#include "types/Types.h"
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>

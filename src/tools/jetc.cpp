@@ -9,9 +9,9 @@
 
 #define CODE(code) #code
 
-#include "Project.h"
-#include "Compiler.h"
-#include "Expressions.h"
+#include "../Project.h"
+#include "../Compiler.h"
+#include "../Expressions.h"
 
 #include <iostream>
 #include <string>
@@ -32,7 +32,7 @@ using namespace Jet;
 #include <sstream>
 //#include <clang-c/Index.h>
 
-#include "arg_parse.h"
+#include "../arg_parse.h"
 //#include "OptionParser.h"
 
 #ifdef _DEBUG

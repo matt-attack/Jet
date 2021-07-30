@@ -5,7 +5,7 @@
 #include "DeclarationExpressions.h"
 #include "ControlExpressions.h"
 #include "Lexer.h"
-#include "Types/Function.h"
+#include "types/Function.h"
 
 #ifdef _WIN32
 #include <direct.h>

@@ -9,8 +9,8 @@
 
 #include <vector>
 
-#include "Types/Types.h"
-#include "Types/Function.h"
+#include "types/Types.h"
+#include "types/Function.h"
 #include "Token.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"

@@ -1,6 +1,6 @@
 #include "Compiler.h"
 #include "CompilerContext.h"
-#include "Types/Function.h"
+#include "types/Function.h"
 
 #include "Lexer.h"
 #include "Expressions.h"

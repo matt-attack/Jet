@@ -13,27 +13,27 @@ add_definitions(${LLVM_DEFINITIONS})
 include_directories("${PROJECT_BINARY_DIR}" )
 
 add_executable(jet 
-	jetc.cpp
+	src/tools/jetc.cpp
 	
-	Compiler.cpp
-	CompilerContext.cpp
-	Expressions.cpp
-	DeclarationExpressions.cpp
-	ControlExpressions.cpp
-	Parser.cpp
-	Parselets.cpp
-	Source.cpp
-	Types/Types.cpp
-	Types/Function.cpp
-	Lexer.cpp
-	Token.cpp
-	Project.cpp
-	Compilation.cpp
+	src/Compiler.cpp
+	src/CompilerContext.cpp
+	src/Expressions.cpp
+	src/DeclarationExpressions.cpp
+	src/ControlExpressions.cpp
+	src/Parser.cpp
+	src/Parselets.cpp
+	src/Source.cpp
+	src/types/Types.cpp
+	src/types/Function.cpp
+	src/Lexer.cpp
+	src/Token.cpp
+	src/Project.cpp
+	src/Compilation.cpp
 )
 target_compile_features(jet PRIVATE cxx_range_for)
 
 add_executable(test_runner 
-	test_runner.cpp
+	src/tools/test_runner.cpp
 )
 target_compile_features(test_runner PRIVATE cxx_range_for)
 
