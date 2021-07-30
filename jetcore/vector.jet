@@ -162,13 +162,16 @@ struct vector<Any TT>
 	
 	fun void vector()
 	{
+        puts("created vector");
 		this.cur_size = 0;
 		this.data = new TT[4];
 	}
 	
 	fun void ~vector()
 	{
+        puts("destroying vector");
 		free this.data;
+        puts("destroyed vector");
 	}
 	
 	fun VectorIterator<TT> GetEnumerator() const

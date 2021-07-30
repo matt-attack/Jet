@@ -37,7 +37,7 @@ void Sleep(int duration)
 #include <thread>
 
 //this adds all the available options to the parser for jet
-void Jet::SetupDefaultCommandOptions(OptionParser* parser)
+/*void Jet::SetupDefaultCommandOptions(OptionParser* parser)
 {
 	parser->AddOption("o", "0", true);
 	parser->AddOption("f", "0", true);
@@ -60,7 +60,7 @@ void CompilerOptions::ApplyOptions(OptionParser* parser)
 	this->linker = parser->GetOption("linker").GetString();
 	this->debug = parser->GetOption("debug").GetInt();
 	this->output_ir = parser->GetOption("ir").GetBool();
-}
+}*/
 
 void Jet::Diagnostic::Print()
 {
@@ -145,7 +145,7 @@ public:
 	}
 };
 
-void ExecuteProject(JetProject* project, const char* projectdir)
+void ExecuteProject(const JetProject* project)
 {
 	//now try running it if we are supposed to
 #ifdef _WIN32
@@ -177,15 +177,11 @@ void ExecuteProject(JetProject* project, const char* projectdir)
 }
 
 extern std::string executable_path;
-int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std::string& confg_name, OptionParser* parser)
+int Compiler::Compile(const JetProject* project, const CompilerOptions* optons, const std::string& config_name)
 {
-	std::unique_ptr<JetProject> project(JetProject::Load(projectdir));
-	if (project == 0)
-		return 0;
-
 	char olddir[1000];
 	getcwd(olddir, 1000);
-	std::string path = projectdir;
+	std::string path = project->path;
 	path += '/';
 
 	if (path.length() > 1)
@@ -194,7 +190,8 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 	//build each dependency
 	bool needs_rebuild = false;
 	int deps = project->dependencies.size();
-	const std::vector<std::string>& resolved_deps = project->ResolveDependencies();
+	std::vector<std::string> resolved_deps;
+    project->ResolveDependencies(resolved_deps);
 	for (int i = 0; i < deps; i++)
 	{
 		auto ii = project->dependencies[i];
@@ -217,16 +214,24 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 
 		if (ii[0] != '.' && ii.find('/') == -1 && ii.find('\\') == -1)
 		{
-			//ok, search for the p/ackage using our database, we didnt give a path to one
+			//ok, search for the package using our database, we didnt give a path to one
 			std::string path = this->FindProject(ii, "0.0.0");
 		}
 
+        // Try and load the package
+        std::unique_ptr<JetProject> proj(JetProject::Load(ii));
+        if (!proj)
+        {
+            printf("Could not load dependency project.");
+            return 0;
+        }
+
 		//spin up new compiler instance and build it
 		Compiler compiler;
-		auto success = compiler.Compile(ii.c_str());
+		auto success = compiler.Compile(proj.get());
 		if (success == 0)
 		{
-			printf("Dependency compilation failed, stopping compilation.");
+			printf("Dependency compilation failed, stopping compilation.\n");
 
 			//restore working directory
 			chdir(olddir);
@@ -238,7 +243,7 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 		}
 	}
 
-	printf("\nCompiling Project: %s\n", projectdir);
+	printf("\nCompiling Project: %s\n", project->path.c_str());
 
 	//read in buildtimes
 	std::vector<int> buildtimes;
@@ -295,15 +300,6 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 		modifiedtimes.push_back(data.st_mtime);
 	}
 
-	std::string config_name = "";
-	if (parser)
-	{
-		SetupDefaultCommandOptions(parser);
-
-		if (parser->commands.size() > 1)
-			config_name = parser->commands[1];
-	}
-
 	//get the config, or default
 	JetProject::BuildConfig configuration;
 	if (config_name.length() > 0)
@@ -312,7 +308,7 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 		bool found = false;
 		for (auto ii : project->configurations)
 		{
-			if (ii.name == confg_name)
+			if (ii.name == config_name)
 			{
 				configuration = ii;
 				found = true;
@@ -338,20 +334,19 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 
 	//read in config from command and stuff
 	CompilerOptions options;
-	if (parser)
-	{
-		parser->Parse(configuration.options);
+    if (optons)
+    {
+        options = *optons;
+    }
 
-		options.ApplyOptions(parser);
-	}
-	else
-	{
+    // todo revamp this
+	/*{
 		OptionParser p;
 		SetupDefaultCommandOptions(&p);
 		p.Parse(configuration.options);
 
 		options.ApplyOptions(&p);
-	}
+	}*/
 
 	//add options to this later
 	FILE* jlib = fopen("build/symbols.jlib", "rb");
@@ -380,7 +375,7 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 
 					if (options.run && project->IsExecutable())
 					{
-						ExecuteProject(project.get(), projectdir);
+						ExecuteProject(project);
 						Sleep(50);//give it a moment to run, for some reason derps up without this
 					}
 					else if (options.run)
@@ -413,7 +408,7 @@ int Compiler::Compile(const char* projectdir, CompilerOptions* optons, const std
 		msg.Print();
 	});
 
-	std::unique_ptr<Compilation> compilation(Compilation::Make(project.get(), &diagnostics, options.time, options.debug));
+	std::unique_ptr<Compilation> compilation(Compilation::Make(project, &diagnostics, options.time, options.debug));
 
 error:
 
@@ -434,7 +429,7 @@ error:
 		return 0;
 	}
 
-	compilation->Assemble(options.target, options.linker, options.optimization, options.time, options.output_ir);
+	compilation->Assemble(resolved_deps, options.target, options.linker, options.optimization, options.time, options.output_ir);
 
 	if (compilation->GetErrors().size() > 0)
 	{
@@ -466,12 +461,12 @@ error:
 	//ok now lets add it to the project cache, lets be sure to always save a backup though and need to get current path of the jetc 
 	if (executable_path.length())
 	{
-		this->UpdateProjectList(project.get());
+		this->UpdateProjectList(project);
 	}
 
 	if (options.run && project->IsExecutable())
 	{
-		ExecuteProject(project.get(), projectdir);
+		ExecuteProject(project);
 		Sleep(50);//give it a moment to run, for some reason derps up without this
 	}
 	else if (options.run)
@@ -536,7 +531,7 @@ std::string Compiler::FindProject(const std::string& project_name, const std::st
 	return "";
 }
 
-void Compiler::UpdateProjectList(JetProject* project)
+void Compiler::UpdateProjectList(const JetProject* project)
 {
     // dont add executable projects
     if (project->IsExecutable())

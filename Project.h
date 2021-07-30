@@ -26,7 +26,7 @@ namespace Jet
 		};
 	private:
 
-		bool opened, is_executable;
+		bool opened;
 
 		JetProject()
 		{
@@ -40,8 +40,10 @@ namespace Jet
 		std::vector<std::string> resolved_deps;
 
 	public:
+        bool is_executable;
 		Document* document;
 		std::string path;
+        std::string output_path;//relative to path, contains no trailing /
 		std::string project_name;
 		std::string version;
 		std::vector<std::string> files;
@@ -63,17 +65,19 @@ namespace Jet
 		};
 		std::vector<BuildConfig> configurations;
 
-		bool IsExecutable()
+		bool IsExecutable() const
 		{
 			return this->is_executable;
 		}
 
 		
-		std::map<std::string, Source*> GetSources();
+		std::map<std::string, Source*> GetSources() const;
 
 		static JetProject* Load(const std::string& projectdir);
 
-		const std::vector<std::string>& ResolveDependencies();
+        static JetProject* Create() { return new JetProject; }
+
+		void ResolveDependencies(std::vector<std::string>& deps) const;
 	};
 }
 

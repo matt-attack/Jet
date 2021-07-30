@@ -170,6 +170,7 @@ bool JetProject::_Load(const std::string& projectdir)
 	}
 
 	this->path = projectdir;
+    this->output_path = "build";
 
 	char olddir[500];
 	getcwd(olddir, 500);
@@ -265,7 +266,7 @@ bool JetProject::_Load(const std::string& projectdir)
 	return true;
 }
 
-std::map<std::string, Source*> JetProject::GetSources()
+std::map<std::string, Source*> JetProject::GetSources() const
 {
 	//char cwd[500];
 	//getcwd(cwd, 500);
@@ -296,10 +297,9 @@ std::map<std::string, Source*> JetProject::GetSources()
 	return sources;
 }
 
-const std::vector<std::string>& JetProject::ResolveDependencies()
+void JetProject::ResolveDependencies(std::vector<std::string>& resolved_deps) const
 {
-	if (this->resolved_deps.size())
-		return this->resolved_deps;
+	resolved_deps.clear();
 
 	for (auto dep : this->dependencies)
 	{
@@ -317,14 +317,13 @@ const std::vector<std::string>& JetProject::ResolveDependencies()
 			//printf("Project \"%s\" resolved to %s\n", dep.c_str(), path.c_str());
 
 			//if we couldnt find it there will just be a blank string that we can handle down later
-			this->resolved_deps.push_back(path);
+			resolved_deps.push_back(path);
 		}
 		else
 		{
-			this->resolved_deps.push_back(dep);
+			resolved_deps.push_back(dep);
 		}
 	}
-	return this->resolved_deps;
 }
 
 JetProject* JetProject::Load(const std::string& projectdir)

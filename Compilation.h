@@ -105,7 +105,7 @@ namespace Jet
 
 		Namespace* global;
 
-		Compilation(JetProject* proj);
+		Compilation(const JetProject* proj);
 	public:
 		bool typecheck;
 		bool compiling_includes = false;
@@ -122,7 +122,7 @@ namespace Jet
 		Type* BoolType;
 		Type* CharPointerType;
 
-		JetProject* project;
+		const JetProject* project;
 
 		Namespace* ns;
 
@@ -140,7 +140,7 @@ namespace Jet
 		//Give size of zero for non-array
 		CValue AddGlobal(const std::string& name, Type* t, int size, llvm::Constant* init = 0, bool intern = false, bool is_const = false);
 
-		static Compilation* Make(JetProject* proj, DiagnosticBuilder* builder, bool time = false, int debug = 2);
+		static Compilation* Make(const JetProject* proj, DiagnosticBuilder* builder, bool time = false, int debug = 2);
 
 		std::vector<Diagnostic>& GetErrors()
 		{
@@ -151,7 +151,7 @@ namespace Jet
 		void Error(const std::string& string, const Token& start, const Token& end);
 
 		//generates and outputs an exe or lib file
-		void Assemble(const std::string& target = "", const std::string& linker = "", int olevel = 0, bool time = false, bool output_ir = false);
+		void Assemble(const std::vector<std::string>& resolved_deps, const std::string& target = "", const std::string& linker = "", int olevel = 0, bool time = false, bool output_ir = false);
 
 
 		//racer stuff
@@ -178,7 +178,7 @@ namespace Jet
 		void Optimize(int level);
 
 		void OutputIR(const char* filename);
-		void OutputPackage(const std::string& project_name, int o_level, bool time = false);
+		void OutputPackage(const std::vector<std::string>& resolved_deps, const std::string& project_name, int o_level, bool time = false);
 
 		void Dump()
 		{

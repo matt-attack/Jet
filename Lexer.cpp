@@ -167,8 +167,10 @@ public:
 			}
 		}
 
-		for (auto ii : keywords)
+		for (auto& ii : keywords)
+        {
 			TokenToString[ii.second] = ii.first;
+        }
 
 		TokenToString[TokenType::Name] = "name";
 		TokenToString[TokenType::Number] = "number";
@@ -406,9 +408,11 @@ Token Lexer::Next()
 
 				ifstack.push_back(condition);
 
-				bool is_true = true;// this->defines[condition];
+				bool is_true = this->defines[condition];
 				if (is_true)
+                {
 					continue;
+                }
 
 				//read until we find and else or end if
 				while (true)
@@ -438,7 +442,9 @@ Token Lexer::Next()
 			else if (toktype == TokenType::EndIfMacro)
 			{
 				if (ifstack.size() > 0)
+                {
 					ifstack.pop_back();
+                }
 				else
 				{
 					diag->Error("#endif without matching #if", Token());

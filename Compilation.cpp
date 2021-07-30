@@ -77,7 +77,7 @@ std::string Jet::exec(const char* cmd, int* error_code) {
 }
 
 llvm::LLVMContext llvm_context_jet;
-Compilation::Compilation(JetProject* proj) : builder(llvm_context_jet), context(llvm_context_jet), project(proj)
+Compilation::Compilation(const JetProject* proj) : builder(llvm_context_jet), context(llvm_context_jet), project(proj)
 {
 	this->typecheck = false;
 	this->target = 0;
@@ -241,7 +241,7 @@ public:
 
 
 extern std::string generate_jet_from_header(const char* header);
-Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnostics, bool time, int debug)
+Compilation* Compilation::Make(const JetProject* project, DiagnosticBuilder* diagnostics, bool time, int debug)
 {
 	Compilation* compilation = new Compilation(project);
 	compilation->diagnostics = diagnostics;
@@ -255,8 +255,22 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		chdir(path.c_str());
 
 	std::vector<std::pair<std::string, char*>> lib_symbols;
-	const std::vector<std::string>& resolved_deps = project->ResolveDependencies();
+	std::vector<std::string> resolved_deps;
+    project->ResolveDependencies(resolved_deps);// todo I'm resolving twos
 	int deps = project->dependencies.size();
+
+    // build a list of jlibs to load
+    std::vector<std::string> jlibs;
+    // add any jlibs from the libraries list
+    for (auto& lib: project->libs)
+    {
+        if (lib.find(".jlib") != std::string::npos)
+        {
+            jlibs.push_back(lib);
+        }
+    }
+
+    // add jlibs from dependencies
 	for (int i = 0; i < deps; i++)
 	{
 		auto ii = resolved_deps[i];
@@ -267,20 +281,27 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		}
 
 		//read in declarations for each dependency
-		std::string symbol_filepath = ii + "/build/symbols.jlib";
+		jlibs.push_back(ii + "/build/" + GetNameFromPath(ii) + ".jlib");
+    }
+
+    for (auto& symbol_filepath: jlibs)
+    {
 		std::ifstream symbols(symbol_filepath, std::ios_base::binary);
 		if (symbols.is_open() == false)
 		{
 			for (auto ii : lib_symbols)
 				delete[] ii.second;
 
-			diagnostics->Error("Dependency include of '" + ii + "' failed: could not find symbol file!", "project.jp");
+			diagnostics->Error("Dependency include of '" + symbol_filepath + "' failed: could not find symbol file!", "project.jp");
 
 			//restore working directory
 			chdir(olddir);
 
 			return 0;
 		}
+
+        // todo add an identifier to the start of the file to prevent anything weird from happening
+        // if the extension is wrong
 
 		//parse symbols
 		symbols.seekg(0, std::ios::end);    // go to the end
@@ -342,7 +363,7 @@ Compilation* Compilation::Make(JetProject* project, DiagnosticBuilder* diagnosti
 		if (hdr == 0)//for now just run it every time
 		{
 			//fix conversion of attributes for calling convention and fix function pointers
-			std::string str = generate_jet_from_header(two.c_str());
+			std::string str;// = generate_jet_from_header(two.c_str());
 			if (str.length() == 0)
 			{
 				diagnostics->Error("Could not find header file '" + two + "' to convert.\n", "project.jp");
@@ -684,7 +705,7 @@ std::string LinkLibLD(const std::string& path)
 	return out;
 }
 
-void Compilation::Assemble(const std::string& target, const std::string& linker, int olevel, bool time, bool output_ir)
+void Compilation::Assemble(const std::vector<std::string>& resolved_deps, const std::string& target, const std::string& linker, int olevel, bool time, bool output_ir)
 {
 	if (this->diagnostics->GetErrors().size() > 0)
 		return;
@@ -727,7 +748,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 		this->OutputIR("build/output.ir");
 
 	//output the .o file and .jlib for this package
-	this->OutputPackage(project->project_name, olevel, time);
+	this->OutputPackage(resolved_deps, project->project_name, olevel, time);
 
 	//and handling the arguments as well as function overloads, which is still a BIG problem
 	//need name mangling
@@ -805,7 +826,7 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 			cmd += "-o \"build/" + project->project_name + extension + "\" ";
 			//todo need to make sure to link in deps of deps also fix linking
 			//need to link each dependency
-			for (auto ii : project->ResolveDependencies())
+			for (auto ii : resolved_deps)
 			{
 				cmd += "\"" + ii + "/build/";//cmd += "-L" + ii + "/build/ ";
 
@@ -813,11 +834,11 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 			}
 
 			//then for each dependency add libs that it needs to link
-			for (auto ii : project->ResolveDependencies())
+			for (auto ii : resolved_deps)
 			{
 				//open up and read first part of the jlib file
 				int size;
-				char* data = ReadDependenciesFromSymbols((ii + "/build/symbols.jlib").c_str(), size);
+				char* data = ReadDependenciesFromSymbols((ii + "/build/" + project->project_name + ".jlib").c_str(), size);
 
 				if (data == 0)
 				{
@@ -865,11 +886,11 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 				cmd += ii + "/build/lib" + GetNameFromPath(ii) + ".a ";
 
 			//then for each dependency add libs that it needs to link
-			for (auto ii : project->ResolveDependencies())
+			for (auto ii : resolved_deps)
 			{
 				//open up and read first part of the jlib file
 				int size;
-				char* data = ReadDependenciesFromSymbols((ii + "/build/symbols.jlib").c_str(), size);
+				char* data = ReadDependenciesFromSymbols((ii + "/build/" + GetNameFromPath(ii) + ".jlib").c_str(), size);
 
 				if (data == 0)
 				{
@@ -911,8 +932,9 @@ void Compilation::Assemble(const std::string& target, const std::string& linker,
 
 		std::string cmd = ar + " rcs build/lib" + project->project_name + ".a ";
 		cmd += "build/" + project->project_name + ".o ";
+        //cmd += "build/" + project->project_name + ".jlib ";
 
-		for (auto ii : project->ResolveDependencies())
+		for (auto ii : resolved_deps)
 		{
 			//need to extract then merge
 			//can use llvm-ar or just ar
@@ -1080,7 +1102,7 @@ std::string Compilation::SetTarget(const std::string& triple)
 	return TheTriple.str().c_str();
 }
 
-void Compilation::OutputPackage(const std::string& project_name, int o_level, bool time)
+void Compilation::OutputPackage(const std::vector<std::string>& resolved_deps, const std::string& project_name, int o_level, bool time)
 {
 	llvm::legacy::PassManager MPM;
 
@@ -1117,15 +1139,15 @@ void Compilation::OutputPackage(const std::string& project_name, int o_level, bo
 	if (this->project->IsExecutable())
 		return;
 
-	std::ofstream stable("build/symbols.jlib", std::ios_base::binary);
+	std::ofstream stable("build/" + project->project_name + ".jlib", std::ios_base::binary);
 	//write names of libraries to link
 	std::string libnames;
 	//add libs from dependencies
-	for (auto ii : this->project->ResolveDependencies())
+	for (auto ii : resolved_deps)
 	{
 		//open up and read first part of the jlib file
 		int size;
-		char* data = ReadDependenciesFromSymbols((ii + "/build/symbols.jlib").c_str(), size);
+		char* data = ReadDependenciesFromSymbols((ii + "/build/" + GetNameFromPath(ii) + ".jlib").c_str(), size);
 
 		if (data == 0)
 		{
