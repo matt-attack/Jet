@@ -329,7 +329,7 @@ Compilation* Compilation::Make(const JetProject* project, DiagnosticBuilder* dia
 
 	char tmp_cwd[500];
 	getcwd(tmp_cwd, 500);
-	auto file = compilation->debug->createFile("../aaaa.jet", "");
+	auto file = compilation->debug->createFile("../aaaa.jet", tmp_cwd);
 	compilation->debug_info.cu = compilation->debug->createCompileUnit(llvm::dwarf::DW_LANG_C, file, "Jet Compiler", false, "", 0, "", emission_kind, 0, emit_debug);
 
 	//compile it

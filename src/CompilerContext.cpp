@@ -850,32 +850,43 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 		this->root->Error("Cannot return from outside function!", *current_token);
 	}
 
+    auto return_type = this->function->return_type;
+
     // If we are doing a struct return, first copy into the return value before destructing
-    if (ret.type->type == Types::Struct)
+    if (return_type->type == Types::Struct)
     {
-        if (ret.val)
+        // do the cast!
+        CValue cast = DoCast(return_type, ret, false, this->function->f->arg_begin());
+
+        if (cast.val)
         {
-		  llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(ret.val);
+		  llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(cast.val);
 		  I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
         }
 
+
         // okay, try and do a copy
-        auto copy_iter = ret.type->data->functions.end();// todo actually do and multimap
-        auto assign_iter = ret.type->data->functions.find("=");// todo multimap
+        auto copy_iter = cast.type->data->functions.end();// todo actually do and multimap
+        auto assign_iter = cast.type->data->functions.find("=");// todo multimap
+        // if a cast was done, we've already constructed
+        if (cast.type != ret.type)
+        {
+
+        }
         //if we have a copy constructor , just call it
-        if (copy_iter != ret.type->data->functions.end())// if we have copy constructor (todo)
+        else if (copy_iter != return_type->data->functions.end())// if we have copy constructor (todo)
         {
 
         }
         // todo wrap this into function?
-        else if (assign_iter != ret.type->data->functions.end())// if we have assignment operator
+        else if (assign_iter != return_type->data->functions.end())// if we have assignment operator
         {
             // if we have a constructor, call it
-            this->Construct(CValue(ret.type->GetPointerType(), this->function->f->arg_begin()), 0);
+            this->Construct(CValue(return_type->GetPointerType(), this->function->f->arg_begin()), 0);
             // next, call assign
 			Function* fun = assign_iter->second;
 			fun->Load(this->root);
-			std::vector<CValue> argsv = { CValue(ret.type->GetPointerType(), this->function->f->arg_begin()), ret };
+			std::vector<CValue> argsv = { CValue(return_type->GetPointerType(), this->function->f->arg_begin()), cast };
 
 			fun->Call(this, argsv, true);
         }
@@ -883,8 +894,8 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
         {
 		    //do a memcpy
 		    auto dptr = root->builder.CreatePointerCast(this->function->f->arg_begin(), this->root->CharPointerType->GetLLVMType());
-		    auto sptr = root->builder.CreatePointerCast(ret.pointer, this->root->CharPointerType->GetLLVMType());
-		    root->builder.CreateMemCpy(dptr, 0, sptr, 0, ret.type->GetSize());// todo properly handle alignment
+		    auto sptr = root->builder.CreatePointerCast(cast.pointer, this->root->CharPointerType->GetLLVMType());
+		    root->builder.CreateMemCpy(dptr, 0, sptr, 0, return_type->GetSize());// todo properly handle alignment
         }
     }
 
@@ -901,7 +912,7 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 		cur = cur->prev;
 	} while (cur);
 
-	if (ret.type->type == Types::Void)
+	if (return_type->type == Types::Void)
 	{
 		// Only allow this if the function return type is void
 		if (this->function->return_type->type != Types::Void)
@@ -911,13 +922,13 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 		}
 		return root->builder.CreateRetVoid();
 	}
-	else if (ret.type->type == Types::Struct)
+	else if (return_type->type == Types::Struct)
 	{
 		return root->builder.CreateRetVoid();
 	}
 
 	// Try and cast to the return type if we can
-	ret = this->DoCast(this->function->return_type, ret);
+	ret = this->DoCast(return_type, ret);
 
     if (!ret.val)
     {
@@ -927,7 +938,7 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 	return root->builder.CreateRet(ret.val);
 }
 
-CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
+CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value* alloca)
 {
 	if (value.type->type == t->type && value.type->data == t->data)
 		return value;
@@ -1132,7 +1143,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit)
 
             // Okay, create the object, then construct it
             // first alloca and store it as the pointer
-            CValue aalloca(t, 0, this->root->builder.CreateAlloca(t->GetLLVMType(), 0, "cast"), false);
+            CValue aalloca(t, 0, alloca ? alloca : this->root->builder.CreateAlloca(t->GetLLVMType(), 0, "cast"), false);
             // then call the constructor
             std::vector<CValue> v;
             v.push_back(aalloca);

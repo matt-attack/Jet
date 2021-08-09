@@ -328,7 +328,7 @@ namespace Jet
 		void Construct(CValue value, llvm::Value* size);
 		void Destruct(CValue pointer, llvm::Value* arr_size);
 
-		CValue DoCast(Type* t, CValue value, bool Explicit = false);
+		CValue DoCast(Type* t, CValue value, bool Explicit = false, llvm::Value* alloca = 0);
 		bool CheckCast(Type* src, Type* dest, bool Explicit = false, bool Throw = true);
 
 		CompilerContext* StartFunctionDefinition(Function* function);

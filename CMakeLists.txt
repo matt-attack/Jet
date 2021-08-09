@@ -12,14 +12,15 @@ add_definitions(${LLVM_DEFINITIONS})
 
 include_directories("${PROJECT_BINARY_DIR}" src)
 
+file(GLOB_RECURSE EXPRESSION_SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/expressions/*.cpp")
+
 add_executable(jet 
 	src/tools/jetc.cpp
+
+    ${EXPRESSION_SOURCES}
 	
 	src/Compiler.cpp
 	src/CompilerContext.cpp
-	src/expressions/Expressions.cpp
-	src/expressions/DeclarationExpressions.cpp
-	src/expressions/ControlExpressions.cpp
 	src/Parser.cpp
 	src/Parselets.cpp
 	src/Source.cpp

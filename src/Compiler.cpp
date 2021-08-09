@@ -222,7 +222,7 @@ int Compiler::Compile(const JetProject* project, const CompilerOptions* optons, 
         std::unique_ptr<JetProject> proj(JetProject::Load(ii));
         if (!proj)
         {
-            printf("Could not load dependency project.");
+            printf("Could not load dependency project.\n");
             return 0;
         }
 

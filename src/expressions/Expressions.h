@@ -11,57 +11,13 @@
 #include "Source.h"
 #include "types/Function.h"
 
+#include <expressions/Expression.h>
+
 
 namespace Jet
 {
 	class Source;
 	class Compiler;
-
-	class Expression
-	{
-		std::string qualified_namespace_;// cache
-	public:
-		Token semicolon;
-		Expression()
-		{
-			parent = 0;
-		}
-
-		virtual ~Expression()
-		{
-
-		}
-
-		Expression* parent;
-		virtual void SetParent(Expression* parent)
-		{
-			this->parent = parent;
-		}
-
-		const std::string& GetNamespaceQualifier();
-
-        inline void ResetNamespace() { qualified_namespace_.clear(); }
-
-		virtual CValue Compile(CompilerContext* context) = 0;
-
-		virtual void CompileDeclarations(CompilerContext* context) = 0;
-
-		virtual void Print(std::string& output, Source* source) = 0;
-
-		//add a type checking function
-		//will be tricky to get implemented correctly will need somewhere to store variables and member types
-		virtual Type* TypeCheck(CompilerContext* context) = 0;
-
-		virtual void Visit(ExpressionVisitor* visitor) = 0;//visits all subexpressions
-
-		virtual const char* GetNamespace() { return 0; }// returns the namespace that we create, if any
-	};
-
-	class IStorableExpression
-	{
-	public:
-		virtual void CompileStore(CompilerContext* context, CValue right) = 0;
-	};
 
 	class NameExpression : public Expression, public IStorableExpression
 	{
@@ -981,11 +937,6 @@ namespace Jet
 			left->Visit(visitor);
 			right->Visit(visitor);
 		}
-	};
-
-	class StatementExpression : public Expression
-	{
-	public:
 	};
 
 	class BlockExpression : public Expression

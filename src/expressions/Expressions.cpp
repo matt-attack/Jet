@@ -44,31 +44,6 @@ CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
 	context->root->Error("Not Implemented", *context->current_token);
 }
 
-const std::string& Expression::GetNamespaceQualifier()
-{
-	if (qualified_namespace_.length())
-	{
-		return qualified_namespace_;
-	}
-
-	// go down the tree and build up a qualified namespace
-	if (!this->parent)
-	{
-		return qualified_namespace_;//no parent, no problem
-	}
-
-	qualified_namespace_ = this->parent->GetNamespaceQualifier();
-
-	const char* ns = GetNamespace();
-	if (ns)
-	{
-		qualified_namespace_ += "__";
-		qualified_namespace_ += ns;
-	}
-	
-	return qualified_namespace_;
-}
-
 CValue SliceExpression::Compile(CompilerContext* context)
 {
     CValue lval = left->Compile(context);

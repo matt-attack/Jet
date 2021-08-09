@@ -147,8 +147,11 @@ int DoCommand(int argc, const char* argv[])
         DiagnosticBuilder b([](Diagnostic& x) {x.Print(); });
         auto compilation = Compilation::Make(p, &b);
 
-        std::vector<std::string> resolved_deps;
-	    compilation->Assemble(resolved_deps);
+        if (compilation)
+        {
+            std::vector<std::string> resolved_deps;
+	        compilation->Assemble(resolved_deps);
+        }
 
         delete compilation;
         delete p;

@@ -1,0 +1,61 @@
+
+extern_c fun int printf(char* h, int h);
+extern_c fun char* malloc(int x);
+
+extern_c fun int puts(char* str);
+
+extern_c fun char getchar();
+
+extern_c fun void exit(int status);
+
+struct Vector3
+{
+    float x;
+    float y;
+    float z;
+
+    fun void Vector3()
+    {
+        this.x = 0.0;
+        this.y = 0.0;
+        this.z = 0.0;
+    }
+
+    fun void Vector3(float x, float y, float z)
+    {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+
+    fun Vector3 operator+(Vector3 v)
+    {
+        return Vector3(this.x + v.x, this.y + v.y, this.z + v.z);
+    }
+
+    fun bool operator==(Vector3 v)
+    {
+        return this.x == v.x || this.y == v.y || this.z == v.z;
+    }
+}
+
+fun int main()
+{
+	//let Vector3 x(1.0, 2.0, 3.0);// todo fix this?
+    let Vector3 y = Vector3(1.0, 2.0, 3.0);
+    let Vector3 z;
+    let w = Vector3(1.0, 2.0, 3.0);
+
+    let q = w + z;
+
+    if (w != q)
+    {
+        exit(-1);
+    }
+
+    if (!(w == q))
+    {
+        exit(-1);
+    }
+	return 0;
+}
