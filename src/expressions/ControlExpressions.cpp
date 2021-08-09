@@ -452,6 +452,11 @@ CValue CallExpression::Compile(CompilerContext* context)
 	{
 		context->Destruct(ret, 0);
 	}
+    else if (ret.type->type == Types::Struct)
+    {
+        // add it to the destruct queue
+        context->DestructLater(ret);
+    }
 
 	return ret;
 }

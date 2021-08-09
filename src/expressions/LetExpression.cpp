@@ -171,6 +171,10 @@ CValue LetExpression::Compile(CompilerContext* context)
                 }
                 else
                 {
+                    if (type->type == Types::Struct)
+                    {
+                        context->Construct(CValue(type->GetPointerType(), Alloca), 0);
+                    }
 				    context->Store(alloc, val);
                 }
 			}
@@ -187,10 +191,15 @@ CValue LetExpression::Compile(CompilerContext* context)
 			if (val.type->GetSize() >= 4)
 				Alloca->setAlignment(4);
 
+            if (type->type == Types::Struct)
+            {
+                context->Construct(CValue(type->GetPointerType(), Alloca), 0);
+            }
+
 			CValue alloc;
 			alloc.val = Alloca;
 			alloc.type = val.type->GetPointerType();
-			context->Store(alloc, val, true);
+			context->Store(alloc, val);
 		}
 		else
 		{

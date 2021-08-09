@@ -124,8 +124,10 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 	this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
 }
 
-void CompilerContext::Store(CValue loc, CValue val, bool RVO)
-{
+void CompilerContext::Store(CValue loc, CValue in_val, bool RVO)
+{	
+	auto val = this->DoCast(loc.type->base, in_val);
+
 	if (loc.type->base->type == Types::Struct && RVO == false && val.type->type == Types::Struct && loc.type->base == val.type)
 	{
 		if (loc.type->base->data->is_class == true)
@@ -163,41 +165,39 @@ void CompilerContext::Store(CValue loc, CValue val, bool RVO)
 			return;
 		}
 	}
-	
-	auto vall = this->DoCast(loc.type->base, val);
 
 	// Handle copying
 	if (loc.type->base->type == Types::Struct)
 	{
-		if (vall.val)
+		if (val.val)
 		{
-			llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(vall.val);
+			llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(val.val);
 			I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
 		}
 		auto dptr = root->builder.CreatePointerCast(loc.val, root->CharPointerType->GetLLVMType());
-		auto sptr = root->builder.CreatePointerCast(vall.pointer, root->CharPointerType->GetLLVMType());
+		auto sptr = root->builder.CreatePointerCast(val.pointer, root->CharPointerType->GetLLVMType());
 		root->builder.CreateMemCpy(dptr, 0, sptr, 0, loc.type->base->GetSize());// todo properly handle alignment
 		return;
 	}
 	else if (loc.type->base->type == Types::InternalArray)
 	{
-        if (vall.val)
+        if (val.val)
         {
-		    llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(vall.val);
+		    llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(val.val);
 		    I->eraseFromParent();// remove the load so we dont freak out llvm doing a struct copy
         }
 		auto dptr = root->builder.CreatePointerCast(loc.val, root->CharPointerType->GetLLVMType());
-		auto sptr = root->builder.CreatePointerCast(vall.pointer, root->CharPointerType->GetLLVMType());
+		auto sptr = root->builder.CreatePointerCast(val.pointer, root->CharPointerType->GetLLVMType());
 		root->builder.CreateMemCpy(dptr, 0, sptr, 0, loc.type->base->GetSize());// todo properly handle alignment
 		return;
 	}
 
-    if (!vall.val)
+    if (!val.val)
     {
-        vall.val = root->builder.CreateLoad(vall.pointer);
+        val.val = root->builder.CreateLoad(val.pointer);
     }
 	
-	root->builder.CreateStore(vall.val, loc.val);
+	root->builder.CreateStore(val.val, loc.val);
 }
 
 CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue lhsptr, CValue right)
@@ -1148,7 +1148,13 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
             std::vector<CValue> v;
             v.push_back(aalloca);
             v.push_back(value);
-            f.second->Call(this, v, false); 
+            f.second->Call(this, v, false);
+
+            if (!alloca)
+            {
+                DestructLater(aalloca);
+            }
+
             //printf("found constructor for type %s\n", f.second->arguments[1].first->name.c_str());
             return aalloca;
         }
@@ -1453,6 +1459,11 @@ void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
 			this->root->builder.SetInsertPoint(end);
 		}
 	}
+}
+
+void CompilerContext::DestructLater(CValue data)
+{
+    scope->to_destruct.push_back(data);
 }
 
 void CompilerContext::Destruct(CValue reference, llvm::Value* arr_size)
