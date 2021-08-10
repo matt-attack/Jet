@@ -192,6 +192,17 @@ llvm::Type* Type::GetLLVMType()
 		return llvm::PointerType::get(this->base->GetLLVMType(), 0);//address space, wat?
 	case (int)Types::Function:
 	{
+        // if we return a struct, make sure to use that as the first argument
+        if (this->function->return_type->type == Types::Struct)
+        {
+		    std::vector<llvm::Type*> args;
+            args.push_back(this->function->return_type->GetPointerType()->GetLLVMType());
+		    for (auto ii : this->function->args)
+			    args.push_back(ii->GetLLVMType());
+
+		    return llvm::FunctionType::get(llvm::Type::getVoidTy(llvm_context_jet), args, false)->getPointerTo();
+        }
+
 		std::vector<llvm::Type*> args;
 		for (auto ii : this->function->args)
 			args.push_back(ii->GetLLVMType());

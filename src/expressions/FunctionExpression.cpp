@@ -652,6 +652,18 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	}
 	else
 	{
+        // make sure we dont have any duplicates
+        auto dup = context->root->ns->members.equal_range(fname);
+        for (auto it = dup.first; it != dup.second; it++)
+        {
+            if (it->second.type == SymbolType::Function &&
+                it->second.fn->arguments.size() != args->size())
+            {
+                continue;
+            }
+            // todo give details about the location of the existing symbol
+            context->root->Error("A matching symbol with name '" + name.text + "' is already defined", this->name);
+        }
 		context->root->ns->members.insert({ fname, fun });
 	}
 

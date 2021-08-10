@@ -23,8 +23,8 @@ namespace Jet
 
 	struct CompilerOptions
 	{
-		int optimization;//from 0-3
-		int debug;//0 = none, 1 = lines, 2 = everything
+		int optimization = 0;//from 0-3
+		int debug = 2;//0 = none, 1 = lines, 2 = everything
 		bool force, run = false, time = false;
 		bool output_ir = false;
 		std::string target, linker;

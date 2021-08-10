@@ -1462,7 +1462,16 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 {
 	auto global = this->ns->members.find(name);
 	if (global != this->ns->members.end())
-		Error("Global variable '" + name + "' already exists in " + this->ns->name, *this->current_function->current_token);
+    {
+        if (this->ns->name.length())
+        {
+   		    Error("Global '" + name + "' already exists in '" + this->ns->name + "'", *this->current_function->current_token);
+        }
+        else
+        {
+		    Error("Global '" + name + "' already exists", *this->current_function->current_token);
+        }
+    }
 
 	llvm::Constant* initializer;
 	llvm::Type* type;
