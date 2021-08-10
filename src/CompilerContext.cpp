@@ -623,6 +623,31 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		arsgs.push_back(ii.type);
 	}
 
+    //check variables first if this isnt a member call
+    if (!Struct)
+    {
+        CValue var = this->GetVariable(name, false);
+
+        if (var.val || var.pointer)
+        {
+            if (var.type->function->args.size() != args.size())
+            {
+		        this->root->Error("Function expected " + std::to_string(var.type->function->args.size()) + " arguments, got " + std::to_string(args.size()), *this->current_token);
+            }
+
+            if (!var.val)
+            {
+                var.val = this->root->builder.CreateLoad(var.pointer);
+            }
+
+		    std::vector<llvm::Value*> argsv;
+		    for (unsigned int i = 0; i < args.size(); i++)
+			    argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
+
+		    return CValue(var.type->function->return_type, this->root->builder.CreateCall(var.val, argsv));
+        }
+    }
+
 	auto old_tok = this->current_token;
     bool is_constructor;
 	Function* fun = this->GetMethod(name, arsgs, Struct, is_constructor);
@@ -771,7 +796,7 @@ void CompilerContext::SetDebugLocation(const Token& t)
 	this->root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope));
 }
 
-CValue CompilerContext::GetVariable(const std::string& name)
+CValue CompilerContext::GetVariable(const std::string& name, bool error)
 {
 	auto cur = this->scope;
 	CValue value;
@@ -838,7 +863,14 @@ CValue CompilerContext::GetVariable(const std::string& name)
 			return value;
 		}
 
-		this->root->Error("Undeclared identifier '" + name + "'", *current_token);
+        if (error)
+        {
+		    this->root->Error("Undeclared identifier '" + name + "'", *current_token);
+        }
+        else
+        {
+            return CValue();
+        }
 	}
 	return value;
 }

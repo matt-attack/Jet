@@ -121,7 +121,7 @@ namespace Jet
 			this->tscope->named_values[name] = ty;
 		}
 
-		CValue GetVariable(const std::string& name);
+		CValue GetVariable(const std::string& name, bool error = true);
 
 		Type* TCGetVariable(const std::string& name)
 		{
