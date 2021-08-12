@@ -647,7 +647,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
             {
                 // add a place to put the return value
                 alloca.type = return_type;
-                alloca.val = this->root->builder.CreateAlloca(return_type->GetLLVMType(), 0, "constructortemp");
+                alloca.val = this->root->builder.CreateAlloca(return_type->GetLLVMType(), 0, "returntemp");
                 argsv.push_back(alloca.val);
             }
 		    for (unsigned int i = 0; i < args.size(); i++)
@@ -939,8 +939,11 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 
 			fun->Call(this, argsv, true);
         }
-        else // otherwise just copy
+        else // otherwise construct and then memcopy
         {
+            // if we have a constructor, call it
+            this->Construct(CValue(return_type->GetPointerType(), this->function->f->arg_begin()), 0);
+
 		    //do a memcpy
 		    auto dptr = root->builder.CreatePointerCast(this->function->f->arg_begin(), this->root->CharPointerType->GetLLVMType());
 		    auto sptr = root->builder.CreatePointerCast(cast.pointer, this->root->CharPointerType->GetLLVMType());
@@ -1373,6 +1376,35 @@ void Scope::Destruct(CompilerContext* context, llvm::Value* ignore)
 	this->destructed = true;
 }
 
+void CompilerContext::EndStatement()
+{
+    for (int i = to_destruct.size() - 1; i >= 0; i--)
+    {
+        const auto& ii = to_destruct[i];
+        if (ii.type->type == Types::Struct)
+        {
+			Destruct(ii, 0);
+        }
+        else if (ii.type->type == Types::InternalArray && ii.type->base->type == Types::Struct)
+        {
+            auto loc = root->builder.CreateGEP(ii.pointer, { root->builder.getInt32(0), root->builder.getInt32(0) });
+            Destruct(CValue(ii.type->base, 0, loc),
+                            root->builder.getInt32(ii.type->size));
+        }
+		else if (ii.type->type == Types::Array && ii.type->base->type == Types::Struct)
+		{
+			auto loc = root->builder.CreateGEP(ii.pointer, { root->builder.getInt32(0), root->builder.getInt32(0) });
+			auto size = root->builder.CreateLoad(loc);
+
+			auto ptr = root->builder.CreateGEP(ii.pointer, { root->builder.getInt32(0), root->builder.getInt32(1) });
+			ptr = root->builder.CreateLoad(ptr);
+			Destruct(CValue(ii.type->base->GetPointerType(), ptr), size);
+		}
+	}
+
+    to_destruct.clear();
+}
+
 void CompilerContext::PopScope()
 {
 	//call destructors
@@ -1512,7 +1544,7 @@ void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
 
 void CompilerContext::DestructLater(CValue data)
 {
-    scope->to_destruct.push_back(data);
+    this->to_destruct.push_back(data);
 }
 
 void CompilerContext::Destruct(CValue reference, llvm::Value* arr_size)

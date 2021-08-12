@@ -175,7 +175,7 @@ CValue LetExpression::Compile(CompilerContext* context)
                     {
                         context->Construct(CValue(type->GetPointerType(), Alloca), 0);
                     }
-				    context->Store(alloc, val);
+				    context->Store(alloc, val);// todo copy constructor
                 }
 			}
 		}
@@ -199,7 +199,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 			CValue alloc;
 			alloc.val = Alloca;
 			alloc.type = val.type->GetPointerType();
-			context->Store(alloc, val);
+			context->Store(alloc, val);// todo copy constructor
 		}
 		else
 		{

@@ -454,7 +454,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 	}
     else if (ret.type->type == Types::Struct)
     {
-        // add it to the destruct queue
+        // add it to the destruct queue to be removed when this statement ends
         context->DestructLater(ret);
     }
 

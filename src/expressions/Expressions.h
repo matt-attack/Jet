@@ -982,6 +982,7 @@ namespace Jet
 				try
 				{
 					ii->Compile(context);
+                    context->EndStatement();// destroy anything created in this statement but unused
 				}
 				catch (int i)
 				{

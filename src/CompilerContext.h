@@ -57,6 +57,9 @@ namespace Jet
 
 		std::stack<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> loops;
 
+
+		std::vector<CValue> to_destruct;
+
 	public:
 		Compilation* root;
 		CompilerContext* parent;
@@ -113,6 +116,7 @@ namespace Jet
 
 		void RegisterLocal(const std::string& name, CValue val, bool needs_destruction = false, bool is_const = false);
 
+        void EndStatement();// todo clean this idea up, this calls destructor on anything created in this statement
 		std::function<void(const std::string& name, Type* ty)> local_reg_callback;
 		void TCRegisterLocal(const std::string& name, Type* ty)
 		{
