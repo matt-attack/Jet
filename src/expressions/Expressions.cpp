@@ -468,7 +468,12 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 	}
     else
     {
-	    context->root->Error("Unexpected condition in Get Element", this->token);
+        // otherwise just compile
+        lhs = left->Compile(context);
+        if (lhs.is_const && for_store && lhs.type->type == Types::Struct)
+        {
+           context->root->Error("Cannot store into const value", p->token);
+        }
     }
 
     // Now index into it using the index or member name
