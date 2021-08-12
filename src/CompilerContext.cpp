@@ -640,11 +640,28 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
                 var.val = this->root->builder.CreateLoad(var.pointer);
             }
 
+            auto return_type = var.type->function->return_type;
 		    std::vector<llvm::Value*> argsv;
+            CValue alloca;
+            if (return_type->type == Types::Struct)
+            {
+                // add a place to put the return value
+                alloca.type = return_type;
+                alloca.val = this->root->builder.CreateAlloca(return_type->GetLLVMType(), 0, "constructortemp");
+                argsv.push_back(alloca.val);
+            }
 		    for (unsigned int i = 0; i < args.size(); i++)
 			    argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
 
-		    return CValue(var.type->function->return_type, this->root->builder.CreateCall(var.val, argsv));
+            auto ret = this->root->builder.CreateCall(var.val, argsv);
+            if (return_type->type == Types::Struct)
+            {
+                return CValue(return_type, 0, alloca.val);
+            }
+            else
+            {
+		        return CValue(return_type, ret);
+            }
         }
     }
 
