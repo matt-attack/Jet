@@ -224,7 +224,7 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 		arg.push_back(ii.first->TypeCheck(context));
 	
     bool is_constructor;
-	auto fun = context->GetMethod(fname, arg, stru, is_constructor);
+	Function* fun = 0;//context->GetMethod(fname, arg, stru, is_constructor);
 	if (fun == 0)
 	{
 		//check variables
@@ -447,14 +447,10 @@ CValue CallExpression::Compile(CompilerContext* context)
 	context->CurrentToken(&this->open);
 	auto ret = context->Call(fname, argsv, stru, devirtualize, is_const);
 
-	//destruct if my parent doesnt use me and todo if I have a destructor
-	if (ret.type->type == Types::Struct && dynamic_cast<BlockExpression*>(this->parent))
-	{
-		context->Destruct(ret, 0);
-	}
-    else if (ret.type->type == Types::Struct)
+    // add any returned struct to the destruct queue to be removed when this statement ends
+    // that way it doesnt leak
+    if (ret.type->type == Types::Struct)
     {
-        // add it to the destruct queue to be removed when this statement ends
         context->DestructLater(ret);
     }
 

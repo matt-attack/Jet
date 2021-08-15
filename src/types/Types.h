@@ -183,10 +183,12 @@ namespace Jet
 		};
 
 		Symbol() { this->type = SymbolType::Invalid; }
-		Symbol(Function* fn) : fn(fn) { this->type = SymbolType::Function; }
+		Symbol(Function* fn) : fn(fn) { if (fn) this->type = SymbolType::Function; else this->type = SymbolType::Invalid; }
 		Symbol(Type* ty) : ty(ty) { this->type = SymbolType::Type; }
 		Symbol(Namespace* ns) : ns(ns) { this->type = SymbolType::Namespace; }
 		Symbol(CValue* val) : val(val) { this->type = SymbolType::Variable; }
+
+        operator bool() { return type != SymbolType::Invalid; } 
 	};
 
 	struct Namespace

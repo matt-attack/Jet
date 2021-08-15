@@ -445,12 +445,19 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 	this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 }
 
-Function* CompilerContext::GetMethod(
+Symbol CompilerContext::GetMethod(
   const std::string& name,
   const std::vector<Type*>& args,
   Type* Struct,
   bool& is_constructor)
 {
+    CValue var = this->GetVariable(name, false);
+
+    if (var.val || var.pointer)
+    {
+        return new CValue(var);
+    }
+
 	Function* fun = 0;
     is_constructor = false;
 	if (Struct == 0)
@@ -497,7 +504,7 @@ Function* CompilerContext::GetMethod(
 				if (fun != type->data->functions.end())
 					return fun->second;
 				else
-					return 0;
+					return Symbol();
 			}
 			//instantiate here
 			this->root->Error("Not implemented", *this->current_token);
@@ -611,6 +618,7 @@ Function* CompilerContext::GetMethod(
 	}
 	else
 	{
+        // todo look for members
 		return Struct->GetMethod(name, args, this);
 	}
 }
@@ -623,55 +631,15 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		arsgs.push_back(ii.type);
 	}
 
-    //check variables first if this isnt a member call
-    if (!Struct)
-    {
-        CValue var = this->GetVariable(name, false);
-
-        if (var.val || var.pointer)
-        {
-            if (var.type->function->args.size() != args.size())
-            {
-		        this->root->Error("Function expected " + std::to_string(var.type->function->args.size()) + " arguments, got " + std::to_string(args.size()), *this->current_token);
-            }
-
-            if (!var.val)
-            {
-                var.val = this->root->builder.CreateLoad(var.pointer);
-            }
-
-            auto return_type = var.type->function->return_type;
-		    std::vector<llvm::Value*> argsv;
-            CValue alloca;
-            if (return_type->type == Types::Struct)
-            {
-                // add a place to put the return value
-                alloca.type = return_type;
-                alloca.val = this->root->builder.CreateAlloca(return_type->GetLLVMType(), 0, "returntemp");
-                argsv.push_back(alloca.val);
-            }
-		    for (unsigned int i = 0; i < args.size(); i++)
-			    argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
-
-            auto ret = this->root->builder.CreateCall(var.val, argsv);
-            if (return_type->type == Types::Struct)
-            {
-                return CValue(return_type, 0, alloca.val);
-            }
-            else
-            {
-		        return CValue(return_type, ret);
-            }
-        }
-    }
-
 	auto old_tok = this->current_token;
-    bool is_constructor;
-	Function* fun = this->GetMethod(name, arsgs, Struct, is_constructor);
+    bool is_constructor = false;
+	Symbol function_symbol = this->GetMethod(name, arsgs, Struct, is_constructor);
 	this->current_token = old_tok;
 
     if (is_constructor)
     {
+        Function* fun = function_symbol.fn;// these must be functions
+
         // For constructors, we alloca the struct and then call it
         auto type = fun->arguments[0].first->base;
 		type->Load(this->root);
@@ -694,117 +662,132 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		return CValue(type, 0, Alloca);
     }
 
-	if (fun == 0 && Struct == 0)
+    bool skip_first = false;// todo clean this up
+	if (!function_symbol && Struct == 0)
 	{
-		//try to find it in variables
-		auto var = this->GetVariable(name);
-
-		if (var.type->type != Types::Function && (var.type->type != Types::Pointer || var.type->base->type != Types::Function))
-		{
-			if (var.type->type == Types::Struct && var.type->data->template_base && var.type->data->template_base->name == "function")
-			{
-                // its a struct so theres always a pointer
-                assert(var.pointer);
-				auto function_ptr = this->root->builder.CreateGEP(var.pointer, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) }, "fptr");
-
-				//get the template param to examine the type
-				auto type = var.type->data->members.begin()->second.ty;// .find("T")->second.ty;
-
-				if (args.size() != type->function->args.size())
-					this->root->Error("Too many args in function call got " + std::to_string(args.size()) + " expected " + std::to_string(type->function->args.size()), *this->current_token);
-
-				std::vector<llvm::Value*> argsv;
-				for (unsigned int i = 0; i < args.size(); i++)
-					argsv.push_back(this->DoCast(type->function->args[i], args[i]).val);//try and cast to the correct type if we can
-
-				//add the data
-				auto data_ptr = this->root->builder.CreateGEP(var.pointer, { this->root->builder.getInt32(0), this->root->builder.getInt32(1) });
-				data_ptr = this->root->builder.CreateGEP(data_ptr, { this->root->builder.getInt32(0), this->root->builder.getInt32(0) });
-				argsv.push_back(data_ptr);
-
-				llvm::Value* fun = this->root->builder.CreateLoad(function_ptr);
-
-				auto rtype = fun->getType()->getContainedType(0)->getContainedType(0);
-				std::vector<llvm::Type*> fargs;
-				for (unsigned int i = 1; i < fun->getType()->getContainedType(0)->getNumContainedTypes(); i++)
-					fargs.push_back(fun->getType()->getContainedType(0)->getContainedType(i));
-				fargs.push_back(this->root->builder.getInt8PtrTy());
-
-				auto fp = llvm::FunctionType::get(rtype, fargs, false)->getPointerTo();
-				fun = this->root->builder.CreatePointerCast(fun, fp);
-				return CValue(type->function->return_type, this->root->builder.CreateCall(fun, argsv));
-			}
-			else
+		this->root->Error("Could not find function '" + name + "'", *this->current_token);
+	}
+	else if (!function_symbol)
+	{
+        // check for variables
+        int i = 0;
+        for (auto& mem: Struct->data->struct_members)
+        {
+            if (mem.name == name)
             {
-				this->root->Error("Cannot call non-function type", *this->current_token);
+                CValue _this = args[0];
+                if (!_this.val)
+                {
+                    _this.val = root->builder.CreateLoad(_this.pointer);
+                }
+
+	            std::vector<llvm::Value*> iindex = { root->builder.getInt32(0), root->builder.getInt32(i) };
+
+	            auto loc = root->builder.CreateGEP(_this.val, iindex, "index");
+
+                // load it m8
+                CValue* val = new CValue(mem.type, 0, loc);
+                function_symbol = val;
+                skip_first = true;
             }
-		}
-		/*if (var.type->type == Types::Pointer && var.type->base->type == Types::Function)
-		{
-			var.val = this->root->builder.CreateLoad(var.val);
-			var.type = var.type->base;
-		}*/
+            i++;
+        }
+        if (!function_symbol)
+		    this->root->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+	}
+
+    // handle actual function vs function pointer
+    if (function_symbol.type == SymbolType::Function)
+    {
+        Function* fun = function_symbol.fn;
+        if (!fun->is_const && is_const)
+        {
+            this->root->Error("Cannot call non-const function '" + name + "' on const value", *this->current_token);
+        } 
+
+	    fun->Load(this->root);
+
+	    //todo: fixme this isnt a very reliable fix
+	    if (args.size() + (fun->return_type->type == Types::Struct ? 1 : 0) != fun->f->arg_size() && fun->arguments.size() > 0 && fun->arguments[0].second == "this")
+	    {	
+		    //ok, we allocate, call then 
+		    //allocate thing
+		    auto type = fun->arguments[0].first->base;
+		    type->Load(this->root);
+
+		    auto TheFunction = this->function->f;
+		    llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+			    TheFunction->getEntryBlock().begin());
+
+		    auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
+
+		    std::vector<llvm::Value*> argsv;
+		    int i = 1;
+
+		    //add struct
+		    argsv.push_back(Alloca);
+		    for (auto ii : args)
+		    	argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
+
+		    fun->Load(this->root);
+
+		    this->root->builder.CreateCall(fun->f, argsv);
+
+		    return CValue(type, this->root->builder.CreateLoad(Alloca));
+	    }
+	    else if (args.size() != fun->f->arg_size() && fun->return_type->type != Types::Struct)
+	    {
+		    this->root->Error("Function expected " + std::to_string(fun->f->arg_size()) + " arguments, got " + std::to_string(args.size()), *this->current_token);
+	    }
+
+	    std::vector<CValue> argsv;
+	    for (unsigned int i = 0; i < args.size(); i++)
+		    argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]));//try and cast to the correct type if we can
+
+	    return fun->Call(this, argsv, devirtualize);
+    }
+    else
+    {
+        // its a variable
+        CValue var = *function_symbol.val;
+        delete function_symbol.val;// we had to allocate it, todo fix this weirdness
+
+        // verify that we can actually call it
+        // todo handle functor structs
+        if (var.type->type != Types::Function)
+        {
+            this->root->Error("Cannot call non-function type", *this->current_token);
+        }
+
         if (!var.val)
         {
             var.val = this->root->builder.CreateLoad(var.pointer);
         }
 
+        auto return_type = var.type->function->return_type;
 		std::vector<llvm::Value*> argsv;
-		for (unsigned int i = 0; i < args.size(); i++)
-			argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
+        CValue alloca;
+        if (return_type->type == Types::Struct)
+        {
+            // add a place to put the return value
+            alloca.type = return_type;
+            alloca.val = this->root->builder.CreateAlloca(return_type->GetLLVMType(), 0, "returntemp");
+            argsv.push_back(alloca.val);
+        }
+		for (unsigned int i = skip_first ? 1 : 0; i < args.size(); i++)
+		    argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
 
-		return CValue(var.type->function->return_type, this->root->builder.CreateCall(var.val, argsv));
-	}
-	else if (fun == 0)
-	{
-		this->root->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
-	}
+        auto ret = this->root->builder.CreateCall(var.val, argsv);
 
-    if (!fun->is_const && is_const)
-    {
-        this->root->Error("Cannot call non-const function '" + name + "' on const value", *this->current_token);
-    } 
-
-	fun->Load(this->root);
-
-	//todo: fixme this isnt a very reliable fix
-	if (args.size() + (fun->return_type->type == Types::Struct ? 1 : 0) != fun->f->arg_size() && fun->arguments.size() > 0 && fun->arguments[0].second == "this")
-	{	
-		//ok, we allocate, call then 
-		//allocate thing
-		auto type = fun->arguments[0].first->base;
-		type->Load(this->root);
-
-		auto TheFunction = this->function->f;
-		llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-			TheFunction->getEntryBlock().begin());
-
-		auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
-
-		std::vector<llvm::Value*> argsv;
-		int i = 1;
-
-		//add struct
-		argsv.push_back(Alloca);
-		for (auto ii : args)
-			argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
-
-		fun->Load(this->root);
-
-		this->root->builder.CreateCall(fun->f, argsv);
-
-		return CValue(type, this->root->builder.CreateLoad(Alloca));
-	}
-	else if (args.size() != fun->f->arg_size() && fun->return_type->type != Types::Struct)
-	{
-		this->root->Error("Function expected " + std::to_string(fun->f->arg_size()) + " arguments, got " + std::to_string(args.size()), *this->current_token);
-	}
-
-	std::vector<CValue> argsv;
-	for (unsigned int i = 0; i < args.size(); i++)
-		argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]));//try and cast to the correct type if we can
-
-	return fun->Call(this, argsv, devirtualize);
+        if (return_type->type == Types::Struct)
+        {
+            return CValue(return_type, 0, alloca.val);
+        }
+        else
+        {
+		    return CValue(return_type, ret);
+        }
+    }
 }
 
 void CompilerContext::SetDebugLocation(const Token& t)

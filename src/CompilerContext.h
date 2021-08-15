@@ -338,7 +338,7 @@ namespace Jet
 
 		CompilerContext* StartFunctionDefinition(Function* function);
 
-		Function* GetMethod(const std::string& name, const std::vector<Type*>& args, Type* Struct, bool& is_constructor);
+		Symbol GetMethod(const std::string& name, const std::vector<Type*>& args, Type* Struct, bool& is_constructor);
 		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0, bool devirtualize = false, bool is_const = false);
 
 		std::vector<std::string> captures;

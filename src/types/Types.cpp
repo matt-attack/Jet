@@ -861,8 +861,11 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 
 		return fun;
 	}
+
 	if (this->type != Types::Struct)
+    {
 		return 0;
+    }
 
 	//im a struct yo
 	Function* fun = 0;
@@ -876,55 +879,57 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 			fun = ii->second;
 	}
 
-	if (fun == 0)
+    if (fun)
+    {
+        return fun;
+    }
+
+	//check for uncompiled trait extension methods and compile them if we find em
+	auto ttraits = this->GetTraits(context->root);
+	for (auto tr : ttraits)
 	{
-		//check for uncompiled trait extension methods and compile them if we find em
-		auto ttraits = this->GetTraits(context->root);
-		for (auto tr : ttraits)
+		auto frange = tr.second->extension_methods.equal_range(name);
+		for (auto ii = frange.first; ii != frange.second; ii++)
 		{
-			auto frange = tr.second->extension_methods.equal_range(name);
-			for (auto ii = frange.first; ii != frange.second; ii++)
-			{
-				//pick one with the right number of args
-				if (def || ii->second->arguments.size() == args.size())
-					fun = ii->second;
-			}
+			//pick one with the right number of args
+			if (def || ii->second->arguments.size() == args.size())
+				fun = ii->second;
+		}
 
-			if (fun)
-			{
-				auto ns = new Namespace;
-				ns->name = tr.second->name;
-				ns->parent = context->root->ns;
-				context->root->ns = ns;
+		if (fun)
+		{
+			auto ns = new Namespace;
+			ns->name = tr.second->name;
+			ns->parent = context->root->ns;
+			context->root->ns = ns;
 
-				context->root->ns->members.insert({ tr.second->name, this });
+			context->root->ns->members.insert({ tr.second->name, this });
 
 
-				auto rp = context->root->builder.GetInsertBlock();
-				auto dp = context->root->builder.getCurrentDebugLocation();
+			auto rp = context->root->builder.GetInsertBlock();
+			auto dp = context->root->builder.getCurrentDebugLocation();
 
-				//compile function
-				auto oldn = fun->expression->Struct.text;
-				fun->expression->Struct.text = this->name;
-				int i = 0;
-				for (auto ii : tr.second->templates)
-					context->root->ns->members.insert({ ii.second, tr.first[i++] });
+			//compile function
+			auto oldn = fun->expression->Struct.text;
+			fun->expression->Struct.text = this->name;
+			int i = 0;
+			for (auto ii : tr.second->templates)
+				context->root->ns->members.insert({ ii.second, tr.first[i++] });
 
-				fun->expression->CompileDeclarations(context);
-				fun->expression->DoCompile(context);
+			fun->expression->CompileDeclarations(context);
+			fun->expression->DoCompile(context);
 
-				context->root->ns->members.erase(context->root->ns->members.find(tr.second->name));
+			context->root->ns->members.erase(context->root->ns->members.find(tr.second->name));
 
-				context->root->ns = context->root->ns->parent;
-				fun->expression->Struct.text = oldn;
+			context->root->ns = context->root->ns->parent;
+			fun->expression->Struct.text = oldn;
 
-				context->root->builder.SetCurrentDebugLocation(dp);
-				context->root->builder.SetInsertPoint(rp);
+			context->root->builder.SetCurrentDebugLocation(dp);
+			context->root->builder.SetInsertPoint(rp);
 
-				fun = this->data->functions.find(name)->second;
+			fun = this->data->functions.find(name)->second;
 
-				break;
-			}
+			break;
 		}
 	}
 	return fun;
