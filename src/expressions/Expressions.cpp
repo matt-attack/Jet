@@ -789,6 +789,7 @@ CValue OperatorAssignExpression::Compile(CompilerContext* context)
 		lhsptr = GetPtrToExprValue(context, left);
 	auto rhs = this->right->Compile(context);
 
+	context->CurrentToken(&token);
 	auto res = context->BinaryOperation(token.type, lhs, lhsptr, rhs);
 
 	if (auto storable = dynamic_cast<IStorableExpression*>(this->left))
@@ -864,7 +865,8 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		lhsptr = GetPtrToExprValue(context, left);
 
 	auto rhs = this->right->Compile(context);
-
+    
+	context->CurrentToken(&this->_operator);
 	return context->BinaryOperation(this->_operator.type, lhs, lhsptr, rhs);
 }
 

@@ -42,6 +42,7 @@ namespace Jet
 	};
 	
 	class FunctionExpression;
+    class ExternExpression;
 
 	enum class CallingConvention
 	{
@@ -100,6 +101,7 @@ namespace Jet
 		FunctionExpression* template_base;
 		std::vector<std::pair<Type*, std::string>> templates;
 		FunctionExpression* expression;
+        ExternExpression* extern_expression;//todo make this not different
 
 		bool loaded;
 

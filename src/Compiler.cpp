@@ -62,46 +62,6 @@ void CompilerOptions::ApplyOptions(OptionParser* parser)
 	this->output_ir = parser->GetOption("ir").GetBool();
 }*/
 
-void Jet::Diagnostic::Print()
-{
-#ifndef _WIN32
-	const char* m_type = "\x1B[31merror\x1B[0m";
-#else
-	const char* m_type = "error";
-#endif
-	if (token.type != TokenType::InvalidToken)
-	{
-		unsigned int startrow = token.column;
-		unsigned int endrow = token.column + token.text.length();
-
-		// Handle an end token
-		if (end.type != TokenType::InvalidToken)
-		{
-			endrow = end.column + end.text.length();
-		}
-
-		std::string code = this->line;
-		std::string underline = "";
-		for (unsigned int i = 0; i < code.length(); i++)
-		{
-			if (code[i] == '\t')
-				underline += '\t';
-			else if (i >= startrow && i < endrow)
-				underline += '~';
-			else
-				underline += ' ';
-		}
-		printf("[%s] %s %d:%d to %d:%d: %s\n", m_type, this->file.c_str(), token.line, startrow, token.line, endrow, message.c_str());
-		printf("[%s] >>>%s\n", m_type, code.c_str());
-		printf("[%s] >>>%s\n\n", m_type, underline.c_str());
-	}
-	else
-	{
-		//just print something out, it was probably a build system error, not one that occurred in the code
-		printf("[%s] %s: %s\n", m_type, this->file.c_str(), message.c_str());
-	}
-}
-
 class MemberRenamer : public ExpressionVisitor
 {
 	std::string stru, member, newname;
@@ -209,6 +169,11 @@ int Compiler::Compile(const JetProject* project, const CompilerOptions* optons, 
 		{
 			printf("Dependency \"%s\" resolved to %s.\n", ii.c_str(), resolved_deps[i].c_str());
 		}
+
+        if (optons && !optons->build_deps)
+        {
+            continue;
+        }
 
 		ii = resolved_deps[i];
 

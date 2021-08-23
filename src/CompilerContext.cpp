@@ -649,15 +649,12 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 			TheFunction->getEntryBlock().begin());
 		auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
 
-		std::vector<llvm::Value*> argsv;
-		int i = 1;
-		argsv.push_back(Alloca);// add 'this' ptr
+		std::vector<CValue> argsv;
+		argsv.push_back(CValue(type->GetPointerType(), Alloca));// add 'this' ptr
 		for (auto ii : args)// add other arguments
-			argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);
+			argsv.push_back(ii);
 
-		fun->Load(this->root);
-
-		this->root->builder.CreateCall(fun->f, argsv);
+        fun->Call(this, argsv, false);
 
 		return CValue(type, 0, Alloca);
     }
@@ -693,7 +690,9 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
             i++;
         }
         if (!function_symbol)
+        {
 		    this->root->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+        }
 	}
 
     // handle actual function vs function pointer
@@ -740,11 +739,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		    this->root->Error("Function expected " + std::to_string(fun->f->arg_size()) + " arguments, got " + std::to_string(args.size()), *this->current_token);
 	    }
 
-	    std::vector<CValue> argsv;
-	    for (unsigned int i = 0; i < args.size(); i++)
-		    argsv.push_back(this->DoCast(fun->arguments[i].first, args[i]));//try and cast to the correct type if we can
-
-	    return fun->Call(this, argsv, devirtualize);
+	    return fun->Call(this, args, devirtualize);
     }
     else
     {
@@ -775,8 +770,10 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
             argsv.push_back(alloca.val);
         }
 		for (unsigned int i = skip_first ? 1 : 0; i < args.size(); i++)
+        {
 		    argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
-
+        }
+        // todo migrate call to function type rather than function object
         auto ret = this->root->builder.CreateCall(var.val, argsv);
 
         if (return_type->type == Types::Struct)

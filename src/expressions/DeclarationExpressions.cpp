@@ -66,7 +66,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	bool is_c = (token.text == "extern_c");
 
 	Function* fun = new Function(fname, false, is_c, true);
-
+    fun->extern_expression = this;
 	if (auto attr = dynamic_cast<AttributeExpression*>(this->parent))
 	{
 		//add the attribute to the Function

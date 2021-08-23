@@ -27,6 +27,7 @@ namespace Jet
 		int debug = 2;//0 = none, 1 = lines, 2 = everything
 		bool force, run = false, time = false;
 		bool output_ir = false;
+        bool build_deps = true;
 		std::string target, linker;
 		CompilerOptions()
 		{

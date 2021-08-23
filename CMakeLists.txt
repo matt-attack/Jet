@@ -21,6 +21,7 @@ add_executable(jet
 	
 	src/Compiler.cpp
 	src/CompilerContext.cpp
+    src/Diagnostics.cpp
 	src/Parser.cpp
 	src/Parselets.cpp
 	src/Source.cpp

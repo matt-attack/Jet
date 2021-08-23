@@ -9,6 +9,8 @@
 #include "Token.h"
 #include "types/Types.h"
 
+#include "Diagnostics.h"
+
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -21,42 +23,6 @@ namespace llvm
 namespace Jet
 {
 	std::string exec(const char* cmd, int* error_code = 0);
-
-	struct Diagnostic
-	{
-		std::string message;
-		std::string file;
-
-		std::string line;//the line of code that the function was on
-		Token token;
-		Token end;//optional
-
-		int severity;//0 = error, 1 = warning, 2 = info ect..
-		void Print();
-	};
-
-	class DiagnosticBuilder
-	{
-		friend class Compilation;
-		std::vector<Diagnostic> diagnostics;
-		std::function<void(Diagnostic&)> callback;
-		Compilation* compilation;
-	public:
-
-		DiagnosticBuilder(std::function<void(Diagnostic&)> callback) : callback(callback)
-		{
-
-		}
-
-		void Error(const std::string& text, const Token& start, const Token& end);
-		void Error(const std::string& text, const Token& token);
-		void Error(const std::string& text, const std::string& file, int line = -1);
-
-		std::vector<Diagnostic>& GetErrors()
-		{
-			return diagnostics;
-		}
-	};
 
 	struct Namespace;
 	class Source;
@@ -147,6 +113,7 @@ namespace Jet
 			return this->diagnostics->GetErrors();
 		}
 
+        void Info(const std::string& string, Token token);
 		void Error(const std::string& string, Token token);
 		void Error(const std::string& string, const Token& start, const Token& end);
 

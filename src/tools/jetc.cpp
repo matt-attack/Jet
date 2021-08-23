@@ -228,6 +228,7 @@ int DoCommand(int argc, const char* argv[])
         auto linker = parser.Add("linker", "Set linker type.", "");
         auto target = parser.Add("target", "Set target string.", "");
         auto output_ir = parser.AddMulti({"ir"}, "Output LLVM IR to the build directory.", "");
+        auto no_deps = parser.AddMulti({"no-deps"}, "Don't build any dependencies.", "");
         parser.Parse(argv, argc, 1);
 
 		CompilerOptions options;
@@ -239,6 +240,7 @@ int DoCommand(int argc, const char* argv[])
         options.debug = debug->GetInt();
         options.target = target->GetString();
         options.output_ir = output_ir->GetBool();
+        options.build_deps = !no_deps->GetBool();
 
 		std::string config = parser.GetPositional(1);
 

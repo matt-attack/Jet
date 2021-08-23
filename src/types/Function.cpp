@@ -206,6 +206,8 @@ Type* Function::GetType(Compilation* compiler)
 
 CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv, bool devirtualize)
 {
+    this->Load(context->root);// just in case
+
 	//virtual function calls for generators fail, need to devirtualize them
 	// this shouldnt matter, all generators shouldnt be virtual
 	if (this->is_generator)
@@ -231,75 +233,54 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 	}
 
 	//list of struct arguments to add attributes to
-	std::vector<int> to_convert;
+	//std::vector<int> to_convert;
 	int i = 0; int ai = 0;
 	if (this->return_type->type == Types::Struct)
 	{
 		i = 1;
 	}
 
+    try
+    {
 	// for every argument that is a struct, pass it by pointer instead of by value
 	for (auto& ii : argsv)
 	{
-		if (ii.type->type == Types::Struct || ii.type->type == Types::Union)
+        // Cast first
+        CValue casted = context->DoCast(this->arguments[ai].first, ii);
+		if (casted.type->type == Types::Struct || casted.type->type == Types::Union)
 		{
-			//convert it to a pointer yo
-			/*auto TheFunction = context->function->f;
-			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-				TheFunction->getEntryBlock().begin());
-			auto alloc = TmpB.CreateAlloca(ii.val->getType(), 0, "arg_pass_tmp");
-			alloc->setAlignment(4);
-
-			//construct it
-			context->Construct(CValue(ii.type->GetPointerType(), alloc), 0);// todo do I actually need to construct it in all cases?
-			//seems like a possible memory leak location
-
-			//extract the types from the function
-			auto type = this->arguments[ai].first;
-			if (type->type == Types::Struct)
-			{
-				auto funiter = type->data->functions.find("=");
-				//todo: search through multimap to find one with the right number of args
-				if (funiter != type->data->functions.end() && funiter->second->arguments.size() == 2)
-				{
-					// call the copy constructor
-					Function* fun = funiter->second;
-					fun->Load(context->root);
-					if (ii.pointer == 0)
-						context->root->Error("Cannot convert to reference", *context->current_token);
-
-					auto pt = type->GetPointerType();
-					std::vector<CValue> argsv = { CValue(pt, alloc), CValue(pt, ii.pointer) };
-
-					fun->Call(context, argsv, true);
-				}
-				else if (type->data->is_class)
-				{
-					context->root->Error("Cannot copy class '" + type->data->name + "' unless it has a copy operator.", *context->current_token);
-				}
-				else
-				{
-					//copy by value
-					//was ii.val, but this makes more sense
-					auto sptr = context->root->builder.CreatePointerCast(ii.pointer, context->root->CharPointerType->GetLLVMType());
-					auto dptr = context->root->builder.CreatePointerCast(alloc, context->root->CharPointerType->GetLLVMType());
-					context->root->builder.CreateMemCpy(dptr, 0, sptr, 0, type->GetSize());// todo properly handle alignment
-				}
-			}
-			else
-			{
-				throw 7;//how does this even get hit
-			}*/
-
-            if (ii.pointer == 0)
+            if (casted.pointer == 0)
 				context->root->Error("Cannot convert to reference", *context->current_token);
 
-			arg_vals[i] = ii.pointer;
-			to_convert.push_back(i);
+			arg_vals[i] = casted.pointer;
+			//to_convert.push_back(i);
 		}
+        else
+        {
+            arg_vals[i] = casted.val;
+        }
 		i++;
 		ai++;
 	}
+    }
+    catch (int i)
+    {
+        Token t;
+        if (this->expression)
+        {
+            t = expression->name;
+        }
+        else if (this->extern_expression)
+        {
+            t = extern_expression->name;
+        }
+        else
+        {
+            
+        }
+        context->root->Info("For argument " + std::to_string(ai) + " of '" + name + "'", t);
+        throw i;
+    }
 
 	//if we are the upper level of the inheritance tree, devirtualize
 	//if we are a virtual call, do that
@@ -334,12 +315,12 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 	}
 
 	//add attributes
-	for (auto ii : to_convert)
+	/*for (auto ii : to_convert)
 	{
 		//auto& ctext = context->root->builder.getContext();
 		//call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
 		//call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-	}
+	}*/
 
 	if (ptr_struct_return)
 	{

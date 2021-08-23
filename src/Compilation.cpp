@@ -1514,6 +1514,13 @@ void Compilation::Error(const std::string& string, Token token)
 	throw 7;
 }
 
+void Compilation::Info(const std::string& string, Token token)
+{
+	this->diagnostics->Error(string, token, INFO);
+
+	throw 7;
+}
+
 void Compilation::Error(const std::string& string, const Token& start, const Token& end)
 {
 	this->diagnostics->Error(string, start, end);
@@ -1860,66 +1867,3 @@ Jet::Function* Compilation::GetFunctionAtPoint(const char* file, int line)
 	return 0;
 }
 
-void DiagnosticBuilder::Error(const std::string& text, const Token& token)
-{
-	Diagnostic error;
-	error.token = token;
-	error.message = text;
-
-	if (token.type != TokenType::InvalidToken)
-	{
-		auto current_source = token.GetSource((Compilation*)compilation);
-
-		error.line = current_source->GetLine(token.line);
-		error.file = current_source->filename;
-	}
-	error.severity = 0;
-
-	if (this->callback)
-		this->callback(error);
-
-	//try and remove exceptions from build system
-	this->diagnostics.push_back(error);
-}
-
-void DiagnosticBuilder::Error(const std::string& text, const Token& start_token, const Token& end_token)
-{
-	Diagnostic error;
-	error.token = start_token;
-	error.end = end_token;
-	error.message = text;
-
-	if (start_token.type != TokenType::InvalidToken)
-	{
-		auto current_source = start_token.GetSource((Compilation*)compilation);
-
-		error.line = current_source->GetLine(start_token.line);
-		error.file = current_source->filename;
-	}
-	error.severity = 0;
-
-	if (this->callback)
-		this->callback(error);
-
-	//try and remove exceptions from build system
-	this->diagnostics.push_back(error);
-}
-
-
-void DiagnosticBuilder::Error(const std::string& text, const std::string& file, int line)
-{
-	Diagnostic error;
-	error.token = Token();
-	error.message = text;
-
-	error.line = line;
-	error.file = file;
-
-	error.severity = 0;
-
-	if (this->callback)
-		this->callback(error);
-
-	//try and remove exceptions from build system
-	this->diagnostics.push_back(error);
-}
