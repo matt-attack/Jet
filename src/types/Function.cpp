@@ -266,19 +266,21 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
     catch (int i)
     {
         Token t;
+        std::string ns;
         if (this->expression)
         {
             t = expression->name;
+            ns = expression->GetHumanReadableNamespace();
         }
         else if (this->extern_expression)
         {
             t = extern_expression->name;
+            ns = extern_expression->GetHumanReadableNamespace();
+            if (ns.length()) { ns += "::"; }
+            if (extern_expression->Struct.length()) { ns += extern_expression->Struct; }
         }
-        else
-        {
-            
-        }
-        context->root->Info("For argument " + std::to_string(ai) + " of '" + name + "'", t);
+        if (ns.length()) { ns += "::"; }
+        context->root->Info("For argument " + std::to_string(ai) + " of '" + ns + t.text + "'", t);
         throw i;
     }
 
