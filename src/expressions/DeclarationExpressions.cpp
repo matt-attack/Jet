@@ -87,7 +87,12 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	if (Struct.length() > 0)
 	{
 		// todo this seems wrong
-		fun->name = "__" + Struct + "_" + fname;//mangled name
+        std::string struct_prefix = Struct;
+        // replace :: with __
+        for (int i = 0; i < struct_prefix.size(); i++) {
+            if (struct_prefix[i] == ':') struct_prefix[i] = '_';
+        }
+		fun->name = "__" + struct_prefix + "_" + fname;//mangled name
 
 		//add to struct
 		auto ii = context->root->TryLookupType(Struct);

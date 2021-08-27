@@ -1225,10 +1225,24 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 				if (ii.second.ty->data->expression)
 					add_location(ii.second.ty->data->expression->token, data, compilation);
 
+                // add namespacing
+                auto index = ii.second.ty->data->name.find_last_of(':');
+                std::string struct_name;
+                if (index == std::string::npos)
+                {
+                    struct_name = ii.second.ty->data->name;
+                }
+                else
+                {
+                    struct_name = ii.second.ty->data->name.substr(index + 1);
+                    std::string ns = ii.second.ty->data->name.substr(0, index - 1);
+                    data += "namespace " + ns + " { ";
+                }
+
 				//export me
 				if (ii.second.ty->data->templates.size() > 0)
 				{
-					data += "struct " + ii.second.ty->data->name + "<";
+					data += "struct " + struct_name + "<";
 					for (unsigned int i = 0; i < ii.second.ty->data->templates.size(); i++)
 					{
 						data += ii.second.ty->data->templates[i].first->name + " ";
@@ -1240,7 +1254,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 				}
 				else
 				{
-					data += "struct " + ii.second.ty->data->name + "{";
+					data += "struct " + struct_name + "{";
 				}
 				for (auto var : ii.second.ty->data->struct_members)
 				{
@@ -1287,6 +1301,12 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 					continue;
 				}
 				data += "}";
+
+                // close the namespace
+                if (index != std::string::npos)
+                {
+                    data += " }";
+                }
 
 				//output member functions
 				for (auto fun : ii.second.ty->data->functions)

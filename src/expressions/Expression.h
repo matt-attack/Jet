@@ -62,6 +62,23 @@ namespace Jet
         	return qualified_namespace_;
         }
 
+        inline std::string GetHumanReadableNamespace()
+        {
+            const auto& qns = GetNamespaceQualifier();
+            std::string new_ns;
+            for (int i = 0; i < qns.length(); i++)
+            {
+                if (i < qns.length() - 1 && qns[i] == '_' && qns[i+1] == '_')
+                {
+                    i++;
+                    new_ns += "::";
+                    continue;
+                }
+                new_ns += qns[i];
+            }
+            return new_ns;
+        }
+
         inline void ResetNamespace() { qualified_namespace_.clear(); }
 
 		virtual CValue Compile(CompilerContext* context) = 0;

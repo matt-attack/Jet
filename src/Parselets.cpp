@@ -528,6 +528,7 @@ Expression* TraitParselet::parse(Parser* parser, Token token)
 Expression* StructParselet::parse(Parser* parser, Token token)
 {
 	Token name = parser->Consume(TokenType::Name);
+
 	Token ob, cb;
 	//parse templates
 	std::vector<StructTemplate>* templated = 0;
@@ -863,7 +864,7 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	Token name = parser->Consume();
 	if (name.type == TokenType::Free)
 	{
-		name.type = TokenType::Name;
+		name.type = TokenType::Name;// a bit of a hack
 	}
 	else if (name.type != TokenType::Name)
 	{
@@ -878,11 +879,20 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	}
 	auto arguments = new std::vector < ExternArg > ;
 
-	std::string stru;
-	if (parser->MatchAndConsume(TokenType::Scope))
-	{
-		//its a struct definition
-		stru = name.text;
+    // read namespaces
+    std::string stru;
+    while (parser->MatchAndConsume(TokenType::Scope))
+    {
+        if (!stru.length()) stru = name.text;
+        if (parser->LookAhead(1).type == TokenType::Scope)
+        {
+            stru += "::"; 
+            stru += parser->Consume(TokenType::Name).text;
+        }
+    }
+
+    if (stru.length())
+    {
 		bool destructor = parser->MatchAndConsume(TokenType::BNot);
 
 		name = parser->Consume();
