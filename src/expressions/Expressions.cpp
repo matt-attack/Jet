@@ -41,7 +41,7 @@ CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
 			return GetPtrToExprValue(context, g->GetInside());
 		}
 	}
-	context->root->Error("Not Implemented", *context->current_token);
+	context->root->Error("Not Implemented in GetPtrToExprValue", *context->current_token);
 }
 
 CValue SliceExpression::Compile(CompilerContext* context)
@@ -784,13 +784,10 @@ CValue OperatorAssignExpression::Compile(CompilerContext* context)
 
 	//try and cast right side to left
 	auto lhs = this->left->Compile(context);
-	CValue lhsptr;
-	if (lhs.type->type == Types::Struct)
-		lhsptr = GetPtrToExprValue(context, left);
 	auto rhs = this->right->Compile(context);
 
 	context->CurrentToken(&token);
-	auto res = context->BinaryOperation(token.type, lhs, lhsptr, rhs);
+	auto res = context->BinaryOperation(token.type, lhs, rhs);
 
 	if (auto storable = dynamic_cast<IStorableExpression*>(this->left))
 		storable->CompileStore(context, res);
@@ -860,14 +857,11 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 
 	// Handle non-short-circuiting binary operations
 	auto lhs = this->left->Compile(context);
-	CValue lhsptr;
-	if (lhs.type->type == Types::Struct)
-		lhsptr = GetPtrToExprValue(context, left);
 
 	auto rhs = this->right->Compile(context);
     
 	context->CurrentToken(&this->_operator);
-	return context->BinaryOperation(this->_operator.type, lhs, lhsptr, rhs);
+	return context->BinaryOperation(this->_operator.type, lhs, rhs);
 }
 
 CValue NewExpression::Compile(CompilerContext* context)

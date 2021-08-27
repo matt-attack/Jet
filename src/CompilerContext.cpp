@@ -200,7 +200,7 @@ void CompilerContext::Store(CValue loc, CValue in_val, bool RVO)
 	root->builder.CreateStore(val.val, loc.val);
 }
 
-CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue lhsptr, CValue right)
+CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue right)
 {
 	llvm::Value* res = 0;
 
@@ -232,6 +232,11 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue l
 			{ TokenType::GreaterThanEqual, ">=" },
 			{ TokenType::Equals, "==" }
 		};
+        if (!left.pointer)
+        {
+            this->root->Error("Unexpected error", Token());
+        }
+        CValue lhsptr(left.type->GetPointerType(), left.pointer);
         // special case for != (call == and then not it)
         if (op == TokenType::NotEqual)
         {
