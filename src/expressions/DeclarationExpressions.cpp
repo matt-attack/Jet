@@ -60,6 +60,35 @@ CValue ExternExpression::Compile(CompilerContext* context)
 
 void ExternExpression::CompileDeclarations(CompilerContext* context)
 {
+    context->CurrentToken(&type);
+    if (type.type == TokenType::Name)
+    {
+        // its a global variable
+        // todo, what do I do?
+
+        bool is_const = false;
+
+		auto var_type = context->root->LookupType(type.text);
+
+		if (type.text.back() == ']')
+		{
+			std::string len = type.text;
+			len = len.substr(len.find_first_of('[') + 1);
+		    if (is_const && len.c_str())
+		    {
+			    context->root->Error("Cannot declare a const global array variable.", token);
+		    }
+
+			context->root->AddGlobal(name.text, var_type->base, std::atoi(len.c_str()), 0, false, is_const);
+		}
+		else
+		{
+			context->root->AddGlobal(name.text, var_type, 0, 0, false, is_const);
+		}
+
+        return;
+    }
+
 	std::string fname = name.text;
 
 	// todo come up with a better way to handle c externs
@@ -98,14 +127,16 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		auto ii = context->root->TryLookupType(Struct);
 		if (ii == 0)//its new
 		{
-			context->root->Error("Not implemented!", token);
+			context->root->Error("Tried to declare an extern member function for an undeclared struct!", token);
 			//str = new Type;
 			//context->root->types[this->name] = str;
 		}
 		else
 		{
 			if (ii->type != Types::Struct)
+            {
 				context->root->Error("Cannot define an extern function for a type that is not a struct", token);
+            }
 
 			ii->data->functions.insert({ fname, fun });
 		}

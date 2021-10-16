@@ -191,7 +191,7 @@ namespace Jet
 	class ExternExpression : public Expression
 	{
         friend class Function;
-		Token name, fun;
+		Token name, type;
 		std::string Struct;
 		std::vector<ExternArg>* args;
 		Token token;
@@ -199,11 +199,20 @@ namespace Jet
 		Token open_bracket, close_bracket;
 	public:
 
-		ExternExpression(Token token, Token fun, Token name, Token ret_type, Token ob, std::vector<ExternArg>* args, Token cb, std::string str = "")
+		ExternExpression(Token token, Token type, Token name, std::string ns = "")
+		{
+			this->type = type;
+			this->name = name;
+			this->token = token;
+			this->Struct = ns;// todo rename this
+            this->args = 0;
+		}
+
+		ExternExpression(Token token, Token type, Token name, Token ret_type, Token ob, std::vector<ExternArg>* args, Token cb, std::string str = "")
 		{
 			this->open_bracket = ob;
 			this->close_bracket = cb;
-			this->fun = fun;
+			this->type = type;
 			this->args = args;
 			this->name = name;
 			this->token = token;
@@ -213,7 +222,8 @@ namespace Jet
 
 		~ExternExpression()
 		{
-			delete args;
+            if (args)
+			    delete args;
 		}
 
 		void SetParent(Expression* parent)
@@ -232,10 +242,18 @@ namespace Jet
 
 		void Print(std::string& output, Source* source)
 		{
-			//add tokens for the ( )
 			token.Print(output, source);
 
-			fun.Print(output, source);// output += " fun"; fixme
+            if (type.type == TokenType::Name)
+            {
+                type.Print(output, source);
+
+                name.Print(output, source);
+
+                return;
+            }
+
+			type.Print(output, source);// output += " fun"; fixme
 			ret_type.Print(output, source);
 
 			name.Print(output, source);

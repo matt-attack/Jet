@@ -46,6 +46,8 @@ namespace Jet
 
 	//CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::Value*>& argsv, bool devirtualize);
 
+    static Token invalid_token;
+
 	//compiles functions
 	class Compiler;
 	class CompilerContext
@@ -75,6 +77,8 @@ namespace Jet
 
 			this->tscope = new TCScope;
 			this->tscope->prev = 0;
+
+            this->current_token = &invalid_token;
 		}
 
 		~CompilerContext()

@@ -673,6 +673,7 @@ char* ReadDependenciesFromSymbols(const char* path, int& size)
 
 		return data;
 	}
+    size = 0;
 	return 0;
 }
 
@@ -837,7 +838,7 @@ void Compilation::Assemble(const std::vector<std::string>& resolved_deps, const 
 			for (auto ii : resolved_deps)
 			{
 				//open up and read first part of the jlib file
-				int size;
+				int size = 0;
 				char* data = ReadDependenciesFromSymbols((ii + "/build/" + project->project_name + ".jlib").c_str(), size);
 
 				if (data == 0)
@@ -1133,7 +1134,8 @@ void Compilation::OutputPackage(const std::vector<std::string>& resolved_deps, c
 
 	//write out symbol data
 	std::string function;
-	this->ns->OutputMetadata(function, this);
+	this->ns->OutputMetadata(function, this, false);
+	this->ns->OutputMetadata(function, this, true);
 
 	//only make jlib file if i'm a library
 	if (this->project->IsExecutable())
@@ -1496,11 +1498,11 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
     if (is_const && size == 0)
     {
         // If its const, we can mark it as a value type
-	    this->ns->members.insert({ name, Symbol(new CValue(my_type, initializer, 0)) });
+	    this->ns->members.insert({ name, Symbol(new CValue(my_type, initializer, 0), *this->current_function->current_token) });
     }
     else
     {
-        this->ns->members.insert({ name, Symbol(new CValue(my_type, 0, ng)) });
+        this->ns->members.insert({ name, Symbol(new CValue(my_type, 0, ng), *this->current_function->current_token) });
     }
 
 	//todo if it has a constructor, make sure to call it in the initializers...

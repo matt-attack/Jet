@@ -456,17 +456,17 @@ Symbol CompilerContext::GetMethod(
   Type* Struct,
   bool& is_constructor)
 {
-    CValue var = this->GetVariable(name, false);
-
-    if (var.val || var.pointer)
-    {
-        return new CValue(var);
-    }
-
 	Function* fun = 0;
     is_constructor = false;
 	if (Struct == 0)
 	{
+        CValue var = this->GetVariable(name, false);
+
+        if (var.val || var.pointer)
+        {
+            return new CValue(var);
+        }
+
 		//global function?
 		auto iter = this->root->GetFunction(name, args);
 		if (iter == 0)
@@ -774,9 +774,10 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
             alloca.val = this->root->builder.CreateAlloca(return_type->GetLLVMType(), 0, "returntemp");
             argsv.push_back(alloca.val);
         }
-		for (unsigned int i = skip_first ? 1 : 0; i < args.size(); i++)
+        int skip = skip_first ? 1 : 0;// if skip first, we dont pass in struct as the first argument
+		for (unsigned int i = skip; i < args.size(); i++)
         {
-		    argsv.push_back(this->DoCast(var.type->function->args[i], args[i]).val);//try and cast to the correct type if we can
+		    argsv.push_back(this->DoCast(var.type->function->args[i-skip], args[i]).val);//try and cast to the correct type if we can
         }
         // todo migrate call to function type rather than function object
         auto ret = this->root->builder.CreateCall(var.val, argsv);

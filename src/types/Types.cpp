@@ -1186,13 +1186,57 @@ void add_location(Token token, std::string& data, Compilation* compilation)
 	data += '\n';
 }
 
-void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
+void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool globals)
 {
+    if (globals)
+    {
+        // output globals last
+	    for (auto ii : this->members)
+	    {
+		    //ok, lets add debug location info
+            if (ii.second.type == SymbolType::Variable)
+            {
+                add_location(ii.second.token, data, compilation);
+
+                // add namespacing
+                std::string ns = GetQualifiedName();
+                //auto index = ii.second.ty->data->name.find_last_of(':');
+                std::string struct_name;
+                //if (index == std::string::npos)
+                {
+                    //struct_name = ii.second.ty->data->name;
+                }
+                if (ns.length())
+                {
+                    //struct_name = ii.second.ty->data->name.substr(index + 1);
+                    //std::string ns = ii.second.ty->data->name.substr(0, index - 1);
+                    data += "namespace " + ns + " { ";
+                }
+
+                // todo should add location
+                //std::string ns = GetQualifiedName();
+                //if (ns.length()) ns += "::";
+                data += "extern " + ii.second.val->type->ToString() + " " + ii.first + ";\n";
+
+                // close namespace
+                if (ns.length())
+                {
+                    data += "}\n";
+                }
+            }
+		    else if (ii.second.type == SymbolType::Namespace)
+		    {
+			    ii.second.ns->OutputMetadata(data, compilation, true);
+		    }
+        }
+        return;
+    }
+
 	//ok, change this to output in blocks, give size and location/namespace
 	for (auto ii : this->members)
 	{
 		//ok, lets add debug location info
-		if (ii.second.type == SymbolType::Function && ii.second.fn->do_export)
+        if (ii.second.type == SymbolType::Function && ii.second.fn->do_export)
 		{
 			if (ii.second.fn->expression)
 				add_location(ii.second.fn->expression->token, data, compilation);
@@ -1399,7 +1443,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation)
 		}
 		else if (ii.second.type == SymbolType::Namespace)
 		{
-			ii.second.ns->OutputMetadata(data, compilation);
+			ii.second.ns->OutputMetadata(data, compilation, false);
 		}
 	}
 }

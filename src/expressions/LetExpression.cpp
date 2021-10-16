@@ -1,4 +1,5 @@
 #include "LetExpression.h"
+#include "DeclarationExpressions.h"
 
 using namespace Jet;
 
@@ -6,9 +7,10 @@ CValue LetExpression::Compile(CompilerContext* context)
 {
 	context->CurrentToken(&(*_names)[0].name);
 
-	// If im in global scope, add a global variable
-	if (this->parent->parent == 0)
+	// If im in global scope (not in a function), add a global variable
+	if (this->parent->parent == 0 || dynamic_cast<NamespaceExpression*>(this->parent->parent))
 	{
+        std::string name = GetNamespaceQualifier() + this->_names->front().name.text;
 		if (this->_names->front().type.text.length() == 0)
 		{
 			context->root->Error("Cannot infer type for a global variable", token);

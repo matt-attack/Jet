@@ -857,6 +857,31 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 
 Expression* ExternParselet::parse(Parser* parser, Token token)
 {
+    if (parser->LookAhead().type == TokenType::Name)
+    {
+        auto type = ::ParseType(parser);
+        auto name = parser->Consume(TokenType::Name);
+
+        // read namespaces
+        std::string ns;
+        while (parser->MatchAndConsume(TokenType::Scope))
+        {
+            if (!ns.length()) ns = name.text;
+            if (parser->LookAhead(1).type == TokenType::Scope)
+            {
+                ns += "::"; 
+                ns += parser->Consume(TokenType::Name).text;
+            }
+        }
+
+        if (ns.length())
+        {
+            name = parser->Consume(TokenType::Name);
+        }
+
+	    return new ExternExpression(token, type, name, ns);
+    }
+
 	auto fun = parser->Consume(TokenType::Function);
 
 	Token ret_type = ::ParseType(parser);

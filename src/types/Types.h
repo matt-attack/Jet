@@ -5,6 +5,8 @@
 #include <string>
 #include <map>
 
+#include "../Token.h"
+
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/DIBuilder.h>
 
@@ -181,12 +183,14 @@ namespace Jet
 			Function* fn;
 			CValue* val;
 		};
+        Token token;
 
 		Symbol() { this->type = SymbolType::Invalid; }
 		Symbol(Function* fn) : fn(fn) { if (fn) this->type = SymbolType::Function; else this->type = SymbolType::Invalid; }
 		Symbol(Type* ty) : ty(ty) { this->type = SymbolType::Type; }
 		Symbol(Namespace* ns) : ns(ns) { this->type = SymbolType::Namespace; }
 		Symbol(CValue* val) : val(val) { this->type = SymbolType::Variable; }
+		Symbol(CValue* val, const Token& t) : val(val), token(t) { this->type = SymbolType::Variable; }
 
         operator bool() { return type != SymbolType::Invalid; } 
 	};
@@ -224,7 +228,7 @@ namespace Jet
 			return 0;
 		}
 
-		void OutputMetadata(std::string& data, Compilation* comp);
+		void OutputMetadata(std::string& data, Compilation* comp, bool globals);
 
 		const std::string& GetQualifiedName();
 
