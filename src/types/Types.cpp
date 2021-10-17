@@ -1200,22 +1200,11 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool
 
                 // add namespacing
                 std::string ns = GetQualifiedName();
-                //auto index = ii.second.ty->data->name.find_last_of(':');
-                std::string struct_name;
-                //if (index == std::string::npos)
-                {
-                    //struct_name = ii.second.ty->data->name;
-                }
                 if (ns.length())
                 {
-                    //struct_name = ii.second.ty->data->name.substr(index + 1);
-                    //std::string ns = ii.second.ty->data->name.substr(0, index - 1);
                     data += "namespace " + ns + " { ";
                 }
 
-                // todo should add location
-                //std::string ns = GetQualifiedName();
-                //if (ns.length()) ns += "::";
                 data += "extern " + ii.second.val->type->ToString() + " " + ii.first + ";\n";
 
                 // close namespace

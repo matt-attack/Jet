@@ -1467,7 +1467,7 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
     {
         if (this->ns->name.length())
         {
-   		    Error("Global '" + name + "' already exists in '" + this->ns->name + "'", *this->current_function->current_token);
+   		    Error("Global '" + name + "' already exists in namespace '" + this->ns->GetQualifiedName() + "'", *this->current_function->current_token);
         }
         else
         {
