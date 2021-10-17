@@ -405,9 +405,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 
 			//setup vtable if there is one
 			ii.second->Load(context->root);
-			auto iter = ii.second->f->getBasicBlockList().begin()->begin();
-			for (unsigned int i = 0; i < ii.second->arguments.size() * 3; i++)
-				iter++;
+            auto iter = ii.second->f->getBasicBlockList().begin()->begin();
 			context->root->builder.SetInsertPoint(&*iter);
 
 			//todo: oops code duplication here
@@ -427,7 +425,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 							auto myself = ii.second->context->Load("this");
 							std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->root->builder.getInt32(i) };
 
-							auto gep = context->root->builder.CreateGEP(myself.val, iindex, "getmember");
+							auto gep = context->root->builder.CreateGEP(myself.pointer, iindex, "getmember");
 							iii->second->Load(context->root);
 
 							context->root->builder.CreateCall(iii->second->f, gep);
@@ -460,13 +458,20 @@ void StructExpression::AddConstructors(CompilerContext* context)
 		}
 		else if (ii.second->name == "__" + str->data->name + "_~" + strname)
 		{
+            // Get current builder state for restoring when we are done
 			auto rp = context->root->builder.GetInsertBlock();
 			auto dp = context->root->builder.getCurrentDebugLocation();
 
-			auto iter = ii.second->f->getBasicBlockList().begin()->begin();
-			for (unsigned int i = 0; i < ii.second->arguments.size() * 3; i++)
-				iter++;
-			context->root->builder.SetInsertPoint(&*iter);
+            // Find the end of the function then remove the return instruction from it
+            auto& bb = ii.second->f->getBasicBlockList().back();
+			bb.getInstList().pop_back();
+
+            // Then start inserting at the end
+			context->root->builder.SetInsertPoint(&bb);
+
+            // Making sure to set debug info correctly first
+            const auto& token = ii.second->expression->token;
+            context->root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(token.line, token.column, ii.second->scope));
 
 			int i = 0;
 			for (auto iip : str->data->struct_members)
@@ -482,7 +487,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 							auto myself = ii.second->context->Load("this");
 							std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->root->builder.getInt32(i) };
 
-							auto gep = context->root->builder.CreateGEP(myself.val, iindex, "getmember");
+							auto gep = context->root->builder.CreateGEP(myself.pointer, iindex, "getmember");
 							iii->second->Load(context->root);
 
 							context->root->builder.CreateCall(iii->second->f, gep);
@@ -492,11 +497,17 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				i++;
 			}
 
+            // Re-emit the return
+		    context->root->builder.CreateRetVoid();
+
+            // Set everything back
 			context->root->builder.SetCurrentDebugLocation(dp);
 			if (rp)
             {
 				context->root->builder.SetInsertPoint(rp);
             }
+
+            //ii.second->f->getBasicBlockList().back().print(llvm::errs(), 0);
 		}
 	}
 }
