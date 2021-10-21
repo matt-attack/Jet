@@ -446,6 +446,20 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			break;
 		}
 	}
+    else if (left.type->type == Types::Bool)
+    {
+        switch (op)
+        {
+		case TokenType::Equals:
+			res = root->builder.CreateICmpEQ(left.val, right.val);
+			return CValue(root->BoolType, res);
+			break;
+		case TokenType::NotEqual:
+			res = root->builder.CreateICmpNE(left.val, right.val);
+			return CValue(root->BoolType, res);
+			break;
+        }
+    }
 
 	this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
 }

@@ -514,6 +514,11 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
             }
 
 		    auto indexv = context->DoCast(context->root->IntType, index->Compile(context));
+            if (!indexv.val)
+            {
+                indexv.val = context->root->builder.CreateLoad(indexv.pointer, "autodereference");
+            }
+
             std::vector<unsigned int> iindex = { 1 };
             auto pointer = context->root->builder.CreateExtractValue(lhs.val, iindex);
 			auto loc = context->root->builder.CreateGEP(pointer, indexv.val, "index");
