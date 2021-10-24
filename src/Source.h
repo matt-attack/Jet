@@ -19,7 +19,6 @@ namespace Jet
 		unsigned int length;
 		char* text;
 
-		std::vector<std::pair<const char*, unsigned int> > lines;
 	public:
 
 		//takes ownership of source
@@ -32,9 +31,7 @@ namespace Jet
 			this->filename = source.filename;
 			this->column = source.column;
 			this->linenumber = source.linenumber;
-			this->lines = std::move(source.lines);
 
-			source.lines.clear();
 			source.text = 0;
 		}
 		~Source();
@@ -42,8 +39,7 @@ namespace Jet
 		//used for setting up debug info from symbols
 		void SetCurrentLine(unsigned int line);
 
-		std::string GetLine(unsigned int line);
-		const char* GetLinePointer(unsigned int line);
+        inline const char* GetData() const { return text; }
 
 		void PreProcess(std::map<std::string, bool>& vars, DiagnosticBuilder* diag);
 

@@ -11,8 +11,6 @@ Source::Source(char* src, const std::string& filename)
 	this->linenumber = 1;
 	this->column = 1;
 	this->filename = filename;
-
-	this->lines.push_back({ text, 0 });
 }
 
 Source::~Source()
@@ -22,33 +20,10 @@ Source::~Source()
 
 void Source::SetCurrentLine(unsigned int line)
 {
-	if (line > this->lines.size())
-	{
-		this->lines.resize(line);
-	}
-	this->lines[line - 1].first = &text[index];
 	this->linenumber = line;
 	this->column = 0;
 }
 
-std::string Source::GetLine(unsigned int line)
-{
-	auto l = this->lines[line - 1];
-	if (l.second == 0)
-	{
-		//search for the end
-		while (l.first[l.second] != 0 && l.first[l.second] != '\n')
-			l.second++;
-	}
-	return std::string(l.first, l.second);
-}
-
-const char* Source::GetLinePointer(unsigned int line)
-{
-	auto l = this->lines[line - 1];
-
-	return l.first;
-}
 char Source::EatChar()
 {
 	if (index >= length)
@@ -69,15 +44,6 @@ char Source::ConsumeChar()
 	{
 		this->linenumber++;
 		this->column = 0;
-
-		if (this->lines.size() == this->linenumber - 1)
-		{
-			this->lines.push_back({ &text[index + 1], 0 });
-		}
-		else
-		{
-			this->lines[this->linenumber - 2] = { &text[index + 1], 0 };
-		}
 	}
 
 	return text[index++];
@@ -97,16 +63,7 @@ char Source::MatchAndConsumeChar(char c)
 		{
 			this->column = 0;
 			this->linenumber++;
-			//this->lines.push_back({ &text[index + 1], 0 });
-			if (this->lines.size() == this->linenumber - 1)
-			{
-				this->lines.push_back({ &text[index + 1], 0 });
-			}
-			else
-			{
-				this->lines[this->linenumber - 2] = { &text[index + 1], 0 };
-			}
-		}
+        }
 	}
 	return ch;
 }

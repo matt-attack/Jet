@@ -653,6 +653,6 @@ Token Lexer::Next()
 		throw 7;
 	}
 
-	return Token(src->GetLinePointer(1) + src->GetLength(), trivia_length, src->linenumber, src->column, TokenType::EoF, "");
+	return Token(src->GetData() + src->GetLength(), trivia_length, src->linenumber, src->column, TokenType::EoF, "");
 }
 

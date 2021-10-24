@@ -410,7 +410,7 @@ namespace Jet
 
 			output += "\"";
 			//fixme!
-			auto cur = &source->GetLinePointer(token.line)[token.column]/* token.text_ptr*/ + 1;
+			auto cur = token.text_ptr + 1;//&source->GetLinePointer(token.line)[token.column]/* token.text_ptr*/ + 1;
 			do
 			{
 				if (*cur == '\"' && *(cur - 1) != '\\')

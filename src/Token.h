@@ -185,6 +185,8 @@ namespace Jet
 		void Print(std::string& str, Source* source) const;
 
 		Source* GetSource(Compilation* compilation) const;
+
+        std::string GetLineText(const char* start) const;
 	};
 
 	struct TokenRange
