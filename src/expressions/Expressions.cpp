@@ -194,6 +194,13 @@ CValue PostfixExpression::Compile(CompilerContext* context)
 	context->CurrentToken(&this->_operator);
 	auto lhs = left->Compile(context);
 
+    // load it pre-operation
+    if (!lhs.val)
+    {
+        lhs.val = context->root->builder.CreateLoad(lhs.pointer, "postfix-dereference");
+        lhs.pointer = 0;
+    }
+
 	auto res = context->UnaryOperation(this->_operator.type, lhs);
 
 	//only do this for ++ and --
@@ -596,7 +603,12 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
         // Indexing into it
         else
 		{
-			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->DoCast(context->root->IntType, index->Compile(context)).val };
+            auto indexv = context->DoCast(context->root->IntType, index->Compile(context));
+            if (!indexv.val)
+            {
+                indexv.val = context->root->builder.CreateLoad(indexv.pointer, "autodereference");
+            }
+			std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), indexv.val};
 
 			auto loc = context->root->builder.CreateGEP(lhs.pointer, iindex, "array_index");
 

@@ -745,7 +745,15 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 		    //add struct
 		    argsv.push_back(Alloca);
 		    for (auto ii : args)
-		    	argsv.push_back(this->DoCast(fun->arguments[i++].first, ii).val);//try and cast to the correct type if we can
+            {
+                //try and cast to the correct type if we can
+                auto val = this->DoCast(fun->arguments[i++].first, ii);
+                if (!val.val)
+                {
+                    val.val = this->root->builder.CreateLoad(val.pointer, "autodereference");
+                }
+		    	argsv.push_back(val.val);
+            }
 
 		    fun->Load(this->root);
 
@@ -791,7 +799,13 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
         int skip = skip_first ? 1 : 0;// if skip first, we dont pass in struct as the first argument
 		for (unsigned int i = skip; i < args.size(); i++)
         {
-		    argsv.push_back(this->DoCast(var.type->function->args[i-skip], args[i]).val);//try and cast to the correct type if we can
+            //try and cast to the correct type if we can
+            auto val = this->DoCast(var.type->function->args[i-skip], args[i]);
+            if (!val.val)
+            {
+                val.val = this->root->builder.CreateLoad(val.pointer, "autodereference");
+            }
+		    argsv.push_back(val.val);//try and cast to the correct type if we can
         }
         // todo migrate call to function type rather than function object
         auto ret = this->root->builder.CreateCall(var.val, argsv);
