@@ -58,9 +58,9 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 	else if (this->type == Types::Double)
 		this->debug_type = compiler->debug->createBasicType("double", 64, llvm::dwarf::DW_ATE_float);
 	else if (this->type == Types::Pointer)
-		this->debug_type = compiler->debug->createPointerType(this->base->GetDebugType(compiler), 32);//todo handle 64 bit
+		this->debug_type = compiler->debug->createPointerType(this->base->GetDebugType(compiler), 64);//todo handle 64 bit
 	else if (this->type == Types::Function)
-		this->debug_type = compiler->debug->createBasicType("fun_pointer", 32, llvm::dwarf::DW_ATE_address);
+		this->debug_type = compiler->debug->createBasicType("fun_pointer", 64, llvm::dwarf::DW_ATE_address);
 	else if (this->type == Types::Struct)
 	{
 		llvm::DIType* typ = 0;
@@ -68,7 +68,15 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		int line = 0;
 		if (this->data->expression)
 			line = this->data->expression->token.line;
-		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, 1024, 8, llvm::DINode::DIFlags::FlagPublic, typ, 0);
+
+        int real_size = 0;
+		for (auto type : this->data->struct_members)
+		{
+			type.type->Load(compiler);
+			real_size += type.type->GetSize()*8;
+		}
+
+		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->data->name, compiler->debug_info.file, line, real_size, 8, llvm::DINode::DIFlags::FlagPublic, typ, 0);
 		this->debug_type = dt;
 
 		//now build and set elements
@@ -106,13 +114,20 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 		//if (this->data->expression)
 		//	line = this->data->expression->token.line;
 
-		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->name, compiler->debug_info.file, line, 1024, 8, llvm::DINode::DIFlags::FlagPublic, typ, 0);
+        int real_size = 0;
+		auto list = { compiler->IntType, this->base->GetPointerType() };
+		for (auto type : list)
+		{
+			type->Load(compiler);
+			real_size += type->GetSize()*8;
+		}
+
+		auto dt = compiler->debug->createStructType(compiler->debug_info.file, this->name, compiler->debug_info.file, line, real_size, 8, llvm::DINode::DIFlags::FlagPublic, typ, 0);
 		this->debug_type = dt;
 
 		//now build and set elements
 		std::vector<llvm::Metadata*> ftypes;
 		int offset = 0;
-		auto list = { compiler->IntType, this->base->GetPointerType() };
 		const char* names[] = { "size", "ptr" };
 		int i = 0;
 		for (auto type : list)
@@ -176,7 +191,7 @@ llvm::Type* Type::GetLLVMType()
 		if (this->llvm_type)
 			return this->llvm_type;
 		std::vector<llvm::Type*> types = { llvm::Type::getInt32Ty(llvm_context_jet), base->GetPointerType()->GetLLVMType() };
-		auto res = llvm::StructType::create(types, this->name);
+		auto res = llvm::StructType::create(types, this->name, true);
 		this->llvm_type = res;
 		return res;
 		//fix this to use the new type
@@ -1094,7 +1109,7 @@ void Struct::Load(Compilation* compiler)
 		this->type = llvm::StructType::create(elementss, this->name, true);
 	else
 	{
-		struct_type->setBody(elementss);
+		struct_type->setBody(elementss, true);
 		this->type = struct_type;
 	}
 	this->loaded = true;
@@ -1464,7 +1479,7 @@ int Type::GetSize()
 	case Types::Pointer:
 		return 8;//todo: use correct size for 64 bit when that happens
 	case Types::Array:
-		return 8;//pointer + integer todo need to use pointer size here too
+		return 12;//pointer + integer todo need to use pointer size here too
 	case Types::InternalArray:
 		return this->base->GetSize()*this->size;
 	}
