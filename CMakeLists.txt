@@ -27,6 +27,8 @@ add_executable(jet
 	src/Source.cpp
 	src/types/Types.cpp
 	src/types/Function.cpp
+    src/types/Namespace.cpp
+    src/types/Struct.cpp
 	src/Lexer.cpp
 	src/Token.cpp
 	src/Project.cpp

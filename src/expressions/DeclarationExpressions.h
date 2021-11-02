@@ -10,6 +10,7 @@
 #include "ExpressionVisitor.h"
 #include "Source.h"
 #include "types/Function.h"
+#include "types/Struct.h"
 #include "Expressions.h"
 
 #include "LetExpression.h"

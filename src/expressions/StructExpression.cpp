@@ -3,6 +3,8 @@
 
 #include <CompilerContext.h>
 
+#include <types/Struct.h>
+
 using namespace Jet;
 
 StructExpression::~StructExpression()

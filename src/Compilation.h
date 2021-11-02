@@ -8,6 +8,7 @@
 
 #include "Token.h"
 #include "types/Types.h"
+#include "types/Namespace.h"
 
 #include "Diagnostics.h"
 
