@@ -373,7 +373,7 @@ int Compiler::Compile(const JetProject* project, const CompilerOptions* optons, 
 		msg.Print();
 	});
 
-	std::unique_ptr<Compilation> compilation(Compilation::Make(project, &diagnostics, options.time, options.debug));
+	std::unique_ptr<Compilation> compilation(Compilation::Make(project, &diagnostics, options.time, options.debug, options.target));
 
 error:
 
@@ -394,7 +394,7 @@ error:
 		return 0;
 	}
 
-	compilation->Assemble(resolved_deps, options.target, options.linker, options.optimization, options.time, options.output_ir);
+	compilation->Assemble(resolved_deps, options.linker, options.optimization, options.time, options.output_ir);
 
 	if (compilation->GetErrors().size() > 0)
 	{

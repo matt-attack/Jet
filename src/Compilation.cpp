@@ -240,7 +240,7 @@ public:
 
 
 extern std::string generate_jet_from_header(const char* header);
-Compilation* Compilation::Make(const JetProject* project, DiagnosticBuilder* diagnostics, bool time, int debug)
+Compilation* Compilation::Make(const JetProject* project, DiagnosticBuilder* diagnostics, bool time, int debug, std::string target)
 {
 	Compilation* compilation = new Compilation(project);
 	compilation->diagnostics = diagnostics;
@@ -322,6 +322,13 @@ Compilation* Compilation::Make(const JetProject* project, DiagnosticBuilder* dia
 	//spin off children and lets compile this!
 	compilation->module = new llvm::Module(project->project_name, compilation->context);
 	compilation->debug = new llvm::DIBuilder(*compilation->module, true);
+
+    
+	//set target
+	//add string
+	//linux i686-pc-linux-gnu
+	//raspbian arm-pc-linux-gnueabif"armv6-linux-gnueabihf"
+	compilation->SetTarget(target);
 
 	bool emit_debug = debug > 0;
 	auto emission_kind = debug <= 1 ? llvm::DICompileUnit::DebugEmissionKind::LineTablesOnly : llvm::DICompileUnit::DebugEmissionKind::FullDebug;
@@ -705,7 +712,7 @@ std::string LinkLibLD(const std::string& path)
 	return out;
 }
 
-void Compilation::Assemble(const std::vector<std::string>& resolved_deps, const std::string& target, const std::string& linker, int olevel, bool time, bool output_ir)
+void Compilation::Assemble(const std::vector<std::string>& resolved_deps, const std::string& linker, int olevel, bool time, bool output_ir)
 {
 	if (this->diagnostics->GetErrors().size() > 0)
 		return;
@@ -726,12 +733,6 @@ void Compilation::Assemble(const std::vector<std::string>& resolved_deps, const 
 #else
 	mkdir("build/");
 #endif
-
-	//set target
-	//add string
-	//linux i686-pc-linux-gnu
-	//raspbian arm-pc-linux-gnueabif"armv6-linux-gnueabihf"
-	std::string real_target = this->SetTarget(target);
 
 	// now lets split apart the target to get the arch, OS and stdlib (ignoring the second bit)
 	std::string target_arch = real_target.substr(0, real_target.find_first_of('-'));
@@ -1099,10 +1100,13 @@ std::string Compilation::SetTarget(const std::string& triple)
 
     auto layout = this->target->createDataLayout();
 
-    // todo use me
-    //pointer_size = layout->getPointerSize();
+    // Get the actual pointer size
+    pointer_size = layout.getPointerSize();
+    //printf("Pointer size %i\n", pointer_size);
 
 	module->setDataLayout(layout);
+
+    real_target = TheTriple.str().c_str();
 
 	return TheTriple.str().c_str();
 }

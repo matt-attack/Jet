@@ -54,7 +54,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 	else if (this->type == Types::Double)
 		this->debug_type = compiler->debug->createBasicType("double", 64, llvm::dwarf::DW_ATE_float);
 	else if (this->type == Types::Pointer)
-		this->debug_type = compiler->debug->createPointerType(this->base->GetDebugType(compiler), 64);//todo handle 64 bit
+		this->debug_type = compiler->debug->createPointerType(this->base->GetDebugType(compiler), compilation->pointer_size*8);//todo handle 64 bit
 	else if (this->type == Types::Function)
 		this->debug_type = compiler->debug->createBasicType("fun_pointer", 64, llvm::dwarf::DW_ATE_address);
 	else if (this->type == Types::Struct)
@@ -967,7 +967,7 @@ int Type::GetSize()
 	case Types::Double:
 		return 8;
 	case Types::Pointer:
-		return 8;//todo: use correct size for 64 bit when that happens
+		return compilation->pointer_size;//todo: use correct size for 64 bit when that happens
 	case Types::Array:
 		return 12;//pointer + integer todo need to use pointer size here too
 	case Types::InternalArray:
