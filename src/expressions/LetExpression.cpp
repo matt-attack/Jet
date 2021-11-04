@@ -44,7 +44,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 			context->root->AddGlobal(this->_names->front().name.text, type, 0, cval, false, is_const);
 		}
 
-		return CValue();
+		return CValue(context->root->VoidType, 0);
 	}
     else
     {
@@ -58,7 +58,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 		auto aname = ii.name.text;
 
 		Type* type = 0;
-		CValue val;
+		CValue val(0, 0);
 		llvm::AllocaInst* Alloca = 0;
 		if (ii.type.text.length())
 		{
@@ -163,9 +163,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 			// Store the initial value into the alloca.
 			if (this->_right)
 			{
-				CValue alloc;
-				alloc.type = type->GetPointerType();
-				alloc.val = Alloca;
+				CValue alloc(type->GetPointerType(), Alloca);
                 // properly handle constructors
                 if (type->type == Types::Struct && type != val.type)
                 {
@@ -198,9 +196,7 @@ CValue LetExpression::Compile(CompilerContext* context)
                 context->Construct(CValue(type->GetPointerType(), Alloca), 0);
             }
 
-			CValue alloc;
-			alloc.val = Alloca;
-			alloc.type = val.type->GetPointerType();
+			CValue alloc(val.type->GetPointerType(), Alloca);
 			context->Store(alloc, val);// todo copy constructor
 		}
 		else
@@ -241,5 +237,5 @@ CValue LetExpression::Compile(CompilerContext* context)
 		}
 	}
 
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }

@@ -231,7 +231,7 @@ namespace Jet
 			context->function->f->getBasicBlockList().push_back(end);
 			context->root->builder.SetInsertPoint(end);
 
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
@@ -366,7 +366,7 @@ namespace Jet
 
 			context->PopScope();
 
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		void CompileDeclarations(CompilerContext* context) {};
@@ -719,9 +719,9 @@ namespace Jet
 			if (right)
 				context->Return(right->Compile(context));
 			else
-				context->Return(CValue());// root->builder.CreateRetVoid(); um, im not destructing if I return void
+				context->Return(CValue(context->root->VoidType, 0));// root->builder.CreateRetVoid(); um, im not destructing if I return void
 
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		virtual Type* TypeCheck(CompilerContext* context)
@@ -773,7 +773,7 @@ namespace Jet
 			context->SetDebugLocation(token);
 			context->Break();
 
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		virtual Type* TypeCheck(CompilerContext* context)
@@ -811,7 +811,7 @@ namespace Jet
 			context->SetDebugLocation(token);
 			context->Continue();
 
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		virtual Type* TypeCheck(CompilerContext* context)

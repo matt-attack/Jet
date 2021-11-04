@@ -38,13 +38,13 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		void CompileDeclarations(CompilerContext* context)
 		{
 			//define it
-			Type* ty = new Type(this->name.text, Types::Union);
+			Type* ty = new Type(context->root, this->name.text, Types::Union);
 			ty->_union = new Union;
 			ty->_union->members.resize(this->elements.size());
 			for (unsigned int i = 0; i < this->elements.size(); i++)
@@ -118,7 +118,7 @@ namespace Jet
 			for (unsigned int i = 0; i < this->names->size(); i++)
 				context->PopNamespace();
 
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		virtual Type* TypeCheck(CompilerContext* context)
@@ -317,7 +317,7 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		void CompileDeclarations(CompilerContext* context);
@@ -457,7 +457,7 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context)
 		{
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		void SetParent(Expression* parent)
@@ -521,7 +521,7 @@ namespace Jet
 			if (this->parent->parent != 0)
 				context->root->Error("Cannot use typedef outside of global scope", token);
 
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		virtual Type* TypeCheck(CompilerContext* context)

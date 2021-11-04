@@ -49,7 +49,7 @@ namespace Jet
 		friend class StructExpression;
 
 		llvm::TargetMachine* target;
-		llvm::LLVMContext& context;
+		llvm::LLVMContext context;
 
 		struct DebugInfo {
 			llvm::DICompileUnit* cu;
@@ -88,6 +88,7 @@ namespace Jet
 		Type* IntType;
 		Type* BoolType;
 		Type* CharPointerType;
+        Type* VoidType;
 
 		const JetProject* project;
 

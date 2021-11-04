@@ -20,7 +20,6 @@ namespace Jet
 	std::string ParseType(const char* tname, int& p);
 
 	class Type;
-	extern Type VoidType;
 	struct CValue
 	{
 		//my type info
@@ -28,13 +27,6 @@ namespace Jet
 		llvm::Value* val;
 		llvm::Value* pointer;
         bool is_const;
-
-		CValue()
-		{
-			type = &VoidType;
-			val = 0;
-			pointer = 0;
-		}
 
 		CValue(Type* type, llvm::Value* val) 
           : type(type), val(val), pointer(0), is_const(false) {}
@@ -94,6 +86,8 @@ namespace Jet
 		llvm::DIType* debug_type;
 		Type* pointer_type;
 		llvm::Type* llvm_type = 0;
+
+        Compilation* compilation;
 	public:
 
 		Types type : 8;
@@ -115,9 +109,12 @@ namespace Jet
 		std::vector<std::pair<Type**, Trait*>> GetTraits(Compilation* compiler);
 		bool MatchesTrait(Compilation* compiler, Trait* trait);
 
-		Type() : debug_type(0) { data = 0; type = Types::Void; loaded = false; size = 0; pointer_type = 0; }
-		Type(std::string name, Types type, Struct *data = 0) : type(type), data(data), loaded(false), size(0), name(name), pointer_type(0), debug_type(0) {}
-		Type(std::string name, Types type, Type* base, int size = 0) : type(type), base(base), loaded(false), size(size), name(name), pointer_type(0), debug_type(0) {}
+		Type(Compilation* comp, std::string name, Types type, Struct *data = 0) 
+          : compilation(comp), type(type), data(data), loaded(false), size(0),
+            name(name), pointer_type(0), debug_type(0) {}
+		Type(Compilation* comp, std::string name, Types type, Type* base, int size = 0)
+          : compilation(comp), type(type), base(base), loaded(false), size(size),
+            name(name), pointer_type(0), debug_type(0) {}
 
 		void Load(Compilation* compiler);
 

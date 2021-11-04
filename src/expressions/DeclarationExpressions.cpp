@@ -55,7 +55,7 @@ void EnumExpression::CompileDeclarations(CompilerContext* context)
 
 CValue ExternExpression::Compile(CompilerContext* context)
 {
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 void ExternExpression::CompileDeclarations(CompilerContext* context)
@@ -164,7 +164,7 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 	if (tr == context->root->ns->members.end())
 	{
 		t = new Trait;
-		Type* ty = new Type(name.text, Types::Trait);
+		Type* ty = new Type(context->root, name.text, Types::Trait);
 		ty->trait = t;
 		context->root->ns->members.insert({ name.text, Symbol(ty) });
 		context->root->traits[name.text] = t;
@@ -189,9 +189,7 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 		{
 			t->templates.push_back({ 0, ii.name.text });
 
-			auto type = new Type;
-			type->name = ii.name.text;
-			type->type = Types::Invalid;
+			auto type = new Type(context->root, ii.name.text, Types::Invalid);
 			type->ns = context->root->ns;
 			t->members.insert({ ii.name.text, type });
 		}

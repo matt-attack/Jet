@@ -990,7 +990,7 @@ namespace Jet
 				}
 			}
 
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 		}
 
 		void CompileDeclarations(CompilerContext* context)

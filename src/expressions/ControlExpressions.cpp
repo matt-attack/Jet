@@ -35,7 +35,7 @@ CValue DefaultExpression::Compile(CompilerContext* context)
 	//start using our new block
 	context->function->f->getBasicBlockList().push_back(block);
 	context->root->builder.SetInsertPoint(block);
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 CValue CaseExpression::Compile(CompilerContext* context)
@@ -59,7 +59,7 @@ CValue CaseExpression::Compile(CompilerContext* context)
 	//start using our new block
 	context->function->f->getBasicBlockList().push_back(block);
 	context->root->builder.SetInsertPoint(block);
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 CValue IfExpression::Compile(CompilerContext* context)
@@ -109,7 +109,7 @@ CValue IfExpression::Compile(CompilerContext* context)
 	context->function->f->getBasicBlockList().push_back(EndBB);
 	context->root->builder.SetInsertPoint(EndBB);
 
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 CValue SwitchExpression::Compile(CompilerContext* context)
@@ -167,7 +167,7 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	context->function->f->getBasicBlockList().push_back(this->switch_end);
 	context->root->builder.SetInsertPoint(this->switch_end);
 
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 Type* CallExpression::TypeCheck(CompilerContext* context)
@@ -291,12 +291,12 @@ CValue YieldExpression::Compile(CompilerContext* context)
 	//start inserting in new block
 	context->root->builder.SetInsertPoint(bb);
 
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 CValue MatchExpression::Compile(CompilerContext* context)
 {
-	CValue val;//first get pointer to union
+	CValue val(0,0);//first get pointer to union
 	auto i = dynamic_cast<NameExpression*>(var);
 	auto p = dynamic_cast<IndexExpression*>(var);
 	if (i)
@@ -304,7 +304,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 	else if (p)
 		val = p->GetElement(context);
 
-	if (val.type->type != Types::Union)
+	if (!val.type || val.type->type != Types::Union)
 		context->root->Error("Cannot match with a non-union", token);
 
 	auto endbb = llvm::BasicBlock::Create(context->context, "match.end");
@@ -359,7 +359,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		ii.block->Compile(context);
 
 		//need to do this without destructing args
-		context->scope->named_values[ii.name.text] = CValue();
+		context->scope->named_values.insert( {ii.name.text, CValue(context->root->VoidType, 0) } );
 		context->PopScope();
 
 		//branch to end
@@ -370,7 +370,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 	context->function->f->getBasicBlockList().push_back(endbb);
 	context->root->builder.SetInsertPoint(endbb);
 
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 CValue CallExpression::Compile(CompilerContext* context)

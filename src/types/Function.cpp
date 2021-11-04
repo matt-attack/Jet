@@ -75,7 +75,7 @@ void Function::Load(Compilation* compiler)
 	llvm::FunctionType *ft;
 	if (this->return_type->type == Types::Struct)
 	{
-		ft = llvm::FunctionType::get(VoidType.GetLLVMType(), args, false);
+		ft = llvm::FunctionType::get(compiler->VoidType->GetLLVMType(), args, false);
 	}
 	else
 	{

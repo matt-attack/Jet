@@ -8,17 +8,13 @@
 
 using namespace Jet;
 
-Type Jet::VoidType("void", Types::Void);
-
 Type* Type::GetPointerType()
 {
 	if (this->pointer_type)
 		return this->pointer_type;
 
-	auto type = new Type;
-	type->name = name + "*";
+	auto type = new Type(compilation, name + "*", Types::Pointer);
 	type->base = this;
-	type->type = Types::Pointer;
 	this->pointer_type = type;
 
 	type->ns = type->base->ns;
@@ -157,32 +153,30 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 	throw 7;
 }
 
-//todo make this not a global context
-extern llvm::LLVMContext llvm_context_jet;
 llvm::Type* Type::GetLLVMType()
 {
 	switch ((int)this->type)
 	{
 	case (int)Types::Double:
-		return llvm::Type::getDoubleTy(llvm_context_jet);
+		return llvm::Type::getDoubleTy(compilation->context);
 	case (int)Types::Float:
-		return llvm::Type::getFloatTy(llvm_context_jet);
+		return llvm::Type::getFloatTy(compilation->context);
 	case (int)Types::UInt:
 	case (int)Types::Int:
-		return llvm::Type::getInt32Ty(llvm_context_jet);
+		return llvm::Type::getInt32Ty(compilation->context);
 	case (int)Types::ULong:
 	case (int)Types::Long:
-		return llvm::Type::getInt64Ty(llvm_context_jet);
+		return llvm::Type::getInt64Ty(compilation->context);
 	case (int)Types::Void:
-		return llvm::Type::getVoidTy(llvm_context_jet);
+		return llvm::Type::getVoidTy(compilation->context);
 	case (int)Types::UChar:
 	case (int)Types::Char:
-		return llvm::Type::getInt8Ty(llvm_context_jet);
+		return llvm::Type::getInt8Ty(compilation->context);
 	case (int)Types::UShort:
 	case (int)Types::Short:
-		return llvm::Type::getInt16Ty(llvm_context_jet);
+		return llvm::Type::getInt16Ty(compilation->context);
 	case (int)Types::Bool:
-		return llvm::Type::getInt1Ty(llvm_context_jet);
+		return llvm::Type::getInt1Ty(compilation->context);
 	case (int)Types::Struct:
 		assert(this->loaded);
 		return this->data->type;
@@ -190,13 +184,12 @@ llvm::Type* Type::GetLLVMType()
 	{
 		if (this->llvm_type)
 			return this->llvm_type;
-		std::vector<llvm::Type*> types = { llvm::Type::getInt32Ty(llvm_context_jet), base->GetPointerType()->GetLLVMType() };
+
+		std::vector<llvm::Type*> types = { llvm::Type::getInt32Ty(compilation->context),
+                                           base->GetPointerType()->GetLLVMType() };
 		auto res = llvm::StructType::create(types, this->name, true);
 		this->llvm_type = res;
 		return res;
-		//fix this to use the new type
-		//	maybe store the llvm type in it
-		//return llvm::ArrayType::get(this->base->GetLLVMType(), this->size);
 	}
 	case (int)Types::InternalArray:
 	{
@@ -215,7 +208,7 @@ llvm::Type* Type::GetLLVMType()
 		    for (auto ii : this->function->args)
 			    args.push_back(ii->GetLLVMType());
 
-		    return llvm::FunctionType::get(llvm::Type::getVoidTy(llvm_context_jet), args, false)->getPointerTo();
+		    return llvm::FunctionType::get(llvm::Type::getVoidTy(compilation->context), args, false)->getPointerTo();
         }
 
 		std::vector<llvm::Type*> args;
@@ -526,8 +519,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	if (this->type == Types::Trait)
 	{
 		//fix traits referenced in templates
-		Type* trait = new Type;
-		trait->type = Types::Trait;
+		Type* trait = new Type(compiler, "", Types::Trait);
 		trait->name = this->name + "<";
 		int i = 0;
 		for (auto ii : types)
@@ -592,7 +584,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	str->expression = this->data->expression;
 
 
-	Type* t = new Type(str->name, Types::Struct, str);
+	Type* t = new Type(compilation, str->name, Types::Struct, str);
 	t->ns = this->ns;
 
 	//make sure the real thing is stored as this

@@ -105,7 +105,7 @@ CValue StructExpression::Compile(CompilerContext* context)
 				context->root->Error("Trait '" + ii.type.text + "' is not defined", ii.type);
 		}
 
-		return CValue();
+		return CValue(context->root->VoidType, 0);
 	}
 
 	//compile function members
@@ -118,7 +118,7 @@ CValue StructExpression::Compile(CompilerContext* context)
 	//add any missing constructors
 	this->AddConstructors(context);
 
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 void StructExpression::Visit(ExpressionVisitor* visitor)
@@ -174,7 +174,7 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 	if (has_constructor == false)
 	{
 		auto fun = new Function("__" + str->data->name + "_" + strname, false);//
-		fun->return_type = &VoidType;
+		fun->return_type = context->root->VoidType;
 		fun->arguments = { { str->GetPointerType(), "this" } };
 		fun->f = 0;
 		fun->expression = 0;
@@ -184,7 +184,7 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 	if (has_destructor == false)
 	{
 		auto fun = new Function("__" + str->data->name + "_~" + strname, false);//
-		fun->return_type = &VoidType;
+		fun->return_type = context->root->VoidType;
 		fun->arguments = { { str->GetPointerType(), "this" } };
 		fun->f = 0;
 		fun->expression = 0;
@@ -227,7 +227,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				std::vector<std::pair<Type*, std::string>> argsv;
 				argsv.push_back({ str->GetPointerType(), "this" });
 
-				auto ret = &VoidType;
+				auto ret = context->root->VoidType;
 
 				CompilerContext* function = context->StartFunctionDefinition(ii.second);
 				ii.second->f = function->function->f;
@@ -289,7 +289,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 					i++;
 				}
 
-				function->Return(CValue());
+				function->Return(CValue(context->root->VoidType, 0));
 
 				context->root->builder.SetCurrentDebugLocation(dp);
 				if (rp)
@@ -307,7 +307,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 				std::vector<std::pair<Type*, std::string>> argsv;
 				argsv.push_back({ str->GetPointerType(), "this" });
 
-				auto ret = &VoidType;
+				auto ret = context->root->VoidType;
 
 				CompilerContext* function = context->StartFunctionDefinition(ii.second);
 				ii.second->f = function->function->f;
@@ -389,7 +389,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 					i++;
 				}
 
-				function->Return(CValue());
+				function->Return(CValue(context->root->VoidType, 0));
 
 				context->root->builder.SetCurrentDebugLocation(dp);
 				if (rp)
@@ -529,7 +529,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 		type_name = this->name.text;
     }
 
-	Type* str = new Type(type_name, Types::Struct, new Struct);
+	Type* str = new Type(context->root, type_name, Types::Struct, new Struct);
 	if (this->token.type == TokenType::Class)
     {
 		str->data->is_class = true;

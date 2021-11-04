@@ -76,8 +76,7 @@ std::string Jet::exec(const char* cmd, int* error_code) {
 	return result;
 }
 
-llvm::LLVMContext llvm_context_jet;
-Compilation::Compilation(const JetProject* proj) : builder(llvm_context_jet), context(llvm_context_jet), project(proj)
+Compilation::Compilation(const JetProject* proj) : context(), builder(context), project(proj)
 {
 	this->typecheck = false;
 	this->target = 0;
@@ -86,23 +85,23 @@ Compilation::Compilation(const JetProject* proj) : builder(llvm_context_jet), co
 	this->global = this->ns;
 
 	//insert basic types
-	this->FloatType = new Type("float", Types::Float);
+	this->FloatType = new Type(this, "float", Types::Float);
 	ns->members.insert({ "float", this->FloatType });
-	this->DoubleType = new Type("double", Types::Double);
+	this->DoubleType = new Type(this, "double", Types::Double);
 	ns->members.insert({ "double", this->DoubleType });
-	ns->members.insert({ "long", new Type("long", Types::Long) });
-	ns->members.insert({ "ulong", new Type("ulong", Types::ULong) });
-	this->IntType = new Type("int", Types::Int);
+	ns->members.insert({ "long", new Type(this, "long", Types::Long) });
+	ns->members.insert({ "ulong", new Type(this, "ulong", Types::ULong) });
+	this->IntType = new Type(this, "int", Types::Int);
 	ns->members.insert({ "int", this->IntType });
-	ns->members.insert({ "uint", new Type("uint", Types::UInt) });
-	ns->members.insert({ "short", new Type("short", Types::Short) });
-	ns->members.insert({ "ushort", new Type("ushort", Types::UShort) });
-	ns->members.insert({ "char", new Type("char", Types::Char) });
-	ns->members.insert({ "uchar", new Type("uchar", Types::UChar) });
-	this->BoolType = new Type("bool", Types::Bool);
+	ns->members.insert({ "uint", new Type(this, "uint", Types::UInt) });
+	ns->members.insert({ "short", new Type(this, "short", Types::Short) });
+	ns->members.insert({ "ushort", new Type(this, "ushort", Types::UShort) });
+	ns->members.insert({ "char", new Type(this, "char", Types::Char) });
+	ns->members.insert({ "uchar", new Type(this, "uchar", Types::UChar) });
+	this->BoolType = new Type(this, "bool", Types::Bool);
 	ns->members.insert({ "bool", this->BoolType });
-	// NEED TO BE SURE NOT TO FREE THIS
-	ns->members.insert({ "void", &VoidType });// new Type("void", Types::Void) });
+    this->VoidType = new Type(this, "void", Types::Void);
+	ns->members.insert({ "void", this->VoidType });
 
 	for (auto ii : ns->members)
 	{
@@ -629,7 +628,7 @@ Compilation* Compilation::Make(const JetProject* project, DiagnosticBuilder* dia
 
 		// Executables need an _init function
 		auto func = new Function("_init", false, true);
-		func->return_type = &VoidType;
+		func->return_type = compilation->VoidType;
 		compilation->functions.push_back(func);
 
 		auto n = new CompilerContext(compilation, 0);
@@ -1098,7 +1097,12 @@ std::string Compilation::SetTarget(const std::string& triple)
 	auto CodeModel = llvm::CodeModel::Medium;
 	this->target = TheTarget->createTargetMachine(TheTriple.getTriple(), MCPU, FeaturesStr, Options, RelocModel, CodeModel, OLvl);
 
-	module->setDataLayout(this->target->createDataLayout());
+    auto layout = this->target->createDataLayout();
+
+    // todo use me
+    //pointer_size = layout->getPointerSize();
+
+	module->setDataLayout(layout);
 
 	return TheTriple.str().c_str();
 }
@@ -1197,9 +1201,7 @@ void Compilation::OutputIR(const char* filename)
 void Compilation::AdvanceTypeLookup(Jet::Type** dest, const std::string& name, Token* location)
 {
 	//who knows what type it is, create a dummy one that will get replaced later
-	Type* type = new Type;
-	type->name = name;
-	type->type = Types::Invalid;
+	Type* type = new Type(this, name, Types::Invalid);
 	type->data = 0;
 	type->ns = this->ns;
 	type->_location = location;
@@ -1318,10 +1320,8 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 			if (t->pointer_type)
 				return t->pointer_type;
 
-			type = new Type;
-			type->name = name;
+			type = new Type(this, name, Types::Pointer);
 			type->base = t;
-			type->type = Types::Pointer;
 			t->pointer_type = type;
 			if (load)
 				type->Load(this);
@@ -1536,7 +1536,7 @@ Jet::Type* Compilation::GetArrayType(Jet::Type* base)
 	if (res != this->array_types.end())
 		return res->second;
 
-	Type* t = new Type(base->name + "[]", Types::Array, base);
+	Type* t = new Type(this, base->name + "[]", Types::Array, base);
 	t->ns = this->ns;
 	this->array_types[base] = t;
 	return t;
@@ -1548,7 +1548,7 @@ Jet::Type* Compilation::GetInternalArrayType(Jet::Type* base, unsigned int size)
 	if (res != this->internal_array_types.end())
 		return res->second;
 
-	Type* t = new Type(base->name + "[" + std::to_string(size) + "]", Types::InternalArray, base);
+	Type* t = new Type(this, base->name + "[" + std::to_string(size) + "]", Types::InternalArray, base);
 	t->size = size;
 	t->ns = this->ns;
 	this->internal_array_types[std::pair<Jet::Type*, unsigned int>(base, size)] = t;
@@ -1599,9 +1599,8 @@ Jet::Type* Compilation::GetInternalArrayType(Jet::Type* base, unsigned int size)
 				this->Error("Void is not a valid function argument type", *this->current_function->current_token);
 		}
 
-		auto type = new Type;
+		auto type = new Type(this, "", Types::Function);
 		type->function = t;
-		type->type = Types::Function;
 		type->ns = global;
 		type->name = type->ToString();
 

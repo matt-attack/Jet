@@ -181,14 +181,14 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 			if (iter == context->root->traits.end() || iter->second->valid == false)
 				context->root->Error("Trait '" + ii.first.text + "' is not defined", ii.first);
 		}
-		return CValue();
+		return CValue(context->root->VoidType, 0);
 	}
 
 	if (Struct.length())
 	{
 		auto iter = context->root->LookupType(Struct, false);
 		if (iter->type == Types::Trait)
-			return CValue();
+			return CValue(context->root->VoidType, 0);
 	}
 
 	return this->DoCompile(context);
@@ -457,7 +457,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		function_context->root->builder.CreateRet(function_context->root->builder.getInt1(false));//signal we are gone generating values
 	else if (function_context->function->f->getBasicBlockList().back().getTerminator() == 0)
 		if (ret->type == Jet::Types::Void)// Implicit return void at end to satisfy llvm
-			function_context->Return(CValue());
+			function_context->Return(CValue(context->root->VoidType, 0));
 		else
 			context->root->Error("Function must return a value!", token);
 
@@ -671,9 +671,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	if (is_generator)
 	{
 		//build data about the generator context struct
-		Type* str = new Type;
-		str->name = name_prefix + "_yielder_context";
-		str->type = Types::Struct;
+		Type* str = new Type(context->root, name_prefix + "_yielder_context", Types::Struct);
 		str->data = new Jet::Struct;
 		str->data->name = str->name;
 		str->data->parent_struct = 0;
@@ -699,7 +697,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		}
 		{
 			auto func = new Function(name_prefix + "_yield_reset", name.text.length() == 0);
-			func->return_type = &VoidType;
+			func->return_type = context->root->VoidType;
 			func->arguments = { { 0, "_context" } };
 			func->arguments.resize(1);
 			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
@@ -714,7 +712,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		}
 		{
 			auto func = new Function(name_prefix + "_generator_current", name.text.length() == 0);
-			func->return_type = &VoidType;
+			func->return_type = context->root->VoidType;
 			context->root->AdvanceTypeLookup(&func->return_type, this->ret_type.text, &this->ret_type);
 			context->root->functions.push_back(func);
 
@@ -781,7 +779,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 				if (temp.second.text == sub)
 				{
 					//insert dummy types
-					fun->arguments.push_back({ new Type(ii.type.text, Types::Invalid), ii.name.text });
+					fun->arguments.push_back({ new Type(context->root, ii.type.text, Types::Invalid), ii.name.text });
 					done = true;
 					break;
 				}

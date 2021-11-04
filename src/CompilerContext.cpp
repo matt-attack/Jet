@@ -642,6 +642,8 @@ Symbol CompilerContext::GetMethod(
 	}
 }
 
+#undef alloca
+
 CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct, bool devirtualize, bool is_const)
 {
 	std::vector<Type*> arsgs;
@@ -788,7 +790,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
         auto return_type = var.type->function->return_type;
 		std::vector<llvm::Value*> argsv;
-        CValue alloca;
+        CValue alloca(0, 0);
         if (return_type->type == Types::Struct)
         {
             // add a place to put the return value
@@ -830,7 +832,7 @@ void CompilerContext::SetDebugLocation(const Token& t)
 CValue CompilerContext::GetVariable(const std::string& name, bool error)
 {
 	auto cur = this->scope;
-	CValue value;
+	CValue value(0, 0);
 	do
 	{
 		auto iter = cur->named_values.find(name);
@@ -842,7 +844,7 @@ CValue CompilerContext::GetVariable(const std::string& name, bool error)
 		cur = cur->prev;
 	} while (cur);
 
-	if (value.type->type == Types::Void)
+	if (value.type == 0)
 	{
 		auto sym = this->root->GetVariableOrFunction(name);
 		if (sym.type != SymbolType::Invalid)
@@ -882,9 +884,7 @@ CValue CompilerContext::GetVariable(const std::string& name, bool error)
 			//load it, then store it as a local
 			auto val = root->builder.CreateGEP(data, { root->builder.getInt32(0), root->builder.getInt32(this->captures.size()) });
 
-			CValue value;
-			value.val = root->builder.CreateAlloca(var.type->base->GetLLVMType());
-			value.type = var.type;
+			CValue value(var.type, root->builder.CreateAlloca(var.type->base->GetLLVMType()));
 
 			this->RegisterLocal(name, value);//need to register it as immutable 
 
@@ -900,7 +900,7 @@ CValue CompilerContext::GetVariable(const std::string& name, bool error)
         }
         else
         {
-            return CValue();
+            return CValue(root->VoidType, 0);
         }
 	}
 	return value;
@@ -1232,8 +1232,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
 //reduce redundancy by making one general version that just omits the llvm::Value from the CValue when doign a check
 bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
 {
-	CValue value;
-	value.type = src;
+	CValue value(src, 0);
 
 	if (value.type->type == t->type && value.type->data == t->data)
 		return true;
@@ -1499,7 +1498,7 @@ void CompilerContext::RegisterLocal(
 		this->scope->to_destruct.push_back(val);
 
     val.is_const = is_const;
-	this->scope->named_values[name] = val;
+	this->scope->named_values.insert( { name, val} );
 }
 
 void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)

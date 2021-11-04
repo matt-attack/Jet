@@ -91,7 +91,7 @@ CValue SliceExpression::Compile(CompilerContext* context)
     {
       context->root->Error("Cannot slice non-array type '" + lval.type->ToString() + "'", token);
 
-      return CValue();
+      return CValue(context->root->VoidType, 0);
     }
 
     // Now alloca the array
@@ -352,7 +352,7 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 	auto string = dynamic_cast<StringExpression*>(index);
 	if (p || i)
 	{
-		CValue lhs;
+		CValue lhs(0, 0);
 		if (p)
 		{
 			if (tc)
@@ -457,7 +457,7 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 	auto i = dynamic_cast<IndexExpression*>(left);
 
     // First get the left hand side
-	CValue lhs;
+	CValue lhs(0, 0);
 	if (p)
 	{
 		auto old = context->current_token;
@@ -756,7 +756,7 @@ CValue AssignExpression::Compile(CompilerContext* context)
 	if (auto storable = dynamic_cast<IStorableExpression*>(this->left))
 		storable->CompileStore(context, right->Compile(context));
 
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 CValue NameExpression::Compile(CompilerContext* context)
@@ -811,7 +811,7 @@ CValue OperatorAssignExpression::Compile(CompilerContext* context)
 	else
 		context->root->Error("Cannot store into this type.", this->token);
 
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 CValue OperatorExpression::Compile(CompilerContext* context)
@@ -1067,7 +1067,7 @@ CValue FreeExpression::Compile(CompilerContext* context)
 
 	//todo: can mark the size and pointer as zero now
 
-	return CValue();
+	return CValue(context->root->VoidType, 0);
 }
 
 
