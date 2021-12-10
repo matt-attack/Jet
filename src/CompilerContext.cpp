@@ -716,6 +716,20 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
         }
 	}
 
+    // check for functors
+    if (function_symbol.type != SymbolType::Function && function_symbol.val->type->type == Types::Struct)
+    {
+        CValue var = *function_symbol.val;
+        
+        auto funiter = var.type->data->functions.find("()"); 
+        if (funiter != var.type->data->functions.end())
+        {
+            function_symbol.type = SymbolType::Function;
+            delete function_symbol.val;// we had to allocate it, todo fix this weirdness
+            function_symbol.fn = funiter->second;
+        }
+    }
+
     // handle actual function vs function pointer
     if (function_symbol.type == SymbolType::Function)
     {
@@ -780,6 +794,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
         // todo handle functor structs
         if (var.type->type != Types::Function)
         {
+            // functors have already been handled above so anything here is an error
             this->root->Error("Cannot call non-function type", *this->current_token);
         }
 

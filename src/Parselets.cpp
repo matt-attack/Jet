@@ -719,6 +719,8 @@ bool IsValidFunctionNameToken(TokenType op)
 		return true;
 	else if (op == TokenType::AddAssign)
 		return true;
+    else if (op == TokenType::LeftParen)
+        return true;
 
 	return false;
 }
@@ -770,6 +772,11 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 			auto name2 = parser->Consume(TokenType::RightBracket);
 			name.text += ']';
 		}
+        else if (name.type == TokenType::LeftParen)
+        {
+            auto name2 = parser->Consume(TokenType::RightParen);
+            name.text += ')';
+        }
 	}
 
 	//check that the name is ok

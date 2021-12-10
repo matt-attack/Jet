@@ -279,6 +279,11 @@ CValue YieldExpression::Compile(CompilerContext* context)
 
 		auto dest_type = data.type->base->data->struct_members[1].type;
 
+        if (!value.val)
+        {
+            value.val = context->root->builder.CreateLoad(value.pointer, "autodereference");
+        }
+
 		//store result into the generator context
 		value = context->DoCast(dest_type, value);//cast to the correct type
 		br = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
