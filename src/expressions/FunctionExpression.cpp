@@ -137,8 +137,7 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 
 	if (this->is_generator)
 	{
-		auto func = myself;// context->root->ns->GetFunction(this->GetRealName());
-		auto str = func->return_type_;
+		auto str = myself->return_type_;
 		//add _context
 		nc->TCRegisterLocal("_context", str->GetPointerType()->GetPointerType());
 
@@ -210,9 +209,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	//insert the 'this' argument if I am a member function
 	if (struct_name.length() > 0)
 	{
-		auto type = context->root->LookupType(struct_name);
-
-		argsv.push_back({ type, "this" });
+		argsv.push_back({ context->root->LookupType(struct_name), "this" });
 	}
 
 	//add the context pointer as an argument if this is a generator
@@ -487,12 +484,11 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		context->root->builder.SetCurrentDebugLocation(0);
 
 		//compile the other function necessary for an iterator
-		auto func = context->StartFunctionDefinition(myself);//this->GetFunctionNamePrefix(), 0, { argsv.front() }, struct_name.length() > 0 ? argsv[0].first : 0, is_lambda, myself);
+		auto func = context->StartFunctionDefinition(myself);
 
 		auto str = func->function->return_type_;
 
 		context->root->current_function = func;
-		//func->function->Load(context->root);// this shouldnt be necessary, Add Function loads it
 
 		//alloca the new context
 		auto alloc = context->root->builder.CreateAlloca(str->GetLLVMType());

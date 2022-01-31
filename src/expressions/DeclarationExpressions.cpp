@@ -34,7 +34,9 @@ void EnumExpression::CompileDeclarations(CompilerContext* context)
 			//set it to be one greater than the last
 			cur_value = last_value + 1;
 		}
-		context->root->ns->members.insert({ ii.name.text, new CValue(context->Integer(cur_value)) });
+        Symbol s(new CValue(context->Integer(cur_value)));
+        s.token = ii.value;
+		context->root->ns->members.insert({ ii.name.text, s });
         min_value = std::min(min_value, cur_value);
         max_value = std::max(max_value, cur_value);
 		last_value = cur_value;
@@ -43,11 +45,15 @@ void EnumExpression::CompileDeclarations(CompilerContext* context)
 	// Add max and min values if they dont overlap
     if (context->root->ns->members.find("min") == context->root->ns->members.end())
     {
-		context->root->ns->members.insert({ "min", new CValue(context->Integer(min_value)) });
+        Symbol s(new CValue(context->Integer(min_value)));
+        s.token = name;
+		context->root->ns->members.insert({ "min", s });
     }
     if (context->root->ns->members.find("max") == context->root->ns->members.end())
     {
-		context->root->ns->members.insert({ "max", new CValue(context->Integer(max_value)) });
+        Symbol s(new CValue(context->Integer(max_value)));
+        s.token = name;
+		context->root->ns->members.insert({ "max", s });
     }
 
 	context->PopNamespace();

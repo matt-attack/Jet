@@ -72,20 +72,10 @@ void Function::Load(Compilation* compiler)
 	}
 
 	// Determine the return type and final llvm function type
-	llvm::FunctionType *ft;
-	if (return_type_->type == Types::Struct)
-	{
-		ft = llvm::FunctionType::get(compiler->VoidType->GetLLVMType(), args, false);
-	}
-	else
-	{
-		ft = llvm::FunctionType::get(return_type_->GetLLVMType(), args, false);
-	}
+    auto real_ret_type = return_type_->type == Types::Struct ? compiler->VoidType : return_type_;
+	llvm::FunctionType *ft = llvm::FunctionType::get(real_ret_type->GetLLVMType(), args, false);
 
-	// todo need to know if this is a C function, if it is we shouldnt mangle
 	const auto mangled_name = mangle(name_, is_lambda_, arguments_, is_c_function_);
-
-    //printf("mangling %s to %s\n", name.c_str(), mangled_name.c_str());
 
 	f_ = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, mangled_name, compiler->module);
 	switch (calling_convention_)
@@ -131,19 +121,6 @@ void Function::Load(Compilation* compiler)
 		auto aname = arguments_[Idx].second;
 
 		AI->setName(aname);
-
-		//ok, lets watch this here, only need to do this on StdCall and non PoD(lets just do it for everything right now, who needs microoptimizations)
-		//if I do this I have to use it correctly
-		// add attributes for structs being passed in by pointer
-		if (/*this->calling_convention == CallingConvention::StdCall &&*/ arguments_[Idx].first->type == Types::Struct)
-		{
-			//AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::ByVal));
-			//AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::Alignment, 4));
-		}
-
-		//auto D = compiler->debug->createLocalVariable(llvm::dwarf::DW_TAG_arg_variable, this->scope, aname, compiler->debug_info.file, line,
-		//	this->arguments[Idx].first->GetDebugType(compiler));
-		//compiler->debug->insertDeclare(AI.getNodePtrUnchecked(), D, 0, llvm::DebugLoc::get(line, 0, this->scope), &f->getBasicBlockList().front());
 	}
 
 	loaded_ = true;
@@ -201,7 +178,7 @@ Type* Function::GetType(Compilation* compiler) const
 	for (unsigned int i = 0; i < arguments_.size(); i++)
 		args.push_back(arguments_[i].first);
 
-	return compiler->GetFunctionType(return_type_, args);
+    return compiler->GetFunctionType(return_type_, args);
 }
 
 CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv,
@@ -214,15 +191,9 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
         type_ = this->GetType(context->root)->function;
     }
 
-	//virtual function calls for generators fail, need to devirtualize them
+	// virtual function calls for generators fail, need to devirtualize them
 	// this shouldnt matter, all generators shouldnt be virtual
-    bool dv = devirtualize;
-    if (is_generator_)
-    {
-        dv = true;
-    }
-
-    return type_->Call(context, f_, argsv, dv, this, bonus_arg);
+    return type_->Call(context, f_, argsv, devirtualize || is_generator_, this, bonus_arg);
 }
 
 CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::vector<CValue>& argsv,
@@ -255,7 +226,6 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
     }
 
 	//list of struct arguments to add attributes to
-	//std::vector<int> to_convert;
 	int i = 0; int ai = 0;
 	if (this->return_type->type == Types::Struct)
 	{
@@ -352,14 +322,6 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
 		call = context->root->builder.CreateCall(fn, arg_vals);
 		//call->setCallingConv(this->f->getCallingConv());
 	}
-
-	//add attributes
-	/*for (auto ii : to_convert)
-	{
-		//auto& ctext = context->root->builder.getContext();
-		//call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::ByVal));
-		//call->addParamAttr(ii, llvm::Attribute::get(ctext, llvm::Attribute::AttrKind::Alignment, 4));
-	}*/
 
 	if (ptr_struct_return)
 	{

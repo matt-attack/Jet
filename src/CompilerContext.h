@@ -44,8 +44,6 @@ namespace Jet
 		TCScope* prev;
 	};
 
-	//CValue CallFunction(CompilerContext* context, Function* fun, std::vector<llvm::Value*>& argsv, bool devirtualize);
-
     static Token invalid_token;
 
 	//compiles functions
