@@ -33,7 +33,7 @@ CValue DefaultExpression::Compile(CompilerContext* context)
 		context->root->builder.CreateBr(sw->switch_end);
 
 	//start using our new block
-	context->function->f->getBasicBlockList().push_back(block);
+	context->function->f_->getBasicBlockList().push_back(block);
 	context->root->builder.SetInsertPoint(block);
 	return CValue(context->root->VoidType, 0);
 }
@@ -57,7 +57,7 @@ CValue CaseExpression::Compile(CompilerContext* context)
 		context->root->builder.CreateBr(sw->switch_end);
 
 	//start using our new block
-	context->function->f->getBasicBlockList().push_back(block);
+	context->function->f_->getBasicBlockList().push_back(block);
 	context->root->builder.SetInsertPoint(block);
 	return CValue(context->root->VoidType, 0);
 }
@@ -84,8 +84,8 @@ CValue IfExpression::Compile(CompilerContext* context)
 		auto cond = ii->condition->Compile(context);
 		cond = context->DoCast(context->root->BoolType, cond);//try and cast to bool
 
-		llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(context->context, "then", context->function->f);
-		NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(context->context, "elseif", context->function->f);
+		llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(context->context, "then", context->function->f_);
+		NextBB = pos == (branches.size() - 1) ? (hasElse ? ElseBB : EndBB) : llvm::BasicBlock::Create(context->context, "elseif", context->function->f_);
 
 		context->root->builder.CreateCondBr(cond.val, ThenBB, NextBB);
 
@@ -99,14 +99,14 @@ CValue IfExpression::Compile(CompilerContext* context)
 
 	if (hasElse)
 	{
-		context->function->f->getBasicBlockList().push_back(ElseBB);
+		context->function->f_->getBasicBlockList().push_back(ElseBB);
 		context->root->builder.SetInsertPoint(ElseBB);
 
 		this->Else->block->Compile(context);
 		context->root->builder.CreateBr(EndBB);
 	}
 
-	context->function->f->getBasicBlockList().push_back(EndBB);
+	context->function->f_->getBasicBlockList().push_back(EndBB);
 	context->root->builder.SetInsertPoint(EndBB);
 
 	return CValue(context->root->VoidType, 0);
@@ -158,13 +158,13 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	if (no_def)
 	{
 		//insert and create a dummy default
-		context->function->f->getBasicBlockList().push_back(def);
+		context->function->f_->getBasicBlockList().push_back(def);
 		context->root->builder.SetInsertPoint(def);
 		context->root->builder.CreateBr(this->switch_end);
 	}
 
 	//start using end
-	context->function->f->getBasicBlockList().push_back(this->switch_end);
+	context->function->f_->getBasicBlockList().push_back(this->switch_end);
 	context->root->builder.SetInsertPoint(this->switch_end);
 
 	return CValue(context->root->VoidType, 0);
@@ -238,10 +238,10 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 		context->root->Error("Cannot call method '" + fname + "'", this->open);
 	}
 
-	if (fun->arguments.size() == arg.size() + 1)
+	if (fun->arguments_.size() == arg.size() + 1)
 	{
 		//its a constructor or something
-		return fun->arguments[0].first->base;
+		return fun->arguments_[0].first->base;
 	}
 
 	//keep working on this, dont forget constructors
@@ -250,21 +250,21 @@ Type* CallExpression::TypeCheck(CompilerContext* context)
 
 
 	//throw 7;
-	return fun->return_type;
+	return fun->return_type_;
 }
 
 CValue YieldExpression::Compile(CompilerContext* context)
 {
 	//first make sure we are in a generator...
-	if (context->function->is_generator == false)
+	if (context->function->is_generator_ == false)
 		context->root->Error("Cannot use yield outside of a generator!", this->token);
 
 	//create a new block for after the yield
 	auto bb = llvm::BasicBlock::Create(context->context, "yield");
-	context->function->f->getBasicBlockList().push_back(bb);
+	context->function->f_->getBasicBlockList().push_back(bb);
 
 	//add the new block to the generator's indirect branch list
-	context->function->generator.ibr->addDestination(bb);
+	context->function->generator_.ibr->addDestination(bb);
 
 	//store the current location into the generator context so we can jump back
 	auto data = context->Load("_context");
@@ -326,7 +326,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		if (ii.type.type == TokenType::Default)
 		{
 			//add bb for case
-			auto bb = llvm::BasicBlock::Create(context->context, "match.case", context->function->f);
+			auto bb = llvm::BasicBlock::Create(context->context, "match.case", context->function->f_);
 			context->root->builder.SetInsertPoint(bb);
 			sw->setDefaultDest(bb);
 
@@ -350,7 +350,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 			context->root->Error("Type '" + ii.type.text + "' not in union, cannot match to it.", ii.type);
 
 		//add bb for case
-		auto bb = llvm::BasicBlock::Create(context->context, "match.case", context->function->f);
+		auto bb = llvm::BasicBlock::Create(context->context, "match.case", context->function->f_);
 		context->root->builder.SetInsertPoint(bb);
 		auto i = llvm::ConstantInt::get(context->context, llvm::APInt(32, (uint64_t)pi));
 		sw->addCase(i, bb);
@@ -372,7 +372,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 	}
 
 	//start new basic block
-	context->function->f->getBasicBlockList().push_back(endbb);
+	context->function->f_->getBasicBlockList().push_back(endbb);
 	context->root->builder.SetInsertPoint(endbb);
 
 	return CValue(context->root->VoidType, 0);

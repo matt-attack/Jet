@@ -20,11 +20,11 @@ CompilerContext* CompilerContext::StartFunctionDefinition(Function* func)
 {
 	auto n = new CompilerContext(this->root, this);
 	n->function = func;
-	func->context = n;
+	func->context_ = n;
 
 	func->Load(this->root);
 
-	llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->function->f);
+	llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "entry", n->function->f_);
 	root->builder.SetInsertPoint(bb);
 
 	return n;
@@ -137,14 +137,14 @@ void CompilerContext::Store(CValue loc, CValue in_val, bool RVO)
 		// Handle equality operator if we can find it
 		auto fun_iter = stru->functions.find("=");
 		//todo: search through multimap to find one with the right number of args
-		if (fun_iter != stru->functions.end() && fun_iter->second->arguments.size() == 2)
+		if (fun_iter != stru->functions.end() && fun_iter->second->arguments_.size() == 2)
 		{
 			llvm::Value* pointer = val.pointer;
 			if (val.pointer == 0)//its a value type (return value)
 			{
 				//ok, lets be dumb
 				//copy it to an alloca
-				auto TheFunction = this->function->f;
+				auto TheFunction = this->function->f_;
 				llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 					TheFunction->getEntryBlock().begin());
 				pointer = TmpB.CreateAlloca(val.type->GetLLVMType(), 0, "return_pass_tmp");
@@ -241,7 +241,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
         if (op == TokenType::NotEqual)
         {
 			auto funiter = left.type->data->functions.find("==");
-			if (funiter != left.type->data->functions.end() && funiter->second->arguments.size() == 2)
+			if (funiter != left.type->data->functions.end() && funiter->second->arguments_.size() == 2)
 			{
 				Function* fun = funiter->second;
 				fun->Load(this->root);
@@ -255,7 +255,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 		if (res != token_to_string.end())
 		{
 			auto funiter = left.type->data->functions.find(res->second);
-			if (funiter != left.type->data->functions.end() && funiter->second->arguments.size() == 2)
+			if (funiter != left.type->data->functions.end() && funiter->second->arguments_.size() == 2)
 			{
 				Function* fun = funiter->second;
 				fun->Load(this->root);
@@ -498,7 +498,7 @@ Symbol CompilerContext::GetMethod(
 				auto range = type->data->functions.equal_range(tmp_name);
 				for (auto ii = range.first; ii != range.second; ii++)
 				{
-					if (ii->second->arguments.size() == args.size() + 1)
+					if (ii->second->arguments_.size() == args.size() + 1)
 						fun = ii->second;
 				}
 				if (fun)
@@ -534,21 +534,21 @@ Symbol CompilerContext::GetMethod(
 		//look for the best one
 		fun = this->root->GetFunction(name, args);
 
-		if (fun && fun->templates.size() > 0)
+		if (fun && fun->templates_.size() > 0)
 		{
-			auto templates = new Type*[fun->templates.size()];
-			for (unsigned int i = 0; i < fun->templates.size(); i++)
+			auto templates = new Type*[fun->templates_.size()];
+			for (unsigned int i = 0; i < fun->templates_.size(); i++)
 				templates[i] = 0;
 
 			//need to infer
-			if (fun->arguments.size() > 0)
+			if (fun->arguments_.size() > 0)
 			{
 				int i = 0;
-				for (auto ii : fun->templates)
+				for (auto ii : fun->templates_)
 				{
 					//look for stuff in args
 					int i2 = 0;
-					for (auto iii : fun->arguments)
+					for (auto iii : fun->arguments_)
 					{
 						//get the name of the variable
 						unsigned int subl = 0;
@@ -588,26 +588,26 @@ Symbol CompilerContext::GetMethod(
 				}
 			}
 
-			for (unsigned int i = 0; i < fun->templates.size(); i++)
+			for (unsigned int i = 0; i < fun->templates_.size(); i++)
 			{
 				if (templates[i] == 0)
 					this->root->Error("Could not infer template type", *this->current_token);
 			}
 
-			auto oldname = fun->expression->name.text;
-			fun->expression->name.text += '<';
-			for (unsigned int i = 0; i < fun->templates.size(); i++)
+			auto oldname = fun->expression_->name.text;
+			fun->expression_->name.text += '<';
+			for (unsigned int i = 0; i < fun->templates_.size(); i++)
 			{
-				fun->expression->name.text += templates[i]->ToString();
-				if (i + 1 < fun->templates.size())
-					fun->expression->name.text += ',';
+				fun->expression_->name.text += templates[i]->ToString();
+				if (i + 1 < fun->templates_.size())
+					fun->expression_->name.text += ',';
 			}
-			fun->expression->name.text += '>';
-			auto rname = fun->expression->name.text;
+			fun->expression_->name.text += '>';
+			auto rname = fun->expression_->name.text;
 
 			//register the types
 			int i = 0;
-			for (auto ii : fun->templates)
+			for (auto ii : fun->templates_)
 			{
 				//check if traits match
 				if (templates[i]->MatchesTrait(this->root, ii.first->trait) == false)
@@ -621,14 +621,14 @@ Symbol CompilerContext::GetMethod(
 			auto dp = root->builder.getCurrentDebugLocation();
 
 
-			fun->expression->CompileDeclarations(this);
-			fun->expression->DoCompile(this);
+			fun->expression_->CompileDeclarations(this);
+			fun->expression_->DoCompile(this);
 
 			root->builder.SetCurrentDebugLocation(dp);
 			if (rp)
 				root->builder.SetInsertPoint(rp);
 
-			fun->expression->name.text = oldname;
+			fun->expression_->name.text = oldname;
 
 			//time to recompile and stuff
 			return root->ns->members.find(rname)->second.fn;
@@ -662,10 +662,10 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
         Function* fun = function_symbol.fn;// these must be functions
 
         // For constructors, we alloca the struct and then call it
-        auto type = fun->arguments[0].first->base;
+        auto type = fun->arguments_[0].first->base;
 		type->Load(this->root);
 
-		auto TheFunction = this->function->f;
+		auto TheFunction = this->function->f_;
 		llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 			TheFunction->getEntryBlock().begin());
 		auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
@@ -734,7 +734,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
     if (function_symbol.type == SymbolType::Function)
     {
         Function* fun = function_symbol.fn;
-        if (!fun->is_const && is_const)
+        if (!fun->is_const_ && is_const)
         {
             this->root->Error("Cannot call non-const function '" + name + "' on const value", *this->current_token);
         }
@@ -747,13 +747,14 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
         CValue var = *function_symbol.val;
         delete function_symbol.val;// we had to allocate it, todo fix this weirdness
 
-        bool has_bonus = false;
         // verify that we can actually call it
         llvm::Value* append = 0;
         if (var.type->type != Types::Function)
         {
             // handle lambdas (quite hackily). todo fix this....
-            if (var.type->type == Types::Struct && var.type->data->template_base && var.type->data->template_base->name == "function")
+            if (var.type->type == Types::Struct &&
+                var.type->data->template_base &&
+                var.type->data->template_base->name == "function")
             {
                 // To call a lambda, we need to cast the function pointer to add the capture data as
                 // as last argument.
@@ -780,7 +781,6 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
                 var.type = root->GetFunctionType(old_fn_type->function->return_type, types2);
                 skip_first = false;
                 append = data_ptr;
-                has_bonus = true;
             }
             else
             {
@@ -802,14 +802,14 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
             var.val = this->root->builder.CreateLoad(var.pointer);
         }
 
-        return var.type->function->Call(this, var.val, argsc, false, 0, has_bonus);
+        return var.type->function->Call(this, var.val, argsc, false, 0, append);
     }
 }
 
 void CompilerContext::SetDebugLocation(const Token& t)
 {
-	assert(this->function->loaded);
-	this->root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope));
+	assert(this->function->loaded_);
+	this->root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope_));
 }
 
 CValue CompilerContext::GetVariable(const std::string& name, bool error)
@@ -836,7 +836,7 @@ CValue CompilerContext::GetVariable(const std::string& name, bool error)
 			{
 				auto function = sym.fn;
 				function->Load(this->root);
-				return CValue(function->GetType(this->root), function->f, 0, true);
+				return CValue(function->GetType(this->root), function->f_, 0, true);
 			}
 			else if (sym.type == SymbolType::Variable)
 			{
@@ -845,13 +845,13 @@ CValue CompilerContext::GetVariable(const std::string& name, bool error)
 			}
 		}
 
-		if (this->function->is_lambda)
+		if (this->function->is_lambda_)
 		{
 			auto var = this->parent->GetVariable(name);
 
 			//look in locals above me
 			CValue location = this->Load("_capture_data");
-			auto storage_t = this->function->lambda.storage_type;
+			auto storage_t = this->function->lambda_.storage_type;
 
 			//todo make sure this is the right location to do all of this
 			//append the new type
@@ -860,7 +860,7 @@ CValue CompilerContext::GetVariable(const std::string& name, bool error)
 				types.push_back(storage_t->getContainedType(i));
 
 			types.push_back(var.type->GetLLVMType());
-			storage_t = this->function->lambda.storage_type = storage_t->create(types);
+			storage_t = this->function->lambda_.storage_type = storage_t->create(types);
 
 			auto data = root->builder.CreatePointerCast(location.val, storage_t->getPointerTo());
 
@@ -896,13 +896,13 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 		this->root->Error("Cannot return from outside function!", *current_token);
 	}
 
-    auto return_type = this->function->return_type;
+    auto return_type = this->function->return_type_;
 
     // If we are doing a struct return, first copy into the return value before destructing
     if (return_type->type == Types::Struct)
     {
         // do the cast!
-        CValue cast = DoCast(return_type, ret, false, this->function->f->arg_begin());
+        CValue cast = DoCast(return_type, ret, false, this->function->f_->arg_begin());
 
         if (cast.val)
         {
@@ -928,21 +928,21 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
         else if (assign_iter != return_type->data->functions.end())// if we have assignment operator
         {
             // if we have a constructor, call it
-            this->Construct(CValue(return_type->GetPointerType(), this->function->f->arg_begin()), 0);
+            this->Construct(CValue(return_type->GetPointerType(), this->function->f_->arg_begin()), 0);
             // next, call assign
 			Function* fun = assign_iter->second;
 			fun->Load(this->root);
-			std::vector<CValue> argsv = { CValue(return_type->GetPointerType(), this->function->f->arg_begin()), cast };
+			std::vector<CValue> argsv = { CValue(return_type->GetPointerType(), this->function->f_->arg_begin()), cast };
 
 			fun->Call(this, argsv, true);
         }
         else // otherwise construct and then memcopy
         {
             // if we have a constructor, call it
-            this->Construct(CValue(return_type->GetPointerType(), this->function->f->arg_begin()), 0);
+            this->Construct(CValue(return_type->GetPointerType(), this->function->f_->arg_begin()), 0);
 
 		    //do a memcpy
-		    auto dptr = root->builder.CreatePointerCast(this->function->f->arg_begin(), this->root->CharPointerType->GetLLVMType());
+		    auto dptr = root->builder.CreatePointerCast(this->function->f_->arg_begin(), this->root->CharPointerType->GetLLVMType());
 		    auto sptr = root->builder.CreatePointerCast(cast.pointer, this->root->CharPointerType->GetLLVMType());
 		    root->builder.CreateMemCpy(dptr, 0, sptr, 0, return_type->GetSize());// todo properly handle alignment
         }
@@ -964,10 +964,10 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 	if (return_type->type == Types::Void)
 	{
 		// Only allow this if the function return type is void
-		if (this->function->return_type->type != Types::Void)
+		if (this->function->return_type_->type != Types::Void)
 		{
 			this->root->Error("Cannot return void in function returning '"
-								+ this->function->return_type->ToString() + "'!", *current_token);
+								+ this->function->return_type_->ToString() + "'!", *current_token);
 		}
 		return root->builder.CreateRetVoid();
 	}
@@ -1178,12 +1178,12 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
                 continue;
             }
 
-            if (f.second->arguments.size() != 2)
+            if (f.second->arguments_.size() != 2)
             {
                 continue;
             }
 
-            if (f.second->arguments[1].first != value.type)
+            if (f.second->arguments_[1].first != value.type)
             {
                 continue;
             }
@@ -1504,16 +1504,17 @@ void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
 		fun->Load(this->root);
 		if (arr_size == 0)
 		{//just one element, construct it
-			this->root->builder.CreateCall(fun->f, { pointer.val });
+			this->root->builder.CreateCall(fun->f_, { pointer.val });
 		}
 		else
 		{//construct each child element
 			llvm::Value* counter = this->root->builder.CreateAlloca(this->root->IntType->GetLLVMType(), 0, "newcounter");
 			this->root->builder.CreateStore(this->Integer(0).val, counter);
 
-			auto start = llvm::BasicBlock::Create(this->root->context, "start", this->root->current_function->function->f);
-			auto body = llvm::BasicBlock::Create(this->root->context, "body", this->root->current_function->function->f);
-			auto end = llvm::BasicBlock::Create(this->root->context, "end", this->root->current_function->function->f);
+            auto llvm_f = root->current_function->function->f_;
+			auto start = llvm::BasicBlock::Create(this->root->context, "start", llvm_f);
+			auto body = llvm::BasicBlock::Create(this->root->context, "body", llvm_f);
+			auto end = llvm::BasicBlock::Create(this->root->context, "end", llvm_f);
 
 			this->root->builder.CreateBr(start);
 			this->root->builder.SetInsertPoint(start);
@@ -1525,12 +1526,12 @@ void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
 			if (pointer.type->type == Types::Array)
 			{
 				auto elementptr = this->root->builder.CreateGEP(pointer.val, { this->root->builder.getInt32(0), cval });
-				this->root->builder.CreateCall(fun->f, { elementptr });
+				this->root->builder.CreateCall(fun->f_, { elementptr });
 			}
 			else
 			{
 				auto elementptr = this->root->builder.CreateGEP(pointer.val, { cval });
-				this->root->builder.CreateCall(fun->f, { elementptr });
+				this->root->builder.CreateCall(fun->f_, { elementptr });
 			}
 
 			auto inc = this->root->builder.CreateAdd(cval, this->Integer(1).val);
@@ -1564,16 +1565,17 @@ void CompilerContext::Destruct(CValue reference, llvm::Value* arr_size)
 		fun->Load(this->root);
 		if (arr_size == 0)
 		{   //just one element, destruct it
-			this->root->builder.CreateCall(fun->f, { reference.pointer });
+			this->root->builder.CreateCall(fun->f_, { reference.pointer });
 		}
 		else
 		{   //destruct each child element
 			llvm::Value* counter = this->root->builder.CreateAlloca(this->root->IntType->GetLLVMType(), 0, "newcounter");
 			this->root->builder.CreateStore(this->Integer(0).val, counter);
 
-			auto start = llvm::BasicBlock::Create(this->root->context, "start", this->root->current_function->function->f);
-			auto body = llvm::BasicBlock::Create(this->root->context, "body", this->root->current_function->function->f);
-			auto end = llvm::BasicBlock::Create(this->root->context, "end", this->root->current_function->function->f);
+            auto llvm_f = root->current_function->function->f_;
+			auto start = llvm::BasicBlock::Create(this->root->context, "start", llvm_f);
+			auto body = llvm::BasicBlock::Create(this->root->context, "body", llvm_f);
+			auto end = llvm::BasicBlock::Create(this->root->context, "end", llvm_f);
 
 			this->root->builder.CreateBr(start);
 			this->root->builder.SetInsertPoint(start);
@@ -1585,12 +1587,12 @@ void CompilerContext::Destruct(CValue reference, llvm::Value* arr_size)
 			if (is_array)//false)//pointer.type->type == Types::Array)
 			{
 				auto elementptr = this->root->builder.CreateGEP(reference.pointer, { this->root->builder.getInt32(0), cval });
-				this->root->builder.CreateCall(fun->f, { elementptr });
+				this->root->builder.CreateCall(fun->f_, { elementptr });
 			}
 			else
 			{
 				auto elementptr = this->root->builder.CreateGEP(reference.pointer, { cval });
-				this->root->builder.CreateCall(fun->f, { elementptr });
+				this->root->builder.CreateCall(fun->f_, { elementptr });
 			}
 
 			auto inc = this->root->builder.CreateAdd(cval, this->Integer(1).val);

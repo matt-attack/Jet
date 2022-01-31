@@ -82,7 +82,7 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 	if (this->name.text.length() == 0)
 	{
 		context->CurrentToken(&this->ret_type);
-		nc->function->return_type = context->root->LookupType(this->ret_type.text, false);
+		nc->function->return_type_ = context->root->LookupType(this->ret_type.text, false);
 
 		//ok return type, im a lambda
 		std::vector<std::pair<Type*, std::string>> argsv;
@@ -129,7 +129,7 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 	context->CurrentToken(&this->ret_type);
 	if (this->templates == 0)
 	{
-		nc->function->return_type = context->root->LookupType(this->ret_type.text, false);
+		nc->function->return_type_ = context->root->LookupType(this->ret_type.text, false);
 
 		for (auto ii : *this->args)
 			nc->TCRegisterLocal(ii.name.text, context->root->LookupType(ii.type.text)->GetPointerType());
@@ -138,7 +138,7 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 	if (this->is_generator)
 	{
 		auto func = myself;// context->root->ns->GetFunction(this->GetRealName());
-		auto str = func->return_type;
+		auto str = func->return_type_;
 		//add _context
 		nc->TCRegisterLocal("_context", str->GetPointerType()->GetPointerType());
 
@@ -151,7 +151,7 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 
 		if (this->ret_type.text == "void")
 			;
-		else if (nc->function->has_return == false && this->is_generator == false)
+		else if (nc->function->has_return_ == false && this->is_generator == false)
 			context->root->Error("Function must return a value!", token);
 	}
 
@@ -218,9 +218,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	//add the context pointer as an argument if this is a generator
 	if (this->is_generator)
 	{
-		auto func = myself;// context->root->ns->GetFunction(this->GetRealName());
-
-		auto str = func->return_type;
+		auto str = myself->return_type_;
 		str->Load(context->root);
 		argsv.push_back({ str->GetPointerType(), "_context" });
 	}
@@ -327,12 +325,12 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	CompilerContext* function_context;
 	if (this->is_generator)
 	{
-		function_context = argsv.front().first->base->data->functions.find("MoveNext")->second->context;
+		function_context = argsv.front().first->base->data->functions.find("MoveNext")->second->context_;
 		function_context->function->Load(context->root);
-		llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", function_context->function->f);
+		llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", function_context->function->f_);
 		context->root->builder.SetInsertPoint(bb);
 
-		function_context->function->is_generator = true;
+		function_context->function->is_generator_ = true;
 	}
 	else
 	{
@@ -340,26 +338,26 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		if (this->name.text.length() == 0)
 		{
 			myself = new Function(this->GetFunctionNamePrefix(), false);
-			myself->expression = this;
-			myself->is_virtual = false;
-			myself->arguments = argsv;
-			myself->return_type = ret;
-            myself->is_lambda = true;
+			myself->expression_ = this;
+			myself->is_virtual_ = false;
+			myself->arguments_ = argsv;
+			myself->return_type_ = ret;
+            myself->is_lambda_ = true;
 			context->root->functions.push_back(myself);
 		}
 
-		function_context = context->StartFunctionDefinition(myself);//this->GetFunctionNamePrefix(), ret, argsv, struct_name.length() > 0 ? argsv[0].first->base : 0, is_lambda, myself);
+		function_context = context->StartFunctionDefinition(myself);
 	}
 
-	function_context->function->lambda.storage_type = storage_t;
+	function_context->function->lambda_.storage_type = storage_t;
 	context->root->current_function = function_context;
 	//function_context->function->Load(context->root);
 
 	function_context->SetDebugLocation(this->token);
 
 	// Setup arguments for the function
-	auto AI = function_context->function->f->arg_begin();
-	if (function_context->function->return_type->type == Types::Struct)
+	auto AI = function_context->function->f_->arg_begin();
+	if (function_context->function->return_type_->type == Types::Struct)
 	{
 		AI++;// skip the struct return argument, its not a real argument
 	}
@@ -378,14 +376,14 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		AI->setName(arg_name);
 
 		//insert debug declarations
-		auto local = context->root->debug->createAutoVariable(function_context->function->scope, arg_name,
+		auto local = context->root->debug->createAutoVariable(function_context->function->scope_, arg_name,
 			context->root->debug_info.file, this->token.line,
 			arg_type->GetDebugType(context->root));
 
 		llvm::Instruction* call = context->root->debug->insertDeclare(storage, local, context->root->debug->createExpression(),
-			llvm::DebugLoc::get(this->token.line, this->token.column, function_context->function->scope),
+			llvm::DebugLoc::get(this->token.line, this->token.column, function_context->function->scope_),
 			context->root->builder.GetInsertBlock());
-		call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function_context->function->scope));
+		call->setDebugLoc(llvm::DebugLoc::get(this->token.line, this->token.column, function_context->function->scope_));
 
 
         // Get the offset to apply for looking for the name token for this
@@ -433,17 +431,17 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		for (unsigned int i = 2 + this->args->size(); i < data.type->base->data->struct_members.size(); i++)
 		{
 			auto gep = context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(i) });
-			function_context->function->generator.variable_geps.push_back(gep);
+			function_context->function->generator_.variable_geps.push_back(gep);
 		}
 
 		//branch to the continue point
 		auto br = function_context->root->builder.CreateGEP(data.val, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 		auto loc = function_context->root->builder.CreateLoad(br);
 		auto ibr = function_context->root->builder.CreateIndirectBr(loc, 10);//todo this number may need to be different
-		function_context->function->generator.ibr = ibr;
+		function_context->function->generator_.ibr = ibr;
 
 		//add new bb
-		yieldbb = llvm::BasicBlock::Create(context->context, "yield", function_context->function->f);
+		yieldbb = llvm::BasicBlock::Create(context->context, "yield", function_context->function->f_);
 		ibr->addDestination(yieldbb);
 
 		function_context->root->builder.SetInsertPoint(yieldbb);
@@ -452,16 +450,16 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	block->Compile(function_context);
 
 	//check for return, and insert one or error if there isnt one
-	if (function_context->function->is_generator)
+	if (function_context->function->is_generator_)
 		function_context->root->builder.CreateRet(function_context->root->builder.getInt1(false));//signal we are gone generating values
-	else if (function_context->function->f->getBasicBlockList().back().getTerminator() == 0)
+	else if (function_context->function->f_->getBasicBlockList().back().getTerminator() == 0)
 		if (ret->type == Jet::Types::Void)// Implicit return void at end to satisfy llvm
 			function_context->Return(CValue(context->root->VoidType, 0));
 		else
 			context->root->Error("Function must return a value!", token);
 
 	//remove instructions after the first terminator in a block to prevent issues
-	for (auto ii = function_context->function->f->getBasicBlockList().begin(); ii != function_context->function->f->getBasicBlockList().end(); ii++)
+	for (auto ii = function_context->function->f_->getBasicBlockList().begin(); ii != function_context->function->f_->getBasicBlockList().end(); ii++)
 	{
 		bool returned = false;
 		for (auto inst = ii->begin(); inst != ii->end();)
@@ -491,7 +489,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		//compile the other function necessary for an iterator
 		auto func = context->StartFunctionDefinition(myself);//this->GetFunctionNamePrefix(), 0, { argsv.front() }, struct_name.length() > 0 ? argsv[0].first : 0, is_lambda, myself);
 
-		auto str = func->function->return_type;
+		auto str = func->function->return_type_;
 
 		context->root->current_function = func;
 		//func->function->Load(context->root);// this shouldnt be necessary, Add Function loads it
@@ -508,7 +506,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		//store arguments into context
 		if (argsv.size() > 1)
 		{
-			auto AI = func->function->f->arg_begin();
+			auto AI = func->function->f_->arg_begin();
 			AI++;//skip the return value argument
 			for (unsigned int i = 1; i < argsv.size(); i++)
 			{
@@ -519,20 +517,20 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		//then return the newly created iterator object by storing it into the first arg
 		auto sptr = context->root->builder.CreatePointerCast(alloc, context->root->CharPointerType->GetLLVMType());
-		auto dptr = context->root->builder.CreatePointerCast(func->function->f->arg_begin(), context->root->CharPointerType->GetLLVMType());
+		auto dptr = context->root->builder.CreatePointerCast(func->function->f_->arg_begin(), context->root->CharPointerType->GetLLVMType());
 		context->root->builder.CreateMemCpy(dptr, 0, sptr, 0, str->GetSize());// todo properly handle alignment
 
 		context->root->builder.CreateRetVoid();
 
 		//now compile reset function
 		{
-			auto reset = argsv.front().first->base->data->functions.find("Reset")->second->context;
+			auto reset = argsv.front().first->base->data->functions.find("Reset")->second->context_;
 			context->root->current_function = reset;
 			reset->function->Load(reset->root);
-			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", reset->function->f);
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", reset->function->f_);
 			context->root->builder.SetInsertPoint(bb);
 
-			auto self = reset->function->f->arg_begin();
+			auto self = reset->function->f_->arg_begin();
 			//set the branch location back to start
 			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) });
 			auto val = llvm::BlockAddress::get(yieldbb);
@@ -542,14 +540,14 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		}
 		//compile current function
 		{
-			auto current = argsv.front().first->base->data->functions.find("Current")->second->context;
+			auto current = argsv.front().first->base->data->functions.find("Current")->second->context_;
 			context->root->current_function = current;
 			current->function->Load(current->root);
-			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", current->function->f);
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", current->function->f_);
 			context->root->builder.SetInsertPoint(bb);
 
 			//return the current value
-			auto self = current->function->f->arg_begin();
+			auto self = current->function->f_->arg_begin();
 			auto ptr = context->root->builder.CreateGEP(self, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 			context->root->builder.CreateRet(context->root->builder.CreateLoad(ptr));
 		}
@@ -562,21 +560,22 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	context->root->current_function = context;
 
 	//store the lambda value
+    auto llvm_f = function_context->function->f_;
 	if (lambda)
 	{
 		function_context->WriteCaptures(lambda);
 
 		auto ptr = context->root->builder.CreateGEP(lambda, { context->root->builder.getInt32(0), context->root->builder.getInt32(0) }, "name");
 
-		ptr = context->root->builder.CreatePointerCast(ptr, function_context->function->f->getType()->getPointerTo());
-		context->root->builder.CreateStore(function_context->function->f, ptr);
+		ptr = context->root->builder.CreatePointerCast(ptr, llvm_f->getType()->getPointerTo());
+		context->root->builder.CreateStore(llvm_f, ptr);
 	}
 
 	context->CurrentToken(&this->token);
 	if (lambda)//return the lambda if we are one
 		return CValue(lambda_type, context->root->builder.CreateLoad(lambda), lambda);
 	else
-		return CValue(function_context->function->GetType(context->root), function_context->function->f);
+		return CValue(function_context->function->GetType(context->root), llvm_f);
 }
 
 std::string FunctionExpression::GetFunctionNamePrefix()
@@ -615,9 +614,9 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
     }
 
 	Function* fun = new Function(name_prefix, false);
-	fun->expression = this;
-	fun->is_virtual = (this->token.type == TokenType::Virtual);
-    fun->is_const = !!const_tok;
+	fun->expression_ = this;
+	fun->is_virtual_ = (this->token.type == TokenType::Virtual);
+    fun->is_const_ = !!const_tok;
 	context->root->functions.push_back(fun);
 	myself = fun;
 
@@ -625,11 +624,11 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	{
 		//add the attribute to the Function
 		if (attr->name.text == "stdcall")
-			fun->calling_convention = CallingConvention::StdCall;
+			fun->calling_convention_ = CallingConvention::StdCall;
 		else if (attr->name.text == "thiscall")
-			fun->calling_convention = CallingConvention::ThisCall;
+			fun->calling_convention_ = CallingConvention::ThisCall;
 		else if (attr->name.text == "fastcall")
-			fun->calling_convention = CallingConvention::FastCall;
+			fun->calling_convention_ = CallingConvention::FastCall;
 	}
 
 	bool is_trait = false;
@@ -656,7 +655,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
         for (auto it = dup.first; it != dup.second; it++)
         {
             if (it->second.type == SymbolType::Function &&
-                it->second.fn->arguments.size() != args->size())
+                it->second.fn->arguments_.size() != args->size())
             {
                 continue;
             }
@@ -681,48 +680,48 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		//add default iterator methods, will fill in function later
 		{
 			auto func = new Function(name_prefix + "_generator", name.text.length() == 0);
-			func->return_type = context->root->BoolType;
-			func->arguments = { { 0, "_context" } };
-			func->arguments.resize(1);
-			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
+			func->return_type_ = context->root->BoolType;
+			func->arguments_ = { { 0, "_context" } };
+			func->arguments_.resize(1);
+			context->root->AdvanceTypeLookup(&func->arguments_[0].first, str->name + "*", &this->ret_type);
 			context->root->functions.push_back(func);
 
 			auto n = new CompilerContext(context->root, context);
 			n->function = func;
-			func->context = n;
-			context->root->ns->members.insert({ func->name, func });
+			func->context_ = n;
+			context->root->ns->members.insert({ func->name_, func });
 
 			str->data->functions.insert({ "MoveNext", func });
 		}
 		{
 			auto func = new Function(name_prefix + "_yield_reset", name.text.length() == 0);
-			func->return_type = context->root->VoidType;
-			func->arguments = { { 0, "_context" } };
-			func->arguments.resize(1);
-			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
+			func->return_type_ = context->root->VoidType;
+			func->arguments_ = { { 0, "_context" } };
+			func->arguments_.resize(1);
+			context->root->AdvanceTypeLookup(&func->arguments_[0].first, str->name + "*", &this->ret_type);
 			context->root->functions.push_back(func);
 
 			auto n = new CompilerContext(context->root, context);
 			n->function = func;
-			func->context = n;
-			context->root->ns->members.insert({ func->name, func });
+			func->context_ = n;
+			context->root->ns->members.insert({ func->name_, func });
 
 			str->data->functions.insert({ "Reset", func });
 		}
 		{
 			auto func = new Function(name_prefix + "_generator_current", name.text.length() == 0);
-			func->return_type = context->root->VoidType;
-			context->root->AdvanceTypeLookup(&func->return_type, this->ret_type.text, &this->ret_type);
+			func->return_type_ = context->root->VoidType;
+			context->root->AdvanceTypeLookup(&func->return_type_, this->ret_type.text, &this->ret_type);
 			context->root->functions.push_back(func);
 
-			func->arguments = { { 0, "_context" } };
-			func->arguments.resize(1);
-			context->root->AdvanceTypeLookup(&func->arguments[0].first, str->name + "*", &this->ret_type);
+			func->arguments_ = { { 0, "_context" } };
+			func->arguments_.resize(1);
+			context->root->AdvanceTypeLookup(&func->arguments_[0].first, str->name + "*", &this->ret_type);
 
 			auto n = new CompilerContext(context->root, context);
 			n->function = func;
-			func->context = n;
-			context->root->ns->members.insert({ func->name, func });
+			func->context_ = n;
+			context->root->ns->members.insert({ func->name_, func });
 			str->data->functions.insert({ "Current", func });
 		}
 
@@ -737,25 +736,25 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		str->ns = context->root->ns;
 
 		//DO NOT LOAD THIS UNTIL COMPILATION, IN FACT DONT LOAD ANYTHING
-		fun->return_type = str;
+		fun->return_type_ = str;
 	}
 	else if (is_trait)
-		fun->return_type = 0;
+		fun->return_type_ = 0;
 	else if (advlookup)
-		context->root->AdvanceTypeLookup(&fun->return_type, this->ret_type.text, &this->ret_type);
+		context->root->AdvanceTypeLookup(&fun->return_type_, this->ret_type.text, &this->ret_type);
 	else
-		fun->return_type = context->root->LookupType(this->ret_type.text, false);
+		fun->return_type_ = context->root->LookupType(this->ret_type.text, false);
 
-	fun->arguments.reserve(this->args->size() + (str.length() ? 1 : 0));
+	fun->arguments_.reserve(this->args->size() + (str.length() ? 1 : 0));
 
 	//add the this pointer argument if this is a member function
 	if (str.length() > 0)
 	{
-		fun->arguments.push_back({ 0, "this" });
+		fun->arguments_.push_back({ 0, "this" });
 		if (is_trait == false && advlookup)
-			context->root->AdvanceTypeLookup(&fun->arguments.back().first, str + "*", &this->token);
+			context->root->AdvanceTypeLookup(&fun->arguments_.back().first, str + "*", &this->token);
 		else if (is_trait == false)
-			fun->arguments.back().first = context->root->LookupType(str + "*", false);
+			fun->arguments_.back().first = context->root->LookupType(str + "*", false);
 	}
 
 	//add arguments to new function
@@ -778,7 +777,7 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 				if (temp.second.text == sub)
 				{
 					//insert dummy types
-					fun->arguments.push_back({ new Type(context->root, ii.type.text, Types::Invalid), ii.name.text });
+					fun->arguments_.push_back({ new Type(context->root, ii.type.text, Types::Invalid), ii.name.text });
 					done = true;
 					break;
 				}
@@ -791,16 +790,18 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 		if (!advlookup)//else
 			type = context->root->LookupType(ii.type.text);
 
-		fun->arguments.push_back({ type, ii.name.text });
+		fun->arguments_.push_back({ type, ii.name.text });
 		if (advlookup && is_trait == false)
-			context->root->AdvanceTypeLookup(&fun->arguments.back().first, ii.type.text, &this->token);
+			context->root->AdvanceTypeLookup(&fun->arguments_.back().first, ii.type.text, &this->token);
 	}
 
 	//add templates to new function
 	if (this->templates)
 	{
 		for (auto ii : *this->templates)
-			fun->templates.push_back({ context->root->LookupType(ii.first.text), ii.second.text });
+        {
+			fun->templates_.push_back({ context->root->LookupType(ii.first.text), ii.second.text });
+        }
 	}
 }
 

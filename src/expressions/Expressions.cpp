@@ -414,12 +414,12 @@ Type* IndexExpression::GetType(CompilerContext* context, bool tc)
 
 			auto funiter = stru->functions.find("[]");
 			//todo: search through multimap to find one with the right number of args
-			if (funiter != stru->functions.end() && funiter->second->arguments.size() == 2)
+			if (funiter != stru->functions.end() && funiter->second->arguments_.size() == 2)
 			{
 				Function* fun = funiter->second;
 				//CValue right = index->Compile(context);
 				//todo: casting
-				return fun->return_type->base;
+				return fun->return_type_->base;
 			}
 		}
 	}
@@ -441,7 +441,7 @@ CValue GetStructElement(CompilerContext* context, const std::string& name, const
 		if (method == 0)
 			context->root->Error("Struct Member '" + name + "' of Struct '" + type->data->name + "' Not Found", token);
 		method->Load(context->root);
-		return CValue(method->GetType(context->root), method->f);
+		return CValue(method->GetType(context->root), method->f_);
 	}
 	std::vector<llvm::Value*> iindex = { context->root->builder.getInt32(0), context->root->builder.getInt32(index) };
 
@@ -497,13 +497,13 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 			// todo maybe wrap finding this function into a function
 			auto funiter = stru->functions.find("[]");
 			//todo: search through multimap to find one with the right number of args
-			if (funiter != stru->functions.end() && funiter->second->arguments.size() == 2)
+			if (funiter != stru->functions.end() && funiter->second->arguments_.size() == 2)
 			{
 				Function* fun = funiter->second;
 				fun->Load(context->root);
 				CValue right = index->Compile(context);
 				//todo: casting
-				return CValue(fun->return_type, context->root->builder.CreateCall(fun->f, { lhs.pointer, right.val }, "operator_overload"));
+				return CValue(fun->return_type_, context->root->builder.CreateCall(fun->f_, { lhs.pointer, right.val }, "operator_overload"));
 			}
             else
             {
@@ -774,7 +774,7 @@ CValue NameExpression::Compile(CompilerContext* context)
 			{
 				auto function = sym.fn;
 				function->Load(context->root);
-				return CValue(function->GetType(context->root), function->f);
+				return CValue(function->GetType(context->root), function->f_);
 			}
 			else if (sym.type == SymbolType::Variable)
 			{
@@ -828,17 +828,19 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		auto cond = this->left->Compile(context);
 		cond = context->DoCast(context->root->BoolType, cond);
 
+        auto f = context->function->f_;
+
 		auto cur_block = context->root->builder.GetInsertBlock();
 		context->root->builder.CreateCondBr(cond.val, else_block, end_block);
 
-		context->function->f->getBasicBlockList().push_back(else_block);
+		f->getBasicBlockList().push_back(else_block);
 		context->root->builder.SetInsertPoint(else_block);
 		auto cond2 = this->right->Compile(context);
 
 		cond2 = context->DoCast(context->root->BoolType, cond2);
 		context->root->builder.CreateBr(end_block);
 
-		context->function->f->getBasicBlockList().push_back(end_block);
+		f->getBasicBlockList().push_back(end_block);
 		context->root->builder.SetInsertPoint(end_block);
 		auto phi = context->root->builder.CreatePHI(cond.type->GetLLVMType(), 2, "land");
 		phi->addIncoming(cond.val, cur_block);
@@ -854,16 +856,18 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 		auto cond = this->left->Compile(context);
 		cond = context->DoCast(context->root->BoolType, cond);
 
+        auto f = context->function->f_;
+
 		auto cur_block = context->root->builder.GetInsertBlock();
 		context->root->builder.CreateCondBr(cond.val, end_block, else_block);
 
-		context->function->f->getBasicBlockList().push_back(else_block);
+		f->getBasicBlockList().push_back(else_block);
 		context->root->builder.SetInsertPoint(else_block);
 		auto cond2 = this->right->Compile(context);
 		cond2 = context->DoCast(context->root->BoolType, cond2);
 		context->root->builder.CreateBr(end_block);
 
-		context->function->f->getBasicBlockList().push_back(end_block);
+		f->getBasicBlockList().push_back(end_block);
 		context->root->builder.SetInsertPoint(end_block);
 
 		auto phi = context->root->builder.CreatePHI(cond.type->GetLLVMType(), 2, "lor");
@@ -948,7 +952,7 @@ CValue NewExpression::Compile(CompilerContext* context)
 				context->root->Error(err, this->token);
 			}
 			fun->Load(context->root);
-			context->root->builder.CreateCall(fun->f, llvm_args);
+			context->root->builder.CreateCall(fun->f_, llvm_args);
 		}
 		else
 		{
@@ -1029,7 +1033,7 @@ CValue FreeExpression::Compile(CompilerContext* context)
 			{//just one element, destruct it
 				rootptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
 
-				context->root->builder.CreateCall(fun->f, { pointer.val });
+				context->root->builder.CreateCall(fun->f_, { pointer.val });
 			}
 			else
 			{
@@ -1039,9 +1043,11 @@ CValue FreeExpression::Compile(CompilerContext* context)
 				llvm::Value* counter = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType(), 0, "newcounter");
 				context->root->builder.CreateStore(context->Integer(0).val, counter);
 
-				auto start = llvm::BasicBlock::Create(context->root->context, "start", context->root->current_function->function->f);
-				auto body = llvm::BasicBlock::Create(context->root->context, "body", context->root->current_function->function->f);
-				auto end = llvm::BasicBlock::Create(context->root->context, "end", context->root->current_function->function->f);
+                auto f = context->root->current_function->function->f_;
+
+				auto start = llvm::BasicBlock::Create(context->root->context, "start", f);
+				auto body = llvm::BasicBlock::Create(context->root->context, "body", f);
+				auto end = llvm::BasicBlock::Create(context->root->context, "end", f);
 
 				context->root->builder.CreateBr(start);
 				context->root->builder.SetInsertPoint(start);
@@ -1051,7 +1057,7 @@ CValue FreeExpression::Compile(CompilerContext* context)
 
 				context->root->builder.SetInsertPoint(body);
 				auto elementptr = context->root->builder.CreateGEP(pointer.val, { cval });
-				context->root->builder.CreateCall(fun->f, { elementptr });
+				context->root->builder.CreateCall(fun->f_, { elementptr });
 
 				auto inc = context->root->builder.CreateAdd(cval, context->Integer(1).val);
 				context->root->builder.CreateStore(inc, counter);

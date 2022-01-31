@@ -74,11 +74,11 @@ CValue LetExpression::Compile(CompilerContext* context)
 			type = val.type;
 		}
 
-		if (context->function->is_generator)// Add arguments to variable symbol table.
+		if (context->function->is_generator_)// Add arguments to variable symbol table.
 		{
 			//find the already added type with the same name
-			auto ty = context->function->arguments[0].first->base;
-			auto var_ptr = context->function->generator.variable_geps[context->function->generator.var_num++];
+			auto ty = context->function->arguments_[0].first->base;
+			auto var_ptr = context->function->generator_.variable_geps[context->function->generator_.var_num++];
 
 			if (this->_right)
 			{
@@ -89,12 +89,12 @@ CValue LetExpression::Compile(CompilerContext* context)
 			//output debug info
 			llvm::DIFile* unit = context->root->debug_info.file;
 			type->Load(context->root);
-			llvm::DILocalVariable* D = context->root->debug->createAutoVariable(context->function->scope, aname, unit, ii.name.line,
+			llvm::DILocalVariable* D = context->root->debug->createAutoVariable(context->function->scope_, aname, unit, ii.name.line,
 				type->GetDebugType(context->root));
 
 			llvm::Instruction *Call = context->root->debug->insertDeclare(
-				var_ptr, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
-			Call->setDebugLoc(llvm::DebugLoc::get(ii.name.line, ii.name.column, context->function->scope));
+				var_ptr, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope_), context->root->builder.GetInsertBlock());
+			Call->setDebugLoc(llvm::DebugLoc::get(ii.name.line, ii.name.column, context->function->scope_));
 
 			//still need to do store
 			// todo this probably needs to support things with destructors..
@@ -108,7 +108,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 
 			type = context->root->LookupType(ii.type.text);
 
-			auto TheFunction = context->function->f;
+			auto TheFunction = context->function->f_;
 			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 				TheFunction->getEntryBlock().begin());
 
@@ -182,7 +182,7 @@ CValue LetExpression::Compile(CompilerContext* context)
 		else if (this->_right)
 		{
 			//need to move allocas outside of the loop and into the main body
-			auto TheFunction = context->function->f;
+			auto TheFunction = context->function->f_;
 			llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 				TheFunction->getEntryBlock().begin());
 
@@ -207,12 +207,12 @@ CValue LetExpression::Compile(CompilerContext* context)
 		// Add debug info
 		llvm::DIFile* unit = context->root->debug_info.file;
 		type->Load(context->root);
-		llvm::DILocalVariable* D = context->root->debug->createAutoVariable(context->function->scope, aname, unit, ii.name.line,
+		llvm::DILocalVariable* D = context->root->debug->createAutoVariable(context->function->scope_, aname, unit, ii.name.line,
 			type->GetDebugType(context->root));
 
 		llvm::Instruction *declare = context->root->debug->insertDeclare(
-			Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope), context->root->builder.GetInsertBlock());
-		declare->setDebugLoc(llvm::DebugLoc::get(ii.name.line, ii.name.column, context->function->scope));
+			Alloca, D, context->root->debug->createExpression(), llvm::DebugLoc::get(this->token.line, this->token.column, context->function->scope_), context->root->builder.GetInsertBlock());
+		declare->setDebugLoc(llvm::DebugLoc::get(ii.name.line, ii.name.column, context->function->scope_));
 
         context->CurrentToken(&ii.name);
 		context->RegisterLocal(aname, CValue(type, 0, Alloca), true, is_const);

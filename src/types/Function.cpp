@@ -34,25 +34,25 @@ std::string mangle(const std::string& name, bool is_lambda, const std::vector<st
 
 Function::~Function()
 {
-	delete this->context;
+	delete context_;
 }
 
 void Function::Load(Compilation* compiler)
 {
-	if (this->loaded)
+	if (loaded_)
 		return;
 
-	if (this->return_type->type == Types::Invalid)
-		this->return_type = compiler->LookupType(this->return_type->name);
+	if (return_type_->type == Types::Invalid)
+		return_type_ = compiler->LookupType(return_type_->name);
 
 	std::vector<llvm::Type*> args;
 	std::vector<llvm::Metadata*> ftypes;
 	// return structs through the first argument by pointer
-	if (this->return_type->type == Types::Struct)
+	if (return_type_->type == Types::Struct)
 	{
-		args.push_back(return_type->GetPointerType()->GetLLVMType());
+		args.push_back(return_type_->GetPointerType()->GetLLVMType());
 	}
-	for (auto& type : this->arguments)
+	for (auto& type : arguments_)
 	{
 		// lookup any unloaded types
 		if (type.first->type == Types::Invalid)
@@ -73,69 +73,69 @@ void Function::Load(Compilation* compiler)
 
 	// Determine the return type and final llvm function type
 	llvm::FunctionType *ft;
-	if (this->return_type->type == Types::Struct)
+	if (return_type_->type == Types::Struct)
 	{
 		ft = llvm::FunctionType::get(compiler->VoidType->GetLLVMType(), args, false);
 	}
 	else
 	{
-		ft = llvm::FunctionType::get(this->return_type->GetLLVMType(), args, false);
+		ft = llvm::FunctionType::get(return_type_->GetLLVMType(), args, false);
 	}
 
 	// todo need to know if this is a C function, if it is we shouldnt mangle
-	const auto mangled_name = mangle(name, this->is_lambda, arguments, is_c_function);
+	const auto mangled_name = mangle(name_, is_lambda_, arguments_, is_c_function_);
 
     //printf("mangling %s to %s\n", name.c_str(), mangled_name.c_str());
 
-	this->f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, mangled_name, compiler->module);
-	switch (this->calling_convention)
+	f_ = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, mangled_name, compiler->module);
+	switch (calling_convention_)
 	{
 	case CallingConvention::StdCall:
-		f->setCallingConv(llvm::CallingConv::X86_StdCall);
+		f_->setCallingConv(llvm::CallingConv::X86_StdCall);
 		break;
 	case CallingConvention::FastCall:
-		f->setCallingConv(llvm::CallingConv::X86_FastCall);
+		f_->setCallingConv(llvm::CallingConv::X86_FastCall);
 		break;
 	case CallingConvention::ThisCall:
-		f->setCallingConv(llvm::CallingConv::X86_ThisCall);
+		f_->setCallingConv(llvm::CallingConv::X86_ThisCall);
 		break;
 	}
 
 	// dont add debug info for externs or c functions
-	if (!is_c_function && !is_extern)
+	if (!is_c_function_ && !is_extern_)
 	{
 		llvm::DIFile* unit = compiler->debug_info.file;
 
 		auto functiontype = compiler->debug->createSubroutineType(compiler->debug->getOrCreateTypeArray(ftypes));
-		int line = this->expression ? this->expression->token.line : 0;
-		llvm::DISubprogram* sp = compiler->debug->createFunction(unit, this->name, mangled_name, unit, line, functiontype, false, true, line, llvm::DINode::DIFlags::FlagPublic, false, nullptr);// , f);
+		int line = expression_ ? expression_->token.line : 0;
+		llvm::DISubprogram* sp = compiler->debug->createFunction(unit, name_, mangled_name, unit, line, functiontype, false, true, line, llvm::DINode::DIFlags::FlagPublic, false, nullptr);// , f);
 
 		// this catches duplicates or incorrect functions
-		assert(sp->describes(f));
-		this->scope = sp;
+		assert(sp->describes(f_));
+		scope_ = sp;
 
-		f->setSubprogram(sp);
+		f_->setSubprogram(sp);
 	}
 
 	//alloc args
-	auto AI = f->arg_begin();
+	auto AI = f_->arg_begin();
 	// add struct return pointer argument
-	if (this->return_type->type == Types::Struct)
+	if (return_type_->type == Types::Struct)
 	{
 		AI->setName("return");
 		AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::StructRet));
 		++AI;
 	}
-	for (unsigned Idx = 0, e = arguments.size(); Idx != e; ++Idx, ++AI)
+	for (unsigned Idx = 0, e = arguments_.size(); Idx != e; ++Idx, ++AI)
 	{
-		auto aname = this->arguments[Idx].second;
+		auto aname = arguments_[Idx].second;
 
 		AI->setName(aname);
 
 		//ok, lets watch this here, only need to do this on StdCall and non PoD(lets just do it for everything right now, who needs microoptimizations)
 		//if I do this I have to use it correctly
 		// add attributes for structs being passed in by pointer
-		if (/*this->calling_convention == CallingConvention::StdCall &&*/ this->arguments[Idx].first->type == Types::Struct)
+		if (/*this->calling_convention == CallingConvention::StdCall &&*/ arguments_[Idx].first->type == Types::Struct)
 		{
 			//AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::ByVal));
 			//AI->addAttr(llvm::Attribute::get(compiler->context, llvm::Attribute::AttrKind::Alignment, 4));
@@ -146,7 +146,7 @@ void Function::Load(Compilation* compiler)
 		//compiler->debug->insertDeclare(AI.getNodePtrUnchecked(), D, 0, llvm::DebugLoc::get(line, 0, this->scope), &f->getBasicBlockList().front());
 	}
 
-	this->loaded = true;
+	loaded_ = true;
 }
 
 Function* Function::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
@@ -198,10 +198,10 @@ Function* Function::Instantiate(Compilation* compiler, const std::vector<Type*>&
 Type* Function::GetType(Compilation* compiler) const
 {
 	std::vector<Type*> args;
-	for (unsigned int i = 0; i < this->arguments.size(); i++)
-		args.push_back(this->arguments[i].first);
+	for (unsigned int i = 0; i < arguments_.size(); i++)
+		args.push_back(arguments_[i].first);
 
-	return compiler->GetFunctionType(return_type, args);
+	return compiler->GetFunctionType(return_type_, args);
 }
 
 CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv,
@@ -209,33 +209,33 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 {
     this->Load(context->root);
 
-    if (!type)
+    if (!type_)
     {
-        type = this->GetType(context->root)->function;
+        type_ = this->GetType(context->root)->function;
     }
 
 	//virtual function calls for generators fail, need to devirtualize them
 	// this shouldnt matter, all generators shouldnt be virtual
     bool dv = devirtualize;
-    if (this->is_generator)
+    if (is_generator_)
     {
         dv = true;
     }
 
-    return type->Call(context, f, argsv, dv, this, bonus_arg);
+    return type_->Call(context, f_, argsv, dv, this, bonus_arg);
 }
 
 CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::vector<CValue>& argsv,
   const bool devirtualize, const Function* f, const bool bonus_arg)
 {
-	bool ptr_struct_return = (this->return_type->type == Types::Struct);
+	bool ptr_struct_return = (return_type->type == Types::Struct);
 
 	//convert to an array of args for llvm
 	std::vector<llvm::Value*> arg_vals;
 	//if we return a struct, it is actually passed through the first argument
 	if (ptr_struct_return)
 	{
-		auto TheFunction = context->function->f;
+		auto TheFunction = context->function->f_;
 		llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
 			TheFunction->getEntryBlock().begin());
 		auto alloc = TmpB.CreateAlloca(this->return_type->GetLLVMType(), 0, "return_pass_tmp");
@@ -299,17 +299,17 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
     {
         Token t;
         std::string ns;
-        if (f && f->expression)
+        if (f && f->expression_)
         {
-            t = f->expression->name;
-            ns = f->expression->GetHumanReadableNamespace();
+            t = f->expression_->name;
+            ns = f->expression_->GetHumanReadableNamespace();
         }
-        else if (f && f->extern_expression)
+        else if (f && f->extern_expression_)
         {
-            t = f->extern_expression->name;
-            ns = f->extern_expression->GetHumanReadableNamespace();
+            t = f->extern_expression_->name;
+            ns = f->extern_expression_->GetHumanReadableNamespace();
             if (ns.length()) { ns += "::"; }
-            if (f->extern_expression->Struct.length()) { ns += f->extern_expression->Struct; }
+            if (f->extern_expression_->Struct.length()) { ns += f->extern_expression_->Struct; }
         }
         else
         {
@@ -324,18 +324,18 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
 	//if we are the upper level of the inheritance tree, devirtualize
 	//if we are a virtual call, do that
 	llvm::CallInst* call;
-	if (f && f->is_virtual && devirtualize == false)
+	if (f && f->is_virtual_ && devirtualize == false)
 	{
 		// calculate the offset to the virtual table pointer in the struct
 		auto gep = context->root->builder.CreateGEP(argsv[0].val, 
-			{ context->root->builder.getInt32(0), context->root->builder.getInt32(f->virtual_table_location) }, 
+			{ context->root->builder.getInt32(0), context->root->builder.getInt32(f->virtual_table_location_) }, 
 			"get_vtable");
 
 		// then load that pointer to get the vtable pointer
 		llvm::Value* ptr = context->root->builder.CreateLoad(gep);
 
 		// index into the vtable for this particular function
-		ptr = context->root->builder.CreateGEP(ptr, { context->Integer(f->virtual_offset).val }, "get_offset_in_vtable");
+		ptr = context->root->builder.CreateGEP(ptr, { context->Integer(f->virtual_offset_).val }, "get_offset_in_vtable");
 
 		// load the function pointer from the vtable
 		ptr = context->root->builder.CreateLoad(ptr);

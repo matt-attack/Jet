@@ -73,7 +73,7 @@ void MakeDocs(Compilation* compilation)
 		{
 			out += "<tr>\n";
 			out += "\t<td>" + mem.first + "</td>\n";
-			out += "\t<td>Returns " + mem.second.fn->return_type->name + "</td>\n";
+			out += "\t<td>Returns " + mem.second.fn->return_type_->name + "</td>\n";
 			out += "</tr>\n";
 		}
 		else if (mem.second.type == Jet::SymbolType::Type)

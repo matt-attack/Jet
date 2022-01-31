@@ -331,14 +331,14 @@ void Type::Load(Compilation* compiler)
 //is is function, b is trait fruncton
 bool IsMatch(Function* a, Function* b)
 {
-	if (a->return_type != b->return_type)
+	if (a->return_type_ != b->return_type_)
 		return false;
 
-	if (a->arguments.size() != b->arguments.size() - 1)
+	if (a->arguments_.size() != b->arguments_.size() - 1)
 		return false;
 
-	for (int i = 1; i < a->arguments.size(); i++)
-		if (a->arguments[i].first != b->arguments[i - 1].first)
+	for (int i = 1; i < a->arguments_.size(); i++)
+		if (a->arguments_[i].first != b->arguments_[i - 1].first)
 			return false;
 
 	return true;
@@ -420,16 +420,16 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 						break;//couldnt find it, doesnt match
 					}
 
-					if (range.first->second->return_type)
+					if (range.first->second->return_type_)
 					{
-						bool res = FindTemplates(compiler, types, range.first->second->return_type, fun.second->return_type, ii.second, fun.second->return_type->name);
+						bool res = FindTemplates(compiler, types, range.first->second->return_type_, fun.second->return_type_, ii.second, fun.second->return_type_->name);
 						if (res == false)
 						{
 							match = false;
 							break;
 						}
 
-						if (fun.second->return_type->type != Types::Trait && fun.second->return_type->type != Types::Invalid && fun.second->return_type != range.first->second->return_type)
+						if (fun.second->return_type_->type != Types::Trait && fun.second->return_type_->type != Types::Invalid && fun.second->return_type_ != range.first->second->return_type_)
 						{
 							match = false;
 							break;
@@ -437,14 +437,14 @@ std::vector<std::pair<Type**, Trait*>> Type::GetTraits(Compilation* compiler)
 					}
 
 					//do it for args
-					if (range.first->second->arguments.size() != fun.second->arguments.size() + 1)
+					if (range.first->second->arguments_.size() != fun.second->arguments_.size() + 1)
 					{
 						match = false;
 						break;
 					}
-					for (int i = 1; i < range.first->second->arguments.size(); i++)
+					for (int i = 1; i < range.first->second->arguments_.size(); i++)
 					{
-						bool res = FindTemplates(compiler, types, range.first->second->arguments[i].first, fun.second->arguments[i - 1].first, ii.second, fun.second->arguments[i - 1].first->name);
+						bool res = FindTemplates(compiler, types, range.first->second->arguments_[i].first, fun.second->arguments_[i - 1].first, ii.second, fun.second->arguments_[i - 1].first->name);
 						if (res == false)
 						{
 							match = false;
@@ -848,7 +848,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 			//pick one with the right number of args
 			if (def)
 				fun = ii->second;
-			else if (ii->second->arguments.size() + 1 == args.size())
+			else if (ii->second->arguments_.size() + 1 == args.size())
 				fun = ii->second;
 		}
 
@@ -861,7 +861,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 				//pick one with the right number of args
 				if (def)
 					fun = ii->second;
-				else if (ii->second->arguments.size() + 1 == args.size())
+				else if (ii->second->arguments_.size() + 1 == args.size())
 					fun = ii->second;
 			}
 		}
@@ -882,7 +882,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 		//pick one with the right number of args
 		if (def)
 			fun = ii->second;
-		else if (ii->second->arguments.size() == args.size())
+		else if (ii->second->arguments_.size() == args.size())
 			fun = ii->second;
 	}
 
@@ -899,7 +899,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 		for (auto ii = frange.first; ii != frange.second; ii++)
 		{
 			//pick one with the right number of args
-			if (def || ii->second->arguments.size() == args.size())
+			if (def || ii->second->arguments_.size() == args.size())
 				fun = ii->second;
 		}
 
@@ -912,24 +912,26 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 
 			context->root->ns->members.insert({ tr.second->name, this });
 
+            auto exp = fun->expression_;
+
 
 			auto rp = context->root->builder.GetInsertBlock();
 			auto dp = context->root->builder.getCurrentDebugLocation();
 
 			//compile function
-			auto oldn = fun->expression->Struct.text;
-			fun->expression->Struct.text = this->name;
+			auto oldn = exp->Struct.text;
+			exp->Struct.text = this->name;
 			int i = 0;
 			for (auto ii : tr.second->templates)
 				context->root->ns->members.insert({ ii.second, tr.first[i++] });
 
-			fun->expression->CompileDeclarations(context);
-			fun->expression->DoCompile(context);
+			exp->CompileDeclarations(context);
+			exp->DoCompile(context);
 
 			context->root->ns->members.erase(context->root->ns->members.find(tr.second->name));
 
 			context->root->ns = context->root->ns->parent;
-			fun->expression->Struct.text = oldn;
+			exp->Struct.text = oldn;
 
 			context->root->builder.SetCurrentDebugLocation(dp);
 			context->root->builder.SetInsertPoint(rp);

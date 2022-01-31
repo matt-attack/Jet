@@ -635,17 +635,17 @@ Compilation* Compilation::Make(const JetProject* project, DiagnosticBuilder* dia
 
 		// Executables need an _init function
 		auto func = new Function("_init", false, true);
-		func->return_type = compilation->VoidType;
+		func->return_type_ = compilation->VoidType;
 		compilation->functions.push_back(func);
 
 		auto n = new CompilerContext(compilation, 0);
 		n->function = func;
-		func->context = n;
-		compilation->ns->members.insert({ func->name, func });
+		func->context_ = n;
+		compilation->ns->members.insert({ func->name_, func });
 
 		compilation->current_function = n;
 		func->Load(compilation);
-		llvm::BasicBlock *bb = llvm::BasicBlock::Create(compilation->context, "entry", func->f);
+		llvm::BasicBlock *bb = llvm::BasicBlock::Create(compilation->context, "entry", func->f_);
 		compilation->builder.SetInsertPoint(bb);
 
 		compilation->builder.CreateRetVoid();
@@ -1020,9 +1020,9 @@ void Compilation::Optimize(int level)
 	//run it on all functions
 	for (auto fun : this->functions)
 	{
-		if (fun && fun->f && fun->expression)
+		if (fun && fun->f_ && fun->expression_)
 		{
-			OurFPM.run(*fun->f);
+			OurFPM.run(*fun->f_);
 		}
 	}
 }
@@ -1700,7 +1700,7 @@ Function* Compilation::GetFunction(const std::string& name, const std::vector<Ty
 		{
 		    if (it->second.type == SymbolType::Function)
 		    {
-		    	if (it->second.fn->arguments.size() == args.size())
+		    	if (it->second.fn->arguments_.size() == args.size())
 		    	{
 		    		return it->second.fn;
 		    	}
@@ -1717,7 +1717,7 @@ Function* Compilation::GetFunction(const std::string& name, const std::vector<Ty
 		    {
 		    	if (it->second.type == SymbolType::Function)
 		    	{
-		    		if (it->second.fn->arguments.size() == args.size())
+		    		if (it->second.fn->arguments_.size() == args.size())
 		    		{
 		    			return it->second.fn;
 		    		}
@@ -1813,9 +1813,9 @@ Jet::Function* Compilation::GetFunctionAtPoint(const char* file, int line)
 {
 	for (auto ii : this->functions)
 	{
-		if (ii->expression)
+		if (ii->expression_)
 		{
-			auto block = ii->expression->GetBlock();
+			auto block = ii->expression_->GetBlock();
 			if (block->start.line <= line && block->end.line >= line)
 			{
 				auto src = block->start.GetSource(this);

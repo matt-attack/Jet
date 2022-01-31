@@ -89,18 +89,18 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool
 	for (auto ii : this->members)
 	{
 		//ok, lets add debug location info
-        if (ii.second.type == SymbolType::Function && ii.second.fn->do_export)
+        if (ii.second.type == SymbolType::Function && ii.second.fn->do_export_)
 		{
-			if (ii.second.fn->expression)
-				add_location(ii.second.fn->expression->token, data, compilation);
+			if (ii.second.fn->expression_)
+				add_location(ii.second.fn->expression_->token, data, compilation);
 
-            if (ii.second.fn->is_c_function)
-			    data += "extern_c fun " + ii.second.fn->return_type->ToString() + " ";
+            if (ii.second.fn->is_c_function_)
+			    data += "extern_c fun " + ii.second.fn->return_type_->ToString() + " ";
             else
-			    data += "extern fun " + ii.second.fn->return_type->ToString() + " ";
+			    data += "extern fun " + ii.second.fn->return_type_->ToString() + " ";
 			data += ii.first + "(";
 			bool first = false;
-			for (auto arg : ii.second.fn->arguments)
+			for (auto arg : ii.second.fn->arguments_)
 			{
 				if (first)
 					data += ",";
@@ -208,10 +208,10 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool
 				//output member functions
 				for (auto fun : ii.second.ty->data->functions)
 				{
-					if (fun.second->expression)
-						add_location(fun.second->expression->token, data, compilation);
+					if (fun.second->expression_)
+						add_location(fun.second->expression_->token, data, compilation);
 
-					data += "extern fun " + fun.second->return_type->ToString() + " " + ii.second.ty->data->name + "::";
+					data += "extern fun " + fun.second->return_type_->ToString() + " " + ii.second.ty->data->name + "::";
 
 					if (IsLetter(fun.first[0]) == false)
 						if (!(fun.first[0] == '~' && fun.first.length() > 1 && IsLetter(fun.first[1])))
@@ -219,14 +219,14 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool
 
 					data += fun.first + "(";
 					bool first = false;
-					for (unsigned int i = 1; i < fun.second->arguments.size(); i++)
+					for (unsigned int i = 1; i < fun.second->arguments_.size(); i++)
 					{
 						if (first)
 							data += ",";
 						else
 							first = true;
 
-						data += fun.second->arguments[i].first->ToString() + " " + fun.second->arguments[i].second;
+						data += fun.second->arguments_[i].first->ToString() + " " + fun.second->arguments_[i].second;
 					}
 					data += ");";
 				}
@@ -252,9 +252,9 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool
 				data += "{";
 				for (auto fun : ii.second.ty->trait->functions)
 				{
-					data += " fun " + fun.second->return_type->name + " " + fun.first + "(";
+					data += " fun " + fun.second->return_type_->name + " " + fun.first + "(";
 					bool first = false;
-					for (auto arg : fun.second->arguments)
+					for (auto arg : fun.second->arguments_)
 					{
 						if (first)
 							data += ",";
@@ -270,27 +270,27 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool
 				//export extension methods
 				for (auto fun : ii.second.ty->trait->extension_methods)
 				{
-					auto source = fun.second->expression->GetBlock()->start.GetSource(compilation);
+					auto source = fun.second->expression_->GetBlock()->start.GetSource(compilation);
 
-					if (fun.second->expression)
-						add_location(fun.second->expression->token, data, compilation);
+				    add_location(fun.second->expression_->token, data, compilation);
+
 					data += "fun ";
-					fun.second->expression->ret_type.Print(data, source);
+					fun.second->expression_->ret_type.Print(data, source);
 					data += " ";
 					data += ii.second.ty->trait->name + "::";
 					data += fun.first + "(";
 					int i = 0;
-					for (auto ii : *fun.second->expression->args)
+					for (auto ii : *fun.second->expression_->args)
 					{
 						data += ii.type.text + " " + ii.name.text;
-						if (i != fun.second->expression->args->size() - 1)
+						if (i != fun.second->expression_->args->size() - 1)
 							data += ", ";
 						//ii->Print(output, source);
 						i++;
 					}
 					data += ")";
 
-					fun.second->expression->GetBlock()->Print(data, source);
+					fun.second->expression_->GetBlock()->Print(data, source);
 				}
 			}
 		}

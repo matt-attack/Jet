@@ -178,7 +178,7 @@ namespace Jet
 					return function->GetType(this->root);
 				}*/
 
-				if (this->function->is_lambda)
+				if (this->function->is_lambda_)
 				{
 					this->root->Error("Lambda checking like this unimplemented", *this->current_token);
 					//auto var = this->parent->GetVariable(name);
@@ -291,7 +291,7 @@ namespace Jet
 
 			this->root->builder.CreateBr(loops.top().second);
 
-			llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "post.continue", this->function->f);
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "post.continue", this->function->f_);
 			this->root->builder.SetInsertPoint(bb);
 		}
 
@@ -302,7 +302,7 @@ namespace Jet
 
 			this->root->builder.CreateBr(loops.top().first);
 
-			llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "post.break", this->function->f);
+			llvm::BasicBlock *bb = llvm::BasicBlock::Create(root->context, "post.break", this->function->f_);
 			this->root->builder.SetInsertPoint(bb);
 		}
 

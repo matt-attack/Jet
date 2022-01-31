@@ -95,24 +95,22 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	bool is_c = (token.text == "extern_c");
 
 	Function* fun = new Function(fname, false, is_c, true);
-    fun->extern_expression = this;
+    fun->extern_expression_ = this;
 	if (auto attr = dynamic_cast<AttributeExpression*>(this->parent))
 	{
 		//add the attribute to the Function
 		if (attr->name.text == "stdcall")
-			fun->calling_convention = CallingConvention::StdCall;
+			fun->calling_convention_ = CallingConvention::StdCall;
 		else if (attr->name.text == "thiscall")
-			fun->calling_convention = CallingConvention::ThisCall;
+			fun->calling_convention_ = CallingConvention::ThisCall;
 		else if (attr->name.text == "fastcall")
-			fun->calling_convention = CallingConvention::FastCall;
+			fun->calling_convention_ = CallingConvention::FastCall;
 	}
-	context->root->AdvanceTypeLookup(&fun->return_type, this->ret_type.text, &this->ret_type);
+	context->root->AdvanceTypeLookup(&fun->return_type_, this->ret_type.text, &this->ret_type);
 
 	// Reserve space for the arguments + this if we apply to a struct
-	fun->arguments.reserve(this->args->size() + (Struct.length() > 0 ? 1 : 0));
+	fun->arguments_.reserve(this->args->size() + (Struct.length() > 0 ? 1 : 0));
 
-
-	fun->f = 0;
 	if (Struct.length() > 0)
 	{
 		// todo this seems wrong
@@ -121,7 +119,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
         for (int i = 0; i < struct_prefix.size(); i++) {
             if (struct_prefix[i] == ':') struct_prefix[i] = '_';
         }
-		fun->name = "__" + struct_prefix + "_" + fname;//mangled name
+		fun->name_ = "__" + struct_prefix + "_" + fname;//mangled name
 
 		//add to struct
 		auto ii = context->root->TryLookupType(Struct);
@@ -141,7 +139,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 			ii->data->functions.insert({ fname, fun });
 		}
 
-		fun->arguments.push_back({ ii->GetPointerType(), "this" });
+		fun->arguments_.push_back({ ii->GetPointerType(), "this" });
 	}
 	else
 	{
@@ -151,8 +149,8 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	//look up arg types
 	for (auto ii : *this->args)
 	{
-		fun->arguments.push_back({ 0, ii.name.text });
-		context->root->AdvanceTypeLookup(&fun->arguments.back().first, ii.type.text, &this->token);
+		fun->arguments_.push_back({ 0, ii.name.text });
+		context->root->AdvanceTypeLookup(&fun->arguments_.back().first, ii.type.text, &this->token);
 	}
 }
 
@@ -198,12 +196,12 @@ void TraitExpression::CompileDeclarations(CompilerContext* context)
 	for (auto ii : this->funcs)
 	{
 		Function* func = new Function(ii.name.text, false);
-		context->root->AdvanceTypeLookup(&func->return_type, ii.ret_type.text, &ii.ret_type);
-		func->arguments.reserve(ii.args.size());
+		context->root->AdvanceTypeLookup(&func->return_type_, ii.ret_type.text, &ii.ret_type);
+		func->arguments_.reserve(ii.args.size());
 		for (auto arg : ii.args)
 		{
-			func->arguments.push_back({ 0, "dummy" });
-			context->root->AdvanceTypeLookup(&func->arguments.back().first, arg.type.text, &arg.type);
+			func->arguments_.push_back({ 0, "dummy" });
+			context->root->AdvanceTypeLookup(&func->arguments_.back().first, arg.type.text, &arg.type);
 		}
 
 		t->functions.insert({ ii.name.text, func });

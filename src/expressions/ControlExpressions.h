@@ -211,7 +211,7 @@ namespace Jet
 
 
 			context->root->builder.CreateBr(start);
-			context->function->f->getBasicBlockList().push_back(start);
+			context->function->f_->getBasicBlockList().push_back(start);
 			context->root->builder.SetInsertPoint(start);
 
 			auto cond = this->condition->Compile(context);
@@ -219,7 +219,7 @@ namespace Jet
 			context->root->builder.CreateCondBr(cond.val, body, end);
 
 
-			context->function->f->getBasicBlockList().push_back(body);
+			context->function->f_->getBasicBlockList().push_back(body);
 			context->root->builder.SetInsertPoint(body);
 
 			context->PushLoop(end, start);
@@ -228,7 +228,7 @@ namespace Jet
 
 			context->root->builder.CreateBr(start);
 
-			context->function->f->getBasicBlockList().push_back(end);
+			context->function->f_->getBasicBlockList().push_back(end);
 			context->root->builder.SetInsertPoint(end);
 
 			return CValue(context->root->VoidType, 0);
@@ -326,9 +326,11 @@ namespace Jet
 			llvm::BasicBlock *end = llvm::BasicBlock::Create(context->context, "forend");
 			llvm::BasicBlock *cont = llvm::BasicBlock::Create(context->context, "forcontinue");
 
+            auto f = context->function->f_;
+
 			//insert stupid branch
 			context->root->builder.CreateBr(start);
-			context->function->f->getBasicBlockList().push_back(start);
+			f->getBasicBlockList().push_back(start);
 			context->root->builder.SetInsertPoint(start);
 
 			if (this->condition)
@@ -343,7 +345,7 @@ namespace Jet
 				context->root->builder.CreateBr(body);
 			}
 
-			context->function->f->getBasicBlockList().push_back(body);
+			f->getBasicBlockList().push_back(body);
 			context->root->builder.SetInsertPoint(body);
 
 			context->PushLoop(end, cont);
@@ -353,7 +355,7 @@ namespace Jet
 			context->root->builder.CreateBr(cont);
 
 			//insert continue branch here
-			context->function->f->getBasicBlockList().push_back(cont);
+			f->getBasicBlockList().push_back(cont);
 			context->root->builder.SetInsertPoint(cont);
 
 			if (incr)
@@ -361,7 +363,7 @@ namespace Jet
 
 			context->root->builder.CreateBr(start);
 
-			context->function->f->getBasicBlockList().push_back(end);
+			f->getBasicBlockList().push_back(end);
 			context->root->builder.SetInsertPoint(end);
 
 			context->PopScope();
@@ -731,10 +733,10 @@ namespace Jet
 			{
 				auto type = right->TypeCheck(context); 
 				context->CurrentToken(&this->token);
-				context->CheckCast(type, context->function->return_type, false, true);
+				context->CheckCast(type, context->function->return_type_, false, true);
 			}
 
-			context->function->has_return = true;
+			context->function->has_return_ = true;
 
 			return 0;
 		}

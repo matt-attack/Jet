@@ -60,12 +60,12 @@ void Struct::Load(Compilation* compiler)
 			this->functions.insert(ii);
 
 			//exclude any constructors, or missing functions
-			bool ic = is_constructor(ii.second->name);
+			bool ic = is_constructor(ii.second->name_);
 			if (ic || ii.first == this->parent_struct->data->name || ii.second == 0)
 				continue;
 
-			if (ii.second->virtual_offset + 1 > vtable_size)
-				vtable_size = ii.second->virtual_offset + 1;
+			if (ii.second->virtual_offset_ + 1 > vtable_size)
+				vtable_size = ii.second->virtual_offset_ + 1;
 		}
 		for (auto ii : oldfuncs)
 		{
@@ -76,7 +76,7 @@ void Struct::Load(Compilation* compiler)
 				if (mem.first == dupname)
 				{
 					duplicate = true;
-					dup_loc = mem.second->virtual_offset;
+					dup_loc = mem.second->virtual_offset_;
 
 					//lets just erase it
 					this->functions.erase(ii.first);
@@ -91,12 +91,12 @@ void Struct::Load(Compilation* compiler)
 			if (ii.first == this->name || ii.second == 0)
 				continue;
 
-			assert(ii.second->virtual_offset == -1);
+			assert(ii.second->virtual_offset_ == -1);
 
 			if (duplicate)
-				ii.second->virtual_offset = dup_loc;
+				ii.second->virtual_offset_ = dup_loc;
 			else
-				ii.second->virtual_offset = vtable_size++;
+				ii.second->virtual_offset_ = vtable_size++;
 		}
 	}
 	else
@@ -108,8 +108,8 @@ void Struct::Load(Compilation* compiler)
 			if (ii.first == this->name || ii.second == 0)
 				continue;
 
-			if (ii.second->is_virtual)
-				ii.second->virtual_offset = vtable_size++;
+			if (ii.second->is_virtual_)
+				ii.second->virtual_offset_ = vtable_size++;
 		}
 	}
 
@@ -192,17 +192,17 @@ void Struct::Load(Compilation* compiler)
 		//first add all virtuals from the parent, then all of mine
 		for (auto ii : this->functions)
 		{
-			if (ii.second == 0 || ii.second->virtual_offset == -1)
+			if (ii.second == 0 || ii.second->virtual_offset_ == -1)
 				continue;
 
 			//ii.second->is_virtual = true;
-			ii.second->virtual_table_location = vtable_loc;
+			ii.second->virtual_table_location_ = vtable_loc;
 
 			ii.second->Load(compiler);
-			auto ptr = ii.second->f;
+			auto ptr = ii.second->f_;
 			auto charptr = llvm::ConstantExpr::getBitCast(ptr, compiler->CharPointerType->GetLLVMType());
 
-			ptrs[ii.second->virtual_offset] = charptr;
+			ptrs[ii.second->virtual_offset_] = charptr;
 		}
 
 		auto arr = llvm::ConstantArray::get(llvm::ArrayType::get(compiler->CharPointerType->GetLLVMType(), vtable_size), ptrs);
