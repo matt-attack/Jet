@@ -1056,7 +1056,7 @@ std::string Compilation::SetTarget(const std::string& triple)
 			TheTriple.setTriple(llvm::sys::getDefaultTargetTriple());
 	}
 
-	printf("Assembling as %s\n", TheTriple.str().c_str());
+	//printf("Assembling as %s\n", TheTriple.str().c_str());
 
 
 	//std::error_code ec;

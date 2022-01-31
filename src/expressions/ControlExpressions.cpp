@@ -394,6 +394,18 @@ CValue CallExpression::Compile(CompilerContext* context)
 		//ok handle what to do if im an index expression
 		fname = name->GetName();
 
+        CValue var = context->GetVariable(fname, false);
+
+        if (var.type->type == Types::Struct)
+        {
+          if (!(var.type->data->template_base && var.type->data->template_base->name == "function"))
+          {
+            stru = var.type;
+            argsv.push_back(CValue(stru->GetPointerType(), var.pointer));
+            fname = "()";
+          }
+        }
+
 		//need to use the template stuff how to get it working with index expressions tho???
 	}
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
@@ -439,10 +451,11 @@ CValue CallExpression::Compile(CompilerContext* context)
 		if (lhs.type->type != Types::Function)
 			context->root->Error("Cannot call non-function", *context->current_token);
 
-		std::vector<llvm::Value*> argts;
+		std::vector<CValue> argts;
 		for (auto ii : *this->args)
-			argts.push_back(ii.first->Compile(context).val);
-		return CValue(lhs.type->function->return_type, context->root->builder.CreateCall(lhs.val, argts));
+			argts.push_back(ii.first->Compile(context));
+
+        return lhs.type->function->Call(context, lhs.val, argts);
 	}
 
 	//build arg list

@@ -25,6 +25,7 @@ namespace Jet
 		friend class CompilerContext;
 		friend class Type;
 		friend struct Function;
+        friend struct FunctionType;
 		friend struct Struct;
 
 		Token name;

@@ -39,6 +39,25 @@ namespace Jet
 		{
 
 		}
+
+        std::string ToString()
+        {
+            std::string str;
+            str += return_type ? return_type->ToString() : "void";
+            str += '(';
+            for (int i = 0; i < args.size(); i++)
+            {
+                str += args[i]->ToString();
+                if (i != args.size() - 1)
+                {
+                    str += ", ";
+                }
+            }
+            str += ')';
+            return str;
+        }
+
+        CValue Call(CompilerContext* context, llvm::Value* val, const std::vector<CValue>& args, const bool devirtualize = false, const Function* f = 0, const bool bonus_arg = false);
 	};
 	
 	class FunctionExpression;
@@ -53,7 +72,8 @@ namespace Jet
 	};
 	struct Function
 	{
-		FunctionType* type;
+        friend struct FunctionType;
+		FunctionType* type = 0;
 		CallingConvention calling_convention;
 
 		// the prefix for the mangled function name
@@ -124,7 +144,8 @@ namespace Jet
 
 		~Function();
 
-		CValue Call(CompilerContext* context, const std::vector<CValue>& argsv, bool devirtualize);
+		CValue Call(CompilerContext* context, const std::vector<CValue>& argsv,
+          const bool devirtualize, const bool bonus_arg = false);
 
 		bool IsCompatible(Function* f)
 		{
@@ -143,7 +164,7 @@ namespace Jet
 
 		void Load(Compilation* compiler);
 
-		Type* GetType(Compilation* compiler);
+		Type* GetType(Compilation* compiler) const;
 
 		Function* Instantiate(Compilation* compiler, const std::vector<Type*>& types);
 	};

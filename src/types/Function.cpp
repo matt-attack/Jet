@@ -195,7 +195,7 @@ Function* Function::Instantiate(Compilation* compiler, const std::vector<Type*>&
 	return 0;
 }
 
-Type* Function::GetType(Compilation* compiler)
+Type* Function::GetType(Compilation* compiler) const
 {
 	std::vector<Type*> args;
 	for (unsigned int i = 0; i < this->arguments.size(); i++)
@@ -204,15 +204,30 @@ Type* Function::GetType(Compilation* compiler)
 	return compiler->GetFunctionType(return_type, args);
 }
 
-CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv, bool devirtualize)
+CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv,
+  const bool devirtualize, bool bonus_arg)
 {
-    this->Load(context->root);// just in case
+    this->Load(context->root);
+
+    if (!type)
+    {
+        type = this->GetType(context->root)->function;
+    }
 
 	//virtual function calls for generators fail, need to devirtualize them
 	// this shouldnt matter, all generators shouldnt be virtual
-	if (this->is_generator)
-		devirtualize = true;
+    bool dv = devirtualize;
+    if (this->is_generator)
+    {
+        dv = true;
+    }
 
+    return type->Call(context, f, argsv, dv, this, bonus_arg);
+}
+
+CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::vector<CValue>& argsv,
+  const bool devirtualize, const Function* f, const bool bonus_arg)
+{
 	bool ptr_struct_return = (this->return_type->type == Types::Struct);
 
 	//convert to an array of args for llvm
@@ -232,6 +247,13 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 		arg_vals.push_back(ii.val);
 	}
 
+    // check for correct number of arguments
+    int expected_args = bonus_arg ? args.size() + 1 : args.size();
+    if (expected_args != argsv.size())
+    {
+        context->root->Error("Function expected " + std::to_string(expected_args) + " arguments, got " + std::to_string(argsv.size()), *context->current_token);
+    }
+
 	//list of struct arguments to add attributes to
 	//std::vector<int> to_convert;
 	int i = 0; int ai = 0;
@@ -242,69 +264,84 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 
     try
     {
-	// for every argument that is a struct, pass it by pointer instead of by value
-	for (auto& ii : argsv)
-	{
-        // Cast first
-        CValue casted = context->DoCast(this->arguments[ai].first, ii);
-		if (casted.type->type == Types::Struct || casted.type->type == Types::Union)
-		{
-            if (casted.pointer == 0)
-				context->root->Error("Cannot convert to reference", *context->current_token);
+	    // for every argument that is a struct, pass it by pointer instead of by value
+	    for (auto& ii : argsv)
+	    {
+            // Cast first
+            if (ai > args.size() - 1)
+            {
+                arg_vals[i] = ii.val;
+                i++; ai++;
+                continue;
+            }
+            
+            CValue casted = context->DoCast(this->args[ai], ii);
+		    if (casted.type->type == Types::Struct || casted.type->type == Types::Union)
+		    {
+                if (casted.pointer == 0)
+				    context->root->Error("Cannot convert to reference", *context->current_token);
 
-			arg_vals[i] = casted.pointer;
-			//to_convert.push_back(i);
-		}
-        else
-        {
-            arg_vals[i] = casted.val;
-        }
-		i++;
-		ai++;
-	}
+			    arg_vals[i] = casted.pointer;
+		    }
+            else
+            {
+                if (!casted.val)
+                {
+                    casted.val = context->root->builder.CreateLoad(casted.pointer, "autodereference");
+                }
+                arg_vals[i] = casted.val;
+            }
+		    i++;
+		    ai++;
+	    }
     }
     catch (int i)
     {
         Token t;
         std::string ns;
-        if (this->expression)
+        if (f && f->expression)
         {
-            t = expression->name;
-            ns = expression->GetHumanReadableNamespace();
+            t = f->expression->name;
+            ns = f->expression->GetHumanReadableNamespace();
         }
-        else if (this->extern_expression)
+        else if (f && f->extern_expression)
         {
-            t = extern_expression->name;
-            ns = extern_expression->GetHumanReadableNamespace();
+            t = f->extern_expression->name;
+            ns = f->extern_expression->GetHumanReadableNamespace();
             if (ns.length()) { ns += "::"; }
-            if (extern_expression->Struct.length()) { ns += extern_expression->Struct; }
+            if (f->extern_expression->Struct.length()) { ns += f->extern_expression->Struct; }
+        }
+        else
+        {
+            // its probably a function pointer
+            t.text = this->ToString();
         }
         if (ns.length()) { ns += "::"; }
-        context->root->Info("For argument " + std::to_string(ai) + " of '" + ns + t.text + "'", t);
+        context->root->Info("For argument " + std::to_string(ai + 1) + " of '" + ns + t.text + "'", t);
         throw i;
     }
 
 	//if we are the upper level of the inheritance tree, devirtualize
 	//if we are a virtual call, do that
 	llvm::CallInst* call;
-	if (this->is_virtual && devirtualize == false)
+	if (f && f->is_virtual && devirtualize == false)
 	{
 		// calculate the offset to the virtual table pointer in the struct
 		auto gep = context->root->builder.CreateGEP(argsv[0].val, 
-			{ context->root->builder.getInt32(0), context->root->builder.getInt32(this->virtual_table_location) }, 
+			{ context->root->builder.getInt32(0), context->root->builder.getInt32(f->virtual_table_location) }, 
 			"get_vtable");
 
 		// then load that pointer to get the vtable pointer
 		llvm::Value* ptr = context->root->builder.CreateLoad(gep);
 
 		// index into the vtable for this particular function
-		ptr = context->root->builder.CreateGEP(ptr, { context->Integer(this->virtual_offset).val }, "get_offset_in_vtable");
+		ptr = context->root->builder.CreateGEP(ptr, { context->Integer(f->virtual_offset).val }, "get_offset_in_vtable");
 
 		// load the function pointer from the vtable
 		ptr = context->root->builder.CreateLoad(ptr);
 
 		//then cast it to the correct function type
-		auto func = context->root->builder.CreatePointerCast(ptr, this->GetType(context->root)->GetLLVMType());
+		auto func = context->root->builder.CreatePointerCast(ptr, f->GetType(context->root)->GetLLVMType());
 
 		//then call it
 		call = context->root->builder.CreateCall(func, arg_vals);
@@ -312,8 +349,8 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
 	}
 	else
 	{
-		call = context->root->builder.CreateCall(this->f, arg_vals);
-		call->setCallingConv(this->f->getCallingConv());
+		call = context->root->builder.CreateCall(fn, arg_vals);
+		//call->setCallingConv(this->f->getCallingConv());
 	}
 
 	//add attributes

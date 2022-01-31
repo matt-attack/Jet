@@ -192,6 +192,7 @@ namespace Jet
 	class ExternExpression : public Expression
 	{
         friend class Function;
+        friend class FunctionType;
 		Token name, type;
 		std::string Struct;
 		std::vector<ExternArg>* args;

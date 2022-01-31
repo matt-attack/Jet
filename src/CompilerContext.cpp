@@ -737,50 +737,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
         if (!fun->is_const && is_const)
         {
             this->root->Error("Cannot call non-const function '" + name + "' on const value", *this->current_token);
-        } 
-
-	    fun->Load(this->root);
-
-	    //todo: fixme this isnt a very reliable fix
-	    if (args.size() + (fun->return_type->type == Types::Struct ? 1 : 0) != fun->f->arg_size() && fun->arguments.size() > 0 && fun->arguments[0].second == "this")
-	    {	
-		    //ok, we allocate, call then 
-		    //allocate thing
-		    auto type = fun->arguments[0].first->base;
-		    type->Load(this->root);
-
-		    auto TheFunction = this->function->f;
-		    llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-			    TheFunction->getEntryBlock().begin());
-
-		    auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
-
-		    std::vector<llvm::Value*> argsv;
-		    int i = 1;
-
-		    //add struct
-		    argsv.push_back(Alloca);
-		    for (auto ii : args)
-            {
-                //try and cast to the correct type if we can
-                auto val = this->DoCast(fun->arguments[i++].first, ii);
-                if (!val.val)
-                {
-                    val.val = this->root->builder.CreateLoad(val.pointer, "autodereference");
-                }
-		    	argsv.push_back(val.val);
-            }
-
-		    fun->Load(this->root);
-
-		    this->root->builder.CreateCall(fun->f, argsv);
-
-		    return CValue(type, this->root->builder.CreateLoad(Alloca));
-	    }
-	    else if (args.size() != fun->f->arg_size() && fun->return_type->type != Types::Struct)
-	    {
-		    this->root->Error("Function expected " + std::to_string(fun->f->arg_size()) + " arguments, got " + std::to_string(args.size()), *this->current_token);
-	    }
+        }
 
 	    return fun->Call(this, args, devirtualize);
     }
@@ -790,51 +747,62 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
         CValue var = *function_symbol.val;
         delete function_symbol.val;// we had to allocate it, todo fix this weirdness
 
+        bool has_bonus = false;
         // verify that we can actually call it
-        // todo handle functor structs
+        llvm::Value* append = 0;
         if (var.type->type != Types::Function)
         {
-            // functors have already been handled above so anything here is an error
-            this->root->Error("Cannot call non-function type", *this->current_token);
+            // handle lambdas (quite hackily). todo fix this....
+            if (var.type->type == Types::Struct && var.type->data->template_base && var.type->data->template_base->name == "function")
+            {
+                // To call a lambda, we need to cast the function pointer to add the capture data as
+                // as last argument.
+		        auto ptr = root->builder.CreateGEP(var.pointer, { root->builder.getInt32(0), root->builder.getInt32(0) }, "get_fn_ptr");
+		        auto data_ptr = root->builder.CreateGEP(var.pointer, { root->builder.getInt32(0), root->builder.getInt32(1) }, "get_data_ptr");
+                data_ptr = root->builder.CreatePointerCast(data_ptr, root->CharPointerType->GetLLVMType());
+
+                auto old_fn_type = var.type->data->struct_members[0].type;
+
+                auto ret = old_fn_type->function->return_type->GetLLVMType();
+
+                std::vector<llvm::Type*> types;
+                std::vector<Type*> types2;
+                for (const auto& arg: old_fn_type->function->args)
+                {
+                    types.push_back(arg->GetLLVMType());
+                    types2.push_back(arg);
+                }
+                types.push_back(root->CharPointerType->GetLLVMType());
+                auto type = llvm::FunctionType::get(ret, types, false)->getPointerTo()->getPointerTo();
+                var.val = 0;
+		        var.pointer = root->builder.CreatePointerCast(ptr, type);
+
+                var.type = root->GetFunctionType(old_fn_type->function->return_type, types2);
+                skip_first = false;
+                append = data_ptr;
+                has_bonus = true;
+            }
+            else
+            {
+                // functors have already been handled above so anything here is an error
+                this->root->Error("Cannot call non-function type", *this->current_token);
+            }
         }
+
+        std::vector<CValue> argsc;
+        int skip = skip_first ? 1 : 0;// if skip first, we dont pass in struct as the first argument
+		for (unsigned int i = skip; i < args.size(); i++)
+        {
+		    argsc.push_back(args[i]);//try and cast to the correct type if we can
+        }
+        if (append) argsc.push_back(CValue(this->root->CharPointerType, append));
 
         if (!var.val)
         {
             var.val = this->root->builder.CreateLoad(var.pointer);
         }
 
-        auto return_type = var.type->function->return_type;
-		std::vector<llvm::Value*> argsv;
-        CValue alloca(0, 0);
-        if (return_type->type == Types::Struct)
-        {
-            // add a place to put the return value
-            alloca.type = return_type;
-            alloca.val = this->root->builder.CreateAlloca(return_type->GetLLVMType(), 0, "returntemp");
-            argsv.push_back(alloca.val);
-        }
-        int skip = skip_first ? 1 : 0;// if skip first, we dont pass in struct as the first argument
-		for (unsigned int i = skip; i < args.size(); i++)
-        {
-            //try and cast to the correct type if we can
-            auto val = this->DoCast(var.type->function->args[i-skip], args[i]);
-            if (!val.val)
-            {
-                val.val = this->root->builder.CreateLoad(val.pointer, "autodereference");
-            }
-		    argsv.push_back(val.val);//try and cast to the correct type if we can
-        }
-        // todo migrate call to function type rather than function object
-        auto ret = this->root->builder.CreateCall(var.val, argsv);
-
-        if (return_type->type == Types::Struct)
-        {
-            return CValue(return_type, 0, alloca.val);
-        }
-        else
-        {
-		    return CValue(return_type, ret);
-        }
+        return var.type->function->Call(this, var.val, argsc, false, 0, has_bonus);
     }
 }
 
@@ -891,7 +859,7 @@ CValue CompilerContext::GetVariable(const std::string& name, bool error)
 			for (unsigned int i = 0; i < this->captures.size(); i++)
 				types.push_back(storage_t->getContainedType(i));
 
-			types.push_back(var.type->base->GetLLVMType());
+			types.push_back(var.type->GetLLVMType());
 			storage_t = this->function->lambda.storage_type = storage_t->create(types);
 
 			auto data = root->builder.CreatePointerCast(location.val, storage_t->getPointerTo());
@@ -899,11 +867,11 @@ CValue CompilerContext::GetVariable(const std::string& name, bool error)
 			//load it, then store it as a local
 			auto val = root->builder.CreateGEP(data, { root->builder.getInt32(0), root->builder.getInt32(this->captures.size()) });
 
-			CValue value(var.type, root->builder.CreateAlloca(var.type->base->GetLLVMType()));
+			CValue value(var.type, 0, root->builder.CreateAlloca(var.type->GetLLVMType()));
 
-			this->RegisterLocal(name, value);//need to register it as immutable 
+			this->RegisterLocal(name, value, false, true);//need to register it as immutable 
 
-			root->builder.CreateStore(root->builder.CreateLoad(val), value.val);
+			root->builder.CreateStore(root->builder.CreateLoad(val), value.pointer);
 			this->captures.push_back(name);
 
 			return value;
@@ -1229,7 +1197,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
             std::vector<CValue> v;
             v.push_back(aalloca);
             v.push_back(value);
-            f.second->Call(this, v, false);
+            f.second->Call(this, v, false, true);
 
             if (!alloca)
             {
@@ -1458,7 +1426,7 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 		{
 			//this->CurrentToken(&ii);
 			auto var = parent->GetVariable(ii);
-			elements.push_back(var.type->base->GetLLVMType());
+			elements.push_back(var.type->GetLLVMType());
 		}
 
 		auto storage_t = llvm::StructType::get(this->root->context, elements);
@@ -1476,6 +1444,11 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 			//then store it
 			auto val = parent->Load(var);
 			size += val.type->GetSize();
+
+            if (!val.val)
+            {
+                val.val = root->builder.CreateLoad(val.pointer);
+            }
 			root->builder.CreateStore(val.val, ptr);
 		}
 		if (size > 64)

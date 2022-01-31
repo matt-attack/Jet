@@ -203,8 +203,6 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	if (this->captures)
 		is_lambda = false;//todo this seems wrong...
 
-	//if we have specifier we are not lambda, just inline function
-
 	//build list of types of vars
 	std::vector<std::pair<Type*, std::string>> argsv;
 	auto struct_name = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
@@ -346,6 +344,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 			myself->is_virtual = false;
 			myself->arguments = argsv;
 			myself->return_type = ret;
+            myself->is_lambda = true;
 			context->root->functions.push_back(myself);
 		}
 
