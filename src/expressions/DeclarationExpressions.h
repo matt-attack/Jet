@@ -82,6 +82,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, elements.back().first };
+        }
 	};
 
 	class NamespaceExpression : public Expression
@@ -183,6 +188,11 @@ namespace Jet
 			}
 			return namespaceprefix_.c_str();
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, block->GetTokenRange().second };
+        }
 	};
 
 	struct ExternArg
@@ -277,6 +287,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, close_bracket };
+        }
 	};
 
 	struct TraitFunctionArg
@@ -379,6 +394,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, close_bracket };
+        }
 	};
 	
 	class AttributeExpression : public Expression
@@ -434,6 +454,11 @@ namespace Jet
 		{
 			return next->Compile(context);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { open_bracket, close_bracket };
+        }
 	};
 
 	struct EnumValue
@@ -501,7 +526,13 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, close };
+        }
 	};
+
 	class TypedefExpression : public Expression
 	{
 		Token token;
@@ -550,6 +581,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, other_type };
+        }
 	};
 }
 #endif

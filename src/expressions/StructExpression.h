@@ -98,5 +98,10 @@ namespace Jet
 			namespaceprefix_ += this->name.text;
 			return namespaceprefix_.c_str();
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, end };
+        }
 	};
 }

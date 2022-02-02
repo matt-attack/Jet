@@ -122,6 +122,7 @@ namespace Jet
 
         void Info(const std::string& string, Token token);
 		void Error(const std::string& string, Token token);
+        void Error(const std::string& string, const std::pair<Token, Token>& tokens);
 		void Error(const std::string& string, const Token& start, const Token& end);
 
 		//generates and outputs an exe or lib file

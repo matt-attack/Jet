@@ -42,6 +42,7 @@ namespace Jet
 	class FreeExpression;
 	class EnumExpression;
     class SliceExpression;
+    class MatchExpression;
 	class ExpressionVisitor
 	{
 	public:
@@ -96,6 +97,8 @@ namespace Jet
 		virtual void Visit(TypedefExpression* exp) {};
 		virtual void Visit(NewExpression* exp) {};
 		virtual void Visit(FreeExpression* exp) {};
+
+        virtual void Visit(MatchExpression* exp) {};
 
 		virtual void Visit(NamespaceExpression* exp) {};
 		virtual void Visit(ScopedExpression* exp) {};

@@ -94,6 +94,8 @@ namespace Jet
 		virtual void Visit(ExpressionVisitor* visitor) = 0;//visits all subexpressions
 
 		virtual const char* GetNamespace() { return 0; }// returns the namespace that we create, if any
+
+        virtual std::pair<Token, Token> GetTokenRange() = 0;
 	};
 
 	class IStorableExpression

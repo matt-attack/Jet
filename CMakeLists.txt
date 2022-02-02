@@ -34,12 +34,12 @@ add_executable(jet
 	src/Project.cpp
 	src/Compilation.cpp
 )
-target_compile_features(jet PRIVATE cxx_range_for)
+target_compile_features(jet PRIVATE cxx_range_for cxx_override)
 
 add_executable(test_runner 
 	src/tools/test_runner.cpp
 )
-target_compile_features(test_runner PRIVATE cxx_range_for)
+target_compile_features(test_runner PRIVATE cxx_range_for cxx_override)
 
 #source_group(Types REGULAR_EXPRESSION Types/*)
 

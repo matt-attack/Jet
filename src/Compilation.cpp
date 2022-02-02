@@ -1513,6 +1513,13 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 	return CValue(ret_type, 0, ng);
 }
 
+void Compilation::Info(const std::string& string, Token token)
+{
+	this->diagnostics->Error(string, token, INFO);
+
+	throw 7;
+}
+
 void Compilation::Error(const std::string& string, Token token)
 {
 	this->diagnostics->Error(string, token);
@@ -1520,11 +1527,17 @@ void Compilation::Error(const std::string& string, Token token)
 	throw 7;
 }
 
-void Compilation::Info(const std::string& string, Token token)
+void Compilation::Error(const std::string& string, const std::pair<Token, Token>& tokens)
 {
-	this->diagnostics->Error(string, token, INFO);
-
-	throw 7;
+    if (!tokens.second)
+    {
+        this->diagnostics->Error(string, tokens.first);
+    }
+    else
+    {
+        this->diagnostics->Error(string, tokens.first, tokens.second);
+    }
+    throw 7;
 }
 
 void Compilation::Error(const std::string& string, const Token& start, const Token& end)

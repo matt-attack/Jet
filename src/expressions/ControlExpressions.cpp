@@ -310,7 +310,48 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		val = p->GetElement(context);
 
 	if (!val.type || val.type->type != Types::Union)
-		context->root->Error("Cannot match with a non-union", token);
+    {
+        if (!val.type)
+        {
+            val = var->Compile(context);
+        }
+        // If its not a union, we static branch based on the type
+        for (auto ii : this->cases)
+	    {
+            // if its a match, compile it then return
+            Type* ty = context->root->LookupType(ii.type.text);
+
+            if (ty == val.type)
+            {
+                context->PushScope();
+
+                // add the variable, if it doesnt match
+                if (!i || i->GetName() != ii.name.text)
+                {
+                    context->RegisterLocal(ii.name.text, val);
+                }
+
+                ii.block->Compile(context);
+
+		        context->PopScope();
+
+                return CValue(context->root->VoidType, 0);
+            }
+        }
+
+        // otherwise, try and compile the default
+        for (auto ii : this->cases)
+	    {
+            if (ii.type.type == TokenType::Default)
+            {
+                ii.block->Compile(context);
+
+                return CValue(context->root->VoidType, 0);
+            }
+        }
+
+        return CValue(context->root->VoidType, 0);
+    }
 
 	auto endbb = llvm::BasicBlock::Create(context->context, "match.end");
 

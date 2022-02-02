@@ -66,9 +66,9 @@ namespace Jet
 			return token.text;
 		}
 
-		CValue Compile(CompilerContext* context);
+		CValue Compile(CompilerContext* context) override;
 
-		void CompileStore(CompilerContext* context, CValue right)
+		void CompileStore(CompilerContext* context, CValue right) override
 		{
 			//need to do cast if necessary
 			context->CurrentToken(&token);
@@ -85,9 +85,9 @@ namespace Jet
 			context->Store(CValue(dest.type->GetPointerType(), dest.pointer), right);
 		}
 
-		void CompileDeclarations(CompilerContext* context) {};
+		void CompileDeclarations(CompilerContext* context) override {};
 
-		virtual Type* TypeCheck(CompilerContext* context)
+		Type* TypeCheck(CompilerContext* context) override
 		{
 			context->CurrentToken(&this->token);
 			//this implementation is wrong
@@ -98,7 +98,7 @@ namespace Jet
 			//lookup type
 		}
 
-		void Print(std::string& output, Source* source)
+		void Print(std::string& output, Source* source) override
 		{
 			token.Print(output, source);
 			if (this->templates)
@@ -111,10 +111,15 @@ namespace Jet
 			}
 		}
 
-		virtual void Visit(ExpressionVisitor* visitor)
+		void Visit(ExpressionVisitor* visitor) override
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 
 	class ScopedExpression : public Expression
@@ -168,6 +173,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 
 	class NewExpression : public Expression
@@ -225,6 +235,12 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            Token end = size ? close_bracket : type;
+            return { token, end };
+        }
 	};
 
 	class FreeExpression : public Expression
@@ -266,6 +282,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, pointer->GetTokenRange().second };
+        }
 	};
 
 	/*class ArrayExpression: public Expression
@@ -379,6 +400,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 
 	class StringExpression : public Expression
@@ -399,9 +425,9 @@ namespace Jet
 
 		CValue Compile(CompilerContext* context);
 
-		void CompileDeclarations(CompilerContext* context) {};
+		void CompileDeclarations(CompilerContext* context) override {};
 
-		void Print(std::string& output, Source* source)
+		void Print(std::string& output, Source* source) override
 		{
 			auto code = token.text_ptr;
 			auto trivia = token.text_ptr - token.trivia_length;
@@ -417,19 +443,24 @@ namespace Jet
 					break;
 				output += *cur;
 			} while (*cur++ != 0);
-			//token.Print(output, source);
+
 			output += "\"";
 		}
 
-		virtual Type* TypeCheck(CompilerContext* context)
+		Type* TypeCheck(CompilerContext* context) override
 		{
 			return context->root->LookupType("char*");
 		}
 
-		virtual void Visit(ExpressionVisitor* visitor)
+		void Visit(ExpressionVisitor* visitor) override
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 
 	class IndexExpression : public Expression, public IStorableExpression
@@ -440,6 +471,7 @@ namespace Jet
 		Expression* index;
 		Expression* left;
 		Token token, close_bracket;
+
 		IndexExpression(Expression* left, Expression* index, Token t, Token cb)
 		{
 			this->token = t;
@@ -506,6 +538,11 @@ namespace Jet
 			if (left)
 				left->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, close_bracket };
+        }
 	};
 
 	class SliceExpression : public Expression
@@ -578,6 +615,11 @@ namespace Jet
 			if (length)
 				length->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, close_bracket };
+        }
 	};
 
 	class AssignExpression : public Expression
@@ -637,6 +679,11 @@ namespace Jet
 			left->Visit(visitor);
 			right->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 
 	class OperatorAssignExpression : public Expression
@@ -690,6 +737,11 @@ namespace Jet
 			right->Visit(visitor);
 			left->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 
 	/*class SwapExpression: public Expression
@@ -775,6 +827,11 @@ namespace Jet
 			visitor->Visit(this);
 			right->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { begin, end };
+        }
 	};
 
 	class PrefixExpression : public Expression, public IStorableExpression
@@ -819,6 +876,11 @@ namespace Jet
 			visitor->Visit(this);
 			right->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { _operator, Token() };
+        }
 	};
 
 	class PostfixExpression : public Expression
@@ -866,6 +928,11 @@ namespace Jet
 			visitor->Visit(this);
 			left->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { _operator, Token() };
+        }
 	};
 
 	class OperatorExpression : public Expression
@@ -937,6 +1004,11 @@ namespace Jet
 			left->Visit(visitor);
 			right->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { _operator, Token() };
+        }
 	};
 
 	class BlockExpression : public Expression
@@ -1048,6 +1120,11 @@ namespace Jet
 			for (auto ii : this->statements)
 				ii->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { start, end };
+        }
 	};
 
 	class ScopeExpression : public BlockExpression
@@ -1211,6 +1288,11 @@ namespace Jet
 		{
 			return context->root->IntType;
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, end };
+        }
 	};
 
 	class TypeofExpression : public Expression
@@ -1253,6 +1335,11 @@ namespace Jet
 		{
 			return context->root->IntType;
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, end };
+        }
 	};
 
 	class GroupExpression : public Expression
@@ -1301,6 +1388,11 @@ namespace Jet
 		{
 			return this->expr->TypeCheck(context);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { begin, end };
+        }
 	};
 }
 #endif

@@ -93,6 +93,11 @@ namespace Jet
 		virtual void Visit(ExpressionVisitor* visitor);
 
 		CValue DoCompile(CompilerContext* context);//call this to do real compilation
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 
 }

@@ -93,6 +93,11 @@ namespace Jet
 					ii.first->Visit(visitor);
 			}
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { open, close };
+        }
 	};
 
 
@@ -156,8 +161,19 @@ namespace Jet
 
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
-			//	visitor->Visit(this);
+			visitor->Visit(this);
+            var->Visit(visitor);
+
+            for (auto& ii: cases)
+            {
+                ii.block->Visit(visitor);
+            }
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, close_brace };
+        }
 	};
 
 	class WhileExpression : public Expression
@@ -253,6 +269,11 @@ namespace Jet
 			condition->Visit(visitor);
 			block->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, block->GetTokenRange().second };
+        }
 	};
 
 	class ForExpression : public Expression
@@ -399,6 +420,11 @@ namespace Jet
 			incr->Visit(visitor);
 			block->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, block->GetTokenRange().second };
+        }
 	};
 
 	class CaseExpression : public Expression
@@ -447,6 +473,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, colon };
+        }
 	};
 
 	class DefaultExpression : public Expression
@@ -490,6 +521,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, colon };
+        }
 	};
 
 	class SwitchExpression : public Expression
@@ -573,6 +609,11 @@ namespace Jet
 			var->Visit(visitor);
 			block->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, block->GetTokenRange().second };
+        }
 	};
 
 	struct Branch
@@ -687,6 +728,20 @@ namespace Jet
 				this->Else->block->Visit(visitor);
 			}
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            Token end;
+            if (Else)
+            {
+                end = Else->block->GetTokenRange().second;
+            }
+            else
+            {
+                end = branches.back()->block->GetTokenRange().second;
+            }
+            return { token, end };
+        }
 	};
 
 	class ReturnExpression : public Expression
@@ -756,6 +811,11 @@ namespace Jet
 			if (right)
 				right->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 
 	class BreakExpression : public Expression
@@ -794,6 +854,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 
 	class ContinueExpression : public Expression
@@ -832,6 +897,11 @@ namespace Jet
 		{
 			visitor->Visit(this);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 
 	class YieldExpression : public Expression
@@ -884,6 +954,11 @@ namespace Jet
 			//visitor->Visit(this);
 			right->Visit(visitor);
 		}
+
+        std::pair<Token, Token> GetTokenRange() override
+        {
+            return { token, Token() };
+        }
 	};
 }
 #endif
