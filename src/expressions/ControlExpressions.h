@@ -94,9 +94,9 @@ namespace Jet
 			}
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { open, close };
+            return { &open, &close };
         }
 	};
 
@@ -170,9 +170,9 @@ namespace Jet
             }
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, close_brace };
+            return { &token, &close_brace };
         }
 	};
 
@@ -270,9 +270,9 @@ namespace Jet
 			block->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, block->GetTokenRange().second };
+            return { &token, block->GetTokenRange().second };
         }
 	};
 
@@ -421,9 +421,9 @@ namespace Jet
 			block->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, block->GetTokenRange().second };
+            return { &token, block->GetTokenRange().second };
         }
 	};
 
@@ -474,9 +474,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, colon };
+            return { &token, &colon };
         }
 	};
 
@@ -522,9 +522,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, colon };
+            return { &token, &colon };
         }
 	};
 
@@ -610,9 +610,9 @@ namespace Jet
 			block->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, block->GetTokenRange().second };
+            return { &token, block->GetTokenRange().second };
         }
 	};
 
@@ -729,9 +729,9 @@ namespace Jet
 			}
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            Token end;
+            const Token* end;
             if (Else)
             {
                 end = Else->block->GetTokenRange().second;
@@ -740,7 +740,7 @@ namespace Jet
             {
                 end = branches.back()->block->GetTokenRange().second;
             }
-            return { token, end };
+            return { &token, end };
         }
 	};
 
@@ -812,9 +812,9 @@ namespace Jet
 				right->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };
         }
 	};
 
@@ -855,9 +855,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };
         }
 	};
 
@@ -898,9 +898,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };
         }
 	};
 
@@ -936,9 +936,6 @@ namespace Jet
 
 			if (this->right)
 				this->right->Print(output, source);
-			//new_type.Print(output, source);
-			//equals.Print(output, source);
-			//other_type.Print(output, source);
 		}
 
 		void CompileDeclarations(CompilerContext* context)
@@ -950,14 +947,12 @@ namespace Jet
 
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
-			throw 7;//todo
-			//visitor->Visit(this);
 			right->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };
         }
 	};
 }

@@ -39,7 +39,7 @@ void Struct::Load(Compilation* compiler)
 		//check parent for vtable
 		//	is just moving all the members ok, or do I need to compress vtables
 		if (this->parent_struct->type != Types::Struct)
-			compiler->Error("Struct's parent must be another Struct!", *compiler->current_function->current_token);
+			compiler->Error("Struct's parent must be another Struct!", compiler->current_function->current_token);
 
 		//add its members to me
 		auto oldmem = std::move(this->struct_members);
@@ -146,7 +146,7 @@ void Struct::Load(Compilation* compiler)
 					compiler->Error("Circular dependency in class \"" + this->name +  "\"", this->expression->members[i].variable.type);
 				}
 				else
-					compiler->Error("Circular dependency in class \"" + this->name + "\"", *compiler->current_function->current_token);
+					compiler->Error("Circular dependency in class \"" + this->name + "\"", compiler->current_function->current_token);
 			}
 		}
 		else

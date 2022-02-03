@@ -20,7 +20,7 @@ CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
         CValue var = context->GetVariable(i->GetName());
         if (!var.pointer)
         {
-          context->root->Error("Cannot get pointer", *context->current_token);
+          context->root->Error("Cannot get pointer", context->current_token);
         }
 		return CValue(var.type->GetPointerType(), var.pointer, 0, var.is_const);
 	}
@@ -31,7 +31,7 @@ CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
         {
 		    return CValue(element.type->GetPointerType(), element.pointer, 0, element.is_const);
         }
-        context->root->Error("Cannot get pointer", *context->current_token);
+        context->root->Error("Cannot get pointer", context->current_token);
 	}
 	else
 	{
@@ -41,7 +41,7 @@ CValue GetPtrToExprValue(CompilerContext* context, Expression* right)
 			return GetPtrToExprValue(context, g->GetInside());
 		}
 	}
-	context->root->Error("Not Implemented in GetPtrToExprValue", *context->current_token);
+	context->root->Error("Not Implemented in GetPtrToExprValue", context->current_token);
 }
 
 CValue SliceExpression::Compile(CompilerContext* context)
@@ -901,7 +901,9 @@ CValue NewExpression::Compile(CompilerContext* context)
 	size.val = context->root->builder.CreateAdd(size.val, context->root->builder.getInt32(4));
 	
 	//ok now get new working with it
-	CValue val = context->Call("malloc", { size });
+    Token fname;
+    fname.text = "malloc";
+	CValue val = context->Call(fname, { size });// todo lets not use full on call here
 
 	auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
 	context->root->builder.CreateStore(arr_size, pointer);
@@ -1069,7 +1071,9 @@ CValue FreeExpression::Compile(CompilerContext* context)
 		}
 	}
 
-	context->Call("free", { CValue(context->root->CharPointerType, rootptr) });
+    Token fname;
+    fname.text = "free";
+	context->Call(fname, { CValue(context->root->CharPointerType, rootptr) });
 
 	//todo: can mark the size and pointer as zero now
 
@@ -1108,7 +1112,7 @@ Type* PrefixExpression::TypeCheck(CompilerContext* context)
 			//res = root->builder.CreateFNeg(value.val);// root->builder.CreateFMul(left.val, right.val);
 			break;
 		default:
-			context->root->Error("Invalid Unary Operation '" + TokenToString[this->_operator.type] + "' On Type '" + type->ToString() + "'", *context->current_token);
+			context->root->Error("Invalid Unary Operation '" + TokenToString[this->_operator.type] + "' On Type '" + type->ToString() + "'", context->current_token);
 			break;
 		}
 
@@ -1132,7 +1136,7 @@ Type* PrefixExpression::TypeCheck(CompilerContext* context)
 			//res = root->builder.CreateNot(value.val);
 			break;
 		default:
-			context->root->Error("Invalid Unary Operation '" + TokenToString[this->_operator.type] + "' On Type '" + type->ToString() + "'", *context->current_token);
+			context->root->Error("Invalid Unary Operation '" + TokenToString[this->_operator.type] + "' On Type '" + type->ToString() + "'", context->current_token);
 			break;
 		}
 
@@ -1161,7 +1165,7 @@ Type* PrefixExpression::TypeCheck(CompilerContext* context)
 			break;
 		}
 	}
-	context->root->Error("Invalid Unary Operation '" + TokenToString[this->_operator.type] + "' On Type '" + type->ToString() + "'", *context->current_token);
+	context->root->Error("Invalid Unary Operation '" + TokenToString[this->_operator.type] + "' On Type '" + type->ToString() + "'", context->current_token);
 	//store here
 	//only do this for ++and--
 	return type;

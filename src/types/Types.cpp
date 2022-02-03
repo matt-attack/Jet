@@ -149,7 +149,7 @@ llvm::DIType* Type::GetDebugType(Compilation* compiler)
 	if (this->debug_type)
 		return this->debug_type;
 
-	compiler->Error("Compiler Error: GetDebugType not implemented for type", *compiler->current_function->current_token);
+	compiler->Error("Compiler Error: GetDebugType not implemented for type", compiler->current_function->current_token);
 	throw 7;
 }
 
@@ -316,7 +316,7 @@ void Type::Load(Compilation* compiler)
 	}
 	else if (type == Types::Invalid)
 	{
-		compiler->Error("Tried To Use Undefined Type '" + this->name + "'", *compiler->current_function->current_token);
+		compiler->Error("Tried To Use Undefined Type '" + this->name + "'", compiler->current_function->current_token);
 	}
 	else if (type == Types::Pointer)
 	{
@@ -537,7 +537,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 	}
 
 	if (this->data->templates.size() != types.size())
-		compiler->Error("Incorrect number of template arguments. Got " + std::to_string(types.size()) + " Expected " + std::to_string(this->data->templates.size()), *compiler->current_function->current_token);
+		compiler->Error("Incorrect number of template arguments. Got " + std::to_string(types.size()) + " Expected " + std::to_string(this->data->templates.size()), compiler->current_function->current_token);
 
 	//duplicate and load
 	Struct* str = new Struct;
@@ -566,7 +566,7 @@ Type* Type::Instantiate(Compilation* compiler, const std::vector<Type*>& types)
 
 		//check if traits match
 		if (types[i]->MatchesTrait(compiler, ii.first->trait) == false)
-			compiler->Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *compiler->current_function->current_token);
+			compiler->Error("Type '" + types[i]->name + "' doesn't match Trait '" + ii.first->name + "'", compiler->current_function->current_token);
 
 		compiler->ns->members.insert({ ii.second, types[i++] });
 	}

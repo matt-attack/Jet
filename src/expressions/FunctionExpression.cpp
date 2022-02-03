@@ -170,7 +170,7 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 {
 	auto Struct = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : this->Struct.text;
 
-	context->current_token = &this->token;
+	context->CurrentToken(&this->token);
 	//need to not compile if template or trait
 	if (this->templates)
 	{
@@ -232,7 +232,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		{
 			//look for me in the args
 			if (call->left == this)
-				context->root->Error("Cannot imply type of lambda with the args of its call", *context->current_token);
+				context->root->Error("Cannot imply type of lambda with the args of its call", context->current_token);
 
 			unsigned int i = dynamic_cast<NameExpression*>(call->left) ? 0 : 1;
 			for (; i < call->args->size(); i++)
@@ -278,9 +278,9 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		{
 			for (auto ii : *this->args)
 				if (ii.type.text.length() == 0)
-					context->root->Error("Lambda type inference only implemented for function calls", *context->current_token);
+					context->root->Error("Lambda type inference only implemented for function calls", context->current_token);
 			if (this->ret_type.text.length() == 0)
-				context->root->Error("Lambda type inference only implemented for function calls", *context->current_token);
+				context->root->Error("Lambda type inference only implemented for function calls", context->current_token);
 		}
 	}
 

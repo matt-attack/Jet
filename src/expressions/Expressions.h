@@ -116,9 +116,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };
         }
 	};
 
@@ -174,9 +174,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };
         }
 	};
 
@@ -236,10 +236,10 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            Token end = size ? close_bracket : type;
-            return { token, end };
+            Token* end = size ? &close_bracket : &type;
+            return { &token, end };
         }
 	};
 
@@ -283,9 +283,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, pointer->GetTokenRange().second };
+            return { &token, pointer->GetTokenRange().second };
         }
 	};
 
@@ -401,9 +401,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };
         }
 	};
 
@@ -457,9 +457,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };
         }
 	};
 
@@ -522,7 +522,7 @@ namespace Jet
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
 			//auto loc = this->GetElementPointer(context);
-			context->current_token = &this->token;
+            context->CurrentToken(&this->token);
 			auto type = this->GetType(context, true);
 			if (type->type == Types::Function)
 				return type;
@@ -539,9 +539,9 @@ namespace Jet
 				left->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, close_bracket };
+            return { &token, &close_bracket };
         }
 	};
 
@@ -616,9 +616,9 @@ namespace Jet
 				length->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, close_bracket };
+            return { &token, &close_bracket };
         }
 	};
 
@@ -680,9 +680,9 @@ namespace Jet
 			right->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };
         }
 	};
 
@@ -738,9 +738,9 @@ namespace Jet
 			left->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };
         }
 	};
 
@@ -828,9 +828,9 @@ namespace Jet
 			right->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { begin, end };
+            return { &begin, &end };
         }
 	};
 
@@ -877,9 +877,9 @@ namespace Jet
 			right->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { _operator, Token() };
+            return { &_operator, 0 };
         }
 	};
 
@@ -929,9 +929,9 @@ namespace Jet
 			left->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { _operator, Token() };
+            return { &_operator, 0 };
         }
 	};
 
@@ -1005,9 +1005,9 @@ namespace Jet
 			right->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { _operator, Token() };
+            return { &_operator, 0 };
         }
 	};
 
@@ -1121,9 +1121,9 @@ namespace Jet
 				ii->Visit(visitor);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { start, end };
+            return { &start, &end };
         }
 	};
 
@@ -1289,9 +1289,9 @@ namespace Jet
 			return context->root->IntType;
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, end };
+            return { &token, &end };
         }
 	};
 
@@ -1336,9 +1336,9 @@ namespace Jet
 			return context->root->IntType;
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, end };
+            return { &token, &end };
         }
 	};
 
@@ -1389,9 +1389,9 @@ namespace Jet
 			return this->expr->TypeCheck(context);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { begin, end };
+            return { &begin, &end };
         }
 	};
 }

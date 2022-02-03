@@ -1265,7 +1265,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 			if (do_error)
 			{
 				// Make a new token for this error
-				Token relevant_token = *this->current_function->current_token;
+				Token relevant_token = *this->current_function->current_token.first;
 				relevant_token.text = relevant_token.text.substr(0, i);
                 relevant_token.column += start_index;
 				this->Error("Namespace '" + ns + "' not found", relevant_token);
@@ -1312,7 +1312,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 		if (name.length() == 0)
 		{
 			if (do_error)
-				Error("Missing type specifier, could not infer type", *this->current_function->current_token);
+				Error("Missing type specifier, could not infer type", this->current_function->current_token);
 			else
 				return 0;
 		}
@@ -1434,7 +1434,7 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 		{
 			if (do_error)
 			{
-				Token tok = *this->current_function->current_token;
+				Token tok = *this->current_function->current_token.first;
 				if (start_index > 0)
 				{
 					// need to create a special token as we are into a type
@@ -1471,11 +1471,11 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
     {
         if (this->ns->name.length())
         {
-   		    Error("Global '" + name + "' already exists in namespace '" + this->ns->GetQualifiedName() + "'", *this->current_function->current_token);
+   		    Error("Global '" + name + "' already exists in namespace '" + this->ns->GetQualifiedName() + "'", this->current_function->current_token);
         }
         else
         {
-		    Error("Global '" + name + "' already exists", *this->current_function->current_token);
+		    Error("Global '" + name + "' already exists", this->current_function->current_token);
         }
     }
 
@@ -1498,15 +1498,15 @@ CValue Compilation::AddGlobal(const std::string& name, Jet::Type* t, int size, l
 	}
 	auto ng = new llvm::GlobalVariable(*module, type, false, intern ? llvm::GlobalValue::LinkageTypes::InternalLinkage : llvm::GlobalValue::LinkageTypes::WeakODRLinkage/*ExternalLinkage*/, initializer, name);
 
-	this->debug->createGlobalVariableExpression(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token->line, t->GetDebugType(this), !intern);
+	this->debug->createGlobalVariableExpression(this->debug_info.file, name, name, this->debug_info.file, this->current_function->current_token.first->line, t->GetDebugType(this), !intern);
     if (is_const && size == 0)
     {
         // If its const, we can mark it as a value type
-	    this->ns->members.insert({ name, Symbol(new CValue(my_type, initializer, 0), *this->current_function->current_token) });
+	    this->ns->members.insert({ name, Symbol(new CValue(my_type, initializer, 0), *this->current_function->current_token.first) });
     }
     else
     {
-        this->ns->members.insert({ name, Symbol(new CValue(my_type, 0, ng), *this->current_function->current_token) });
+        this->ns->members.insert({ name, Symbol(new CValue(my_type, 0, ng), *this->current_function->current_token.first) });
     }
 
 	//todo if it has a constructor, make sure to call it in the initializers...
@@ -1518,6 +1518,19 @@ void Compilation::Info(const std::string& string, Token token)
 	this->diagnostics->Error(string, token, INFO);
 
 	throw 7;
+}
+
+void Compilation::Info(const std::string& string, const std::pair<const Token*, const Token*>& tokens)
+{
+    if (tokens.second && !(!*tokens.second))
+    {
+        this->diagnostics->Error(string, *tokens.first, *tokens.second, INFO);
+    }
+    else
+    {
+        this->diagnostics->Error(string, *tokens.first, INFO);
+    }
+    throw 7;
 }
 
 void Compilation::Error(const std::string& string, Token token)
@@ -1536,6 +1549,19 @@ void Compilation::Error(const std::string& string, const std::pair<Token, Token>
     else
     {
         this->diagnostics->Error(string, tokens.first, tokens.second);
+    }
+    throw 7;
+}
+
+void Compilation::Error(const std::string& string, const std::pair<const Token*, const Token*>& tokens)
+{
+    if (tokens.second && !(!*tokens.second))
+    {
+        this->diagnostics->Error(string, *tokens.first, *tokens.second);
+    }
+    else
+    {
+        this->diagnostics->Error(string, *tokens.first);
     }
     throw 7;
 }
@@ -1613,7 +1639,7 @@ Jet::Type* Compilation::GetInternalArrayType(Jet::Type* base, unsigned int size)
 		for (auto arg : args)
 		{
 			if (arg->type == Types::Void)
-				this->Error("Void is not a valid function argument type", *this->current_function->current_token);
+				this->Error("Void is not a valid function argument type", this->current_function->current_token);
 		}
 
 		auto type = new Type(this, "", Types::Function);
@@ -1638,7 +1664,8 @@ void Compilation::ResolveTypes()
 		if ((*loc)->type == Types::Invalid)
 		{
 			//resolve me
-			this->current_function->current_token = (*loc)->_location;
+			this->current_function->current_token.first = (*loc)->_location;
+            this->current_function->current_token.second = 0;
 			this->ns = unresolved_types[i].first;
 
 			if ((*loc)->pointer_type == (Type*)-7)
@@ -1701,7 +1728,7 @@ Function* Compilation::GetFunction(const std::string& name, const std::vector<Ty
             first = false;
             if (!new_ns)
             {
-                Error("Could not find namespace '" + ns + "'", *current_function->current_token);
+                Error("Could not find namespace '" + ns + "'", current_function->current_token);
             }
             cur_ns = new_ns;
             cur_pos += len + 2;
@@ -1789,7 +1816,7 @@ Jet::Symbol Compilation::GetVariableOrFunction(const std::string& name)
             first = false;
             if (!new_ns)
             {
-                Error("Could not find namespace '" + ns + "'", *current_function->current_token);
+                Error("Could not find namespace '" + ns + "'", current_function->current_token);
             }
             cur_ns = new_ns;
             cur_pos += len + 2;

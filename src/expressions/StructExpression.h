@@ -99,9 +99,9 @@ namespace Jet
 			return namespaceprefix_.c_str();
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, end };
+            return { &token, &end };
         }
 	};
 }

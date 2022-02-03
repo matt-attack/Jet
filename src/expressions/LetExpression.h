@@ -122,9 +122,9 @@ namespace Jet
 			}
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, Token() };
+            return { &token, 0 };// todo this is wrong
         }
 	};
 }

@@ -222,7 +222,7 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
     int expected_args = bonus_arg ? args.size() + 1 : args.size();
     if (expected_args != argsv.size())
     {
-        context->root->Error("Function expected " + std::to_string(expected_args) + " arguments, got " + std::to_string(argsv.size()), *context->current_token);
+        context->root->Error("Function expected " + std::to_string(expected_args) + " arguments, got " + std::to_string(argsv.size()), context->current_token);
     }
 
 	//list of struct arguments to add attributes to
@@ -249,7 +249,7 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
 		    if (casted.type->type == Types::Struct || casted.type->type == Types::Union)
 		    {
                 if (casted.pointer == 0)
-				    context->root->Error("Cannot convert to reference", *context->current_token);
+				    context->root->Error("Cannot convert to reference", context->current_token);
 
 			    arg_vals[i] = casted.pointer;
 		    }
@@ -268,11 +268,16 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
     catch (int i)
     {
         Token t;
+        std::pair<const Token*, const Token*> tokens;
         std::string ns;
         if (f && f->expression_)
         {
             t = f->expression_->name;
             ns = f->expression_->GetHumanReadableNamespace();
+
+            const auto& arg = (*f->expression_->args)[ai];
+            tokens.first = &arg.type;
+            tokens.second = &arg.name;
         }
         else if (f && f->extern_expression_)
         {
@@ -280,14 +285,20 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
             ns = f->extern_expression_->GetHumanReadableNamespace();
             if (ns.length()) { ns += "::"; }
             if (f->extern_expression_->Struct.length()) { ns += f->extern_expression_->Struct; }
+
+            const auto& arg = (*f->extern_expression_->args)[ai];
+            tokens.first = &arg.type;
+            tokens.second = &arg.name;
         }
         else
         {
             // its probably a function pointer
             t.text = this->ToString();
+            tokens.first = &t;
+            tokens.second = 0;
         }
         if (ns.length()) { ns += "::"; }
-        context->root->Info("For argument " + std::to_string(ai + 1) + " of '" + ns + t.text + "'", t);
+        context->root->Info("For argument " + std::to_string(ai + 1) + " of function '" + ns + t.text + "'", tokens);
         throw i;
     }
 

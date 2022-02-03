@@ -76,7 +76,8 @@ namespace Jet
 			this->tscope = new TCScope;
 			this->tscope->prev = 0;
 
-            this->current_token = &invalid_token;
+            this->current_token.first = &invalid_token;
+            this->current_token.second = 0;
 		}
 
 		~CompilerContext()
@@ -127,7 +128,7 @@ namespace Jet
 			this->tscope->named_values[name] = ty;
 		}
 
-		CValue GetVariable(const std::string& name, bool error = true);
+		CValue GetVariable(const std::string& name, bool error = true, bool include_functions = true);
 
 		Type* TCGetVariable(const std::string& name)
 		{
@@ -178,7 +179,7 @@ namespace Jet
 
 				if (this->function->is_lambda_)
 				{
-					this->root->Error("Lambda checking like this unimplemented", *this->current_token);
+					this->root->Error("Lambda checking like this unimplemented", this->current_token);
 					//auto var = this->parent->GetVariable(name);
 
 					//look in locals above me
@@ -211,7 +212,7 @@ namespace Jet
 					//return var.type;
 				}
 
-				this->root->Error("Undeclared identifier '" + name + "'", *current_token);
+				this->root->Error("Undeclared identifier '" + name + "'", current_token);
 			}
 			return value;
 		}
@@ -227,7 +228,7 @@ namespace Jet
 			auto res = this->root->ns->members.find(name);
 			if (res != this->root->ns->members.end())
 			{
-				this->root->Error("Namespace '" + name + "' already exists", *this->current_token);
+				this->root->Error("Namespace '" + name + "' already exists", this->current_token);
 				return;
 			}
 
@@ -285,7 +286,7 @@ namespace Jet
 		void Continue()
 		{
 			if (loops.empty())
-				this->root->Error("Cannot continue from outside loop!", *current_token);
+				this->root->Error("Cannot continue from outside loop!", current_token);
 
 			this->root->builder.CreateBr(loops.top().second);
 
@@ -296,7 +297,7 @@ namespace Jet
 		void Break()
 		{
 			if (loops.empty())
-				this->root->Error("Cannot break from outside loop!", *current_token);
+				this->root->Error("Cannot break from outside loop!", current_token);
 
 			this->root->builder.CreateBr(loops.top().first);
 
@@ -306,11 +307,17 @@ namespace Jet
 
 		llvm::ReturnInst* Return(CValue ret);
 
-		const Token* current_token;
+		std::pair<const Token*, const Token*> current_token;
 		inline void CurrentToken(const Token* token)
 		{
-			current_token = token;
+			current_token.first = token;
+            current_token.second = 0;
 		}
+
+        inline void CurrentToken(const std::pair<const Token*, const Token*>& token)
+        {
+            current_token = token;
+        }
 
 		TCScope* TCPushScope()
 		{
@@ -341,7 +348,7 @@ namespace Jet
 		CompilerContext* StartFunctionDefinition(Function* function);
 
 		Symbol GetMethod(const std::string& name, const std::vector<Type*>& args, Type* Struct, bool& is_constructor);
-		CValue Call(const std::string& name, const std::vector<CValue>& args, Type* Struct = 0, bool devirtualize = false, bool is_const = false);
+		CValue Call(const Token& name, const std::vector<CValue>& args, Type* Struct = 0, bool devirtualize = false, bool is_const = false);
 
 		std::vector<std::string> captures;
 		void WriteCaptures(llvm::Value* lambda);

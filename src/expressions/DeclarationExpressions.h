@@ -83,9 +83,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, elements.back().first };
+            return { &token, &elements.back().first };
         }
 	};
 
@@ -189,9 +189,9 @@ namespace Jet
 			return namespaceprefix_.c_str();
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, block->GetTokenRange().second };
+            return { &token, block->GetTokenRange().second };
         }
 	};
 
@@ -288,9 +288,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, close_bracket };
+            return { &token, &close_bracket };
         }
 	};
 
@@ -395,9 +395,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, close_bracket };
+            return { &token, &close_bracket };
         }
 	};
 	
@@ -455,9 +455,9 @@ namespace Jet
 			return next->Compile(context);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { open_bracket, close_bracket };
+            return { &open_bracket, &close_bracket };
         }
 	};
 
@@ -527,9 +527,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, close };
+            return { &token, &close };
         }
 	};
 
@@ -582,9 +582,9 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<Token, Token> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() override
         {
-            return { token, other_type };
+            return { &token, &other_type };
         }
 	};
 }

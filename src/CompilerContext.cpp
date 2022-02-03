@@ -53,7 +53,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 			res = root->builder.CreateFNeg(value.val);
 			break;
 		default:
-			this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
+			this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", current_token);
 			break;
 		}
 
@@ -91,7 +91,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 			res = root->builder.CreateNot(value.val);
 			break;
 		default:
-			this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
+			this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", current_token);
 			break;
 		}
 
@@ -108,7 +108,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 		case TokenType::Decrement:
 			return CValue(value.type, this->root->builder.CreateGEP(value.val, root->builder.getInt32(-1)));
 		default:
-			this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->base->ToString() + "'", *current_token);
+			this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->base->ToString() + "'", current_token);
 		}
 	}
 	else if (value.type->type == Types::Bool)
@@ -121,7 +121,7 @@ CValue CompilerContext::UnaryOperation(TokenType operation, CValue value)
 			break;
 		}
 	}
-	this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", *current_token);
+	this->root->Error("Invalid Unary Operation '" + TokenToString[operation] + "' On Type '" + value.type->ToString() + "'", current_token);
 }
 
 void CompilerContext::Store(CValue loc, CValue in_val, bool RVO)
@@ -131,7 +131,7 @@ void CompilerContext::Store(CValue loc, CValue in_val, bool RVO)
 	if (loc.type->base->type == Types::Struct && RVO == false && val.type->type == Types::Struct && loc.type->base == val.type)
 	{
 		if (loc.type->base->data->is_class == true)
-			this->root->Error("Cannot copy class '" + loc.type->base->data->name + "' unless it has a copy operator.", *this->current_token);
+			this->root->Error("Cannot copy class '" + loc.type->base->data->name + "' unless it has a copy operator.", this->current_token);
 
         auto stru = val.type->data;
 		// Handle equality operator if we can find it
@@ -280,7 +280,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 
 	if (left.type->type != right.type->type)
 	{
-		root->Error("Cannot perform a binary operation between two incompatible types", *this->current_token);
+		root->Error("Cannot perform a binary operation between two incompatible types", this->current_token);
 	}
 
 	if (left.type->type == Types::Float || left.type->type == Types::Double)
@@ -329,7 +329,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			return CValue(root->BoolType, res);
 			break;
 		default:
-			this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
+			this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", current_token);
 
 			break;
 		}
@@ -424,7 +424,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			res = root->builder.CreateLShr(left.val, right.val);
 			break;
 		default:
-			this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
+			this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", current_token);
 
 			break;
 		}
@@ -461,7 +461,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
         }
     }
 
-	this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", *current_token);
+	this->root->Error("Invalid Binary Operation '" + TokenToString[op] + "' On Type '" + left.type->ToString() + "'", current_token);
 }
 
 Symbol CompilerContext::GetMethod(
@@ -474,7 +474,7 @@ Symbol CompilerContext::GetMethod(
     is_constructor = false;
 	if (Struct == 0)
 	{
-        CValue var = this->GetVariable(name, false);
+        CValue var = this->GetVariable(name, false, false);
 
         if (var.val || var.pointer)
         {
@@ -526,7 +526,7 @@ Symbol CompilerContext::GetMethod(
 					return Symbol();
 			}
 			//instantiate here
-			this->root->Error("Not implemented", *this->current_token);
+			this->root->Error("Not implemented", this->current_token);
 
 			//return range.first->second;
 		}
@@ -564,7 +564,7 @@ Symbol CompilerContext::GetMethod(
 						{
 							//found it
 							if (templates[i] != 0 && templates[i] != args[i2])
-								this->root->Error("Could not infer template type", *this->current_token);
+								this->root->Error("Could not infer template type", this->current_token);
 
 							//need to convert back to root type
 							Type* top_type = args[i2];
@@ -577,7 +577,7 @@ Symbol CompilerContext::GetMethod(
 								if (c == '*' && cur_type->type == Types::Pointer)
 									cur_type = cur_type->base;
 								else if (!IsLetter(c))
-									this->root->Error("Could not infer template type", *this->current_token);
+									this->root->Error("Could not infer template type", this->current_token);
 								pos--;
 							}
 							templates[i] = cur_type;
@@ -591,7 +591,7 @@ Symbol CompilerContext::GetMethod(
 			for (unsigned int i = 0; i < fun->templates_.size(); i++)
 			{
 				if (templates[i] == 0)
-					this->root->Error("Could not infer template type", *this->current_token);
+					this->root->Error("Could not infer template type", this->current_token);
 			}
 
 			auto oldname = fun->expression_->name.text;
@@ -611,7 +611,7 @@ Symbol CompilerContext::GetMethod(
 			{
 				//check if traits match
 				if (templates[i]->MatchesTrait(this->root, ii.first->trait) == false)
-					root->Error("Type '" + templates[i]->name + "' doesn't match Trait '" + ii.first->name + "'", *root->current_function->current_token);
+					root->Error("Type '" + templates[i]->name + "' doesn't match Trait '" + ii.first->name + "'", root->current_function->current_token);
 
 				root->ns->members.insert({ ii.second, templates[i++] });
 			}
@@ -644,7 +644,7 @@ Symbol CompilerContext::GetMethod(
 
 #undef alloca
 
-CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>& args, Type* Struct, bool devirtualize, bool is_const)
+CValue CompilerContext::Call(const Token& name, const std::vector<CValue>& args, Type* Struct, bool devirtualize, bool is_const)
 {
 	std::vector<Type*> arsgs;
 	for (auto ii : args)
@@ -654,7 +654,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
 
 	auto old_tok = this->current_token;
     bool is_constructor = false;
-	Symbol function_symbol = this->GetMethod(name, arsgs, Struct, is_constructor);
+	Symbol function_symbol = this->GetMethod(name.text, arsgs, Struct, is_constructor);
 	this->current_token = old_tok;
 
     if (is_constructor)
@@ -683,7 +683,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
     bool skip_first = false;// todo clean this up
 	if (!function_symbol && Struct == 0)
 	{
-		this->root->Error("Could not find function '" + name + "'", *this->current_token);
+		this->root->Error("Could not find function '" + name.text + "'", name);
 	}
 	else if (!function_symbol)
 	{
@@ -691,7 +691,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
         int i = 0;
         for (auto& mem: Struct->data->struct_members)
         {
-            if (mem.name == name)
+            if (mem.name == name.text)
             {
                 CValue _this = args[0];
                 if (!_this.val)
@@ -712,7 +712,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
         }
         if (!function_symbol)
         {
-		    this->root->Error("Function '" + name + "' is not defined on object '" + Struct->ToString() + "'", *this->current_token);
+		    this->root->Error("Function '" + name.text + "' is not defined on object '" + Struct->ToString() + "'", name);
         }
 	}
 
@@ -736,7 +736,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
         Function* fun = function_symbol.fn;
         if (!fun->is_const_ && is_const)
         {
-            this->root->Error("Cannot call non-const function '" + name + "' on const value", *this->current_token);
+            this->root->Error("Cannot call non-const function '" + name.text + "' on const value", this->current_token);
         }
 
 	    return fun->Call(this, args, devirtualize);
@@ -785,7 +785,7 @@ CValue CompilerContext::Call(const std::string& name, const std::vector<CValue>&
             else
             {
                 // functors have already been handled above so anything here is an error
-                this->root->Error("Cannot call non-function type", *this->current_token);
+                this->root->Error("Cannot call non-function type", this->current_token);
             }
         }
 
@@ -812,7 +812,7 @@ void CompilerContext::SetDebugLocation(const Token& t)
 	this->root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope_));
 }
 
-CValue CompilerContext::GetVariable(const std::string& name, bool error)
+CValue CompilerContext::GetVariable(const std::string& name, bool error, bool include_functions)
 {
 	auto cur = this->scope;
 	CValue value(0, 0);
@@ -832,7 +832,7 @@ CValue CompilerContext::GetVariable(const std::string& name, bool error)
 		auto sym = this->root->GetVariableOrFunction(name);
 		if (sym.type != SymbolType::Invalid)
 		{
-			if (sym.type == SymbolType::Function)
+			if (sym.type == SymbolType::Function && include_functions)
 			{
 				auto function = sym.fn;
 				function->Load(this->root);
@@ -879,7 +879,7 @@ CValue CompilerContext::GetVariable(const std::string& name, bool error)
 
         if (error)
         {
-		    this->root->Error("Undeclared identifier '" + name + "'", *current_token);
+		    this->root->Error("Undeclared identifier '" + name + "'", current_token);
         }
         else
         {
@@ -893,7 +893,7 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 {
 	if (this->function == 0)
 	{
-		this->root->Error("Cannot return from outside function!", *current_token);
+		this->root->Error("Cannot return from outside function!", current_token);
 	}
 
     auto return_type = this->function->return_type_;
@@ -967,7 +967,7 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
 		if (this->function->return_type_->type != Types::Void)
 		{
 			this->root->Error("Cannot return void in function returning '"
-								+ this->function->return_type_->ToString() + "'!", *current_token);
+								+ this->function->return_type_->ToString() + "'!", current_token);
 		}
 		return root->builder.CreateRetVoid();
 	}
@@ -1040,7 +1040,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
 			llvm::ConstantInt* ty = llvm::dyn_cast<llvm::ConstantInt>(value.val);
 			if (Explicit == false && (ty == 0 || ty->getSExtValue() != 0))
 			{
-				root->Error("Cannot cast a non-zero integer value to pointer implicitly.", *this->current_token);
+				root->Error("Cannot cast a non-zero integer value to pointer implicitly.", this->current_token);
 			}
 
 			return CValue(t, root->builder.CreateIntToPtr(value.val, t->GetLLVMType()));
@@ -1209,7 +1209,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
         }
     }
 
-	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
+	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", current_token);
 }
 
 //reduce redundancy by making one general version that just omits the llvm::Value from the CValue when doign a check
@@ -1328,7 +1328,7 @@ bool CompilerContext::CheckCast(Type* src, Type* t, bool Explicit, bool Throw)
 	}
 
 	if (Throw)
-		this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", *current_token);
+		this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", current_token);
 
 	return false;
 }
@@ -1453,7 +1453,7 @@ void CompilerContext::WriteCaptures(llvm::Value* lambda)
 		}
 		if (size > 64)
 		{
-			this->root->Error("Capture size too big! Captured " + std::to_string(size) + " bytes but max was 64!", *this->current_token);
+			this->root->Error("Capture size too big! Captured " + std::to_string(size) + " bytes but max was 64!", this->current_token);
 		}
 	}
 	this->captures.clear();
@@ -1475,9 +1475,9 @@ void CompilerContext::RegisterLocal(
         if (cur_scope->named_values.find(name) != cur_scope->named_values.end())
         {
             if (cur_scope == this->scope)
-		        this->root->Error("Variable '" + name + "' already defined", *this->current_token);
+		        this->root->Error("Variable '" + name + "' already defined", this->current_token);
             else
-                this->root->Error("Variable '" + name + "' already defined in higher scope", *this->current_token);
+                this->root->Error("Variable '" + name + "' already defined in higher scope", this->current_token);
         }
         cur_scope = cur_scope->prev;
     } while (cur_scope);

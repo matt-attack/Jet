@@ -426,16 +426,16 @@ CValue CallExpression::Compile(CompilerContext* context)
 
 	std::vector<CValue> argsv;
 
-	std::string fname;
+	Token fname;
 	Type* stru = 0;
 	bool devirtualize = false;
     bool is_const = false;
 	if (auto name = dynamic_cast<NameExpression*>(left))
 	{
 		//ok handle what to do if im an index expression
-		fname = name->GetName();
+		fname = name->token;
 
-        CValue var = context->GetVariable(fname, false);
+        CValue var = context->GetVariable(fname.text, false);
 
         if (var.type->type == Types::Struct)
         {
@@ -443,7 +443,7 @@ CValue CallExpression::Compile(CompilerContext* context)
           {
             stru = var.type;
             argsv.push_back(CValue(stru->GetPointerType(), var.pointer));
-            fname = "()";
+            fname.text = "()";
           }
         }
 
@@ -452,7 +452,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 	else if (auto index = dynamic_cast<IndexExpression*>(left))
 	{
 		//im a struct yo
-		fname = index->member.text;
+		fname = index->member;
 
 		auto left = index->GetBaseElement(context);
         is_const = left.is_const;
@@ -482,7 +482,7 @@ CValue CallExpression::Compile(CompilerContext* context)
         }
         else
         {
-          context->root->Error("Could not calculate this pointer", *context->current_token);
+          context->root->Error("Could not calculate this pointer", context->current_token);
         }
 	}
 	else
@@ -490,7 +490,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 		//calling a function pointer type
 		auto lhs = this->left->Compile(context);
 		if (lhs.type->type != Types::Function)
-			context->root->Error("Cannot call non-function", *context->current_token);
+			context->root->Error("Cannot call non-function", context->current_token);
 
 		std::vector<CValue> argts;
 		for (auto ii : *this->args)
@@ -503,7 +503,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 	for (auto ii : *this->args)
 		argsv.push_back(ii.first->Compile(context));
 
-	context->CurrentToken(&this->open);
+	context->CurrentToken(this->GetTokenRange());
 	auto ret = context->Call(fname, argsv, stru, devirtualize, is_const);
 
     // add any returned struct to the destruct queue to be removed when this statement ends

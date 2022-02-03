@@ -95,7 +95,7 @@ namespace Jet
 
 		virtual const char* GetNamespace() { return 0; }// returns the namespace that we create, if any
 
-        virtual std::pair<Token, Token> GetTokenRange() = 0;
+        virtual std::pair<const Token*, const Token*> GetTokenRange() = 0;
 	};
 
 	class IStorableExpression
