@@ -181,7 +181,7 @@ Type* Function::GetType(Compilation* compiler) const
     return compiler->GetFunctionType(return_type_, args);
 }
 
-CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv,
+CValue Function::Call(CompilerContext* context, const std::vector<FunctionArgument>& argsv,
   const bool devirtualize, bool bonus_arg)
 {
     this->Load(context->root);
@@ -196,7 +196,7 @@ CValue Function::Call(CompilerContext* context, const std::vector<CValue>& argsv
     return type_->Call(context, f_, argsv, devirtualize || is_generator_, this, bonus_arg);
 }
 
-CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::vector<CValue>& argsv,
+CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::vector<FunctionArgument>& argsv,
   const bool devirtualize, const Function* f, const bool bonus_arg)
 {
 	bool ptr_struct_return = (return_type->type == Types::Struct);
@@ -215,14 +215,34 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
 	}
 	for (auto ii : argsv)
 	{
-		arg_vals.push_back(ii.val);
+		arg_vals.push_back(ii.value.val);
 	}
 
     // check for correct number of arguments
     int expected_args = bonus_arg ? args.size() + 1 : args.size();
     if (expected_args != argsv.size())
     {
-        context->root->Error("Function expected " + std::to_string(expected_args) + " arguments, got " + std::to_string(argsv.size()), context->current_token);
+        try
+        {
+            context->root->Error("Function expected " + std::to_string(expected_args) + " arguments, got " + std::to_string(argsv.size()), context->current_token);
+        }
+        catch (int i)
+        {
+            std::pair<const Token*, const Token*> tokens;
+            if (f && f->expression_)
+            {
+                tokens.first = &f->expression_->name;
+                tokens.second = 0;
+                context->root->Info("Defined here", tokens);
+            }
+            else if (f && f->extern_expression_)
+            {
+                tokens.first = &f->extern_expression_->name;
+                tokens.second = 0;
+                context->root->Info("Defined here", tokens);
+            }
+            throw i;
+        }
     }
 
 	//list of struct arguments to add attributes to
@@ -238,14 +258,14 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
 	    for (auto& ii : argsv)
 	    {
             // Cast first
-            if (ai > args.size() - 1)
+            if (ai >= args.size())
             {
-                arg_vals[i] = ii.val;
+                arg_vals[i] = ii.value.val;
                 i++; ai++;
                 continue;
             }
-            
-            CValue casted = context->DoCast(this->args[ai], ii);
+            if (ii.expression) context->CurrentToken(ii.expression->GetTokenRange());
+            CValue casted = context->DoCast(this->args[ai], ii.value);
 		    if (casted.type->type == Types::Struct || casted.type->type == Types::Union)
 		    {
                 if (casted.pointer == 0)
@@ -267,6 +287,7 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
     }
     catch (int i)
     {
+        // Indicate the original function signature for improved diagnostics
         Token t;
         std::pair<const Token*, const Token*> tokens;
         std::string ns;
@@ -298,7 +319,7 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
             tokens.second = 0;
         }
         if (ns.length()) { ns += "::"; }
-        context->root->Info("For argument " + std::to_string(ai + 1) + " of function '" + ns + t.text + "'", tokens);
+        context->root->Info("For argument " + std::to_string(ai + 1) + " of function '" + BOLD(ns + t.text) + "'", tokens);
         throw i;
     }
 
@@ -308,7 +329,7 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
 	if (f && f->is_virtual_ && devirtualize == false)
 	{
 		// calculate the offset to the virtual table pointer in the struct
-		auto gep = context->root->builder.CreateGEP(argsv[0].val, 
+		auto gep = context->root->builder.CreateGEP(argsv[0].value.val, 
 			{ context->root->builder.getInt32(0), context->root->builder.getInt32(f->virtual_table_location_) }, 
 			"get_vtable");
 

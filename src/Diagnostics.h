@@ -29,6 +29,14 @@ namespace Jet
 		void Print();
 	};
 
+    inline std::string BOLD(const std::string& str)
+    {
+        return "\x1b[1m" + str + "\x1b[0m";
+        //return str;
+    }
+
+//#define BOLD(x) "test"##x"test"
+
 	class DiagnosticBuilder
 	{
 		friend class Compilation;

@@ -465,7 +465,7 @@ CValue IndexExpression::GetElement(CompilerContext* context, bool for_store)
 		lhs = context->GetVariable(p->GetName());
         if (lhs.is_const && for_store && lhs.type->type == Types::Struct)
         {
-           context->root->Error("Cannot store into const value '" + p->GetName() + "'", p->token);
+           context->root->Error("Cannot store into const value '" + BOLD(p->GetName()) + "'", p->token);
         }
 		context->CurrentToken(old);
 	}
@@ -887,23 +887,23 @@ CValue OperatorExpression::Compile(CompilerContext* context)
 
 CValue NewExpression::Compile(CompilerContext* context)
 {
-	context->CurrentToken(&this->type);
+	context->CurrentToken(&type_);
 
-	auto ty = context->root->LookupType(type.text);
+	auto ty = context->root->LookupType(type_.text);
 
-	context->CurrentToken(&this->token);
+	context->CurrentToken(&token_);
 	auto size = context->GetSizeof(ty);
-	auto arr_size = this->size ? this->size->Compile(context).val : context->root->builder.getInt32(1);
+	auto arr_size = size_ ? size_->Compile(context).val : context->root->builder.getInt32(1);
 	
 	// todo watch out for this constant 4 for the size, limits char arrays to 4gb
-	if (this->size)
+	if (size_)
 		size.val = context->root->builder.CreateMul(size.val, arr_size);
 	size.val = context->root->builder.CreateAdd(size.val, context->root->builder.getInt32(4));
 	
 	//ok now get new working with it
     Token fname;
     fname.text = "malloc";
-	CValue val = context->Call(fname, { size });// todo lets not use full on call here
+	CValue val = context->Call(fname, { {size, 0} });// todo lets not use full on call here
 
 	auto pointer = context->root->builder.CreatePointerCast(val.val, context->root->IntType->GetPointerType()->GetLLVMType());
 	context->root->builder.CreateStore(arr_size, pointer);
@@ -912,13 +912,13 @@ CValue NewExpression::Compile(CompilerContext* context)
 	auto ptr = context->DoCast(ty->GetPointerType(), val, true);
 
 	//run constructors
-	if (this->args)
+	if (args_)
 	{
 		if (ptr.type->base->type == Types::Struct)
 		{
 			std::vector<llvm::Value*> llvm_args = { ptr.val };
 			std::vector<Type*> arg_types = { ptr.type };
-			for (auto ii : *this->args)
+			for (auto ii : *args_)
 			{
 				auto res = ii.first->Compile(context);
 				//need to try and do casts
@@ -951,24 +951,24 @@ CValue NewExpression::Compile(CompilerContext* context)
 					}
 				}
 				err += ") not found!";
-				context->root->Error(err, this->token);
+				context->root->Error(err, token_);
 			}
 			fun->Load(context->root);
 			context->root->builder.CreateCall(fun->f_, llvm_args);
 		}
 		else
 		{
-			context->root->Error("Cannot construct non-struct type!", this->token);
+			context->root->Error("Cannot construct non-struct type!", token_);
 		}
 
 		//handle constructor args
 		return ptr;
 	}
 
-	context->Construct(ptr, this->size ? arr_size : 0);
+	context->Construct(ptr, size_ ? arr_size : 0);
 
 	//ok now stick it in an array if we specified size
-	if (this->size)
+	if (size_)
 	{
 		auto str_type = context->root->GetArrayType(ty);
 		//alloc the struct for it
@@ -1073,7 +1073,7 @@ CValue FreeExpression::Compile(CompilerContext* context)
 
     Token fname;
     fname.text = "free";
-	context->Call(fname, { CValue(context->root->CharPointerType, rootptr) });
+	context->Call(fname, { {CValue(context->root->CharPointerType, rootptr), 0 } });
 
 	//todo: can mark the size and pointer as zero now
 

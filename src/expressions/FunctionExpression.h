@@ -94,7 +94,7 @@ namespace Jet
 
 		CValue DoCompile(CompilerContext* context);//call this to do real compilation
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, 0 };
         }

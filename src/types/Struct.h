@@ -46,7 +46,8 @@ namespace Jet
 			Type* type;
 		};
 		std::vector<StructMember> struct_members;//member variables
-		std::multimap<std::string, Function*> functions;//member functions
+		std::map<std::string, Function*> functions;//member functions
+        std::vector<Function*> constructors;//constructors
 
 		bool loaded;
 

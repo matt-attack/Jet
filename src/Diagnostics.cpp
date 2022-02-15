@@ -6,11 +6,16 @@ using namespace Jet;
 
 void Diagnostic::Print()
 {
+    std::string color = "";
+    std::string color_end = "";
 #ifndef _WIN32
-	const char* m_type = "\x1B[31merror\x1B[0m";
+    color = "\x1B[1;31m";
+    color_end = "\x1B[0m";
+	const char* m_type = "\x1B[1;31merror\x1B[0m";
     if (this->severity == INFO)
     {
-        m_type = "\x1B[34minfo\x1B[0m";
+        color = "\x1B[1;34m";
+        m_type = "\x1B[1;34minfo \x1B[0m";
     }
 #else
 	const char* m_type = "error";
@@ -26,10 +31,20 @@ void Diagnostic::Print()
 			endrow = end.column + end.text.length();
 		}
 
-		std::string code = this->line;
-		std::string underline = "";
-		for (unsigned int i = 0; i < code.length(); i++)
+		std::string code;
+		std::string underline = color;
+		for (unsigned int i = 0; i < this->line.length(); i++)
 		{
+            if (i == startrow)
+            {
+                code += color;
+            }
+            code += this->line[i];
+            if (i == endrow - 1)
+            {
+                code += color_end;
+            }
+
 			if (code[i] == '\t')
 				underline += '\t';
 			else if (i >= startrow && i < endrow)
@@ -37,7 +52,10 @@ void Diagnostic::Print()
 			else
 				underline += ' ';
 		}
-		printf("[%s] %s %d:%d to %d:%d: %s\n", m_type, this->file.c_str(), token.line, startrow, token.line, endrow, message.c_str());
+        underline += color_end;
+
+        std::string filename = "\x1b[1m" + file + "\x1b[0m";
+		printf("[%s] %s %d:%d to %d:%d: %s\n", m_type, filename.c_str(), token.line, startrow, token.line, endrow, message.c_str());
 		printf("[%s] >>>%s\n", m_type, code.c_str());
 		printf("[%s] >>>%s\n\n", m_type, underline.c_str());
 	}

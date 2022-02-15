@@ -424,7 +424,7 @@ CValue CallExpression::Compile(CompilerContext* context)
 	context->CurrentToken(&this->open);
 	context->SetDebugLocation(this->open);
 
-	std::vector<CValue> argsv;
+	std::vector<FunctionArgument> argsv;
 
 	Token fname;
 	Type* stru = 0;
@@ -439,10 +439,11 @@ CValue CallExpression::Compile(CompilerContext* context)
 
         if (var.type->type == Types::Struct)
         {
+          // hack for lambdas, fixme later
           if (!(var.type->data->template_base && var.type->data->template_base->name == "function"))
           {
             stru = var.type;
-            argsv.push_back(CValue(stru->GetPointerType(), var.pointer));
+            argsv.push_back({CValue(stru->GetPointerType(), var.pointer), 0});
             fname.text = "()";
           }
         }
@@ -464,7 +465,7 @@ CValue CallExpression::Compile(CompilerContext* context)
           assert(left.pointer);
           stru = left.type;
 
-          argsv.push_back(CValue(stru->GetPointerType(), left.pointer));
+          argsv.push_back({CValue(stru->GetPointerType(), left.pointer), 0});
         }
         else if (left.type->type == Types::Pointer &&
                  left.type->base->type == Types::Struct)
@@ -478,7 +479,7 @@ CValue CallExpression::Compile(CompilerContext* context)
           assert(val);
           stru = left.type->base;
 
-          argsv.push_back(CValue(left.type, val));
+          argsv.push_back({CValue(left.type, val), 0});
         }
         else
         {
@@ -492,16 +493,16 @@ CValue CallExpression::Compile(CompilerContext* context)
 		if (lhs.type->type != Types::Function)
 			context->root->Error("Cannot call non-function", context->current_token);
 
-		std::vector<CValue> argts;
+		std::vector<FunctionArgument> argts;
 		for (auto ii : *this->args)
-			argts.push_back(ii.first->Compile(context));
+			argts.push_back({ii.first->Compile(context), ii.first});
 
         return lhs.type->function->Call(context, lhs.val, argts);
 	}
 
 	//build arg list
 	for (auto ii : *this->args)
-		argsv.push_back(ii.first->Compile(context));
+		argsv.push_back({ii.first->Compile(context), ii.first});
 
 	context->CurrentToken(this->GetTokenRange());
 	auto ret = context->Call(fname, argsv, stru, devirtualize, is_const);

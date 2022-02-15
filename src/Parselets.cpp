@@ -1386,8 +1386,8 @@ Expression* NewParselet::parse(Parser* parser, Token token)
 		auto cb = parser->Consume(TokenType::RightBracket);
 
 		auto x = new NewExpression(token, type, size.Release());
-		x->open_bracket = ob;
-		x->close_bracket = cb;
+		x->open_bracket_ = ob;
+		x->close_bracket_ = cb;
 		return x;
 	}
 	else if (parser->LookAhead().type == TokenType::LeftParen)

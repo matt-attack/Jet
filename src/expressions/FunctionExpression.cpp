@@ -450,10 +450,16 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	if (function_context->function->is_generator_)
 		function_context->root->builder.CreateRet(function_context->root->builder.getInt1(false));//signal we are gone generating values
 	else if (function_context->function->f_->getBasicBlockList().back().getTerminator() == 0)
+    {
+        //function_context->function->f_->print(llvm::errs(), nullptr);
 		if (ret->type == Jet::Types::Void)// Implicit return void at end to satisfy llvm
 			function_context->Return(CValue(context->root->VoidType, 0));
 		else
-			context->root->Error("Function must return a value!", token);
+        {
+            try {
+			context->root->Error("Function must return a value", token); } catch (int i ) {}
+        }
+    }
 
 	//remove instructions after the first terminator in a block to prevent issues
 	for (auto ii = function_context->function->f_->getBasicBlockList().begin(); ii != function_context->function->f_->getBasicBlockList().end(); ii++)

@@ -271,6 +271,13 @@ std::map<std::string, Source*> JetProject::GetSources() const
 	//char cwd[500];
 	//getcwd(cwd, 500);
 	std::map<std::string, Source*> sources;
+
+    std::string real_path = this->path;
+    if (real_path.back() == '/')
+    {
+        real_path.pop_back();
+    }
+    real_path = real_path.substr(real_path.find_last_of('/')+1);
 	//std::string scwd = cwd;
 	//int p = scwd.find_last_of('\\');
 	std::string project = this->project_name + "/";
@@ -287,7 +294,7 @@ std::map<std::string, Source*> JetProject::GetSources() const
 			buffer[length] = 0;
 			t.close();
 
-			sources[file] = new Source(buffer, project + file);
+			sources[file] = new Source(buffer, real_path + "/" + file);
 		}
 		else
 		{

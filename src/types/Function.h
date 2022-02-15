@@ -22,6 +22,12 @@ namespace Jet
 	class Compiler;
 	class Compilation;
 	class CompilerContext;
+    class Expression;
+    struct FunctionArgument
+    {
+        CValue value;
+        const Expression* expression;// optional for debug
+    };
 	struct FunctionType
 	{
 		bool loaded;
@@ -57,7 +63,7 @@ namespace Jet
             return str;
         }
 
-        CValue Call(CompilerContext* context, llvm::Value* val, const std::vector<CValue>& args, const bool devirtualize = false, const Function* f = 0, const bool bonus_arg = false);
+        CValue Call(CompilerContext* context, llvm::Value* val, const std::vector<FunctionArgument>& args, const bool devirtualize = false, const Function* f = 0, const bool bonus_arg = false);
 	};
 	
 	class FunctionExpression;
@@ -70,6 +76,7 @@ namespace Jet
 		FastCall,
 		ThisCall
 	};
+
 	struct Function
 	{
         friend struct FunctionType;
@@ -138,7 +145,7 @@ namespace Jet
 
 		~Function();
 
-		CValue Call(CompilerContext* context, const std::vector<CValue>& argsv,
+		CValue Call(CompilerContext* context, const std::vector<FunctionArgument>& argsv,
           const bool devirtualize, const bool bonus_arg = false);
 
 		bool IsCompatible(Function* f)

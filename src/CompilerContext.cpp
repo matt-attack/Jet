@@ -153,7 +153,7 @@ void CompilerContext::Store(CValue loc, CValue in_val, bool RVO)
 
 			Function* fun = fun_iter->second;
 			fun->Load(this->root);
-			std::vector<CValue> argsv = { loc, val };
+			std::vector<FunctionArgument> argsv = { {loc, 0}, {val, 0} };
 
 			fun->Call(this, argsv, true);
 
@@ -245,7 +245,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			{
 				Function* fun = funiter->second;
 				fun->Load(this->root);
-				std::vector<CValue> argsv = { lhsptr, right };// todo probably need to enforce the return type
+				std::vector<FunctionArgument> argsv = { {lhsptr, 0}, {right, 0} };// todo probably need to enforce the return type
                 CValue ret = fun->Call(this, argsv, true);
                 ret.val = root->builder.CreateNot(ret.val);
 				return ret;
@@ -259,7 +259,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			{
 				Function* fun = funiter->second;
 				fun->Load(this->root);
-				std::vector<CValue> argsv = { lhsptr, right };
+				std::vector<FunctionArgument> argsv = { {lhsptr, 0}, {right, 0} };
 				return fun->Call(this, argsv, true);//for now lets keep these operators non-virtual
 			}
 		}
@@ -644,12 +644,61 @@ Symbol CompilerContext::GetMethod(
 
 #undef alloca
 
-CValue CompilerContext::Call(const Token& name, const std::vector<CValue>& args, Type* Struct, bool devirtualize, bool is_const)
+int minimum(int x, int y, int z)
+{
+    return std::min(x, std::min(y, z));
+}
+
+int Edit_Distance(const std::string& s1, const std::string& s2, int n, int m)
+{
+/* Here n = len(s1)
+       m = len(s2) */
+ 
+  if(n == 0 && m == 0)   //Base case
+     return 0;
+  if(n == 0)            //Base case
+     return m;
+  if( m == 0 )         //Base Case
+     return n;
+ 
+/* Recursive Part */
+int   a  = Edit_Distance(s1, s2, n-1, m-1) + (s1[n-1] != s2[m-1]);
+int   b  = Edit_Distance(s1, s2, n-1, m) + 1;                      //Deletion
+int   c  = Edit_Distance(s1, s2, n, m-1) + 1;                      //Insertion
+ 
+   return  minimum(a, b, c);
+}
+
+int levenshtein_distance(const std::string& name, const std::string& name2)
+{
+    return Edit_Distance(name, name2, name.length(), name2.length());
+    /*if (name.length() == 0)
+    {
+        return name2.length();
+    }
+    else if (name2.length() == 0)
+    {
+        return name.length();
+    }
+    else if (name.length() == name2.length())
+    {
+        return levenshtein_distance(name.substr(1), name2.substr(1));
+    }
+    else
+    {
+        return minimum(levenshtein_distance(name.substr(1), name2) + 1,
+                       levenshtein_distance(name, name2.substr(1)) + 1,
+                       levenshtein_distance(name.substr(1), name2.substr(1))
+                         + ((name[0] != name2[0]) ? 1 : 0));
+    }*/
+}
+
+CValue CompilerContext::Call(const Token& name, const std::vector<FunctionArgument>& args, Type* Struct, bool devirtualize, bool is_const)
 {
 	std::vector<Type*> arsgs;
 	for (auto ii : args)
 	{
-		arsgs.push_back(ii.type);
+		arsgs.push_back(ii.value.type);
 	}
 
 	auto old_tok = this->current_token;
@@ -670,8 +719,8 @@ CValue CompilerContext::Call(const Token& name, const std::vector<CValue>& args,
 			TheFunction->getEntryBlock().begin());
 		auto Alloca = TmpB.CreateAlloca(type->GetLLVMType(), 0, "constructortemp");
 
-		std::vector<CValue> argsv;
-		argsv.push_back(CValue(type->GetPointerType(), Alloca));// add 'this' ptr
+		std::vector<FunctionArgument> argsv;
+		argsv.push_back({CValue(type->GetPointerType(), Alloca), 0});// add 'this' ptr
 		for (auto ii : args)// add other arguments
 			argsv.push_back(ii);
 
@@ -683,17 +732,26 @@ CValue CompilerContext::Call(const Token& name, const std::vector<CValue>& args,
     bool skip_first = false;// todo clean this up
 	if (!function_symbol && Struct == 0)
 	{
-		this->root->Error("Could not find function '" + name.text + "'", name);
+        // try and find a function
+        std::string closest = GetSimilarMethod(name.text);
+        if (closest.length())
+        {
+		    this->root->Error("Could not find function '" + BOLD(name.text) + "'. Did you mean '" + BOLD(closest) + "'?", name);
+        }
+        else
+        {
+		    this->root->Error("Could not find function '" + BOLD(name.text) + "'", name);
+        }
 	}
-	else if (!function_symbol)
+	else if (!function_symbol && Struct)
 	{
-        // check for variables
+        // Check for member variables which are callable
         int i = 0;
         for (auto& mem: Struct->data->struct_members)
         {
             if (mem.name == name.text)
             {
-                CValue _this = args[0];
+                CValue _this = args[0].value;
                 if (!_this.val)
                 {
                     _this.val = root->builder.CreateLoad(_this.pointer);
@@ -712,7 +770,36 @@ CValue CompilerContext::Call(const Token& name, const std::vector<CValue>& args,
         }
         if (!function_symbol)
         {
-		    this->root->Error("Function '" + name.text + "' is not defined on object '" + Struct->ToString() + "'", name);
+            // try and find a similar name
+            std::string best; int min_dist = 5;
+            for (auto& mem: Struct->data->struct_members)
+            {
+                int dist = levenshtein_distance(mem.name, name.text);
+                if (dist < min_dist)
+                {
+                    best = mem.name;
+                    min_dist = dist;
+                }
+            }
+            for (auto& mem: Struct->data->functions)
+            {
+                int dist = levenshtein_distance(mem.first, name.text);
+                if (dist < min_dist)
+                {
+                    best = mem.first;
+                    min_dist = dist;
+                }
+            }
+            if (best.length() == 0)
+            {
+		        this->root->Error("Function '" + BOLD(name.text) + "' is not defined on object '" + BOLD(Struct->ToString()) + "'", name);
+            }
+            else
+            {
+		        this->root->Error("Function '" + BOLD(name.text) + "' is not defined on object '" + BOLD(Struct->ToString()) + "'. Did you mean '" + BOLD(best) + "'?", name);
+            }
+
+            // try and find 
         }
 	}
 
@@ -736,7 +823,7 @@ CValue CompilerContext::Call(const Token& name, const std::vector<CValue>& args,
         Function* fun = function_symbol.fn;
         if (!fun->is_const_ && is_const)
         {
-            this->root->Error("Cannot call non-const function '" + name.text + "' on const value", this->current_token);
+            this->root->Error("Cannot call non-const function '" + BOLD(name.text) + "' on const value", this->current_token);
         }
 
 	    return fun->Call(this, args, devirtualize);
@@ -779,7 +866,7 @@ CValue CompilerContext::Call(const Token& name, const std::vector<CValue>& args,
 		        var.pointer = root->builder.CreatePointerCast(ptr, type);
 
                 var.type = root->GetFunctionType(old_fn_type->function->return_type, types2);
-                skip_first = false;
+                //skip_first = false;
                 append = data_ptr;
             }
             else
@@ -789,13 +876,13 @@ CValue CompilerContext::Call(const Token& name, const std::vector<CValue>& args,
             }
         }
 
-        std::vector<CValue> argsc;
+        std::vector<FunctionArgument> argsc;
         int skip = skip_first ? 1 : 0;// if skip first, we dont pass in struct as the first argument
 		for (unsigned int i = skip; i < args.size(); i++)
         {
 		    argsc.push_back(args[i]);//try and cast to the correct type if we can
         }
-        if (append) argsc.push_back(CValue(this->root->CharPointerType, append));
+        if (append) argsc.push_back({CValue(this->root->CharPointerType, append), 0 });
 
         if (!var.val)
         {
@@ -810,6 +897,121 @@ void CompilerContext::SetDebugLocation(const Token& t)
 {
 	assert(this->function->loaded_);
 	this->root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(t.line, t.column, this->function->scope_));
+}
+
+std::string CompilerContext::GetSimilarMethod(const std::string& name)
+{
+    std::string closest; int min_distance = 8;
+
+	auto cur = this->scope;
+	CValue value(0, 0);
+	do
+	{
+        for (const auto& val: cur->named_values)
+        {
+            int dist = levenshtein_distance(val.first, name);
+            if (dist < min_distance)
+            {
+                min_distance = dist;
+                closest = val.first;
+            }
+        }
+		cur = cur->prev;
+	} while (cur);
+
+    bool namespaced = name.find_first_of(':') != std::string::npos;
+    if (namespaced)
+    {
+        // First find the top level namespace indicated by this
+        Namespace* new_ns = 0;
+		Namespace* cur_ns = root->ns;
+
+        int cur_pos = 0;
+
+        bool first = true;
+        do
+        {
+            int len = 0;
+	        while (cur_pos+len < name.length() &&
+                   (IsLetter(name[cur_pos+len]) || IsNumber(name[cur_pos + len])))
+	        {
+		        len++;
+	        }
+            if (cur_pos+len >= name.length()-1)
+            {
+                break;// stop before we hit the last bit
+            }
+
+            std::string ns = name.substr(cur_pos, len);
+
+		    // Try and find this first namespace by recursively going up
+            // If this is not the top level, only check the current namespace
+            new_ns = 0;
+		    do
+		    {
+			    auto res = cur_ns->members.find(ns);
+			    if (res != cur_ns->members.end())
+			    {
+			    	new_ns = res->second.ns;
+			    	break;
+			    }
+			    cur_ns = cur_ns->parent;
+		    }
+		    while (cur_ns && first);
+
+            first = false;
+
+            cur_ns = new_ns;
+            cur_pos += len + 2;
+        }
+        while (true);
+
+        if (!new_ns) { return closest; }
+
+        for (const auto& member: new_ns->members)
+        {
+            if (member.second.type != SymbolType::Function &&
+                member.second.type != SymbolType::Variable)
+            {
+                continue;
+            }
+
+            int dist = levenshtein_distance(member.first, name);
+            if (dist < min_distance)
+            {
+                min_distance = dist;
+                closest = member.first;
+            }
+        }
+    }
+    else
+    {
+	    //search up the namespace tree for this variable or function
+	    auto next = root->ns;
+	    do
+	    {
+            for (const auto& member: next->members)
+            {
+                if (member.second.type != SymbolType::Function &&
+                    member.second.type != SymbolType::Variable)
+                {
+                    continue;
+                }
+
+                int dist = levenshtein_distance(member.first, name);
+                if (dist < min_distance)
+                {
+                    min_distance = dist;
+                    closest = member.first;
+                }
+            }
+
+	    	next = next->parent;
+    	}
+        while (next && !namespaced);
+    }
+
+    return closest;
 }
 
 CValue CompilerContext::GetVariable(const std::string& name, bool error, bool include_functions)
@@ -932,7 +1134,7 @@ llvm::ReturnInst* CompilerContext::Return(CValue ret)
             // next, call assign
 			Function* fun = assign_iter->second;
 			fun->Load(this->root);
-			std::vector<CValue> argsv = { CValue(return_type->GetPointerType(), this->function->f_->arg_begin()), cast };
+			std::vector<FunctionArgument> argsv = { {CValue(return_type->GetPointerType(), this->function->f_->arg_begin()), 0}, {cast, 0} };
 
 			fun->Call(this, argsv, true);
         }
@@ -1040,7 +1242,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
 			llvm::ConstantInt* ty = llvm::dyn_cast<llvm::ConstantInt>(value.val);
 			if (Explicit == false && (ty == 0 || ty->getSExtValue() != 0))
 			{
-				root->Error("Cannot cast a non-zero integer value to pointer implicitly.", this->current_token);
+				root->Error("Cannot cast a non-zero integer value to pointer implicitly", this->current_token);
 			}
 
 			return CValue(t, root->builder.CreateIntToPtr(value.val, t->GetLLVMType()));
@@ -1194,9 +1396,9 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
             // first alloca and store it as the pointer
             CValue aalloca(t, 0, alloca ? alloca : this->root->builder.CreateAlloca(t->GetLLVMType(), 0, "cast"), false);
             // then call the constructor
-            std::vector<CValue> v;
-            v.push_back(aalloca);
-            v.push_back(value);
+            std::vector<FunctionArgument> v;
+            v.push_back({aalloca, 0});
+            v.push_back({value, 0});
             f.second->Call(this, v, false, true);
 
             if (!alloca)
@@ -1209,7 +1411,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
         }
     }
 
-	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'!", current_token);
+	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'", current_token);
 }
 
 //reduce redundancy by making one general version that just omits the llvm::Value from the CValue when doign a check

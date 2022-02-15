@@ -1016,6 +1016,10 @@ llvm::Constant* Type::GetDefaultValue(Compilation* compilation)
 		arr.push_back(this->base->GetDefaultValue(compilation));
 		initializer = llvm::ConstantArray::get(llvm::dyn_cast<llvm::ArrayType>(this->GetLLVMType()), arr);
 	}
+    else if (this->type == Types::Function)
+    {
+        initializer = llvm::ConstantPointerNull::get(llvm::dyn_cast<llvm::PointerType>(this->GetLLVMType()));
+    }
 	else
 	{
 		printf("Unhandled Type in Type::GetDefaultValue!\n");

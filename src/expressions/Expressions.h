@@ -78,7 +78,7 @@ namespace Jet
 
 			if (dest.is_const || !dest.pointer)
 			{
-				context->root->Error("Cannot assign to const variable '" + token.text + "'", token);
+				context->root->Error("Cannot assign to const variable '" + BOLD(token.text) + "'", token);
 			}
 
             // convert the dest to a pointer
@@ -116,7 +116,7 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, 0 };
         }
@@ -174,7 +174,7 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, 0 };
         }
@@ -184,25 +184,25 @@ namespace Jet
 	{
 
 	public:
-		Token token, type;
-		Token open_bracket, close_bracket;
-		Expression* size;
-		std::vector<std::pair<Expression*, Token>>* args;
+		Token token_, type_;
+		Token open_bracket_, close_bracket_;
+		Expression* size_;
+		std::vector<std::pair<Expression*, Token>>* args_;
 		NewExpression(Token tok, Token type, Expression* size, std::vector<std::pair<Expression*, Token>>* args = 0)
 		{
-			this->token = tok;
-			this->type = type;
-			this->args = args;
-			this->size = size;
+			token_ = tok;
+			type_ = type;
+			args_ = args;
+			size_ = size;
 		}
 
 		~NewExpression()
 		{
-			if (this->args)
+			if (args_)
 			{
-				for (auto ii : *this->args)
+				for (auto ii : *args_)
 					delete ii.first;
-				delete args;
+				delete args_;
 			}
 		}
 
@@ -212,34 +212,36 @@ namespace Jet
 
 		virtual Type* TypeCheck(CompilerContext* context)
 		{
-			auto ty = context->root->LookupType(type.text);
+			auto ty = context->root->LookupType(type_.text);
 			return ty->GetPointerType();
 		}
 
 		void Print(std::string& output, Source* source)
 		{
-			//left->Print(output, source);
-			token.Print(output, source);
-			type.Print(output, source);
+			token_.Print(output, source);
+			type_.Print(output, source);
 
-			if (this->size)
+			if (size_)
 			{
-				open_bracket.Print(output, source);// output += '['; fix this
-				size->Print(output, source);
-				close_bracket.Print(output, source);// output += ']'; fix this
+				open_bracket_.Print(output, source);
+				size_->Print(output, source);
+				close_bracket_.Print(output, source);
 			}
-			//right->Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
 		{
 			visitor->Visit(this);
+            if (size_)
+            {
+                size_->Visit(visitor);
+            }
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
-            Token* end = size ? &close_bracket : &type;
-            return { &token, end };
+            const Token* end = size_ ? &close_bracket_ : &type_;
+            return { &token_, end };
         }
 	};
 
@@ -283,7 +285,7 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, pointer->GetTokenRange().second };
         }
@@ -401,7 +403,7 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, 0 };
         }
@@ -457,7 +459,7 @@ namespace Jet
 			visitor->Visit(this);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, 0 };
         }
@@ -539,7 +541,7 @@ namespace Jet
 				left->Visit(visitor);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, &close_bracket };
         }
@@ -616,7 +618,7 @@ namespace Jet
 				length->Visit(visitor);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, &close_bracket };
         }
@@ -680,7 +682,7 @@ namespace Jet
 			right->Visit(visitor);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, 0 };
         }
@@ -738,38 +740,11 @@ namespace Jet
 			left->Visit(visitor);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, 0 };
         }
 	};
-
-	/*class SwapExpression: public Expression
-	{
-	Expression* left;
-	Expression* right;
-	public:
-	SwapExpression(Expression* l, Expression* r)
-	{
-	this->left = l;
-	this->right = r;
-	}
-
-	~SwapExpression()
-	{
-	delete this->right;
-	delete this->left;
-	}
-
-	void SetParent(Expression* parent)
-	{
-	this->Parent = parent;
-	right->SetParent(this);
-	left->SetParent(this);
-	}
-
-	void Compile(CompilerContext* context);
-	};*/
 
 	class CastExpression : public Expression//, public IStorableExpression
 	{
@@ -828,7 +803,7 @@ namespace Jet
 			right->Visit(visitor);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &begin, &end };
         }
@@ -877,7 +852,7 @@ namespace Jet
 			right->Visit(visitor);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &_operator, 0 };
         }
@@ -929,7 +904,7 @@ namespace Jet
 			left->Visit(visitor);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &_operator, 0 };
         }
@@ -1005,9 +980,10 @@ namespace Jet
 			right->Visit(visitor);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
-            return { &_operator, 0 };
+            auto last = right->GetTokenRange();
+            return { left->GetTokenRange().first, last.second ? last.second : last.first };
         }
 	};
 
@@ -1121,7 +1097,7 @@ namespace Jet
 				ii->Visit(visitor);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &start, &end };
         }
@@ -1289,7 +1265,7 @@ namespace Jet
 			return context->root->IntType;
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, &end };
         }
@@ -1336,7 +1312,7 @@ namespace Jet
 			return context->root->IntType;
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &token, &end };
         }
@@ -1389,7 +1365,7 @@ namespace Jet
 			return this->expr->TypeCheck(context);
 		}
 
-        std::pair<const Token*, const Token*> GetTokenRange() override
+        std::pair<const Token*, const Token*> GetTokenRange() const override
         {
             return { &begin, &end };
         }
