@@ -1010,6 +1010,11 @@ CValue FreeExpression::Compile(CompilerContext* context)
 		pointer = CValue(pointer.type->base->GetPointerType(), ptr);
 	}
 
+    if (!pointer.val)
+    {
+        pointer.val = context->root->builder.CreateLoad(pointer.pointer);
+    }
+
 	//get to the root of the pointer (remove the offset for the size)
 	llvm::Value* charptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
 	llvm::Value* rootptr = context->root->builder.CreateGEP(charptr, { context->root->builder.getInt32(-4) });// todo make this smarter about 64 bit
@@ -1017,7 +1022,7 @@ CValue FreeExpression::Compile(CompilerContext* context)
 	//run destructors
 	if (pointer.type->base->type == Types::Struct)
 	{
-		Type* ty = pointer.type->base;
+		/*Type* ty = pointer.type->base;
 		Function* fun = 0;
 		if (ty->data->template_base)
 		{
@@ -1026,23 +1031,25 @@ CValue FreeExpression::Compile(CompilerContext* context)
 		else
 		{
 			fun = ty->GetMethod("~" + ty->data->name, { pointer.type }, context);
-		}
+		}*/
 
-		if (fun)
+		if (true)//fun)
 		{
-			fun->Load(context->root);
+			//fun->Load(context->root);
 			if (false)//this->close_bracket.text.length() == 0)//size == 0)
 			{//just one element, destruct it
-				rootptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
+				//rootptr = context->root->builder.CreatePointerCast(pointer.val, context->root->builder.getInt8PtrTy());
 
-				context->root->builder.CreateCall(fun->f_, { pointer.val });
+				//context->root->builder.CreateCall(fun->f_, { pointer.val });
 			}
 			else
 			{
 				auto arr_size = context->root->builder.CreateLoad(context->root->builder.CreatePointerCast(rootptr, context->root->IntType->GetPointerType()->GetLLVMType()));
 
+                context->Destruct(CValue(pointer.type->base, 0, pointer.val), arr_size);
+
 				//destruct each child element
-				llvm::Value* counter = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType(), 0, "newcounter");
+				/*llvm::Value* counter = context->root->builder.CreateAlloca(context->root->IntType->GetLLVMType(), 0, "newcounter");
 				context->root->builder.CreateStore(context->Integer(0).val, counter);
 
                 auto f = context->root->current_function->function->f_;
@@ -1066,7 +1073,7 @@ CValue FreeExpression::Compile(CompilerContext* context)
 
 				context->root->builder.CreateBr(start);
 
-				context->root->builder.SetInsertPoint(end);
+				context->root->builder.SetInsertPoint(end);*/
 			}
 		}
 	}

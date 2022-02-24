@@ -491,20 +491,11 @@ Symbol CompilerContext::GetMethod(
 			{
 				type->Load(this->root);
 				//look for a constructor
-				//if we are template, remove the templated part
-				auto tmp_name = name;
-				if (name.back() == '>')
-					tmp_name = name.substr(0, name.find_first_of('<'));
-				auto range = type->data->functions.equal_range(tmp_name);
-				for (auto ii = range.first; ii != range.second; ii++)
-				{
-					if (ii->second->arguments_.size() == args.size() + 1)
-						fun = ii->second;
-				}
-				if (fun)
+				auto iter = type->data->functions.find("new");
+				if (iter != type->data->functions.end())
 				{
                     is_constructor = true;
-					return fun;
+					return iter->second;
 				}
 			}
 		}
@@ -594,16 +585,18 @@ Symbol CompilerContext::GetMethod(
 					this->root->Error("Could not infer template type", this->current_token);
 			}
 
-			auto oldname = fun->expression_->name.text;
-			fun->expression_->name.text += '<';
+            auto& fun_name = fun->expression_->data_.signature.name.text;
+
+			const auto oldname = fun_name;
+			fun_name += '<';
 			for (unsigned int i = 0; i < fun->templates_.size(); i++)
 			{
-				fun->expression_->name.text += templates[i]->ToString();
+				fun_name += templates[i]->ToString();
 				if (i + 1 < fun->templates_.size())
-					fun->expression_->name.text += ',';
+					fun_name += ',';
 			}
-			fun->expression_->name.text += '>';
-			auto rname = fun->expression_->name.text;
+			fun_name += '>';
+			auto rname = fun_name;
 
 			//register the types
 			int i = 0;
@@ -628,7 +621,7 @@ Symbol CompilerContext::GetMethod(
 			if (rp)
 				root->builder.SetInsertPoint(rp);
 
-			fun->expression_->name.text = oldname;
+			fun_name = oldname;
 
 			//time to recompile and stuff
 			return root->ns->members.find(rname)->second.fn;
@@ -952,6 +945,17 @@ std::string CompilerContext::GetSimilarMethod(const std::string& name)
 			    auto res = cur_ns->members.find(ns);
 			    if (res != cur_ns->members.end())
 			    {
+                    // handle structs
+                    if (res->second.type == SymbolType::Type)
+                    {
+                        Type* t = res->second.ty;
+                        if (t->type == Types::Struct)
+                        {
+                            new_ns = t->data;
+                        }
+                        break;
+                    }
+
 			    	new_ns = res->second.ns;
 			    	break;
 			    }
@@ -1698,9 +1702,9 @@ void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
 		Type* ty = pointer.type->base;
 		Function* fun = 0;
 		if (ty->data->template_base)
-			fun = ty->GetMethod(ty->data->template_base->name, { pointer.type }, this);
+			fun = ty->GetMethod("new", { pointer.type }, this);
 		else
-			fun = ty->GetMethod(ty->data->name, { pointer.type }, this);
+			fun = ty->GetMethod("new", { pointer.type }, this);
 		if (fun == 0)
 			return;//todo: is this right behavior?
 		fun->Load(this->root);
@@ -1746,6 +1750,29 @@ void CompilerContext::Construct(CValue pointer, llvm::Value* arr_size)
 	}
 }
 
+void CompilerContext::SetNamespace(const std::string& name)
+{
+	auto res = this->root->ns->members.find(name);
+	if (res != this->root->ns->members.end())
+	{
+        if (res->second.type == SymbolType::Type && res->second.ty->type == Types::Struct)
+        {
+            this->root->ns = res->second.ty->data;
+        }
+        else
+        {
+            this->root->ns = res->second.ns;
+        }
+		return;
+	}
+
+	//create new one
+	auto ns = new Namespace(name, this->root->ns);
+
+	this->root->ns->members.insert({ name, Symbol(ns) });
+	this->root->ns = ns;
+}
+
 void CompilerContext::DestructLater(CValue data)
 {
     this->to_destruct.push_back(data);
@@ -1759,9 +1786,9 @@ void CompilerContext::Destruct(CValue reference, llvm::Value* arr_size)
 		Type* ty = reference.type;
 		Function* fun = 0;
 		if (ty->data->template_base)
-			fun = ty->GetMethod("~" + ty->data->template_base->name, { ty->GetPointerType() }, this);
+			fun = ty->GetMethod("free", { ty->GetPointerType() }, this);
 		else
-			fun = ty->GetMethod("~" + ty->data->name, { ty->GetPointerType() }, this);
+			fun = ty->GetMethod("free", { ty->GetPointerType() }, this);
 		if (fun == 0)
 			return;
 		fun->Load(this->root);

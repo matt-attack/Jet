@@ -195,23 +195,38 @@ namespace Jet
         }
 	};
 
-	struct ExternArg
-	{
-		Token type, name, comma;
-	};
 	class ExternExpression : public Expression
 	{
         friend class Function;
         friend class FunctionType;
-		Token name, type;
-		std::string Struct;
-		std::vector<ExternArg>* args;
-		Token token;
-		Token ret_type;
-		Token open_bracket, close_bracket;
+		Token token_, type_;
+		//std::string Struct;
+		//std::vector<ExternArg>* args;
+		//Token name;
+		//Token ret_type;
+		//Token open_bracket, close_bracket;
+
+        std::string namespace_;
+        FunctionSignatureData signature_;
+
 	public:
 
-		ExternExpression(Token token, Token type, Token name, std::string ns = "")
+        ExternExpression(Token token, Token type, FunctionSignatureData& data)
+        {
+            token_ = token;
+            type_ = type;
+            signature_ = data;
+        }
+
+        ExternExpression(Token token, Token type, Token name, std::string ns)
+        {
+            token_ = token;
+            type_ = type;
+            signature_.name = name;
+            namespace_ = ns;
+        }
+
+		/*ExternExpression(Token token, Token type, Token name, std::string ns = "")
 		{
 			this->type = type;
 			this->name = name;
@@ -230,12 +245,12 @@ namespace Jet
 			this->token = token;
 			this->ret_type = ret_type;
 			this->Struct = str;
-		}
+		}*/
 
 		~ExternExpression()
 		{
-            if (args)
-			    delete args;
+            if (signature_.arguments)
+			    delete signature_.arguments;
 		}
 
 		void SetParent(Expression* parent)
@@ -254,33 +269,33 @@ namespace Jet
 
 		void Print(std::string& output, Source* source)
 		{
-			token.Print(output, source);
+			token_.Print(output, source);
 
-            if (type.type == TokenType::Name)
+			type_.Print(output, source);
+
+            // its just an extern variable
+            if (type_.type == TokenType::Name)
             {
-                type.Print(output, source);
-
-                name.Print(output, source);
+                signature_.name.Print(output, source);
 
                 return;
             }
 
-			type.Print(output, source);// output += " fun"; fixme
-			ret_type.Print(output, source);
+            // its an extern function
+			signature_.return_type.Print(output, source);
 
-			name.Print(output, source);
+			signature_.name.Print(output, source);
 
-			open_bracket.Print(output, source);// output += "(";
+			signature_.open_paren.Print(output, source);
 			int i = 0;
-			for (auto ii : *this->args)
+			for (auto ii : *signature_.arguments)
 			{
 				ii.type.Print(output, source);
 				ii.name.Print(output, source);
 				if (ii.comma.text.length())
 					ii.comma.Print(output, source);
 			}
-			close_bracket.Print(output, source);
-			//output += ")";
+			signature_.close_paren.Print(output, source);
 		}
 
 		virtual void Visit(ExpressionVisitor* visitor)
@@ -290,7 +305,7 @@ namespace Jet
 
         std::pair<const Token*, const Token*> GetTokenRange() const override
         {
-            return { &token, &close_bracket };
+            return { &token_, &signature_.close_paren };
         }
 	};
 

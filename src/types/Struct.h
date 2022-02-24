@@ -23,8 +23,8 @@ namespace Jet
 	{
 		bool valid;
 
-		std::multimap<std::string, Function*> functions;
-		std::multimap<std::string, Function*> extension_methods;
+		std::map<std::string, Function*> functions;
+		std::map<std::string, Function*> extension_methods;
 
 		//template stuff
 		std::vector<std::pair<Type*, std::string>> templates;
@@ -47,7 +47,6 @@ namespace Jet
 		};
 		std::vector<StructMember> struct_members;//member variables
 		std::map<std::string, Function*> functions;//member functions
-        std::vector<Function*> constructors;//constructors
 
 		bool loaded;
 

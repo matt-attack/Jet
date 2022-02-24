@@ -11,7 +11,43 @@ namespace Jet
 	{
 		Token type, name, comma;
 	};
+
+    struct FunctionSignatureData
+    {
+        Token name;
+        Token colons;
+        Token struct_name;
+        Token return_type;
+        Token open_paren, close_paren;
+        std::vector<FunctionArg>* arguments = 0;
+        Token operator_token;
+
+        std::vector<std::pair<Token, Token>>* templates = 0;
+    };
+
     class ScopeExpression;
+    struct FunctionParsedData
+    {
+        Token token;
+        //Token name;
+        //Token return_type;
+
+        FunctionSignatureData signature;
+
+        bool is_generator;
+        bool is_static;
+        //std::vector<FunctionArg>* arguments = 0;
+        ScopeExpression* block = 0;
+        //Token Struct;
+        Token colons;
+        std::vector<Token>* captures = 0;
+
+        //std::vector<std::pair<Token, Token>>* templates = 0;
+        //Token open_bracket, close_bracket;
+        //Token operator_tok;
+        Token constant_token;
+    };
+
     class Function;
     class CompilerContext;
     class ExpressionVisitor;
@@ -28,7 +64,7 @@ namespace Jet
         friend struct FunctionType;
 		friend struct Struct;
 
-		Token name;
+		/*Token name;
 		std::vector<FunctionArg>* args;
 		std::vector<Token>* captures;
 		ScopeExpression* block;
@@ -43,17 +79,24 @@ namespace Jet
 		bool is_generator;
 		std::vector<std::pair<Token, Token>>* templates;
 		Token open_bracket, close_bracket;
-		Token oper;
+		Token oper;*/
+
+        FunctionParsedData data_;
 
 		Function* myself;
 	public:
 
 		ScopeExpression* GetBlock()
 		{
-			return block;
+			return data_.block;
 		}
 
-		FunctionExpression(Token token, Token name, Token ret_type, bool generator, std::vector<FunctionArg>* args, ScopeExpression* block, /*NameExpression* varargs = 0,*/ Token Struct, Token colons, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures, Token open_bracket, Token close_bracket, Token oper, Token const_tok)
+        FunctionExpression(const FunctionParsedData& data)
+        {
+            data_ = data;
+        }
+
+		/*FunctionExpression(Token token, Token name, Token ret_type, bool generator, std::vector<FunctionArg>* args, ScopeExpression* block, Token Struct, Token colons, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures, Token open_bracket, Token close_bracket, Token oper, Token const_tok)
 		{
 			this->oper = oper;
 			this->open_bracket = open_bracket;
@@ -70,7 +113,7 @@ namespace Jet
 			this->captures = captures;
 			this->colons = colons;
             this->const_tok = const_tok;
-		}
+		}*/
 
 		~FunctionExpression();
 
@@ -78,7 +121,7 @@ namespace Jet
 
 		const std::string& GetName()
 		{
-			return this->name.text;
+			return data_.signature.name.text;
 		}
 
 		void SetParent(Expression* parent);
@@ -96,7 +139,7 @@ namespace Jet
 
         std::pair<const Token*, const Token*> GetTokenRange() const override
         {
-            return { &token, 0 };
+            return { &data_.token, 0 };
         }
 	};
 

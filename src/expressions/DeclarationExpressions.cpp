@@ -66,39 +66,37 @@ CValue ExternExpression::Compile(CompilerContext* context)
 
 void ExternExpression::CompileDeclarations(CompilerContext* context)
 {
-    context->CurrentToken(&type);
-    if (type.type == TokenType::Name)
+    context->CurrentToken(&type_);
+    if (type_.type == TokenType::Name)
     {
         // its a global variable
-        // todo, what do I do?
-
         bool is_const = false;
 
-		auto var_type = context->root->LookupType(type.text);
+		auto var_type = context->root->LookupType(type_.text);
 
-		if (type.text.back() == ']')
+		if (type_.text.back() == ']')
 		{
-			std::string len = type.text;
+			std::string len = type_.text;
 			len = len.substr(len.find_first_of('[') + 1);
 		    if (is_const && len.c_str())
 		    {
-			    context->root->Error("Cannot declare a const global array variable.", token);
+			    context->root->Error("Cannot declare a const global array variable.", token_);
 		    }
 
-			context->root->AddGlobal(name.text, var_type->base, std::atoi(len.c_str()), 0, false, is_const);
+			context->root->AddGlobal(signature_.name.text, var_type->base, std::atoi(len.c_str()), 0, false, is_const);
 		}
 		else
 		{
-			context->root->AddGlobal(name.text, var_type, 0, 0, false, is_const);
+			context->root->AddGlobal(signature_.name.text, var_type, 0, 0, false, is_const);
 		}
 
         return;
     }
 
-	std::string fname = name.text;
+	std::string fname = signature_.name.text;
 
 	// todo come up with a better way to handle c externs
-	bool is_c = (token.text == "extern_c");
+	bool is_c = (token_.text == "extern_c");
 
 	Function* fun = new Function(fname, false, is_c, true);
     fun->extern_expression_ = this;
@@ -112,15 +110,15 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		else if (attr->name.text == "fastcall")
 			fun->calling_convention_ = CallingConvention::FastCall;
 	}
-	context->root->AdvanceTypeLookup(&fun->return_type_, this->ret_type.text, &this->ret_type);
+	context->root->AdvanceTypeLookup(&fun->return_type_, signature_.return_type.text, &signature_.return_type);
 
 	// Reserve space for the arguments + this if we apply to a struct
-	fun->arguments_.reserve(this->args->size() + (Struct.length() > 0 ? 1 : 0));
+	fun->arguments_.reserve(signature_.arguments->size() + (signature_.struct_name.text.length() > 0 ? 1 : 0));
 
-	if (Struct.length() > 0)
+	if (signature_.struct_name.text.length() > 0)
 	{
 		// todo this seems wrong
-        std::string struct_prefix = Struct;
+        std::string struct_prefix = signature_.struct_name.text;
         // replace :: with __
         for (int i = 0; i < struct_prefix.size(); i++) {
             if (struct_prefix[i] == ':') struct_prefix[i] = '_';
@@ -128,10 +126,10 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		fun->name_ = "__" + struct_prefix + "_" + fname;//mangled name
 
 		//add to struct
-		auto ii = context->root->TryLookupType(Struct);
+		auto ii = context->root->TryLookupType(signature_.struct_name.text);
 		if (ii == 0)//its new
 		{
-			context->root->Error("Tried to declare an extern member function for an undeclared struct!", token);
+			context->root->Error("Tried to declare an extern member function for an undeclared struct!", token_);
 			//str = new Type;
 			//context->root->types[this->name] = str;
 		}
@@ -139,7 +137,7 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 		{
 			if (ii->type != Types::Struct)
             {
-				context->root->Error("Cannot define an extern function for a type that is not a struct", token);
+				context->root->Error("Cannot define an extern function for a type that is not a struct", token_);
             }
 
 			ii->data->functions.insert({ fname, fun });
@@ -153,10 +151,10 @@ void ExternExpression::CompileDeclarations(CompilerContext* context)
 	}
 
 	//look up arg types
-	for (auto ii : *this->args)
+	for (auto ii : *signature_.arguments)
 	{
 		fun->arguments_.push_back({ 0, ii.name.text });
-		context->root->AdvanceTypeLookup(&fun->arguments_.back().first, ii.type.text, &this->token);
+		context->root->AdvanceTypeLookup(&fun->arguments_.back().first, ii.type.text, &token_);
 	}
 }
 

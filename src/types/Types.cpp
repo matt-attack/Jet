@@ -919,8 +919,8 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 			auto dp = context->root->builder.getCurrentDebugLocation();
 
 			//compile function
-			auto oldn = exp->Struct.text;
-			exp->Struct.text = this->name;
+			auto oldn = exp->data_.signature.struct_name.text;
+			exp->data_.signature.struct_name.text = this->name;
 			int i = 0;
 			for (auto ii : tr.second->templates)
 				context->root->ns->members.insert({ ii.second, tr.first[i++] });
@@ -931,7 +931,7 @@ Function* Type::GetMethod(const std::string& name, const std::vector<Type*>& arg
 			context->root->ns->members.erase(context->root->ns->members.find(tr.second->name));
 
 			context->root->ns = context->root->ns->parent;
-			exp->Struct.text = oldn;
+			exp->data_.signature.struct_name.text = oldn;
 
 			context->root->builder.SetCurrentDebugLocation(dp);
 			context->root->builder.SetInsertPoint(rp);

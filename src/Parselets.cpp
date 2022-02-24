@@ -577,7 +577,9 @@ Expression* StructParselet::parse(Parser* parser, Token token)
 		}
 
 		//first read type
-		if (parser->LookAhead().type == TokenType::Function || parser->LookAhead().type == TokenType::Virtual)
+		if (parser->LookAhead().type == TokenType::Function || 
+            parser->LookAhead().type == TokenType::Virtual ||
+            parser->LookAhead().type == TokenType::Static)
 		{
 			//parse the function
 			auto* expr = parser->ParseStatement(true);
@@ -721,89 +723,112 @@ bool IsValidFunctionNameToken(TokenType op)
 		return true;
     else if (op == TokenType::LeftParen)
         return true;
+    // todo remove support for this
+    else if (op == TokenType::New)
+        return true;
+    else if (op == TokenType::Free)
+        return true;
 
 	return false;
 }
-//maybe add a way to make non - nullable non - freeable pointers
-//add superconst to represent const int* const x;
-//still gotta solve operator problem with passing operands as pointers
-Expression* FunctionParselet::parse(Parser* parser, Token token)
+
+void ParseSignature(Parser* parser, FunctionSignatureData& out, bool parse_templates, bool parse_namespaces = false)
 {
-	//read in type
-	Token ret_type = ::ParseType(parser);
-	
-	//todo fix this not allowing binary not operator
-	Token name;
-	if (parser->Match(TokenType::BNot))
+    out.return_type = ::ParseType(parser);
+
+    //out.name = parser->Match(TokenType::Name);
+
+	out.name = parser->Consume();
+	if (out.name.type == TokenType::Free)
 	{
-		Token t = parser->Consume();
-		Token rname = parser->Consume(TokenType::Name);
-		if (rname.trivia_length > 0)
-			parser->Error("Cannot have whitespace between ~ and the classname in destructors", rname);
-		name = rname;
-		name.text = "~" + rname.text;
-		name.text_ptr -= 1;
-		name.trivia_length = t.trivia_length;
+		out.name.type = TokenType::Name;// a bit of a hack
 	}
-	else
+	else if (out.name.type != TokenType::Name)
 	{
-		name = parser->Consume(TokenType::Name);
+		std::string str = "Token Not As Expected! Expected: " + TokenToString[TokenType::Name] + " Got: " + out.name.text;
+
+		//it was probably forgotten, insert dummy
+		//fabricate a fake token
+		parser->Error(str, out.name);//need to make this throw again
+
+		//if (name.type != TokenType::Semicolon)
+		throw 7;
 	}
 
-	auto arguments = new std::vector < FunctionArg > ;
-
-	Token stru, colons;
 	if (parser->Match(TokenType::Scope))
 	{
 		//its a extension method definition
-		colons = parser->Consume();
-		stru = name;
-		name = parser->Consume(TokenType::Name);//parse the real function name
+        if (parse_namespaces)
+        {
+            // read namespaces
+            std::string stru;
+            while (parser->MatchAndConsume(TokenType::Scope))
+            {
+                if (!stru.length()) stru = out.name.text;
+                if (parser->LookAhead(1).type == TokenType::Scope)
+                {
+                    stru += "::"; 
+                    stru += parser->Consume(TokenType::Name).text;
+                }
+            }
+            if (stru.length())
+            {
+                out.struct_name.type = TokenType::Name;
+                out.struct_name.text = stru;
+                out.name = parser->Consume(TokenType::Name);
+            }
+        }
+        else
+        {
+		    out.colons = parser->Consume();
+		    out.struct_name = out.name;
+		    out.name = parser->Consume(TokenType::Name);//parse the real function name
+        }
 	}
 
-	Token oper;
-	if (name.text == "operator")
+	out.arguments = new std::vector < FunctionArg > ;
+
+    // handle operators
+	if (out.name.text == "operator")
 	{
 		//parse in the operator
-		oper = name;
-		name = parser->Consume();
-		if (name.type == TokenType::LeftBracket)
+		out.operator_token = out.name;
+		out.name = parser->Consume();
+		if (out.name.type == TokenType::LeftBracket)
 		{
 			auto name2 = parser->Consume(TokenType::RightBracket);
-			name.text += ']';
+			out.name.text += ']';
 		}
-        else if (name.type == TokenType::LeftParen)
+        else if (out.name.type == TokenType::LeftParen)
         {
             auto name2 = parser->Consume(TokenType::RightParen);
-            name.text += ')';
+            out.name.text += ')';
         }
 	}
 
 	//check that the name is ok
-	if (stru.text.length() && stru.type != TokenType::Name)
-		parser->Error("Invalid struct name", stru);
-	else if (!IsValidFunctionNameToken(name.type))
-		parser->Error("Not a valid operator overload", name);
-
+	if (out.struct_name.text.length() && out.struct_name.type != TokenType::Name)
+		parser->Error("Invalid struct name", out.struct_name);
+	else if (!IsValidFunctionNameToken(out.name.type))
+		parser->Error("Not a valid operator overload", out.name);
 
 	//look for templates
-	std::vector<std::pair<Token, Token>>* templated = 0;
-	if (parser->MatchAndConsume(TokenType::LessThan))
+	if (parse_templates && parser->MatchAndConsume(TokenType::LessThan))
 	{
-		templated = new std::vector < std::pair<Token, Token> > ;
+		out.templates = new std::vector < std::pair<Token, Token> > ;
 		//parse types and stuff
 		do
 		{
 			Token ttname = ParseTrait(parser);
 			Token tname = parser->Consume(TokenType::Name);
 
-			templated->push_back({ ttname, tname });
+			out.templates->push_back({ ttname, tname });
 		} while (parser->MatchAndConsume(TokenType::Comma));
 		parser->Consume(TokenType::GreaterThan);
 	}
 
-	NameExpression* varargs = 0;
-	Token ob = parser->Consume(TokenType::LeftParen);
+    // Now parse arguments
+	out.open_paren = parser->Consume(TokenType::LeftParen);
 
 	if (!parser->Match(TokenType::RightParen))
 	{
@@ -816,9 +841,9 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 			if (name.type == TokenType::Name)
 			{
 				if (comma.type == TokenType::Comma)
-					arguments->push_back({ type, name, comma });
+					out.arguments->push_back({ type, name, comma });
 				else
-					arguments->push_back({ type, name, Token() });
+					out.arguments->push_back({ type, name, Token() });
 			}
 			else
 			{
@@ -827,43 +852,71 @@ Expression* FunctionParselet::parse(Parser* parser, Token token)
 			}
 		} while (parser->MatchAndConsume(TokenType::Comma));
 	}
-	Token cb = parser->Consume(TokenType::RightParen);
-
-    Token const_tok;
-    if (parser->Match(TokenType::Const))
-    {
-        const_tok = parser->Consume(TokenType::Const);
-    }
+	out.close_paren = parser->Consume(TokenType::RightParen);
 
 	//check that there are a proper number of arguments if this is a operator overload
-	if (name.type != TokenType::Name)
+	if (out.name.type != TokenType::Name)
 	{
 		//todo: fix unary minus
-		if ((name.type == TokenType::Decrement
-			|| name.type == TokenType::Increment
-			|| name.type == TokenType::BNot
-			/*|| name.type == TokenType::Minus*/) && arguments->size() != 0)
+		if ((out.name.type == TokenType::Decrement
+			|| out.name.type == TokenType::Increment
+			|| out.name.type == TokenType::BNot
+            || out.name.type == TokenType::Free
+            || out.name.type == TokenType::New
+			/*|| name.type == TokenType::Minus*/))
 		{
 			//todo put more unary ops here
-			parser->Error("Wrong number of arguments for operator overload '" + name.text + "' expected 0 got " + std::to_string(arguments->size()), (*arguments)[arguments->size() - 1].name);
+            if (out.arguments->size() != 0)
+            {
+			    parser->Error("Wrong number of arguments for operator overload '" + out.name.text + "' expected 0 got " + std::to_string(out.arguments->size()), out.name);
+            }
 		}
-		else if (name.text == "[]" && arguments->size() != 1 && arguments->size() != 0)//.type == TokenType::DoubleBracket)//[] operator
-		{
-			parser->Error("Wrong number of arguments for operator overload '" + name.text + "' expected 1 or 0 got " + std::to_string(arguments->size()), (*arguments)[arguments->size() - 1].name);
-		}
-		else if (arguments->size() != 1)
+		else if (out.arguments->size() != 1)
 		{
 			//binary ops
-			parser->Error("Wrong number of arguments for operator overload '" + name.text + "' expected 1 got " + std::to_string(arguments->size()), (*arguments)[arguments->size() - 1].name);
+			parser->Error("Wrong number of arguments for operator overload '" + out.name.text + "' expected 1 got " + std::to_string(out.arguments->size()), out.name);
 		}
 	}
+}
 
-	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, name, ret_type, token.type == TokenType::Generator, arguments, block, /*varargs,*/ stru, colons, templated, 0, ob, cb, oper, const_tok);
+
+
+Expression* StaticParselet::parse(Parser* parser, Token token)
+{
+    FunctionParsedData data;
+    data.token = parser->Consume(TokenType::Function);
+
+    ParseSignature(parser, data.signature, true, false);
+
+	data.block = new ScopeExpression(parser->ParseBlock());
+    data.is_generator = false;
+    data.is_static = true;
+    return new FunctionExpression(data);
+}
+
+//maybe add a way to make non - nullable non - freeable pointers
+//add superconst to represent const int* const x;
+//still gotta solve operator problem with passing operands as pointers
+Expression* FunctionParselet::parse(Parser* parser, Token token)
+{
+    FunctionParsedData data;
+    data.token = token;
+    ParseSignature(parser, data.signature, true, false);
+
+    if (parser->Match(TokenType::Const))
+    {
+        data.constant_token = parser->Consume(TokenType::Const);
+    }
+
+	data.block = new ScopeExpression(parser->ParseBlock());
+    data.is_generator = data.token.type == TokenType::Generator;
+    data.is_static = false;
+	return new FunctionExpression(data);
 }
 
 Expression* ExternParselet::parse(Parser* parser, Token token)
 {
+    // Handle extern variables
     if (parser->LookAhead().type == TokenType::Name)
     {
         auto type = ::ParseType(parser);
@@ -889,107 +942,13 @@ Expression* ExternParselet::parse(Parser* parser, Token token)
 	    return new ExternExpression(token, type, name, ns);
     }
 
+    // The rest is for extern functions
 	auto fun = parser->Consume(TokenType::Function);
 
-	Token ret_type = ::ParseType(parser);
+    FunctionSignatureData data;
+    ParseSignature(parser, data, false, true);
 
-	Token name = parser->Consume();
-	if (name.type == TokenType::Free)
-	{
-		name.type = TokenType::Name;// a bit of a hack
-	}
-	else if (name.type != TokenType::Name)
-	{
-		std::string str = "Token Not As Expected! Expected: " + TokenToString[TokenType::Name] + " Got: " + name.text;
-
-		//it was probably forgotten, insert dummy
-		//fabricate a fake token
-		parser->Error(str, name);//need to make this throw again
-
-		//if (name.type != TokenType::Semicolon)
-		throw 7;
-	}
-	auto arguments = new std::vector < ExternArg > ;
-
-    // read namespaces
-    std::string stru;
-    while (parser->MatchAndConsume(TokenType::Scope))
-    {
-        if (!stru.length()) stru = name.text;
-        if (parser->LookAhead(1).type == TokenType::Scope)
-        {
-            stru += "::"; 
-            stru += parser->Consume(TokenType::Name).text;
-        }
-    }
-
-    if (stru.length())
-    {
-		bool destructor = parser->MatchAndConsume(TokenType::BNot);
-
-		name = parser->Consume();
-
-		Token oper;
-		if (name.text == "operator")
-		{
-			//parse in the operator
-			oper = name;
-			name = parser->Consume();
-			if (name.type == TokenType::LeftBracket)
-			{
-				auto name2 = parser->Consume(TokenType::RightBracket);
-				name.text += ']';
-			}
-		}
-
-		//check that the name is ok
-		//if (stru.text.length() && stru.type != TokenType::Name)
-		//	parser->Error("Invalid struct name", stru);
-		/*else*/ if (!IsValidFunctionNameToken(name.type))
-			parser->Error("Not a valid operator overload", name);
-		if (destructor)
-			name.text = "~" + name.text;
-	}
-
-	NameExpression* varargs = 0;
-	auto ob = parser->Consume(TokenType::LeftParen);
-
-	Token cb;
-	if (!parser->Match(TokenType::RightParen))
-	{
-		do
-		{
-			Token type = ::ParseType(parser);
-			Token name = parser->Consume(TokenType::Name);
-			if (name.type == TokenType::Name)
-			{
-				auto comma = parser->LookAhead();
-				if (comma.type == TokenType::Comma)
-					arguments->push_back({ type, name, comma });
-				else
-					arguments->push_back({ type, name, Token() });
-			}
-			/*else if (name.type == TokenType::Ellipses)
-			{
-			varargs = new NameExpression(parser->Consume(TokenType::Name).getText());
-
-			break;//this is end of parsing arguments
-			}*/
-			else
-			{
-				std::string str = "Token not as expected! Expected name or got: " + name.text;
-				parser->Error(str, name);
-			}
-		} while (parser->MatchAndConsume(TokenType::Comma));
-
-		cb = parser->Consume(TokenType::RightParen);
-	}
-	else
-	{
-		cb = parser->Consume();
-	}
-
-	return new ExternExpression(token, fun, name, ret_type, ob, arguments, cb, stru);
+	return new ExternExpression(token, fun, data);
 }
 
 
@@ -1077,8 +1036,16 @@ Expression* LambdaAndAttributeParselet::parse(Parser* parser, Token token)
 	if (parser->MatchAndConsume(TokenType::Pointy))
 		ret_type = ::ParseType(parser);
 
-	auto block = new ScopeExpression(parser->ParseBlock());
-	return new FunctionExpression(token, Token(), ret_type, false, arguments, block, Token(), Token(), 0, captures, ob, cb, Token(), Token());
+    FunctionParsedData data;
+    data.block = new ScopeExpression(parser->ParseBlock());
+    data.signature.return_type = ret_type;
+    data.token = token;
+    data.is_generator = false;
+    data.signature.arguments = arguments;
+    data.captures = captures;
+    data.signature.open_paren = ob;
+    data.signature.close_paren = cb;
+	return new FunctionExpression(data);
 }
 
 Expression* CallParselet::parse(Parser* parser, Expression* left, Token token)
@@ -1268,9 +1235,9 @@ Expression* MemberParselet::parse(Parser* parser, Expression* left, Token token)
 	UniquePtr<NameExpression*> name = dynamic_cast<NameExpression*>(member);
 	if (name == 0)
 	{
-		delete member; delete left;
+		delete member;
 		parser->Error("Cannot access member name that is not a string", token);
-		return 0;
+		return new IndexExpression(left, Token(), token);
 	}
 
 	return new IndexExpression(left, name->token, token);
@@ -1283,9 +1250,9 @@ Expression* PointerMemberParselet::parse(Parser* parser, Expression* left, Token
 	UniquePtr<NameExpression*> name = dynamic_cast<NameExpression*>(member);
 	if (name == 0)
 	{
-		delete member; delete left;
+		delete member;
 		parser->Error("Cannot access member name that is not a string", token);
-		return 0;
+		return new IndexExpression(left, Token(), token);
 	}
 
 	return new IndexExpression(left, name->token, token);
@@ -1373,6 +1340,13 @@ Expression* NewParselet::parse(Parser* parser, Token token)
 	Token type;
 	if (parser->LookAhead().type == TokenType::Name && parser->LookAhead(1).type == TokenType::LeftParen)
 		type = parser->Consume();//struct constructors
+    else if (parser->LookAhead().type == TokenType::LeftParen)// todo this probably isnt perfect
+    {
+        // this is actually a call to new, hack it into a name expression
+        Token name = token;
+        name.type = TokenType::Name;
+        return new NameExpression(name, false);
+    }
 	else
 		type = ::ParseType(parser, false);
 
@@ -1396,7 +1370,7 @@ Expression* NewParselet::parse(Parser* parser, Token token)
 		parser->Consume();
 
 		UniquePtr<std::vector<std::pair<Expression*, Token>>*> arguments = new std::vector < std::pair<Expression*, Token> >;
-		if (!parser->Match(TokenType::RightParen))
+		if (!parser->MatchAndConsume(TokenType::RightParen))
 		{
 			do
 			{

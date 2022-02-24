@@ -108,6 +108,8 @@ CValue StructExpression::Compile(CompilerContext* context)
 		return CValue(context->root->VoidType, 0);
 	}
 
+	context->SetNamespace(name.text);
+
 	//compile function members
 	for (auto ii : this->members)
 	{
@@ -117,6 +119,8 @@ CValue StructExpression::Compile(CompilerContext* context)
 
 	//add any missing constructors
 	this->AddConstructors(context);
+
+    context->PopNamespace();
 
 	return CValue(context->root->VoidType, 0);
 }
@@ -145,7 +149,7 @@ void StructExpression::AddConstructorDeclarations(Type* str, CompilerContext* co
 	bool has_virtual = false;
 	for (auto ii : this->members)
 	{
-		if (ii.type == StructMember::FunctionMember && ii.function->token.type == TokenType::Virtual)
+		if (ii.type == StructMember::FunctionMember && ii.function->data_.token.type == TokenType::Virtual)
 		{
 			has_virtual = true;
 			break;
@@ -463,7 +467,7 @@ void StructExpression::AddConstructors(CompilerContext* context)
 			context->root->builder.SetInsertPoint(&bb);
 
             // Making sure to set debug info correctly first
-            const auto& token = ii.second->expression_->token;
+            const auto& token = ii.second->expression_->data_.token;
             context->root->builder.SetCurrentDebugLocation(llvm::DebugLoc::get(token.line, token.column, ii.second->scope_));
 
 			int i = 0;
@@ -543,7 +547,7 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 			str->data->templates.push_back({ 0, ii.name.text });
 			context->root->AdvanceTypeLookup(&str->data->templates.back().first, ii.type.text, &ii.type);
 
-			context->root->AdvanceTypeLookup(&str->data->members.insert({ ii.name.text, Symbol((Type*)0) })->second.ty, ii.type.text, &ii.type);
+			context->root->AdvanceTypeLookup(&str->data->members.insert({ ii.name.text, Symbol((Type*)0) }).first->second.ty, ii.type.text, &ii.type);
 		}
 	}
 
@@ -595,11 +599,11 @@ void StructExpression::CompileDeclarations(CompilerContext* context)
 				//this is just for templated structs for typechecking
 				auto func = new Function(ii.function->GetFunctionNamePrefix(), false);
 				context->root->typecheck = true;
-				context->root->AdvanceTypeLookup(&func->return_type_, ii.function->ret_type.text, &ii.function->ret_type);
+				context->root->AdvanceTypeLookup(&func->return_type_, ii.function->data_.signature.return_type.text, &ii.function->data_.signature.return_type);
 				func->arguments_.push_back({ 0, "this" });
-				for (unsigned int i = 0; i < ii.function->args->size(); i++)
+				for (unsigned int i = 0; i < ii.function->data_.signature.arguments->size(); i++)
 				{
-					func->arguments_.push_back({ 0, ii.function->args->at(i).name.text });
+					func->arguments_.push_back({ 0, ii.function->data_.signature.arguments->at(i).name.text });
 				}
 
 				context->root->typecheck = false;

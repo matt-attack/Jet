@@ -239,21 +239,7 @@ namespace Jet
 			this->root->ns = ns;
 		}
 
-		void SetNamespace(const std::string& name)
-		{
-			auto res = this->root->ns->members.find(name);
-			if (res != this->root->ns->members.end())
-			{
-				this->root->ns = res->second.ns;
-				return;
-			}
-
-			//create new one
-			auto ns = new Namespace(name, this->root->ns);
-
-			this->root->ns->members.insert({ name, Symbol(ns) });
-			this->root->ns = ns;
-		}
+		void SetNamespace(const std::string& name);
 
 		void PopNamespace()
 		{

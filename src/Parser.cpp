@@ -114,6 +114,7 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	this->Register(TokenType::Class, new StructParselet());
 	this->Register(TokenType::Trait, new TraitParselet());
 	this->Register(TokenType::Namespace, new NamespaceParselet());
+    this->Register(TokenType::Static, new StaticParselet());
 
 	this->Register(TokenType::Break, new BreakParselet());
 	this->Register(TokenType::Continue, new ContinueParselet());

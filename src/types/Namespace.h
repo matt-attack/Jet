@@ -52,7 +52,7 @@ namespace Jet
 		std::string name;
 		Namespace* parent;
 
-		std::multimap<std::string, Symbol> members;
+		std::map<std::string, Symbol> members;
 
 		Namespace() {};
 
@@ -65,14 +65,6 @@ namespace Jet
 		virtual ~Namespace();
 
 		Function* GetFunction(const std::string& name)
-		{
-			auto r = members.find(name);
-			if (r != members.end() && r->second.type == SymbolType::Function)
-				return r->second.fn;
-			return 0;
-		}
-
-		Function* GetFunction(const std::string& name, const std::vector<CValue>& args)
 		{
 			auto r = members.find(name);
 			if (r != members.end() && r->second.type == SymbolType::Function)

@@ -224,6 +224,15 @@ CValue LetExpression::Compile(CompilerContext* context)
 			{
 				context->Construct(CValue(type->GetPointerType(), Alloca), 0);
 			}
+            else if (type->type == Types::InternalArray && type->base->type == Types::Struct)
+            {
+				auto loc = context->root->builder.CreateGEP(Alloca, { context->root->builder.getInt32(0),  context->root->builder.getInt32(0) });
+				//auto size = context->root->builder.CreateLoad(loc);
+
+				//auto ptr = context->root->builder.CreateGEP(Alloca, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
+				//ptr = context->root->builder.CreateLoad(ptr);
+				context->Construct(CValue(type->base->GetPointerType(), loc), context->root->builder.getInt32(type->size));
+            }
 			else if (type->type == Types::Array && type->base->type == Types::Struct)
 			{
 				//todo lets move this junk into construct so we dont have to do this in multiple places

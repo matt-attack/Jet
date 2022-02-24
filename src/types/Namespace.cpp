@@ -92,7 +92,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool
         if (ii.second.type == SymbolType::Function && ii.second.fn->do_export_)
 		{
 			if (ii.second.fn->expression_)
-				add_location(ii.second.fn->expression_->token, data, compilation);
+				add_location(ii.second.fn->expression_->data_.token, data, compilation);
 
             if (ii.second.fn->is_c_function_)
 			    data += "extern_c fun " + ii.second.fn->return_type_->ToString() + " ";
@@ -182,11 +182,11 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool
 						{
 							std::string source;
 							auto src = ii.function->GetBlock()->start.GetSource(compilation);
-							int line = ii.function->token.line;
+							int line = ii.function->data_.token.line;
 							//subtract out any lines in the trivia
-							for (int i = 1; i <= ii.function->token.trivia_length; i++)
+							for (int i = 1; i <= ii.function->data_.token.trivia_length; i++)
 							{
-								if (ii.function->token.text_ptr[-i] == '\n')
+								if (ii.function->data_.token.text_ptr[-i] == '\n')
 									line -= 1;
 							}
 							data += "\n//!@!" + src->filename + "@" + std::to_string(line) + "\n";
@@ -209,7 +209,7 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool
 				for (auto fun : ii.second.ty->data->functions)
 				{
 					if (fun.second->expression_)
-						add_location(fun.second->expression_->token, data, compilation);
+						add_location(fun.second->expression_->data_.token, data, compilation);
 
 					data += "extern fun " + fun.second->return_type_->ToString() + " " + ii.second.ty->data->name + "::";
 
@@ -272,18 +272,18 @@ void Namespace::OutputMetadata(std::string& data, Compilation* compilation, bool
 				{
 					auto source = fun.second->expression_->GetBlock()->start.GetSource(compilation);
 
-				    add_location(fun.second->expression_->token, data, compilation);
+				    add_location(fun.second->expression_->data_.token, data, compilation);
 
 					data += "fun ";
-					fun.second->expression_->ret_type.Print(data, source);
+					fun.second->expression_->data_.signature.return_type.Print(data, source);
 					data += " ";
 					data += ii.second.ty->trait->name + "::";
 					data += fun.first + "(";
 					int i = 0;
-					for (auto ii : *fun.second->expression_->args)
+					for (auto ii : *fun.second->expression_->data_.signature.arguments)
 					{
 						data += ii.type.text + " " + ii.name.text;
-						if (i != fun.second->expression_->args->size() - 1)
+						if (i != fun.second->expression_->data_.signature.arguments->size() - 1)
 							data += ", ";
 						//ii->Print(output, source);
 						i++;

@@ -1244,6 +1244,17 @@ Jet::Type* Compilation::LookupType(const std::string& name, bool load, bool do_e
 			auto res = cur_ns->members.find(ns);
 			if (res != cur_ns->members.end())
 			{
+                // handle structs
+                if (res->second.type == SymbolType::Type)
+                {
+                    Type* t = res->second.ty;
+                    if (t->type == Types::Struct)
+                    {
+                        new_ns = t->data;
+                    }
+                    break;
+                }
+
 				new_ns = res->second.ns;
 				break;
 			}
@@ -1694,6 +1705,8 @@ Function* Compilation::GetFunction(const std::string& name, const std::vector<Ty
 
         int cur_pos = 0;
 
+        std::string real_name;
+
         bool first = true;
         do
         {
@@ -1705,6 +1718,7 @@ Function* Compilation::GetFunction(const std::string& name, const std::vector<Ty
 	        }
             if (cur_pos+len >= name.length()-1)
             {
+                real_name = name.substr(cur_pos);
                 break;// stop before we hit the last bit
             }
 
@@ -1718,6 +1732,17 @@ Function* Compilation::GetFunction(const std::string& name, const std::vector<Ty
 			    auto res = cur_ns->members.find(ns);
 			    if (res != cur_ns->members.end())
 			    {
+                    // handle structs
+                    if (res->second.type == SymbolType::Type)
+                    {
+                        Type* t = res->second.ty;
+                        if (t->type == Types::Struct)
+                        {
+                            new_ns = t->data;
+                        }
+                        break;
+                    }
+
 			    	new_ns = res->second.ns;
 			    	break;
 			    }
@@ -1735,34 +1760,22 @@ Function* Compilation::GetFunction(const std::string& name, const std::vector<Ty
         }
         while (true);
 
-        auto r = new_ns->members.equal_range(name);
-	    for (auto it = r.first; it != r.second; it++)
-		{
-		    if (it->second.type == SymbolType::Function)
-		    {
-		    	if (it->second.fn->arguments_.size() == args.size())
-		    	{
-		    		return it->second.fn;
-		    	}
-		    }
-	    }
+        auto r = new_ns->members.find(real_name);
+        if (r != new_ns->members.end() && r->second.type == SymbolType::Function)
+        {
+            return r->second.fn;
+        }
     }
     else
     {
 	    // Search down the namespace tree for the function if its not namespaced
 	    do
 	    {
-		    auto r = next->members.equal_range(name);
-	    	for (auto it = r.first; it != r.second; it++)
-		    {
-		    	if (it->second.type == SymbolType::Function)
-		    	{
-		    		if (it->second.fn->arguments_.size() == args.size())
-		    		{
-		    			return it->second.fn;
-		    		}
-		    	}
-	    	}
+            auto r = next->members.find(name);
+            if (r != next->members.end() && r->second.type == SymbolType::Function)
+            {
+                return r->second.fn;
+            }
 
     		next = next->parent;
     	}
@@ -1806,6 +1819,17 @@ Jet::Symbol Compilation::GetVariableOrFunction(const std::string& name)
 			    auto res = cur_ns->members.find(ns);
 			    if (res != cur_ns->members.end())
 			    {
+                    // handle structs
+                    if (res->second.type == SymbolType::Type)
+                    {
+                        Type* t = res->second.ty;
+                        if (t->type == Types::Struct)
+                        {
+                            new_ns = t->data;
+                        }
+                        break;
+                    }
+
 			    	new_ns = res->second.ns;
 			    	break;
 			    }

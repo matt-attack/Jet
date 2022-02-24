@@ -97,7 +97,7 @@ void Function::Load(Compilation* compiler)
 		llvm::DIFile* unit = compiler->debug_info.file;
 
 		auto functiontype = compiler->debug->createSubroutineType(compiler->debug->getOrCreateTypeArray(ftypes));
-		int line = expression_ ? expression_->token.line : 0;
+		int line = expression_ ? expression_->data_.token.line : 0;
 		llvm::DISubprogram* sp = compiler->debug->createFunction(unit, name_, mangled_name, unit, line, functiontype, false, true, line, llvm::DINode::DIFlags::FlagPublic, false, nullptr);// , f);
 
 		// this catches duplicates or incorrect functions
@@ -231,13 +231,13 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
             std::pair<const Token*, const Token*> tokens;
             if (f && f->expression_)
             {
-                tokens.first = &f->expression_->name;
+                tokens.first = &f->expression_->data_.signature.name;
                 tokens.second = 0;
                 context->root->Info("Defined here", tokens);
             }
             else if (f && f->extern_expression_)
             {
-                tokens.first = &f->extern_expression_->name;
+                tokens.first = &f->extern_expression_->signature_.name;
                 tokens.second = 0;
                 context->root->Info("Defined here", tokens);
             }
@@ -293,21 +293,21 @@ CValue FunctionType::Call(CompilerContext* context, llvm::Value* fn, const std::
         std::string ns;
         if (f && f->expression_)
         {
-            t = f->expression_->name;
+            t = f->expression_->data_.signature.name;
             ns = f->expression_->GetHumanReadableNamespace();
 
-            const auto& arg = (*f->expression_->args)[ai];
+            const auto& arg = (*f->expression_->data_.signature.arguments)[ai];
             tokens.first = &arg.type;
             tokens.second = &arg.name;
         }
         else if (f && f->extern_expression_)
         {
-            t = f->extern_expression_->name;
+            t = f->extern_expression_->signature_.name;
             ns = f->extern_expression_->GetHumanReadableNamespace();
             if (ns.length()) { ns += "::"; }
-            if (f->extern_expression_->Struct.length()) { ns += f->extern_expression_->Struct; }
+            if (f->extern_expression_->signature_.struct_name.text.length()) { ns += f->extern_expression_->signature_.struct_name.text; }
 
-            const auto& arg = (*f->extern_expression_->args)[ai];
+            const auto& arg = (*f->extern_expression_->signature_.arguments)[ai];
             tokens.first = &arg.type;
             tokens.second = &arg.name;
         }

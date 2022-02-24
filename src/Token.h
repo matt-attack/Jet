@@ -121,6 +121,7 @@ namespace Jet
 		TypeOf,
 		New,
 		Free,
+        Static,
 
 		Typedef, 
 
