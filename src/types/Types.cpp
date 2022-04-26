@@ -303,6 +303,7 @@ void Type::Load(Compilation* compiler)
 		int size = 0;
 		for (auto ii : this->_union->members)
 		{
+			ii->Load(compiler);
 			int s = ii->GetSize();
 			if (s > size)
 				size = s;
@@ -319,6 +320,18 @@ void Type::Load(Compilation* compiler)
 		compiler->Error("Tried To Use Undefined Type '" + this->name + "'", compiler->current_function->current_token);
 	}
 	else if (type == Types::Pointer)
+	{
+		//load recursively
+		this->base->Load(compiler);
+		this->ns = this->base->ns;
+	}
+	else if (type == Types::Array)
+	{
+		//load recursively
+		this->base->Load(compiler);
+		this->ns = this->base->ns;
+	}
+	else if (type == Types::InternalArray)
 	{
 		//load recursively
 		this->base->Load(compiler);
