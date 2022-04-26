@@ -348,7 +348,7 @@ Expression* UnionParselet::parse(Parser* parser, Token token)
 	while (parser->LookAhead().type != TokenType::Semicolon)
 	{
 		//parse in each block
-		Token name = parser->Consume(TokenType::Name);
+		Token name = ::ParseType(parser);//parser->Consume(TokenType::Name);
 
 		Token bor = parser->LookAhead();
 		if (bor.type == TokenType::BOr)
@@ -393,7 +393,7 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 			continue;
 		}
 
-		Token type = parser->Consume(TokenType::Name);
+		Token type = ::ParseType(parser);//parser->Consume(TokenType::Name);
 		Token name = parser->Consume(TokenType::Name);
 		Token tok = parser->Consume(TokenType::Assign);
 

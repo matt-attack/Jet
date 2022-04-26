@@ -124,6 +124,17 @@ namespace Jet
 			this->cases = elements;
 			this->var = thing;
 		}
+		
+		virtual void SetParent(Expression* parent)
+		{
+			this->parent = parent;
+			var->SetParent(this);
+			for (auto& ii: cases)
+            {
+                ii.block->SetParent(parent);
+            }
+		}
+
 
 		CValue Compile(CompilerContext* context);
 
