@@ -390,7 +390,7 @@ Expression* MatchParselet::parse(Parser* parser, Token token)
 
 			cases.push_back({ def, def, tok, block });
 
-			break;
+			continue;
 		}
 
 		Token type = parser->Consume(TokenType::Name);

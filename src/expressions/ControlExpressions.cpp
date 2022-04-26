@@ -118,7 +118,9 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 
 	CValue value = this->var->Compile(context);
 	if (value.type->type != Types::Int)// todo need to make this work with other integer types
+	{
 		context->root->Error("Argument to Case Statement Must Be an Integer", token);
+	}
 
 	this->switch_end = llvm::BasicBlock::Create(context->context, "switchend");
 
@@ -128,8 +130,9 @@ CValue SwitchExpression::Compile(CompilerContext* context)
 	{
 		auto Case = dynamic_cast<CaseExpression*>(expr);
 		if (Case)
+		{
 			cases.push_back(Case);
-
+		}
 		//add default parser and expression
 		else if (auto def = dynamic_cast<DefaultExpression*>(expr))
 		{
@@ -318,6 +321,11 @@ CValue MatchExpression::Compile(CompilerContext* context)
         // If its not a union, we static branch based on the type
         for (auto ii : this->cases)
 	    {
+	    	if (ii.type.type == TokenType::Default)
+	    	{
+	    		continue;
+	    	}
+	    	
             // if its a match, compile it then return
             Type* ty = context->root->LookupType(ii.type.text);
 
@@ -376,7 +384,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 
 			//branch to end
 			context->root->builder.CreateBr(endbb);
-			break;
+			continue;
 		}
 
 		unsigned int pi = 0;//find what index it is
