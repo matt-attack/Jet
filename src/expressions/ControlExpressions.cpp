@@ -453,7 +453,7 @@ CValue CallExpression::Compile(CompilerContext* context)
           if (!(var.type->data->template_base && var.type->data->template_base->name == "function"))
           {
             stru = var.type;
-            argsv.push_back({CValue(stru->GetPointerType(), var.pointer), 0});
+            argsv.push_back({var, 0});
             fname.text = "()";
           }
         }
@@ -475,7 +475,7 @@ CValue CallExpression::Compile(CompilerContext* context)
           assert(left.pointer);
           stru = left.type;
 
-          argsv.push_back({CValue(stru->GetPointerType(), left.pointer), 0});
+          argsv.push_back({left, 0});
         }
         else if (left.type->type == Types::Pointer &&
                  left.type->base->type == Types::Struct)
@@ -488,8 +488,7 @@ CValue CallExpression::Compile(CompilerContext* context)
           }
           assert(val);
           stru = left.type->base;
-
-          argsv.push_back({CValue(left.type, val), 0});
+          argsv.push_back({CValue(left.type->base, 0, val), 0});
         }
         else
         {

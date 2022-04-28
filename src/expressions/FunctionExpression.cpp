@@ -125,8 +125,6 @@ Type* FunctionExpression::TypeCheck(CompilerContext* context)
 			context->root->ns = typ->data;
 	}
 
-
-
 	context->CurrentToken(&data_.signature.return_type);
 	if (data_.signature.templates == 0)
 	{
@@ -194,41 +192,83 @@ CValue FunctionExpression::Compile(CompilerContext* context)
 	return this->DoCompile(context);
 }
 
-#include <llvm/IR/BasicBlock.h>
-CValue FunctionExpression::DoCompile(CompilerContext* context)
+void FunctionExpression::CreateFunction(CompilerContext* context, bool advance_lookup)
 {
-	context->CurrentToken(&data_.token);
+	std::string name_prefix = this->GetFunctionNamePrefix();
 
+	bool advlookup = advance_lookup;
+	auto str = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : data_.signature.struct_name.text;
+	
 	bool is_lambda = data_.signature.name.text.length() == 0;
 	if (data_.captures)
 		is_lambda = false;//todo this seems wrong...
 
-	//build list of types of vars
-	std::vector<std::pair<Type*, std::string>> argsv;
-	auto struct_name = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : data_.signature.struct_name.text;
-
     if (data_.is_static)
     {
-        struct_name = "";
+        str = "";
     }
 
-	//insert the 'this' argument if I am a member function
-	if (struct_name.length() > 0)
+    if (!str.length() && !!data_.constant_token)
+    {
+        // Error if someone specified const
+        context->root->Error("Can only specify const for member functions", data_.constant_token);
+    }
+	
+	Function* fun = new Function(name_prefix, false);
+	fun->expression_ = this;
+	fun->is_virtual_ = (data_.token.type == TokenType::Virtual);
+    fun->is_const_ = !!data_.constant_token;
+    fun->is_lambda_ = is_lambda;
+	//context->root->functions.push_back(fun);
+	myself = fun;
+
+	if (auto attr = dynamic_cast<AttributeExpression*>(this->parent))
 	{
-		argsv.push_back({ context->root->LookupType(struct_name), "this" });
+		//add the attribute to the Function
+		if (attr->name.text == "stdcall")
+			fun->calling_convention_ = CallingConvention::StdCall;
+		else if (attr->name.text == "thiscall")
+			fun->calling_convention_ = CallingConvention::ThisCall;
+		else if (attr->name.text == "fastcall")
+			fun->calling_convention_ = CallingConvention::FastCall;
 	}
 
-	//add the context pointer as an argument if this is a generator
-	if (data_.is_generator)
+	bool is_trait = false;
+	const auto& fname = data_.signature.name.text;
+	if (str.length() > 0)
 	{
-		auto str = myself->return_type_;
-		str->Load(context->root);
-		argsv.push_back({ str->GetPointerType(), "_context" });
+		auto type = context->root->LookupType(str, false);
+		if (type->type == Types::Trait)
+		{
+			type->Load(context->root);
+			type->trait->extension_methods.insert({ fname, fun });
+			is_trait = true;
+		}
+		else
+		{
+			type->data->functions.insert({ fname, fun });
+			if (advlookup)
+			advlookup = !type->data->template_args.size();
+		}
 	}
-
-	auto rp = context->root->builder.GetInsertBlock();
-	auto dp = context->root->builder.getCurrentDebugLocation();
-	if (is_lambda)
+	else
+	{
+        // make sure we dont have any duplicates
+        auto dup = context->root->ns->members.equal_range(fname);
+        for (auto it = dup.first; it != dup.second; it++)
+        {
+            if (it->second.type == SymbolType::Function &&
+                it->second.fn->arguments_.size() != data_.signature.arguments->size())
+            {
+                continue;
+            }
+            // todo give details about the location of the existing symbol
+            context->root->Error("A matching symbol with name '" + data_.signature.name.text + "' is already defined", data_.signature.name);
+        }
+		context->root->ns->members.insert({ fname, fun });
+	}
+	
+		if (is_lambda)
 	{
 		//get parent
 		auto call = dynamic_cast<CallExpression*>(this->parent);
@@ -238,7 +278,9 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		{
 			//look for me in the args
 			if (call->left == this)
+			{
 				context->root->Error("Cannot imply type of lambda with the args of its call", context->current_token);
+			}
 
 			unsigned int i = dynamic_cast<NameExpression*>(call->left) ? 0 : 1;
 			for (; i < call->args->size(); i++)
@@ -262,7 +304,9 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 				}
 
 				if (data_.signature.return_type.text.length() == 0)//infer return type
+				{
 					data_.signature.return_type.text = type->function->return_type->ToString();
+				}
 			}
 			else if (type->type == Types::Struct && type->data->template_base->name == "function")
 			{
@@ -277,58 +321,209 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 				}
 
 				if (data_.signature.return_type.text.length() == 0)//infer return type
+				{
 					data_.signature.return_type.text = fun->return_type->ToString();
+				}
 			}
 		}
 		else
 		{
 			for (auto ii : *data_.signature.arguments)
+			{
 				if (ii.type.text.length() == 0)
+				{
 					context->root->Error("Lambda type inference only implemented for function calls", context->current_token);
+				
+				}
+			}
 			if (data_.signature.return_type.text.length() == 0)
+			{
 				context->root->Error("Lambda type inference only implemented for function calls", context->current_token);
+			}
 		}
 	}
 
-	for (auto& ii : *data_.signature.arguments)
+
+	if (data_.is_generator)
 	{
-		context->CurrentToken(&ii.type);
-		argsv.push_back({ context->root->LookupType(ii.type.text), ii.name.text });
+		//build data about the generator context struct
+		Type* str = new Type(context->root, name_prefix + "_yielder_context", Types::Struct);
+		str->data = new Jet::Struct;
+		str->data->name = str->name;
+		str->data->parent_struct = 0;
+		str->data->parent = context->root->ns;
+		context->root->ns->members.insert({ str->name, str });
+
+
+		//add default iterator methods, will fill in function later
+		{
+			auto func = new Function(name_prefix + "_generator", data_.signature.name.text.length() == 0);
+			func->return_type_ = context->root->BoolType;
+			func->arguments_ = { { 0, "_context" } };
+			func->arguments_.resize(1);
+			context->root->AdvanceTypeLookup(&func->arguments_[0].first, str->name + "*", &data_.signature.return_type);
+			context->root->functions.push_back(func);
+
+			auto n = new CompilerContext(context->root, context);
+			n->function = func;
+			func->context_ = n;
+			context->root->ns->members.insert({ func->name_, func });
+
+			str->data->functions.insert({ "MoveNext", func });
+		}
+		{
+			auto func = new Function(name_prefix + "_yield_reset", data_.signature.name.text.length() == 0);
+			func->return_type_ = context->root->VoidType;
+			func->arguments_ = { { 0, "_context" } };
+			func->arguments_.resize(1);
+			context->root->AdvanceTypeLookup(&func->arguments_[0].first, str->name + "*", &data_.signature.return_type);
+			context->root->functions.push_back(func);
+
+			auto n = new CompilerContext(context->root, context);
+			n->function = func;
+			func->context_ = n;
+			context->root->ns->members.insert({ func->name_, func });
+
+			str->data->functions.insert({ "Reset", func });
+		}
+		{
+			auto func = new Function(name_prefix + "_generator_current", data_.signature.name.text.length() == 0);
+			func->return_type_ = context->root->VoidType;
+			context->root->AdvanceTypeLookup(&func->return_type_, data_.signature.return_type.text, &data_.signature.return_type);
+			context->root->functions.push_back(func);
+
+			func->arguments_ = { { 0, "_context" } };
+			func->arguments_.resize(1);
+			context->root->AdvanceTypeLookup(&func->arguments_[0].first, str->name + "*", &data_.signature.return_type);
+
+			auto n = new CompilerContext(context->root, context);
+			n->function = func;
+			func->context_ = n;
+			context->root->ns->members.insert({ func->name_, func });
+			str->data->functions.insert({ "Current", func });
+		}
+
+		//add the position and return variables to the context
+		str->data->struct_members.push_back({ "position", "char*", context->root->CharPointerType });
+		str->data->struct_members.push_back({ "return", data_.signature.return_type.text, context->root->LookupType(data_.signature.return_type.text) });
+
+		//add arguments to context
+		for (auto ii : *data_.signature.arguments)
+			str->data->struct_members.push_back({ ii.name.text, ii.type.text, context->root->LookupType(ii.type.text) });
+
+		str->ns = context->root->ns;
+
+		//DO NOT LOAD THIS UNTIL COMPILATION, IN FACT DONT LOAD ANYTHING
+		fun->return_type_ = str;
+	}
+	else if (is_trait)
+	{
+		fun->return_type_ = 0;
+	}
+	else if (advlookup)
+	{
+		context->root->AdvanceTypeLookup(&fun->return_type_, data_.signature.return_type.text, &data_.signature.return_type);
+	}
+	else
+	{
+		fun->return_type_ = context->root->LookupType(data_.signature.return_type.text, false);
 	}
 
-	context->CurrentToken(&data_.signature.return_type);
+	fun->arguments_.reserve(data_.signature.arguments->size() + (str.length() ? 1 : 0) + (is_lambda ? 1 : 0));
 
-	// Determine return type
-	Type* ret;
-	if (data_.is_generator)
-		ret = context->root->BoolType;
-	else
-		ret = context->root->LookupType(data_.signature.return_type.text);
+	//add the this argument if this is a member function
+	if (str.length() > 0)
+	{
+		fun->arguments_.push_back({ 0, "this" });
+		if (is_trait == false && advlookup)
+			context->root->AdvanceTypeLookup(&fun->arguments_.back().first, str, &data_.token);
+		else if (is_trait == false)
+			fun->arguments_.back().first = context->root->LookupType(str, false);
+	}
 
-	// Build lambda data if we are one
+	//add arguments to new function
+	for (auto ii : *data_.signature.arguments)
+	{
+		if (data_.signature.templates)//just set type = 0 if it is one of the templates
+		{
+			bool done = false;
+			for (auto temp : *data_.signature.templates)
+			{
+				//get the name of the variable
+				unsigned int subl = 0;
+				for (; subl < ii.type.text.length(); subl++)
+				{
+					if (!IsLetter(ii.type.text[subl]))
+						break;
+				}
+				//check if it refers to same type
+				std::string sub = ii.type.text.substr(0, subl);
+				if (temp.second.text == sub)
+				{
+					//insert dummy types
+					fun->arguments_.push_back({ new Type(context->root, ii.type.text, Types::Invalid), ii.name.text });
+					done = true;
+					break;
+				}
+			}
+			if (done)
+				continue;
+		}
+
+		Type* type = 0;
+		if (!advlookup)//else
+			type = context->root->LookupType(ii.type.text);
+
+		fun->arguments_.push_back({ type, ii.name.text });
+		if (advlookup && is_trait == false)
+			context->root->AdvanceTypeLookup(&fun->arguments_.back().first, ii.type.text, &data_.token);
+	}
+	
+	// add lambda capture if relevant
+	if (is_lambda)
+	{
+		fun->arguments_.push_back({ context->root->CharPointerType, "_capture_data" });
+	}
+
+	//add templates to new function
+	if (data_.signature.templates)
+	{
+		for (auto ii : *data_.signature.templates)
+        {
+			fun->templates_.push_back({ context->root->LookupType(ii.first.text), ii.second.text });
+        }
+	}
+}
+
+#include <llvm/IR/BasicBlock.h>
+CValue FunctionExpression::DoCompile(CompilerContext* context)
+{
+	context->CurrentToken(&data_.token);
+
+	bool is_lambda = data_.signature.name.text.length() == 0;
+	if (data_.captures)
+		is_lambda = false;//todo this seems wrong...
+		
+	auto struct_name = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : data_.signature.struct_name.text;
+
+    if (data_.is_static)
+    {
+        struct_name = "";
+    }
+
+	// optional lambda data
 	llvm::Value* lambda = 0;
 	Type* lambda_type = 0;
 	llvm::StructType* storage_t = 0;
-	if (is_lambda)
-	{
-		//allocate the function object
-		std::vector<Type*> args;
-		for (auto& ii : argsv)
-			args.push_back(ii.first);
-
-		lambda_type = context->root->LookupType("function<" + context->root->GetFunctionType(ret, args)->ToString() + ">");
-		lambda = context->root->builder.CreateAlloca(lambda_type->GetLLVMType());
-
-		storage_t = llvm::StructType::get(context->root->context, {});
-
-		argsv.push_back({ context->root->CharPointerType, "_capture_data" });
-	}
+	
+	auto rp = context->root->builder.GetInsertBlock();
+	auto dp = context->root->builder.getCurrentDebugLocation();
 
 	// Get or create the relevant function CompilerContext
 	CompilerContext* function_context;
 	if (data_.is_generator)
 	{
-		function_context = argsv.front().first->base->data->functions.find("MoveNext")->second->context_;
+		function_context = myself->arguments_.front().first->base->data->functions.find("MoveNext")->second->context_;
 		function_context->function->Load(context->root);
 		llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", function_context->function->f_);
 		context->root->builder.SetInsertPoint(bb);
@@ -337,17 +532,42 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 	}
 	else
 	{
-		// create the function if this was a lambda
-		if (data_.signature.name.text.length() == 0)
+		// create the function if this was a lambda, other types already have them
+		// from compile declarations
+		if (is_lambda)
 		{
-			myself = new Function(this->GetFunctionNamePrefix(), false);
+			/*myself = new Function(this->GetFunctionNamePrefix(), false);
 			myself->expression_ = this;
 			myself->is_virtual_ = false;
 			myself->arguments_ = argsv;
 			myself->return_type_ = ret;
             myself->is_lambda_ = true;
-			context->root->functions.push_back(myself);
+			context->root->functions.push_back(myself);*/
+			//throw 7;
+			CreateFunction(context, false);
+			
+			
+			// Build lambda data if we are one
+			
+			// Start by grabbing all arguments (not the capture data) into a struct type
+			std::vector<Type*> args;
+			for (int i = 0; i < myself->arguments_.size() - 1; i++)
+			{
+				args.push_back(myself->arguments_[i].first);
+			}
+
+			lambda_type = context->root->LookupType("function<" + context->root->GetFunctionType(myself->return_type_, args)->ToString() + ">");
+			lambda = context->root->builder.CreateAlloca(lambda_type->GetLLVMType());
+
+			storage_t = llvm::StructType::get(context->root->context, {});
 		}
+		
+		// make sure everything is loaded
+		for (auto& arg: myself->arguments_)
+		{
+			arg.first->Load(context->root);
+		}
+		myself->return_type_->Load(context->root);
 
 		function_context = context->StartFunctionDefinition(myself);
 	}
@@ -360,18 +580,20 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	// Setup arguments for the function
 	auto AI = function_context->function->f_->arg_begin();
-	if (function_context->function->return_type_->type == Types::Struct)
+	if (myself->return_type_->type == Types::Struct)
 	{
 		AI++;// skip the struct return argument, its not a real argument
 	}
-	for (unsigned i = 0, e = argsv.size(); i != e; ++i, ++AI)
+	for (unsigned i = 0, e = myself->arguments_.size(); i != e; ++i, ++AI)
 	{
 		// Skip actually adding all args but the first one if this is actually a generator
 		if (i > 0 && data_.is_generator)
+		{
 			continue;
+		}
 
-		auto& arg_name = argsv[i].second;
-        auto& arg_type = argsv[i].first;
+		auto& arg_name = function_context->function->arguments_[i].second;
+        auto& arg_type = function_context->function->arguments_[i].first;
 
         // for now pass all structs by pointer/reference
         // eventually can do this based on size
@@ -454,16 +676,27 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 	//check for return, and insert one or error if there isnt one
 	if (function_context->function->is_generator_)
+	{
 		function_context->root->builder.CreateRet(function_context->root->builder.getInt1(false));//signal we are gone generating values
+	}
 	else if (function_context->function->f_->getBasicBlockList().back().getTerminator() == 0)
     {
         //function_context->function->f_->print(llvm::errs(), nullptr);
-		if (ret->type == Jet::Types::Void)// Implicit return void at end to satisfy llvm
+		if (myself->return_type_->type == Jet::Types::Void)// Implicit return void at end to satisfy llvm
+		{
 			function_context->Return(CValue(context->root->VoidType, 0));
+		}
 		else
         {
-            try {
-			context->root->Error("Function must return a value", data_.token); } catch (int i ) {}
+        	// Error without actually breaking out of this function so we keep compiling
+            try
+            {
+				context->root->Error("Function must return a value", data_.token);
+			}
+			catch (int i)
+			{
+			
+			}
         }
     }
 
@@ -512,11 +745,11 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		//ok, need to use the ret val stuff
 		//store arguments into context
-		if (argsv.size() > 1)
+		if (function_context->function->arguments_.size() > 1)
 		{
 			auto AI = func->function->f_->arg_begin();
 			AI++;//skip the return value argument
-			for (unsigned int i = 1; i < argsv.size(); i++)
+			for (unsigned int i = 1; i < function_context->function->arguments_.size(); i++)
 			{
 				auto ptr = context->root->builder.CreateGEP(alloc, { context->root->builder.getInt32(0), context->root->builder.getInt32(2 + i - 1) });
 				context->root->builder.CreateStore(AI++, ptr);
@@ -532,7 +765,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 
 		//now compile reset function
 		{
-			auto reset = argsv.front().first->base->data->functions.find("Reset")->second->context_;
+			auto reset = function_context->function->arguments_.front().first->base->data->functions.find("Reset")->second->context_;
 			context->root->current_function = reset;
 			reset->function->Load(reset->root);
 			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", reset->function->f_);
@@ -548,7 +781,7 @@ CValue FunctionExpression::DoCompile(CompilerContext* context)
 		}
 		//compile current function
 		{
-			auto current = argsv.front().first->base->data->functions.find("Current")->second->context_;
+			auto current = function_context->function->arguments_.front().first->base->data->functions.find("Current")->second->context_;
 			context->root->current_function = current;
 			current->function->Load(current->root);
 			llvm::BasicBlock *bb = llvm::BasicBlock::Create(context->root->context, "entry", current->function->f_);
@@ -590,13 +823,19 @@ std::string FunctionExpression::GetFunctionNamePrefix()
 {
 	std::string fname;
 	if (data_.signature.name.text.length() > 0)
+	{
 		fname = data_.signature.name.text;
+	}
 	else
+	{
 		fname = "_lambda_";
+	}
 
 	const auto& ns = this->GetNamespaceQualifier();
 	if (ns.length() > 0)
+	{
 		return ns + "_" + fname;
+	}
 	return fname;
 }
 
@@ -608,213 +847,8 @@ void FunctionExpression::CompileDeclarations(CompilerContext* context)
 	{
 		return;//dont compile declaration for lambdas
 	}
-
-	std::string name_prefix = this->GetFunctionNamePrefix();
-
-	bool advlookup = true;
-	auto str = dynamic_cast<StructExpression*>(this->parent) ? dynamic_cast<StructExpression*>(this->parent)->GetName() : data_.signature.struct_name.text;
-
-    if (data_.is_static)
-    {
-        str = "";
-    }
-
-
-    if (!str.length() && !!data_.constant_token)
-    {
-        // Error if someone specified const
-        context->root->Error("Can only specify const for member functions", data_.constant_token);
-    }
-
-	Function* fun = new Function(name_prefix, false);
-	fun->expression_ = this;
-	fun->is_virtual_ = (data_.token.type == TokenType::Virtual);
-    fun->is_const_ = !!data_.constant_token;
-	context->root->functions.push_back(fun);
-	myself = fun;
-
-	if (auto attr = dynamic_cast<AttributeExpression*>(this->parent))
-	{
-		//add the attribute to the Function
-		if (attr->name.text == "stdcall")
-			fun->calling_convention_ = CallingConvention::StdCall;
-		else if (attr->name.text == "thiscall")
-			fun->calling_convention_ = CallingConvention::ThisCall;
-		else if (attr->name.text == "fastcall")
-			fun->calling_convention_ = CallingConvention::FastCall;
-	}
-
-	bool is_trait = false;
-	const auto& fname = data_.signature.name.text;
-	if (str.length() > 0)
-	{
-		auto type = context->root->LookupType(str, false);
-		if (type->type == Types::Trait)
-		{
-			type->Load(context->root);
-			type->trait->extension_methods.insert({ fname, fun });
-			is_trait = true;
-		}
-		else
-		{
-			type->data->functions.insert({ fname, fun });
-			advlookup = !type->data->template_args.size();
-		}
-	}
-	else
-	{
-        // make sure we dont have any duplicates
-        auto dup = context->root->ns->members.equal_range(fname);
-        for (auto it = dup.first; it != dup.second; it++)
-        {
-            if (it->second.type == SymbolType::Function &&
-                it->second.fn->arguments_.size() != data_.signature.arguments->size())
-            {
-                continue;
-            }
-            // todo give details about the location of the existing symbol
-            context->root->Error("A matching symbol with name '" + data_.signature.name.text + "' is already defined", data_.signature.name);
-        }
-		context->root->ns->members.insert({ fname, fun });
-	}
-
-
-	if (data_.is_generator)
-	{
-		//build data about the generator context struct
-		Type* str = new Type(context->root, name_prefix + "_yielder_context", Types::Struct);
-		str->data = new Jet::Struct;
-		str->data->name = str->name;
-		str->data->parent_struct = 0;
-		str->data->parent = context->root->ns;
-		context->root->ns->members.insert({ str->name, str });
-
-
-		//add default iterator methods, will fill in function later
-		{
-			auto func = new Function(name_prefix + "_generator", data_.signature.name.text.length() == 0);
-			func->return_type_ = context->root->BoolType;
-			func->arguments_ = { { 0, "_context" } };
-			func->arguments_.resize(1);
-			context->root->AdvanceTypeLookup(&func->arguments_[0].first, str->name + "*", &data_.signature.return_type);
-			context->root->functions.push_back(func);
-
-			auto n = new CompilerContext(context->root, context);
-			n->function = func;
-			func->context_ = n;
-			context->root->ns->members.insert({ func->name_, func });
-
-			str->data->functions.insert({ "MoveNext", func });
-		}
-		{
-			auto func = new Function(name_prefix + "_yield_reset", data_.signature.name.text.length() == 0);
-			func->return_type_ = context->root->VoidType;
-			func->arguments_ = { { 0, "_context" } };
-			func->arguments_.resize(1);
-			context->root->AdvanceTypeLookup(&func->arguments_[0].first, str->name + "*", &data_.signature.return_type);
-			context->root->functions.push_back(func);
-
-			auto n = new CompilerContext(context->root, context);
-			n->function = func;
-			func->context_ = n;
-			context->root->ns->members.insert({ func->name_, func });
-
-			str->data->functions.insert({ "Reset", func });
-		}
-		{
-			auto func = new Function(name_prefix + "_generator_current", data_.signature.name.text.length() == 0);
-			func->return_type_ = context->root->VoidType;
-			context->root->AdvanceTypeLookup(&func->return_type_, data_.signature.return_type.text, &data_.signature.return_type);
-			context->root->functions.push_back(func);
-
-			func->arguments_ = { { 0, "_context" } };
-			func->arguments_.resize(1);
-			context->root->AdvanceTypeLookup(&func->arguments_[0].first, str->name + "*", &data_.signature.return_type);
-
-			auto n = new CompilerContext(context->root, context);
-			n->function = func;
-			func->context_ = n;
-			context->root->ns->members.insert({ func->name_, func });
-			str->data->functions.insert({ "Current", func });
-		}
-
-		//add the position and return variables to the context
-		str->data->struct_members.push_back({ "position", "char*", context->root->CharPointerType });
-		str->data->struct_members.push_back({ "return", data_.signature.return_type.text, context->root->LookupType(data_.signature.return_type.text) });
-
-		//add arguments to context
-		for (auto ii : *data_.signature.arguments)
-			str->data->struct_members.push_back({ ii.name.text, ii.type.text, context->root->LookupType(ii.type.text) });
-
-		str->ns = context->root->ns;
-
-		//DO NOT LOAD THIS UNTIL COMPILATION, IN FACT DONT LOAD ANYTHING
-		fun->return_type_ = str;
-	}
-	else if (is_trait)
-		fun->return_type_ = 0;
-	else if (advlookup)
-		context->root->AdvanceTypeLookup(&fun->return_type_, data_.signature.return_type.text, &data_.signature.return_type);
-	else
-		fun->return_type_ = context->root->LookupType(data_.signature.return_type.text, false);
-
-	fun->arguments_.reserve(data_.signature.arguments->size() + (str.length() ? 1 : 0));
-
-	//add the this pointer argument if this is a member function
-	if (str.length() > 0)
-	{
-		fun->arguments_.push_back({ 0, "this" });
-		if (is_trait == false && advlookup)
-			context->root->AdvanceTypeLookup(&fun->arguments_.back().first, str + "*", &data_.token);
-		else if (is_trait == false)
-			fun->arguments_.back().first = context->root->LookupType(str + "*", false);
-	}
-
-	//add arguments to new function
-	for (auto ii : *data_.signature.arguments)
-	{
-		if (data_.signature.templates)//just set type = 0 if it is one of the templates
-		{
-			bool done = false;
-			for (auto temp : *data_.signature.templates)
-			{
-				//get the name of the variable
-				unsigned int subl = 0;
-				for (; subl < ii.type.text.length(); subl++)
-				{
-					if (!IsLetter(ii.type.text[subl]))
-						break;
-				}
-				//check if it refers to same type
-				std::string sub = ii.type.text.substr(0, subl);
-				if (temp.second.text == sub)
-				{
-					//insert dummy types
-					fun->arguments_.push_back({ new Type(context->root, ii.type.text, Types::Invalid), ii.name.text });
-					done = true;
-					break;
-				}
-			}
-			if (done)
-				continue;
-		}
-
-		Type* type = 0;
-		if (!advlookup)//else
-			type = context->root->LookupType(ii.type.text);
-
-		fun->arguments_.push_back({ type, ii.name.text });
-		if (advlookup && is_trait == false)
-			context->root->AdvanceTypeLookup(&fun->arguments_.back().first, ii.type.text, &data_.token);
-	}
-
-	//add templates to new function
-	if (data_.signature.templates)
-	{
-		for (auto ii : *data_.signature.templates)
-        {
-			fun->templates_.push_back({ context->root->LookupType(ii.first.text), ii.second.text });
-        }
-	}
+    
+    CreateFunction(context, true);
+    context->root->functions.push_back(myself);
 }
 

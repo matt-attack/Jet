@@ -236,7 +236,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
         {
             this->root->Error("Unexpected error", Token());
         }
-        CValue lhsptr(left.type->GetPointerType(), left.pointer);
+        //CValue lhsptr(left.type->GetPointerType(), left.pointer);
         // special case for != (call == and then not it)
         if (op == TokenType::NotEqual)
         {
@@ -245,7 +245,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			{
 				Function* fun = funiter->second;
 				fun->Load(this->root);
-				std::vector<FunctionArgument> argsv = { {lhsptr, 0}, {right, 0} };// todo probably need to enforce the return type
+				std::vector<FunctionArgument> argsv = { {left, 0}, {right, 0} };// todo probably need to enforce the return type
                 CValue ret = fun->Call(this, argsv, true);
                 ret.val = root->builder.CreateNot(ret.val);
 				return ret;
@@ -259,7 +259,7 @@ CValue CompilerContext::BinaryOperation(Jet::TokenType op, CValue left, CValue r
 			{
 				Function* fun = funiter->second;
 				fun->Load(this->root);
-				std::vector<FunctionArgument> argsv = { {lhsptr, 0}, {right, 0} };
+				std::vector<FunctionArgument> argsv = { {left, 0}, {right, 0} };
 				return fun->Call(this, argsv, true);//for now lets keep these operators non-virtual
 			}
 		}
@@ -745,14 +745,14 @@ CValue CompilerContext::Call(const Token& name, const std::vector<FunctionArgume
             if (mem.name == name.text)
             {
                 CValue _this = args[0].value;
-                if (!_this.val)
+                /*if (!_this.val)
                 {
                     _this.val = root->builder.CreateLoad(_this.pointer);
-                }
+                }*/
 
 	            std::vector<llvm::Value*> iindex = { root->builder.getInt32(0), root->builder.getInt32(i) };
 
-	            auto loc = root->builder.CreateGEP(_this.val, iindex, "index");
+	            auto loc = root->builder.CreateGEP(_this.pointer, iindex, "index");
 
                 // load it m8
                 CValue* val = new CValue(mem.type, 0, loc);

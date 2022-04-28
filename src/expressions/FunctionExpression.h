@@ -96,25 +96,6 @@ namespace Jet
             data_ = data;
         }
 
-		/*FunctionExpression(Token token, Token name, Token ret_type, bool generator, std::vector<FunctionArg>* args, ScopeExpression* block, Token Struct, Token colons, std::vector<std::pair<Token, Token>>* templates, std::vector<Token>* captures, Token open_bracket, Token close_bracket, Token oper, Token const_tok)
-		{
-			this->oper = oper;
-			this->open_bracket = open_bracket;
-			this->close_bracket = close_bracket;
-			this->is_generator = generator;
-			this->ret_type = ret_type;
-			this->args = args;
-			this->block = block;
-			this->name = name;
-			this->token = token;
-			this->varargs = 0;// varargs;
-			this->Struct = Struct;
-			this->templates = templates;
-			this->captures = captures;
-			this->colons = colons;
-            this->const_tok = const_tok;
-		}*/
-
 		~FunctionExpression();
 
 		std::string GetFunctionNamePrefix();
@@ -141,6 +122,11 @@ namespace Jet
         {
             return { &data_.token, 0 };
         }
+        
+    private:
+    
+    	// instantiates the Function* myself for this
+    	void CreateFunction(CompilerContext* context, bool advance_lookup);
 	};
 
 }
