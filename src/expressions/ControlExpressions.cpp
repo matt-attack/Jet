@@ -396,7 +396,9 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		}
 
 		if (pi >= union_type->_union->members.size())
+		{
 			context->root->Error("Type '" + ii.type.text + "' not in union, cannot match to it.", ii.type);
+		}
 
 		//add bb for case
 		auto bb = llvm::BasicBlock::Create(context->context, "match.case", context->function->f_);
@@ -407,7 +409,7 @@ CValue MatchExpression::Compile(CompilerContext* context)
 		//add local
 		auto ptr = context->root->builder.CreateGEP(val.pointer, { context->root->builder.getInt32(0), context->root->builder.getInt32(1) });
 		ptr = context->root->builder.CreatePointerCast(ptr, union_type->_union->members[pi]->GetPointerType()->GetLLVMType());
-		context->RegisterLocal(ii.name.text, CValue(union_type->_union->members[pi]->GetPointerType(), ptr));
+		context->RegisterLocal(ii.name.text, CValue(union_type->_union->members[pi], 0, ptr));
 
 		//build internal
 		ii.block->Compile(context);

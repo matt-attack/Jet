@@ -138,6 +138,7 @@ Token ParseTrait(Parser* parser)
 	}
 
 	Token ret;
+	ret.type = TokenType::Name;
 	ret.column = name.column;
 	ret.line = name.line;
 	ret.trivia_length = name.trivia_length;
