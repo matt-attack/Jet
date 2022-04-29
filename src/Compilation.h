@@ -94,6 +94,7 @@ namespace Jet
 		Type* BoolType;
 		Type* CharPointerType;
         Type* VoidType;
+        Type* InitializerListType;
 
 		const JetProject* project;
 
@@ -101,6 +102,8 @@ namespace Jet
 
 		std::map<std::string, Source*> sources;
 		std::map<std::string, BlockExpression*> asts;
+		
+		std::vector<std::vector<CValue>*> initializer_lists;
 
 		~Compilation();
 

@@ -832,6 +832,8 @@ std::string Type::ToString()
 		return "ulong";
 	case (int)Types::Union:
 		return this->name;
+	case (int)Types::InitializerList:
+		return "Initializer List";
 	case (int)Types::Function:
 		std::string out = this->function->return_type->ToString() + "(";
 		bool first = true;

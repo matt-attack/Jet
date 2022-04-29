@@ -23,7 +23,7 @@ Parser::Parser(Lexer* l, DiagnosticBuilder* diag)
 	//this->Register(TokenType::Pointy, new PointerMemberParselet());
 
 	this->Register(TokenType::Scope, new ScopeParselet());
-	//this->Register(TokenType::LeftBrace, new ObjectParselet());
+	this->Register(TokenType::LeftBrace, new InitializerListParselet());
 
 	//array/index stuffs
 	//this->Register(TokenType::LeftBracket, new ArrayParselet());

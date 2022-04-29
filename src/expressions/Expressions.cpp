@@ -1177,3 +1177,16 @@ Type* PrefixExpression::TypeCheck(CompilerContext* context)
 	//only do this for ++and--
 	return type;
 }
+
+CValue InitializerListExpression::Compile(CompilerContext* context)
+{
+	// compile each subtype and make a new composite type
+	auto values = new std::vector<CValue>();
+	for (auto& val: values_)
+	{
+		values->push_back(val->Compile(context));
+	}
+	
+	context->root->initializer_lists.push_back(values);
+	return CValue(context->root->InitializerListType, (llvm::Value*)values);// this is VERY hacky, todo use union
+}

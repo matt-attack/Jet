@@ -1414,6 +1414,53 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
             return aalloca;
         }
     }
+    
+    if (value.type->type == Types::InitializerList)
+    {
+    	// okay, an initializer list can cast to arrays, so lets do it
+    	if (t->type == Types::Array)
+    	{
+    		// first, get base type and cast everything into it then stuff them into an array
+    		Type* base_type = t->base;
+    		
+    		const std::vector<CValue>* list_elements = (std::vector<CValue>*)value.val;
+    		
+			// allocate the backing data
+			auto ArrayAlloc = root->builder.CreateAlloca(t->base->GetLLVMType(), root->builder.getInt32(list_elements->size()), "init_list_to_arr_data");
+			
+			// now cast each element and stuff them in
+			for (int i = 0; i < list_elements->size(); i++)
+			{
+				auto loc = root->builder.CreateGEP(ArrayAlloc, root->builder.getInt32(i));
+				
+				CValue casted = DoCast(base_type, (*list_elements)[i]);
+				if (!casted.val)
+				{
+					casted.val = root->builder.CreateLoad(casted.pointer);
+				}
+				root->builder.CreateStore(casted.val, loc);
+			}
+
+			//alloc the struct for it
+			auto Alloca = root->builder.CreateAlloca(t->GetLLVMType(), root->builder.getInt32(1), "init_list_to_arr_arr");
+
+			auto size = root->builder.getInt32(list_elements->size());
+
+			//store size
+			auto size_p = root->builder.CreateGEP(Alloca, { root->builder.getInt32(0), root->builder.getInt32(0) });
+			root->builder.CreateStore(size, size_p);
+			
+			//store data pointer to the backing data
+			auto data_p = root->builder.CreateGEP(Alloca, { root->builder.getInt32(0), root->builder.getInt32(1) });
+			root->builder.CreateStore(ArrayAlloc, data_p);
+			
+			return CValue(t, 0, Alloca);
+    	}
+    	else if (t->type == Types::Struct)
+    	{
+    		// we probably want to support this in the future
+    	}
+    }
 
 	this->root->Error("Cannot cast '" + value.type->ToString() + "' to '" + t->ToString() + "'", current_token);
 }

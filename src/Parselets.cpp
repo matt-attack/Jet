@@ -1446,10 +1446,30 @@ Expression* EnumParselet::parse(Parser* parser, Token token)
 			break;
 		}
 		else
+		{
 			values.push_back({ ename, equals, value, parser->Consume() });
+		}
 	} while (true);
 
 	auto end = parser->Consume(TokenType::RightBrace);
 
 	return new EnumExpression(token, name, start, end, std::move(values));// 0;
+}
+
+Expression* InitializerListParselet::parse(Parser* parser, Token token)
+{
+	std::vector<Expression*> values;
+	
+	if (parser->LookAhead().type != TokenType::RightBrace)
+	{
+		do
+		{
+			Expression* expr = parser->ParseExpression(Precedence::ASSIGNMENT);// todo this could leak on exception
+			values.push_back(expr);
+		}
+		while (parser->MatchAndConsume(TokenType::Comma));
+	}
+	
+	auto end = parser->Consume(TokenType::RightBrace);
+	return new InitializerListExpression(token, values, end);
 }

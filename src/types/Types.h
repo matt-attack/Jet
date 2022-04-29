@@ -53,13 +53,15 @@ namespace Jet
 
 		Struct,//value type
 		Union,//tagged unions
-		Function,
+		Function,//executable code which does something
 
 		Trait,//cant instantiate this!!
 
-		Pointer,
+		Pointer,//a pointer to data of another type
 		Array,//acts just like a pointer but really is a struct with size contained
 		InternalArray,//used for things like global arrays
+		
+		InitializerList,// a hybrid type, consisting of an array of values of various types
 
 
 		Invalid,//for unloaded types

@@ -1288,6 +1288,7 @@ namespace Jet
 		void SetParent(Expression* parent)
 		{
 			this->parent = parent;
+			arg->SetParent(this);
 		}
 
 		CValue Compile(CompilerContext* context);
@@ -1338,7 +1339,7 @@ namespace Jet
 		void SetParent(Expression* parent)
 		{
 			this->parent = parent;
-			this->expr->parent = this;
+			this->expr->SetParent(this);
 		}
 
 		CValue Compile(CompilerContext* context)
@@ -1369,6 +1370,67 @@ namespace Jet
         {
             return { &begin, &end };
         }
+	};
+	
+	class InitializerListExpression : public Expression
+	{
+		Token begin_, end_;
+		
+		std::vector<Expression*> values_;
+		
+	public:
+	
+		InitializerListExpression(Token begin, std::vector<Expression*> values, Token end)
+		{
+			begin_ = begin;
+			values_ = values;
+			end_ = end;
+		}
+
+		void SetParent(Expression* parent) override
+		{
+			this->parent = parent;
+			for (const auto& val: values_)
+			{
+				val->SetParent(this);
+			}
+		}
+
+		CValue Compile(CompilerContext* context) override;
+
+		void CompileDeclarations(CompilerContext* context) override
+		{
+			// nothing to do here
+		}
+
+		void Print(std::string& output, Source* source) override
+		{
+			begin_.Print(output, source);
+			
+			for (const auto& val: values_)
+			{
+				val->Print(output, source);
+				
+				// todo print comma
+			}
+			
+			end_.Print(output, source);
+		}
+
+		virtual void Visit(ExpressionVisitor* visitor) override
+		{
+			visitor->Visit(this);
+		}
+
+		virtual Type* TypeCheck(CompilerContext* context) override
+		{
+			return context->root->InitializerListType;
+		}
+
+		std::pair<const Token*, const Token*> GetTokenRange() const override
+		{
+			return { &begin_, &end_ };
+		}
 	};
 }
 #endif

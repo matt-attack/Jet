@@ -102,6 +102,7 @@ Compilation::Compilation(const JetProject* proj) : context(), builder(context), 
 	ns->members.insert({ "bool", this->BoolType });
     this->VoidType = new Type(this, "void", Types::Void);
 	ns->members.insert({ "void", this->VoidType });
+	this->InitializerListType = new Type(this, "Initializer List", Types::InitializerList);
 
 	for (auto ii : ns->members)
 	{
@@ -147,6 +148,12 @@ Compilation::~Compilation()
 	//free traits
 	for (auto ii : this->traits)
 		delete ii.second;
+		
+	//free any initializer lists
+	for (auto ii : this->initializer_lists)
+		delete ii;
+		
+	delete this->InitializerListType;// delete this type since its compiler internal only
 
 	delete this->target;
 	//dont delete this->project we dont have ownership

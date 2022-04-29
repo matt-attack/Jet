@@ -43,6 +43,7 @@ namespace Jet
 	class EnumExpression;
     class SliceExpression;
     class MatchExpression;
+    class InitializerListExpression;
 	class ExpressionVisitor
 	{
 	public:
@@ -111,6 +112,8 @@ namespace Jet
 		virtual void Visit(GroupExpression* exp) {};
 
 		virtual void Visit(TypeofExpression* exp) {};
+		
+		virtual void Visit(InitializerListExpression* exp) {};
 	};
 }
 
