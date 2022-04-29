@@ -1181,10 +1181,10 @@ Type* PrefixExpression::TypeCheck(CompilerContext* context)
 CValue InitializerListExpression::Compile(CompilerContext* context)
 {
 	// compile each subtype and make a new composite type
-	auto values = new std::vector<CValue>();
+	auto values = new InitializerListData;
 	for (auto& val: values_)
 	{
-		values->push_back(val->Compile(context));
+		values->push_back({val->GetTokenRange(), val->Compile(context)});
 	}
 	
 	context->root->initializer_lists.push_back(values);

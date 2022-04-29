@@ -1423,7 +1423,7 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
     		// first, get base type and cast everything into it then stuff them into an array
     		Type* base_type = t->base;
     		
-    		const std::vector<CValue>* list_elements = (std::vector<CValue>*)value.val;
+    		const InitializerListData* list_elements = (InitializerListData*)value.val;
     		
 			// allocate the backing data
 			auto ArrayAlloc = root->builder.CreateAlloca(t->base->GetLLVMType(), root->builder.getInt32(list_elements->size()), "init_list_to_arr_data");
@@ -1433,7 +1433,8 @@ CValue CompilerContext::DoCast(Type* t, CValue value, bool Explicit, llvm::Value
 			{
 				auto loc = root->builder.CreateGEP(ArrayAlloc, root->builder.getInt32(i));
 				
-				CValue casted = DoCast(base_type, (*list_elements)[i]);
+				CurrentToken((*list_elements)[i].first);
+				CValue casted = DoCast(base_type, (*list_elements)[i].second);
 				if (!casted.val)
 				{
 					casted.val = root->builder.CreateLoad(casted.pointer);

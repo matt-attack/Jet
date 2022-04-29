@@ -96,7 +96,7 @@ namespace Jet
 
         std::pair<const Token*, const Token*> GetTokenRange() const override
         {
-            return { &open, &close };
+            return { left->GetTokenRange().first, &close };
         }
 	};
 

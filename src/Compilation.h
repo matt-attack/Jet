@@ -103,7 +103,7 @@ namespace Jet
 		std::map<std::string, Source*> sources;
 		std::map<std::string, BlockExpression*> asts;
 		
-		std::vector<std::vector<CValue>*> initializer_lists;
+		std::vector<InitializerListData*> initializer_lists;
 
 		~Compilation();
 

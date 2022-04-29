@@ -66,6 +66,8 @@ namespace Jet
 
 		Invalid,//for unloaded types
 	};
+	
+	typedef std::vector<std::pair<std::pair<const Token*, const Token*>, CValue>> InitializerListData;
 
 
 	//todo: add void* like type

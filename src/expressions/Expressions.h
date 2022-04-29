@@ -805,7 +805,12 @@ namespace Jet
 
         std::pair<const Token*, const Token*> GetTokenRange() const override
         {
-            return { &begin, &end };
+        	auto expr_range = right->GetTokenRange();
+        	if (expr_range.second)
+        	{
+        		return { &begin, expr_range.second };
+        	}
+            return { &begin, expr_range.first };
         }
 	};
 
@@ -854,7 +859,12 @@ namespace Jet
 
         std::pair<const Token*, const Token*> GetTokenRange() const override
         {
-            return { &_operator, 0 };
+            auto expr_range = right->GetTokenRange();
+        	if (expr_range.second)
+        	{
+        		return { &_operator, expr_range.second };
+        	}
+            return { &_operator, expr_range.first };
         }
 	};
 
@@ -906,7 +916,8 @@ namespace Jet
 
         std::pair<const Token*, const Token*> GetTokenRange() const override
         {
-            return { &_operator, 0 };
+            auto expr_range = left->GetTokenRange();
+            return { expr_range.first, &_operator };
         }
 	};
 
